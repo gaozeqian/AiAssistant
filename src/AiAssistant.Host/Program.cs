@@ -121,6 +121,8 @@ public static class Program
                 var mcp = runtime.McpControl.GetSnapshot();
                 Console.WriteLine(
                     $"mcp: enabled={mcp.Enabled} running={mcp.Running} endpoint={mcp.Endpoint ?? "-"}");
+                Console.WriteLine(
+                    $"pdfFont: {AiAssistant.Export.PdfSharpReportRenderer.ResolvedFontPath ?? "none (vector fallback)"}");
                 return health.IsHealthy ? 0 : 1;
             }
 

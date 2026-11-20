@@ -3,6 +3,7 @@ using PdfSharp;
 using PdfSharp.Drawing;
 using PdfSharp.Fonts;
 using PdfSharp.Pdf;
+using SkiaSharp;
 
 namespace AiAssistant.Export;
 
@@ -233,10 +234,83 @@ public static class PdfSharpReportRenderer
                     "/usr/share/fonts/opentype/noto/NotoSansSC-Regular.otf"
                 ];
 
-        return candidates.FirstOrDefault(path =>
+        var explicitMatch = candidates.FirstOrDefault(path =>
             File.Exists(path) &&
             (path.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) ||
              path.EndsWith(".otf", StringComparison.OrdinalIgnoreCase)));
+        return explicitMatch ?? ScanForCjkTrueType();
+    }
+
+    /// <summary>Fallback discovery for Linux/macOS where font names vary by distribution.</summary>
+    private static string? ScanForCjkTrueType()
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string[] roots = OperatingSystem.IsWindows()
+            ? [Environment.GetFolderPath(Environment.SpecialFolder.Fonts)]
+            : OperatingSystem.IsMacOS()
+                ?
+                [
+                    "/System/Library/Fonts",
+                    "/Library/Fonts",
+                    Path.Combine(home, "Library", "Fonts")
+                ]
+                :
+                [
+                    "/usr/share/fonts",
+                    "/usr/local/share/fonts",
+                    Path.Combine(home, ".local", "share", "fonts")
+                ];
+
+        foreach (var root in roots)
+        {
+            if (!Directory.Exists(root))
+            {
+                continue;
+            }
+
+            IEnumerable<string> files;
+            try
+            {
+                files = Directory.EnumerateFiles(root, "*.ttf", SearchOption.AllDirectories).Take(500);
+            }
+            catch (IOException)
+            {
+                continue;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            foreach (var file in files)
+            {
+                if (file.Contains("VF", StringComparison.OrdinalIgnoreCase) &&
+                    file.Contains("NotoSans", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (SupportsCjk(file))
+                {
+                    return file;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static bool SupportsCjk(string path)
+    {
+        try
+        {
+            using var typeface = SKTypeface.FromFile(path);
+            return typeface is not null && typeface.GetGlyph('时') > 0 && typeface.GetGlyph('报') > 0;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException)
+        {
+            return false;
+        }
     }
 
     private sealed class SingleFontResolver(string path) : IFontResolver
