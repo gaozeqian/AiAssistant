@@ -83,8 +83,8 @@ public sealed partial class SanitizedStructuredLoggerProvider : ILoggerProvider,
         text = UrlWithDetailsRegex().Replace(text, "$1://<redacted-url>");
 
         // 2. Strip Windows & Unix directory paths -> keep leaf file name only
-        text = WindowsFullPathRegex().Replace(text, m => $"<path>/{Path.GetFileName(m.Value)}");
-        text = UnixFullPathRegex().Replace(text, m => $"<path>/{Path.GetFileName(m.Value)}");
+        text = WindowsFullPathRegex().Replace(text, m => $"<path>/{GetPortableLeafName(m.Value)}");
+        text = UnixFullPathRegex().Replace(text, m => $"<path>/{GetPortableLeafName(m.Value)}");
 
         // 3. Redact long hex or base64-like secret tokens (>= 32 contiguous token chars, excluding benign evt_/cnt_/job_ IDs)
         text = SecretLikeTokenRegex().Replace(text, m =>
@@ -106,6 +106,12 @@ public sealed partial class SanitizedStructuredLoggerProvider : ILoggerProvider,
         }
 
         return text;
+    }
+
+    private static string GetPortableLeafName(string path)
+    {
+        var separator = path.AsSpan().LastIndexOfAny('/', '\\');
+        return separator >= 0 && separator + 1 < path.Length ? path[(separator + 1)..] : path;
     }
 
     public void Dispose()

@@ -196,11 +196,23 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
     {
         var behavior = new FakeHelperBehavior { PingDelayMs = 250 };
         var launcher = new FakeMacHelperLauncher(behavior);
-        await using var supervisor = CreateSupervisor(launcher, out _, heartbeatMs: 2_000, requestTimeoutMs: 40);
-        await supervisor.StartAsync(CancellationToken.None);
+        await using var process = (FakeMacHelperProcess)await launcher.LaunchAsync(
+            Path.Combine(_tempRoot, "timeout.sock"),
+            "timeout-test-token",
+            CancellationToken.None);
+        await using var client = await UnixDomainSocketMacHelperClient.ConnectAsync(
+            process.SocketPath,
+            TimeSpan.FromSeconds(2),
+            CancellationToken.None);
+        var handshake = await client.SendAsync(
+            new MacIpcRequest("timeout-handshake", MacHelperProtocol.Methods.Handshake, MacHelperProtocol.CurrentVersion, "timeout-test-token"),
+            TimeSpan.FromSeconds(2),
+            CancellationToken.None);
+        Assert.True(handshake.Ok);
 
-        var timedOut = await supervisor.InvokeAsync(
+        var timedOut = await client.SendAsync(
             new MacIpcRequest("slow-ping", MacHelperProtocol.Methods.Ping),
+            TimeSpan.FromMilliseconds(40),
             CancellationToken.None);
         Assert.False(timedOut.Ok);
         Assert.Equal(MacHelperProtocol.ErrorCodes.Timeout, timedOut.ErrorCode);
@@ -208,8 +220,9 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
         behavior.PingDelayMs = 0;
         behavior.DisconnectOnPing = true;
         await Task.Delay(300); // Let the deliberately slow first ping finish before testing a separate disconnect.
-        var disconnected = await supervisor.InvokeAsync(
+        var disconnected = await client.SendAsync(
             new MacIpcRequest("disconnect", MacHelperProtocol.Methods.Ping),
+            TimeSpan.FromSeconds(1),
             CancellationToken.None);
         Assert.False(disconnected.Ok);
         Assert.Equal(MacHelperProtocol.ErrorCodes.Disconnected, disconnected.ErrorCode);
