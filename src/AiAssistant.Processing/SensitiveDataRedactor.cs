@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using AiAssistant.Application.Ports;
 
 namespace AiAssistant.Processing;
 
@@ -8,10 +9,16 @@ public sealed record RedactionResult(string Text, int RedactionCount);
 /// Deterministic local redaction applied before persistence or any model call.
 /// Covers credentials, tokens, private keys, e-mail/phone identifiers and long secret-like strings.
 /// </summary>
-public sealed partial class SensitiveDataRedactor
+public sealed partial class SensitiveDataRedactor : ITextRedactor
 {
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(120);
     private readonly IReadOnlyList<Regex> _customPatterns;
+
+    TextRedaction ITextRedactor.Redact(string input)
+    {
+        var result = Redact(input);
+        return new TextRedaction(result.Text, result.RedactionCount);
+    }
 
     public SensitiveDataRedactor(IEnumerable<string>? customPatterns = null)
     {

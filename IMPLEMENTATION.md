@@ -500,6 +500,10 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S4.2：单路 `AudioHub`、内存预滚、多订阅广播与最后订阅释放；Windows WASAPI、macOS AVAudioEngine、Linux PulseAudio 工厂接入。
 - [x] S4.3：sherpa-onnx 中文 Paraformer ASR、Silero VAD、pyannote 说话人分离适配器与模型缺失降级测试。
 - [ ] S4-R：外挂中文语音模型资产完成识别质量黄金集评测；Linux RapidOCR 与 Whisper.net 高质量批处理保留为遗留项。
+- [x] S5.1：Microsoft.Extensions.AI 本机网关、Ollama/LM Studio 适配、loopback 策略、超时/脱敏/审计装饰器与能力探测。
+- [x] S5.2：事件向量索引、活动分段、map-reduce、结构化 JSON 校验重试、版本化加密日报与站会 Markdown。
+- [x] S5.3：单消费者三通道调度、启动补偿、幂等/失败保留、日报/站会面板、强制重生成与 Markdown 导出。
+- [ ] S5-R：安装真实 Qwen 模型运行固定中文基准集并确定默认轻量/质量档位；多日调度浸泡并入 S9。
 - [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
 
 ---

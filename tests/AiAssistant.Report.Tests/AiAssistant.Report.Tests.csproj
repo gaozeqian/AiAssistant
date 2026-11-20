@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AiAssistant.Core\AiAssistant.Core.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Application\AiAssistant.Application.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Models\AiAssistant.Models.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Summarization\AiAssistant.Summarization.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Scheduler\AiAssistant.Scheduler.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Storage\AiAssistant.Storage.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Processing\AiAssistant.Processing.csproj" />
+  </ItemGroup>
+</Project>

@@ -91,6 +91,15 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
         });
         menu.Items.Add(new NativeMenuItem
         {
+            Header = "日报与站会",
+            Command = new RelayCommand(() =>
+            {
+                shell.ShowReports();
+                window.ShowFromTray();
+            })
+        });
+        menu.Items.Add(new NativeMenuItem
+        {
             Header = "本地诊断",
             Command = new RelayCommand(() =>
             {

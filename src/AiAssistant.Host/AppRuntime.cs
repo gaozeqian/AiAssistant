@@ -13,11 +13,16 @@ using AiAssistant.Platform.MacOS;
 using AiAssistant.Platform.MacOS.Ipc;
 using AiAssistant.Platform.Windows;
 using AiAssistant.Processing;
+using AiAssistant.Scheduler;
 using AiAssistant.Storage;
 using AiAssistant.Storage.KeyStores;
 using AiAssistant.Storage.Media;
 using AiAssistant.Storage.Observability;
 using AiAssistant.Storage.Sqlite;
+using AiAssistant.Storage.Vectors;
+using AiAssistant.Summarization;
+using AiAssistant.Models;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -26,11 +31,13 @@ namespace AiAssistant.Host;
 public sealed class AppRuntime : IAsyncDisposable
 {
     private readonly ServiceProvider _services;
+    private readonly string _dataDirectory;
     private bool _started;
 
-    private AppRuntime(ServiceProvider services)
+    private AppRuntime(ServiceProvider services, string dataDirectory)
     {
         _services = services;
+        _dataDirectory = dataDirectory;
     }
 
     public int RecoveredJobCount { get; private set; }
@@ -88,6 +95,8 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IEventRepository>(eventRepository);
         services.AddSingleton<IDatabaseMaintenanceService>(maintenance);
         services.AddSingleton<IReportJobQueue>(jobQueue);
+        services.AddSingleton<IVectorIndex>(new HybridSqliteVectorIndex(connectionFactory));
+        RegisterReports(services);
         services.AddSingleton(new CapturePipelineOptions { WhitelistedDirectories = whitelist });
         services.AddSingleton<PrivacyBlacklistPolicy>();
         if (linuxBackendState is not null)
@@ -144,7 +153,8 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<TimelineUseCase>();
         services.AddSingleton<CaptureControlUseCase>();
         services.AddSingleton<DiagnosticsUseCase>();
-        return new AppRuntime(services.BuildServiceProvider()) { LinuxBackendState = linuxBackendState };
+        services.AddSingleton<ReportUseCase>();
+        return new AppRuntime(services.BuildServiceProvider(), dataDirectory) { LinuxBackendState = linuxBackendState };
     }
 
     public async Task StartAsync(CancellationToken ct = default)
@@ -164,6 +174,22 @@ public sealed class AppRuntime : IAsyncDisposable
             await macSupervisor.StartAsync(ct);
         }
 
+        using (var probeCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+        {
+            probeCts.CancelAfter(TimeSpan.FromSeconds(3));
+            try
+            {
+                var model = _services.GetRequiredService<IModelGateway>();
+                _ = await model.ProbeAsync(probeCts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                _services.GetRequiredService<ILogger<AppRuntime>>().LogInformation(
+                    "Local model probe timed out; report jobs will retry on demand.");
+            }
+        }
+
+        await _services.GetRequiredService<ReportJobWorker>().StartAsync(ct);
         await _services.GetRequiredService<ICaptureCoordinator>().StartAsync(ct);
         _services.GetRequiredService<ILogger<AppRuntime>>().LogInformation(
             "Runtime initialized cleanly; recoveredJobs={RecoveredJobs}.",
@@ -175,11 +201,62 @@ public sealed class AppRuntime : IAsyncDisposable
         new(
             new TimelineViewModel(_services.GetRequiredService<TimelineUseCase>()),
             new CaptureControlViewModel(_services.GetRequiredService<CaptureControlUseCase>()),
-            new DiagnosticsViewModel(_services.GetRequiredService<DiagnosticsUseCase>()));
+            new DiagnosticsViewModel(_services.GetRequiredService<DiagnosticsUseCase>()),
+            new ReportsViewModel(
+                _services.GetRequiredService<ReportUseCase>(),
+                Path.Combine(_dataDirectory, "reports")));
 
     public async ValueTask DisposeAsync()
     {
         await _services.DisposeAsync();
+    }
+
+    private static void RegisterReports(IServiceCollection services)
+    {
+        var modelOptions = ModelGatewayOptions.FromEnvironment();
+        var httpClient = new HttpClient();
+        var backend = new HttpModelBackend(httpClient, modelOptions);
+        var auditSink = new InMemoryModelAuditSink();
+        var redactor = new SensitiveDataRedactor();
+
+        services.AddSingleton(httpClient);
+        services.AddSingleton(modelOptions);
+        services.AddSingleton(backend);
+        services.AddSingleton<IChatClient>(backend);
+        services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(backend);
+        services.AddSingleton<IModelAuditSink>(auditSink);
+        services.AddSingleton<ITextRedactor>(redactor);
+        services.AddSingleton<IModelGateway>(provider => new AuditedModelGateway(
+            new RedactingModelGateway(
+                new TimeoutModelGateway(
+                    new LocalModelGateway(
+                        backend,
+                        modelOptions,
+                        provider.GetRequiredService<ILogger<LocalModelGateway>>()),
+                    modelOptions),
+                redactor),
+            auditSink));
+        services.AddSingleton<IReportRepository, SqliteReportRepository>();
+        services.AddSingleton(new ReportGenerationOptions());
+        services.AddSingleton<IReportGenerationRunner, ReportGenerationRunner>();
+        services.AddSingleton<EventEmbeddingIndexer>();
+        services.AddSingleton<ModelBenchmarkRunner>();
+
+        var scheduleTime = TimeOnly.TryParse(
+            Environment.GetEnvironmentVariable("AIASSISTANT_REPORT_TIME"),
+            out var parsedTime)
+            ? parsedTime
+            : new TimeOnly(18, 30);
+        services.AddSingleton(new ReportScheduleOptions
+        {
+            DailyLocalTime = scheduleTime,
+            EnableScheduledDaily = !string.Equals(
+                Environment.GetEnvironmentVariable("AIASSISTANT_REPORT_DISABLE_SCHEDULE"),
+                "true",
+                StringComparison.OrdinalIgnoreCase),
+            EnableStartupCatchUp = true
+        });
+        services.AddSingleton<ReportJobWorker>();
     }
 
     private static void RegisterWindows(IServiceCollection services, IClock clock, IKeyStore keyStore)

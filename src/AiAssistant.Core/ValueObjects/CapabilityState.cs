@@ -22,7 +22,8 @@ public enum CapabilityKind
     AutoStart = 8,
     KeyStore = 9,
     VectorSearch = 10,
-    WakeWord = 11
+    WakeWord = 11,
+    ModelGateway = 12
 }
 
 /// <summary>

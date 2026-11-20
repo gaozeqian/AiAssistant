@@ -7,12 +7,12 @@
 
 ## 1. 当前总体状态快照
 
-- **当前活跃阶段**：`S4 已完成代码与契约；待启动 S5 本机模型与日报`（真实 macOS/Linux 桌面验收与语音/OCR 模型质量评测已按用户决定转为遗留项）
+- **当前活跃阶段**：`S5 已完成代码与契约；待启动 S6 内网/公网档与企业策略`（真实 Ollama 模型质量评测与平台真机验收转为遗留项）
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
-- **当前构建状态**：✅ 本地 Release 0 警告 0 错误；`win-x64` 启动自检、`linux-x64` / `osx-arm64` 发布及 sherpa-onnx 原生库打包通过
-- **当前测试状态**：✅ 62/62 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 10、`Capture.Tests` 4、`Platform.Tests` 29、`Processing.Tests` 7）
-- **下一步待确认事项**：启动 S5 —— Microsoft.Extensions.AI 模型网关、Ollama 本机档、活动分段/map-reduce 日报、持久 `report_jobs` 三通道与日报面板；S4 模型资产与真实桌面验收见第 5 节遗留项
+- **当前构建状态**：✅ 本地 Release 0 警告 0 错误；Host 启动自检、`linux-x64` / `osx-arm64` 发布通过
+- **当前测试状态**：✅ 73/73 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 11、`Capture.Tests` 4、`Platform.Tests` 30、`Processing.Tests` 7、`Report.Tests` 9）
+- **下一步待确认事项**：启动 S6 —— `models.json` 三档端点、企业策略锁定、能力探测、外发脱敏三道闸与审计；S5 真实 Qwen 模型评测见第 5 节遗留项
 
 ---
 
@@ -25,7 +25,7 @@
 | **S2 Windows 最小闭环** | P0 | ✅ 已完成 | `win-x64` 采集、Headless UI、真实桌面强杀重启、24h 全天加速浸泡均通过 | 完成采集与有界管道、Avalonia MVVM 时间线、选中后解密预览、暂停/黑名单、托盘、自启开关、基础保留清理 `MediaRetentionService`、零敏感泄露结构化日志 `SanitizedStructuredLoggerProvider` 与导出预览；24h 浸泡验证控制事件 100% 零丢失 |
 | **S3 三平台扩展** | P1 | 🔄 三平台 CI 全绿；待真实桌面权限/交互验收 | GitHub Actions `win-x64` / `osx-arm64` / `linux-x64` 各 53/53 测试通过，发布/Helper/Portal 打包通过 | macOS Helper、Linux Wayland 默认与初始化失败 X11 回退、portal 加密令牌轮换、AT-SPI/EWMH、inotify/PulseAudio/XDG 均已接入；macOS TCC 与 Linux 真实桌面能力矩阵待人工验收 |
 | **S4 预处理与音频** | P1 | 🔄 代码与契约完成；模型资产评测遗留 | `win-x64` 流水线/AudioHub/WASAPI 实测；`linux-x64` / `osx-arm64` 发布与 sherpa-onnx 原生库打包通过 | 可组合阶段、超时/失败隔离、脱敏、pHash 去重、单路 AudioHub、三平台音频工厂、sherpa-onnx ASR/VAD/说话人分离与缺失模型降级；真实中文语音与 OCR 质量待遗留项验收 |
-| **S5 本机模型与日报** | P2 | ⏳ 待开始 | — | Microsoft.Extensions.AI 网关、Ollama、map-reduce、三通道日报 |
+| **S5 本机模型与日报** | P2 | 🔄 代码与契约完成；真实模型评测遗留 | `win-x64` 网关/分段/调度/UI 实测；`linux-x64` / `osx-arm64` 发布通过 | Microsoft.Extensions.AI 网关、Ollama/LM Studio 兼容适配、脱敏/审计/超时装饰器、事件向量索引、分段+map-reduce+JSON 校验重试、版本化加密日报、单消费者三通道与日报/站会 UI；真实 Qwen 质量待遗留项评测 |
 | **S6 内网与公网档** | P2.5 | ⏳ 待开始 | — | `models.json`、企业策略锁定、能力探测、脱敏三道闸、审计 |
 | **S7 唤醒与基础命令** | P2.6 | ⏳ 待开始 | — | “你好时光” KWS、语音状态机、8s 命令窗口、TTS、固定命令 |
 | **S8 智能检索与对话** | P3 | ⏳ 待开始 | — | 混合检索、证据回链问答、周报、只读 loopback MCP、完整语音对话 |
@@ -58,6 +58,20 @@ dotnet test AiAssistant.sln -c Release
 dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
 ```
 
+### 3.4 本机模型与日报配置
+
+```bash
+# Ollama（默认）或 LM Studio 的 OpenAI 兼容端点
+AIASSISTANT_MODEL_PROVIDER=ollama            # ollama | lmstudio
+AIASSISTANT_MODEL_BASE_URL=http://127.0.0.1:11434
+AIASSISTANT_CHAT_MODEL=qwen3:8b              # 不在代码中写死，按实测档位填写
+AIASSISTANT_EMBEDDING_MODEL=qwen3-embedding:0.6b
+AIASSISTANT_REPORT_TIME=18:30                # 每日定时生成
+AIASSISTANT_REPORT_DISABLE_SCHEDULE=true     # 可选，仅关闭定时通道
+```
+
+默认仅允许 loopback 模型端点；远程端点必须等待 S6 企业策略显式开启。
+
 ---
 
 ## 4. 实施日志（按时间顺序追加）
@@ -74,6 +88,7 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
 - **2026-11-20 [GitHub Actions] [S3 首轮 CI 修复]**：运行 `44696472530` 中 Windows 与 SBOM/许可证作业通过，macOS/Linux 测试暴露跨平台路径脱敏缺陷（Unix 宿主不能用 `Path.GetFileName` 解析反斜杠路径），macOS 另有 IPC 超时测试受监督器时序影响。已将脱敏改为同时识别 `/` 与 `\\` 的主机无关实现，并将超时/断线测试收窄为直接真实 AF_UNIX 传输测试；本地 Release 53/53 测试通过。复验运行 `44701041589` 中三平台各 53/53 测试、全部发布、Swift Helper 编译/冒烟/打包、Linux Portal 打包及 SBOM/许可证检查全部通过。
 - **2026-11-20 [GitHub Actions] [CI 测试稳定性修复]**：后续文档提交的 Windows 作业偶发暴露 `BoundedCaptureCoordinatorTests` 断言竞态：测试仅等待首个事件落库便读取重复合并/黑名单计数。生产逻辑无回归；测试改为同时等待三项指标并在 CI 负载下延长有界等待。专项与全量 Release 53/53 复跑通过。修复提交 `4df8f4c` 的运行 `44703620747` 中三平台各 53/53 测试、发布、Swift Helper 编译/冒烟/打包、Linux Portal 打包与 SBOM/许可证检查全部通过。
 - **2026-11-20 [win-x64] [S4 预处理与统一音频入口完成]**：实现 `ProcessingPipeline`（阶段版本/资源声明、单阶段超时、取消与异常隔离、失败仅降级元数据）、`PerceptualDeduplicationStage`、`TextExtractionStage`、`SensitiveDataRedactor`/`RedactionStage`、`AudioTranscriptionStage` 与 `SpeakerDiarizationStage`，并接入 `BoundedCaptureCoordinator`；预处理失败仍持久化原始事件。实现单路 `AudioHub`（多订阅有界广播、2 秒纯内存预滚、最后订阅退出关闭设备、再次订阅重开）。接入 `org.k2fsa.sherpa.onnx 2.0.2` 的 Paraformer 中文 ASR、Silero VAD、pyannote 说话人分离及模型缺失明确降级；新增 NAudio 3.3 WASAPI 工厂、macOS AVAudioEngine 工厂和 Linux PulseAudio 工厂。全仓 Release 0 警告 0 错误、62/62 测试通过，Host 启动自检与 `linux-x64`/`osx-arm64` 发布（含 sherpa-onnx 原生库）通过。真实模型质量、Linux RapidOCR 与 Whisper 批处理保留在第 5 节遗留项。
+- **2026-11-20 [win-x64] [S5 本机模型与日报完成]**：实现 `HttpModelBackend`（Ollama 与 OpenAI 兼容端点，标准 `IChatClient`/`IEmbeddingGenerator`）、仅 loopback 的 `LocalModelGateway`、超时/脱敏/审计装饰器与无正文模型审计；模型标签全部由环境配置。实现 `EventEmbeddingIndexer`（qwen3-embedding 默认，版本化写入与重建）和固定中文基准集。实现活动分段、map 摘要、reduce 结构化 JSON、Schema 校验与两次重试、Markdown/站会输出及加密版本化 `daily_reports` 仓储。实现单消费者 `ReportJobWorker`、手动/启动补偿/每日定时三通道、幂等与失败保留；新增日报/站会面板、强制重生成与 Markdown 导出。全仓 Release 0 警告 0 错误、73/73 测试通过，Host 启动自检与两平台发布通过。真实 Qwen 质量评测与调度浸泡保留遗留项。
 
 ---
 
@@ -89,3 +104,5 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
 | `S4-R1` | S4 语音 | sherpa-onnx 模型资产（Paraformer、Silero VAD、说话人嵌入）不进入 Git，真实中文语音黄金集未评测 | 仅验证适配与降级路径，未证明识别质量 | 在本地/CI 外挂模型目录运行黄金集与唤醒词评测 |
 | `S4-R2` | S4 OCR | Linux RapidOCR ONNX 模型接入与中文 OCR 质量评测 | Linux OCR 仍只有 AT-SPI，无图像文字兜底 | 在 S5 前引入 RapidOCR 模型资产并跑中文截图集 |
 | `S4-R3` | S4 语音 | Whisper.net 高质量批处理适配器未启用 | 高质量离线转写缺少备选实现 | 需要长音频/高精度场景时再接入，保持 `IAsrEngine` 可替换 |
+| `S5-R1` | S5 模型 | 真实 Ollama Qwen3/3.5 4B–9B 质量、耗时与内存评测未运行；仅提供固定中文基准集与报告格式 | 无法确定默认轻量/质量档位 | 在目标机器安装模型后运行 `ModelBenchmarkRunner`，记录成功率、JSON 合规率与延迟 |
+| `S5-R2` | S5 调度 | 每日定时、启动补偿与失败退避尚未进行多日浸泡 | 长时间休眠/跨日边界可能暴露时序问题 | S9 浸泡测试覆盖跨午夜、休眠唤醒、模型离线与重复触发 |

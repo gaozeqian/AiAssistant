@@ -16,6 +16,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string _databaseText = "尚未检查";
     private string _pipelineText = string.Empty;
     private string _retentionText = "尚未执行清理扫描";
+    private string _modelText = "尚未探测本机模型";
     private string _exportPreviewJson = string.Empty;
     private string _lastRefreshText = "尚未刷新";
     private string _errorMessage = string.Empty;
@@ -60,6 +61,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
     {
         get => _retentionText;
         private set => SetProperty(ref _retentionText, value);
+    }
+
+    public string ModelText
+    {
+        get => _modelText;
+        private set => SetProperty(ref _modelText, value);
     }
 
     public string ExportPreviewJson
@@ -122,6 +129,9 @@ public sealed class DiagnosticsViewModel : ObservableObject
             RetentionText = snapshot.RetentionMetrics is null
                 ? "默认保留策略已配置"
                 : $"已扫描 {snapshot.RetentionMetrics.TotalSweeps} 次 · 安全擦除过期媒体 {snapshot.RetentionMetrics.TotalPurgedBlobs} 个";
+            ModelText = snapshot.ModelCapability is null
+                ? "未配置模型网关"
+                : $"{(snapshot.ModelCapability.ChatAvailable ? "可用" : "降级")} · Chat {snapshot.ModelCapability.ChatModel ?? "未配置"} · Embedding {snapshot.ModelCapability.EmbeddingModel} · {snapshot.ModelCapability.Diagnostic}";
 
             Capabilities.Clear();
             foreach (var capability in snapshot.Capabilities)
@@ -196,6 +206,7 @@ public sealed class CapabilityItem(CapabilityState capability)
         CapabilityKind.KeyStore => "系统密钥库",
         CapabilityKind.VectorSearch => "向量检索",
         CapabilityKind.WakeWord => "唤醒词",
+        CapabilityKind.ModelGateway => "本机模型",
         _ => capability.Kind.ToString()
     };
 

@@ -88,7 +88,9 @@ public sealed record SystemDiagnosticsSnapshot(
     IReadOnlyList<CapabilityState> Capabilities,
     IReadOnlyList<ReportJob> RecentJobs,
     MediaRetentionMetrics? RetentionMetrics = null,
-    IReadOnlyList<DiagnosticLogEntry>? RecentLogs = null);
+    IReadOnlyList<DiagnosticLogEntry>? RecentLogs = null,
+    ModelCapabilitySnapshot? ModelCapability = null,
+    IReadOnlyList<ModelAuditEntry>? ModelAudit = null);
 
 public sealed class DiagnosticsUseCase(
     ICapabilityProvider capabilityProvider,
@@ -96,7 +98,9 @@ public sealed class DiagnosticsUseCase(
     ICaptureCoordinator coordinator,
     IReportJobQueue jobQueue,
     IRetentionService? retentionService = null,
-    IDiagnosticLogReader? logReader = null)
+    IDiagnosticLogReader? logReader = null,
+    IModelGateway? modelGateway = null,
+    IModelAuditSink? modelAuditSink = null)
 {
     private static readonly JsonSerializerOptions PreviewJsonOptions = new()
     {
@@ -109,6 +113,27 @@ public sealed class DiagnosticsUseCase(
         var jobs = await jobQueue.ListRecentJobsAsync(20, ct);
         var retention = retentionService?.GetMetricsSnapshot();
         var recentLogs = logReader?.GetRecentEntries(30) ?? [];
+        ModelCapabilitySnapshot? modelCapability = null;
+        if (modelGateway is not null)
+        {
+            using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            probeCts.CancelAfter(TimeSpan.FromSeconds(3));
+            try
+            {
+                modelCapability = await modelGateway.ProbeAsync(probeCts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                modelCapability = new ModelCapabilitySnapshot(
+                    false,
+                    false,
+                    modelGateway.ChatModelId,
+                    modelGateway.EmbeddingModelId,
+                    ModelEndpointTier.LocalOffline,
+                    "Model probe timed out.");
+            }
+        }
+
         return new SystemDiagnosticsSnapshot(
             capabilityProvider.PlatformName,
             dbHealth,
@@ -116,7 +141,9 @@ public sealed class DiagnosticsUseCase(
             capabilityProvider.GetCapabilities(),
             jobs,
             retention,
-            recentLogs);
+            recentLogs,
+            modelCapability,
+            modelAuditSink?.GetRecent(20));
     }
 
     /// <summary>

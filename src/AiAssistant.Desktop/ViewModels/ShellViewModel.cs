@@ -10,11 +10,13 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public ShellViewModel(
         TimelineViewModel timeline,
         CaptureControlViewModel capture,
-        DiagnosticsViewModel diagnostics)
+        DiagnosticsViewModel diagnostics,
+        ReportsViewModel reports)
     {
         Timeline = timeline ?? throw new ArgumentNullException(nameof(timeline));
         Capture = capture ?? throw new ArgumentNullException(nameof(capture));
         Diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        Reports = reports ?? throw new ArgumentNullException(nameof(reports));
         Capture.StateChanged += OnCaptureStateChanged;
         CaptureStatus = Capture.CaptureStateText;
     }
@@ -24,6 +26,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public CaptureControlViewModel Capture { get; }
 
     public DiagnosticsViewModel Diagnostics { get; }
+
+    public ReportsViewModel Reports { get; }
 
     public int SelectedSectionIndex
     {
@@ -44,6 +48,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         await Capture.InitializeAsync();
         await Timeline.InitializeAsync();
         await Diagnostics.RefreshAsync();
+        await Reports.InitializeAsync();
     }
 
     public void ShowTimeline()
@@ -54,6 +59,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public void ShowDiagnostics()
     {
         SelectedSectionIndex = 2;
+    }
+
+    public void ShowReports()
+    {
+        SelectedSectionIndex = 3;
     }
 
     public void Dispose()

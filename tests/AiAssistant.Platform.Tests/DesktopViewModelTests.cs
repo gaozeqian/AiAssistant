@@ -144,6 +144,38 @@ public sealed class DesktopViewModelTests
         Assert.Contains("capturePipeline", viewModel.ExportPreviewJson);
     });
 
+    [Fact]
+    public Task ReportsPanel_LoadsVersionStandupAndExportsMarkdown() => RunInHeadlessSession(async () =>
+    {
+        var clock = new SystemClock();
+        var repository = new FakeReportRepository();
+        var date = DateOnly.FromDateTime(DateTime.Today);
+        await repository.AppendAsync(
+            date,
+            "# 今日日报\n\n## 概览\n完成 S5 日报闭环。",
+            """{"Standup":{"Yesterday":"完成模型网关","Today":"接入日报面板","Blockers":[]}}""",
+            "qwen3:8b",
+            ModelEndpointTier.LocalOffline,
+            true,
+            ReportTriggerSource.Manual,
+            DateTimeOffset.UtcNow,
+            CancellationToken.None);
+        var exportDirectory = Path.Combine(AppContext.BaseDirectory, "test-temp", $"reports-{Guid.NewGuid():N}");
+        var viewModel = new ReportsViewModel(new ReportUseCase(new FakeReportJobQueue(), repository, clock), exportDirectory);
+
+        await viewModel.InitializeAsync();
+        Assert.True(viewModel.HasReport);
+        Assert.Single(viewModel.Versions);
+        Assert.Contains("完成 S5 日报闭环", viewModel.Markdown, StringComparison.Ordinal);
+        Assert.Contains("完成模型网关", viewModel.StandupText, StringComparison.Ordinal);
+
+        await viewModel.ExportCommand.ExecuteAsync(null);
+        var files = Directory.GetFiles(exportDirectory, "*.md");
+        Assert.Single(files);
+        Assert.Contains("S5", await File.ReadAllTextAsync(files[0]), StringComparison.Ordinal);
+        Directory.Delete(exportDirectory, recursive: true);
+    });
+
     private static ShellViewModel CreateShell()
     {
         var repository = new InMemoryEventRepository();
@@ -158,7 +190,10 @@ public sealed class DesktopViewModelTests
         return new ShellViewModel(
             new TimelineViewModel(new TimelineUseCase(repository, mediaStore, clock)),
             new CaptureControlViewModel(new CaptureControlUseCase(coordinator, new FakeAutoStartService())),
-            new DiagnosticsViewModel(diagnostics));
+            new DiagnosticsViewModel(diagnostics),
+            new ReportsViewModel(
+                new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
+                Path.Combine(AppContext.BaseDirectory, "test-temp", "reports-ui")));
     }
 
     private static async Task RunInHeadlessSession(Func<Task> test)
@@ -299,6 +334,47 @@ public sealed class DesktopViewModelTests
 
         public Task<IReadOnlyList<ReportJob>> ListRecentJobsAsync(int limit, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<ReportJob>>([]);
+    }
+
+    private sealed class FakeReportRepository : IReportRepository
+    {
+        private readonly List<DailyReport> _reports = [];
+
+        public Task<DailyReport?> GetLatestAsync(DateOnly localDate, CancellationToken ct) =>
+            Task.FromResult(_reports.Where(report => report.LocalDate == localDate)
+                .OrderByDescending(report => report.Version)
+                .FirstOrDefault());
+
+        public Task<IReadOnlyList<DailyReport>> ListVersionsAsync(DateOnly localDate, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<DailyReport>>(_reports.Where(report => report.LocalDate == localDate)
+                .OrderByDescending(report => report.Version)
+                .ToArray());
+
+        public Task<DailyReport> AppendAsync(
+            DateOnly localDate,
+            string markdown,
+            string statsJson,
+            string modelId,
+            ModelEndpointTier endpointTier,
+            bool redactionApplied,
+            ReportTriggerSource triggerSource,
+            DateTimeOffset generatedAtUtc,
+            CancellationToken ct)
+        {
+            var report = new DailyReport(
+                $"rpt_{_reports.Count + 1}",
+                localDate,
+                _reports.Count + 1,
+                markdown,
+                statsJson,
+                modelId,
+                endpointTier,
+                redactionApplied,
+                triggerSource,
+                generatedAtUtc);
+            _reports.Add(report);
+            return Task.FromResult(report);
+        }
     }
 
     private sealed class FakeCaptureCoordinator : ICaptureCoordinator

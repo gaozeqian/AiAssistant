@@ -231,6 +231,12 @@
                 </StackPanel>
               </Border>
             </Grid>
+            <Border Background="White" CornerRadius="10" Padding="18">
+              <StackPanel Spacing="7">
+                <TextBlock Text="本机模型网关" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding ModelText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+              </StackPanel>
+            </Border>
             <Border Background="White" CornerRadius="10" Padding="18" IsVisible="{Binding HasExportPreview}">
               <StackPanel Spacing="8">
                 <TextBlock Text="诊断导出预览（仅元数据，用户确认前不写外部文件）" FontWeight="SemiBold" />
@@ -293,6 +299,61 @@
             <TextBlock Text="{Binding LastRefreshText}" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12" />
           </StackPanel>
         </ScrollViewer>
+      </TabItem>
+      <TabItem Header="日报">
+        <Grid DataContext="{Binding Reports}" x:DataType="vm:ReportsViewModel"
+              ColumnDefinitions="360,*" Margin="0,12,0,0">
+          <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="18" Margin="0,0,12,0">
+            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+              <TextBlock Text="日报与站会" FontSize="20" FontWeight="SemiBold" />
+              <DatePicker Grid.Row="1" SelectedDate="{Binding SelectedDate}" Margin="0,14,0,10" />
+              <WrapPanel Grid.Row="2" Margin="0,0,0,12">
+                <Button Classes="primary" Content="生成日报" Command="{Binding GenerateCommand}" Margin="0,0,8,8" />
+                <Button Classes="secondary" Content="强制重生成" Command="{Binding RegenerateCommand}" Margin="0,0,8,8" />
+                <Button Classes="secondary" Content="刷新" Command="{Binding RefreshCommand}" Margin="0,0,8,8" />
+              </WrapPanel>
+              <Grid Grid.Row="3">
+                <ListBox ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}"
+                         Background="Transparent" BorderThickness="0">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ReportVersionItem">
+                      <TextBlock Text="{Binding DisplayText}" Padding="6,8" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <ProgressBar IsIndeterminate="True" VerticalAlignment="Top" IsVisible="{Binding IsBusy}" />
+              </Grid>
+              <StackPanel Grid.Row="4" Spacing="5" Margin="0,12,0,0">
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="#B42318" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="22">
+            <Grid RowDefinitions="Auto,Auto,*">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel>
+                  <TextBlock Text="日报正文" FontSize="22" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding VersionText}" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="secondary" Content="导出 Markdown"
+                        Command="{Binding ExportCommand}" IsEnabled="{Binding HasReport}" />
+              </Grid>
+              <Border Grid.Row="1" Background="#F8FAFC" CornerRadius="8" Padding="14" Margin="0,14,0,12">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="站会视图" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding StandupText}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+              <ScrollViewer Grid.Row="2">
+                <TextBox Text="{Binding Markdown}" IsReadOnly="True" AcceptsReturn="True"
+                         TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"
+                         Background="Transparent" BorderThickness="0" MinHeight="360" />
+              </ScrollViewer>
+            </Grid>
+          </Border>
+        </Grid>
       </TabItem>
     </TabControl>
   </Grid>
