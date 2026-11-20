@@ -10,6 +10,7 @@
 |---|---|---|---|---|
 | `Avalonia` / `Avalonia.Desktop` / `Avalonia.Themes.Fluent` / `Avalonia.Fonts.Inter` | `12.1.6` | `Desktop` / `Host` | MIT | 跨平台桌面 MVVM UI |
 | `Avalonia.Wayland` | `12.1.6` | `Host` | MIT | Linux 原生 Wayland 默认后端（实验性标注，支持自动回退 X11） |
+| `Tmds.DBus.Protocol` | `0.95.2` | `Platform.Linux` | MIT | xdg-desktop-portal、AT-SPI2 会话总线协议与 Unix FD 传递；无额外原生托管捆绑依赖 |
 | `CommunityToolkit.Mvvm` | `8.4.2` | `Desktop` | MIT | MVVM 源生成器与命令绑定 |
 | `Microsoft.Data.Sqlite.Core` | `10.0.15` | `Storage` | MIT | ADO.NET SQLite 核心驱动（不含默认未加密 bundle） |
 | `SQLite3MC.PCLRaw.bundle` | `2.7.1` | `Storage` | MIT | SQLite3 Multiple Ciphers 加密原生引擎（支持 `win-x64` / `osx-arm64` / `linux-x64`） |

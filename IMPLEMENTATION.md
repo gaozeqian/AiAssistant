@@ -494,7 +494,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] 完成异常退出、权限拒绝、磁盘满三个故障测试。
 - [x] 通过 S1/S2 验收后，再启动 macOS helper 与 Linux Wayland 工作。
 - [x] S3.1：完成 macOS 版本化 AF_UNIX IPC、一次性 Token 鉴权、心跳超时、崩溃退避监督器、Swift Helper 原生适配器、LaunchAgent 与 Windows 契约/故障测试。
-- [ ] S3.2：完成 Linux 原生 Wayland 默认、X11 回退、portal 授权恢复、AT-SPI / EWMH、inotify 与 XDG 自启适配器及契约测试。
+- [x] S3.2：完成 Linux 原生 Wayland 默认、X11 回退、portal 授权恢复、AT-SPI / EWMH、inotify 与 XDG 自启适配器及 Windows 契约测试。
 - [ ] 在 macOS 真机或 CI 完成 Swift 6 原生编译、TCC 权限与 Helper 打包联调；在 Linux 桌面完成 Wayland / X11 真机能力矩阵验收。
 
 ---

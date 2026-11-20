@@ -58,6 +58,10 @@ jobs:
         if: matrix.rid == 'osx-arm64'
         run: test -x artifacts/publish/osx-arm64/aiassistant-mac-helper
 
+      - name: Verify Linux Portal Adapter Is Bundled (linux-x64)
+        if: matrix.rid == 'linux-x64'
+        run: test -f artifacts/publish/linux-x64/Tmds.DBus.Protocol.dll
+
   sbom-and-licenses:
     name: SBOM & License Verification
     runs-on: ubuntu-latest

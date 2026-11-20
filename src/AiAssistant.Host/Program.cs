@@ -1,4 +1,6 @@
+using AiAssistant.Platform.Linux.Desktop;
 using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 
 namespace AiAssistant.Host;
 
@@ -24,6 +26,11 @@ public static class Program
             }
 
             Desktop.ShellApp.ViewModelFactory = runtime.CreateShellViewModel;
+            if (OperatingSystem.IsLinux() && runtime.LinuxBackendState is { } linuxBackend)
+            {
+                return StartLinuxDesktop(linuxBackend, args);
+            }
+
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         catch (Exception ex)
@@ -33,7 +40,34 @@ public static class Program
         }
     }
 
-    public static AppBuilder BuildAvaloniaApp()
+    public static AppBuilder BuildAvaloniaApp() => BuildAvaloniaApp(null);
+
+    private static int StartLinuxDesktop(LinuxDisplayBackendState backendState, string[] args)
+    {
+        var lifetime = new ClassicDesktopStyleApplicationLifetime { Args = args };
+        try
+        {
+            BuildAvaloniaApp(backendState.Decision.Backend).SetupWithLifetime(lifetime);
+        }
+        catch (Exception ex) when (backendState.TryMarkInitializationFallback(ex.GetType().Name))
+        {
+            lifetime.Dispose();
+            Console.Error.WriteLine($"Native Wayland initialization failed ({ex.GetType().Name}); retrying with X11/XWayland.");
+            lifetime = new ClassicDesktopStyleApplicationLifetime { Args = args };
+            BuildAvaloniaApp(LinuxDisplayBackendKind.X11).SetupWithLifetime(lifetime);
+        }
+
+        try
+        {
+            return lifetime.Start(args);
+        }
+        finally
+        {
+            lifetime.Dispose();
+        }
+    }
+
+    public static AppBuilder BuildAvaloniaApp(LinuxDisplayBackendKind? linuxBackend)
     {
         var builder = AppBuilder.Configure<Desktop.ShellApp>()
             .UsePlatformDetect()
@@ -42,11 +76,10 @@ public static class Program
 
         if (OperatingSystem.IsLinux())
         {
-            var forcedBackend = Environment.GetEnvironmentVariable("AIASSISTANT_LINUX_BACKEND");
-            var preferX11 = string.Equals(forcedBackend, "X11", StringComparison.OrdinalIgnoreCase);
-            if (!preferX11)
+            var selectedBackend = linuxBackend ?? LinuxDisplayBackendSelector.Select(LinuxDesktopSessionSnapshot.Detect()).Backend;
+            if (selectedBackend == LinuxDisplayBackendKind.Wayland)
             {
-                // ADR-0006: Native Wayland is the default on Linux, falling back on init error or explicit X11 override.
+                // ADR-0006: Native Wayland is the default; Main retries X11 only after an initialization failure.
                 builder = builder.UseWayland();
             }
         }

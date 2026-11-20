@@ -5,6 +5,10 @@ using AiAssistant.Capture;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Platform.Linux;
+using AiAssistant.Platform.Linux.Accessibility;
+using AiAssistant.Platform.Linux.Desktop;
+using AiAssistant.Platform.Linux.Portal;
+using AiAssistant.Platform.Linux.X11;
 using AiAssistant.Platform.MacOS;
 using AiAssistant.Platform.MacOS.Ipc;
 using AiAssistant.Platform.Windows;
@@ -29,6 +33,8 @@ public sealed class AppRuntime : IAsyncDisposable
     }
 
     public int RecoveredJobCount { get; private set; }
+
+    public LinuxDisplayBackendState? LinuxBackendState { get; private set; }
 
     public static AppRuntime Create()
     {
@@ -58,6 +64,7 @@ public sealed class AppRuntime : IAsyncDisposable
         var maintenance = new SqliteDatabaseMaintenanceService(connectionFactory);
         var jobQueue = new SqliteReportJobQueue(connectionFactory, clock);
         var structuredLogProvider = new SanitizedStructuredLoggerProvider(options, clock);
+        var linuxBackendState = OperatingSystem.IsLinux() ? new LinuxDisplayBackendState() : null;
         var services = new ServiceCollection();
 
         services.AddLogging(builder =>
@@ -82,6 +89,10 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IReportJobQueue>(jobQueue);
         services.AddSingleton(new CapturePipelineOptions { WhitelistedDirectories = whitelist });
         services.AddSingleton<PrivacyBlacklistPolicy>();
+        if (linuxBackendState is not null)
+        {
+            services.AddSingleton(linuxBackendState);
+        }
 
         if (OperatingSystem.IsWindows())
         {
@@ -93,9 +104,7 @@ public sealed class AppRuntime : IAsyncDisposable
         }
         else
         {
-            services.AddSingleton<ITextExtractor>(new UnavailableTextExtractor());
-            services.AddSingleton<IAutoStartService>(new LinuxNoOpAutoStartService());
-            services.AddSingleton<ICapabilityProvider>(new LinuxCapabilityProvider(keyStore));
+            RegisterLinux(services, clock, keyStore, options, linuxBackendState ?? new LinuxDisplayBackendState());
         }
 
         services.AddSingleton<ICaptureCoordinator>(provider => new BoundedCaptureCoordinator(
@@ -111,7 +120,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<TimelineUseCase>();
         services.AddSingleton<CaptureControlUseCase>();
         services.AddSingleton<DiagnosticsUseCase>();
-        return new AppRuntime(services.BuildServiceProvider());
+        return new AppRuntime(services.BuildServiceProvider()) { LinuxBackendState = linuxBackendState };
     }
 
     public async Task StartAsync(CancellationToken ct = default)
@@ -216,6 +225,56 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<IMacHelperSupervisor>()));
     }
 
+    private static void RegisterLinux(
+        IServiceCollection services,
+        IClock clock,
+        IKeyStore keyStore,
+        StorageOptions options,
+        LinuxDisplayBackendState backendState)
+    {
+        var processPath = Environment.ProcessPath;
+        var executablePath = string.IsNullOrWhiteSpace(processPath) ? "/usr/bin/aiassistant-host" : processPath;
+        var autoStart = new XdgAutoStartService(executablePath);
+
+        services.AddSingleton(backendState);
+        services.AddSingleton<IXdgPortalClient, TmdsXdgPortalClient>();
+        services.AddSingleton<IPortalRestoreTokenStore>(
+            new ProtectedPortalRestoreTokenStore(Path.Combine(options.DataDirectory, "portal"), keyStore));
+        services.AddSingleton<XdgPortalSessionManager>(provider => new XdgPortalSessionManager(
+            provider.GetRequiredService<IXdgPortalClient>(),
+            provider.GetRequiredService<IPortalRestoreTokenStore>(),
+            provider.GetRequiredService<ILogger<XdgPortalSessionManager>>()));
+        services.AddSingleton<IAtSpiAccessibilityClient, TmdsAtSpiClient>();
+        services.AddSingleton(new X11ScreenCapture(clock));
+        services.AddSingleton(provider => new WaylandScreenCapture(
+            provider.GetRequiredService<IXdgPortalClient>(),
+            provider.GetRequiredService<XdgPortalSessionManager>(),
+            clock,
+            provider.GetRequiredService<ILogger<WaylandScreenCapture>>()));
+        services.AddSingleton<LinuxScreenCapture>();
+        services.AddSingleton<IScreenCapture>(provider => provider.GetRequiredService<LinuxScreenCapture>());
+        services.AddSingleton<IWindowActivitySource>(provider => new LinuxWindowActivitySource(
+            backendState,
+            provider.GetRequiredService<IAtSpiAccessibilityClient>(),
+            clock,
+            provider.GetRequiredService<X11ScreenCapture>()));
+        services.AddSingleton<IFileActivitySource>(new LinuxInotifyFileActivitySource(clock));
+        services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IWindowActivitySource>());
+        services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IFileActivitySource>());
+        services.AddSingleton<ITextExtractor>(provider => new LinuxTextExtractor(provider.GetRequiredService<IAtSpiAccessibilityClient>()));
+        services.AddSingleton<IAudioCapture>(new LinuxPulseAudioCapture(clock));
+        services.AddSingleton<IAutoStartService>(autoStart);
+        services.AddSingleton<ICapabilityProvider>(provider => new LinuxCapabilityProvider(
+            provider.GetRequiredService<IScreenCapture>(),
+            provider.GetRequiredService<IWindowActivitySource>(),
+            provider.GetRequiredService<IFileActivitySource>(),
+            provider.GetRequiredService<ITextExtractor>(),
+            provider.GetRequiredService<IAudioCapture>(),
+            keyStore,
+            autoStart,
+            backendState));
+    }
+
     private static string? ResolveMacHelperPath()
     {
         var overridePath = Environment.GetEnvironmentVariable("AIASSISTANT_MAC_HELPER_PATH");
@@ -232,17 +291,5 @@ public sealed class AppRuntime : IAsyncDisposable
         ];
 
         return candidates.FirstOrDefault(File.Exists);
-    }
-
-    private sealed class UnavailableTextExtractor : ITextExtractor
-    {
-        public CapabilityState AccessibilityCapability =>
-            CapabilityState.Unavailable(CapabilityKind.AccessibilityText, "Platform adapter is scheduled for S3.");
-
-        public CapabilityState OcrCapability =>
-            CapabilityState.Unavailable(CapabilityKind.Ocr, "Platform adapter is scheduled for S3.");
-
-        public Task<ExtractedTextResult> ExtractAsync(TextExtractionRequest request, CancellationToken ct) =>
-            Task.FromResult(new ExtractedTextResult(string.Empty, TextExtractionMethod.None, 0));
     }
 }
