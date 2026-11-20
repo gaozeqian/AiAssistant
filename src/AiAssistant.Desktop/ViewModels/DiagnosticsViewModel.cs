@@ -13,6 +13,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
 {
     private readonly DiagnosticsUseCase _diagnostics;
     private readonly ILocalMcpControl? _mcp;
+    private readonly IModelSecretAdmin? _secrets;
     private readonly string? _exportDirectory;
     private string _platformName = "正在检测平台能力…";
     private string _databaseText = "尚未检查";
@@ -27,21 +28,30 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string _mcpTokenText = "点击“显示令牌”获取本地凭据";
     private string _permissionGuidanceText = "尚未检查平台权限";
     private string _exportStatusText = string.Empty;
+    private string _secretName = string.Empty;
+    private string _secretValue = string.Empty;
+    private string? _selectedSecret;
+    private string _secretStatus = "密钥值写入后不可读取；models.json 通过 apiKeySecret 引用名称。";
     private bool _isLoading;
 
     public DiagnosticsViewModel(
         DiagnosticsUseCase diagnostics,
         ILocalMcpControl? mcp = null,
-        string? exportDirectory = null)
+        string? exportDirectory = null,
+        IModelSecretAdmin? secrets = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _mcp = mcp;
         _exportDirectory = exportDirectory;
+        _secrets = secrets;
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
         ExportPreviewCommand = new AsyncRelayCommand(ExportPreviewAsync);
         RevealMcpTokenCommand = new AsyncRelayCommand(RevealMcpTokenAsync);
         RotateMcpTokenCommand = new AsyncRelayCommand(RotateMcpTokenAsync);
+        SaveSecretCommand = new AsyncRelayCommand(SaveSecretAsync);
+        RefreshSecretsCommand = new AsyncRelayCommand(() => RefreshSecretNamesAsync(updateStatus: true));
+        DeleteSecretCommand = new AsyncRelayCommand(DeleteSecretAsync);
     }
 
     public ObservableCollection<CapabilityItem> Capabilities { get; } = [];
@@ -71,6 +81,40 @@ public sealed class DiagnosticsViewModel : ObservableObject
     public IAsyncRelayCommand RevealMcpTokenCommand { get; }
 
     public IAsyncRelayCommand RotateMcpTokenCommand { get; }
+
+    public IAsyncRelayCommand SaveSecretCommand { get; }
+
+    public IAsyncRelayCommand RefreshSecretsCommand { get; }
+
+    public IAsyncRelayCommand DeleteSecretCommand { get; }
+
+    public ObservableCollection<string> SecretNames { get; } = [];
+
+    public bool HasSecretAdmin => _secrets is not null;
+
+    public string SecretName
+    {
+        get => _secretName;
+        set => SetProperty(ref _secretName, value);
+    }
+
+    public string SecretValue
+    {
+        get => _secretValue;
+        set => SetProperty(ref _secretValue, value);
+    }
+
+    public string? SelectedSecret
+    {
+        get => _selectedSecret;
+        set => SetProperty(ref _selectedSecret, value);
+    }
+
+    public string SecretStatus
+    {
+        get => _secretStatus;
+        private set => SetProperty(ref _secretStatus, value);
+    }
 
     public string McpStatusText
     {
@@ -214,6 +258,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
             McpStatusText = _mcp is null
                 ? "本地 MCP 未接入"
                 : BuildMcpStatus(_mcp.GetSnapshot());
+            await RefreshSecretNamesAsync(updateStatus: false);
             var needsAttention = snapshot.Capabilities.Where(item => item.Status is not CapabilityStatus.Supported).ToArray();
             PermissionGuidanceText = needsAttention.Length == 0
                 ? "当前平台权限齐全，无需额外授权。"
@@ -238,6 +283,87 @@ public sealed class DiagnosticsViewModel : ObservableObject
         { Running: false } => "已启用但监听未启动",
         _ => $"运行中 · {snapshot.Endpoint} · 请求 {snapshot.RequestCount} · 未授权拒绝 {snapshot.UnauthorizedCount} · 限流 {snapshot.RateLimitedCount} · 工具调用 {snapshot.ToolCallCount}"
     };
+
+    private async Task SaveSecretAsync()
+    {
+        if (_secrets is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SecretName) || string.IsNullOrWhiteSpace(SecretValue))
+        {
+            SecretStatus = "请填写密钥名称和值。";
+            return;
+        }
+
+        try
+        {
+            var name = SecretName.Trim();
+            await _secrets.SetAsync(name, SecretValue, CancellationToken.None);
+            SecretValue = string.Empty;
+            await RefreshSecretNamesAsync(updateStatus: false);
+            SecretStatus = $"已加密保存 {name}；值不可再读取。";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.Cryptography.CryptographicException)
+        {
+            SecretStatus = "保存失败，请检查系统密钥库权限。";
+        }
+    }
+
+    private async Task RefreshSecretNamesAsync(bool updateStatus)
+    {
+        if (_secrets is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var names = await _secrets.ListNamesAsync(CancellationToken.None);
+            SecretNames.Clear();
+            foreach (var name in names)
+            {
+                SecretNames.Add(name);
+            }
+
+            if (updateStatus)
+            {
+                SecretStatus = names.Count == 0
+                    ? "尚未保存模型密钥。"
+                    : $"已保存 {names.Count} 个密钥（值不可读取）。";
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.Cryptography.CryptographicException)
+        {
+            if (updateStatus)
+            {
+                SecretStatus = "无法读取密钥列表，请检查系统密钥库权限。";
+            }
+        }
+    }
+
+    private async Task DeleteSecretAsync()
+    {
+        if (_secrets is null || string.IsNullOrWhiteSpace(SelectedSecret))
+        {
+            SecretStatus = "请选择要删除的密钥。";
+            return;
+        }
+
+        try
+        {
+            var name = SelectedSecret;
+            var deleted = await _secrets.DeleteAsync(name, CancellationToken.None);
+            await RefreshSecretNamesAsync(updateStatus: false);
+            SecretStatus = deleted ? $"已删除 {name}。" : $"{name} 不存在。";
+            SelectedSecret = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.Cryptography.CryptographicException)
+        {
+            SecretStatus = "删除失败，请检查系统密钥库权限。";
+        }
+    }
 
     private async Task RevealMcpTokenAsync()
     {

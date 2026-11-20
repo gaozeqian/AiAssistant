@@ -529,6 +529,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.10：`--benchmark-retrieval` 真实 embedding 评测、可配置查询指令前缀与 embeddinggemma 默认指令。
 - [x] S9.11：embeddinggemma 评测与生产接入（`EmbeddingProfile`、`title/text` 文档格式、`--rebuild-vectors`、索引版本 1.1）。
 - [x] S9.12：默认对话模型切换为 `gemma4:12b`，移除代码/测试/文档/示例中的旧模型配置。
+- [x] S9.13：模型端点密钥导入（stdin/诊断页）、列表/删除命令与 `--probe-model` 能力探测。
 - [ ] S9-R：真实证书签名/公证、真实时间多日浸泡与设备热插拔、真机安装升级卸载与无障碍人工验收、CI 实际生成并随 Release 发布 SBOM/校验和。
 - [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
 

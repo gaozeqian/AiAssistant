@@ -50,21 +50,32 @@ public sealed class ProtectedModelSecretStore : IDisposable
         }
     }
 
-    public async Task DeleteAsync(string name, CancellationToken ct)
+    public async Task<bool> DeleteAsync(string name, CancellationToken ct)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         await _gate.WaitAsync(ct);
         try
         {
             var all = await LoadAllUnlockedAsync(ct);
-            if (all.Remove(name))
+            if (!all.Remove(name))
             {
-                await SaveAllUnlockedAsync(all, ct);
+                return false;
             }
+
+            await SaveAllUnlockedAsync(all, ct);
+            return true;
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>Lists secret names only; values are never returned.</summary>
+    public async Task<IReadOnlyList<string>> ListNamesAsync(CancellationToken ct)
+    {
+        var all = await LoadAllAsync(ct);
+        return all.Keys.OrderBy(name => name, StringComparer.Ordinal).ToArray();
     }
 
     private async Task<Dictionary<string, string>> LoadAllAsync(CancellationToken ct)    {
@@ -177,4 +188,14 @@ public sealed class ModelSecretResolver(ProtectedModelSecretStore store) : IMode
 
         return await store.GetAsync(reference, ct);
     }
+}
+
+/// <summary>Application-facing administration of endpoint secrets; never exposes stored values.</summary>
+public sealed class ModelSecretAdmin(ProtectedModelSecretStore store) : AiAssistant.Application.Ports.IModelSecretAdmin
+{
+    public Task<IReadOnlyList<string>> ListNamesAsync(CancellationToken ct) => store.ListNamesAsync(ct);
+
+    public Task SetAsync(string name, string value, CancellationToken ct) => store.SetAsync(name, value, ct);
+
+    public Task<bool> DeleteAsync(string name, CancellationToken ct) => store.DeleteAsync(name, ct);
 }

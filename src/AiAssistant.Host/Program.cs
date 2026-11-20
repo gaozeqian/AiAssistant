@@ -1,3 +1,4 @@
+using System.Text;
 using AiAssistant.Host.Benchmarks;
 using AiAssistant.Platform.Linux.Desktop;
 using Avalonia;
@@ -51,6 +52,74 @@ public static class Program
                 catch (OperationCanceledException)
                 {
                     // Normal Ctrl+C shutdown
+                }
+
+                return 0;
+            }
+
+            if (TryGetOption(args, "--import-model-secret", out var secretName))
+            {
+                Console.Error.Write($"Secret value for '{secretName}': ");
+                var secretValue = ReadSecretFromConsole();
+                if (string.IsNullOrWhiteSpace(secretValue))
+                {
+                    Console.Error.WriteLine("Secret value is empty; nothing was stored.");
+                    return 3;
+                }
+
+                await runtime.ModelSecretAdmin.SetAsync(secretName, secretValue, CancellationToken.None);
+                Console.WriteLine($"Secret '{secretName}' stored encrypted.");
+                return 0;
+            }
+
+            if (args.Contains("--list-model-secrets", StringComparer.OrdinalIgnoreCase))
+            {
+                var names = await runtime.ModelSecretAdmin.ListNamesAsync(CancellationToken.None);
+                if (names.Count == 0)
+                {
+                    Console.WriteLine("No model secrets stored.");
+                }
+
+                foreach (var name in names)
+                {
+                    Console.WriteLine(name);
+                }
+
+                return 0;
+            }
+
+            if (TryGetOption(args, "--delete-model-secret", out var deleteSecretName))
+            {
+                if (!args.Contains("--confirm-delete-secret", StringComparer.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine("Refusing to delete a model secret without --confirm-delete-secret.");
+                    return 3;
+                }
+
+                var deleted = await runtime.ModelSecretAdmin.DeleteAsync(deleteSecretName, CancellationToken.None);
+                Console.WriteLine(deleted
+                    ? $"Secret '{deleteSecretName}' deleted."
+                    : $"Secret '{deleteSecretName}' not found.");
+                return deleted ? 0 : 1;
+            }
+
+            if (args.Contains("--probe-model", StringComparer.OrdinalIgnoreCase))
+            {
+                var capabilities = await runtime.ModelCapabilityProber.ProbeAllAsync(
+                    forceRefresh: true,
+                    CancellationToken.None);
+                if (capabilities.Count == 0)
+                {
+                    Console.WriteLine("No model endpoints configured.");
+                    return 0;
+                }
+
+                foreach (var capability in capabilities)
+                {
+                    Console.WriteLine(
+                        $"{capability.Tier}: chat={capability.ChatAvailable} stream={capability.StreamingAvailable} " +
+                        $"embed={capability.EmbeddingsAvailable} json={capability.StructuredOutputAvailable} " +
+                        $"tools={capability.ToolCallingAvailable} model={capability.ChatModel} | {capability.Diagnostic}");
                 }
 
                 return 0;
@@ -176,6 +245,42 @@ public static class Program
 
         value = string.Empty;
         return false;
+    }
+
+    private static string? ReadSecretFromConsole()
+    {
+        if (Console.IsInputRedirected)
+        {
+            return Console.In.ReadLine();
+        }
+
+        var builder = new StringBuilder();
+        while (true)
+        {
+            var key = Console.ReadKey(intercept: true);
+            if (key.Key == ConsoleKey.Enter)
+            {
+                Console.WriteLine();
+                break;
+            }
+
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Length--;
+                }
+
+                continue;
+            }
+
+            if (!char.IsControl(key.KeyChar))
+            {
+                builder.Append(key.KeyChar);
+            }
+        }
+
+        return builder.ToString();
     }
 
     private static string ResolveBenchmarkOutput(string[] args, string prefix)

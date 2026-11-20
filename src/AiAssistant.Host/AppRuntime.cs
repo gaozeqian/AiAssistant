@@ -60,6 +60,11 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public EventEmbeddingIndexer EmbeddingIndexer => _services.GetRequiredService<EventEmbeddingIndexer>();
 
+    public IModelSecretAdmin ModelSecretAdmin => _services.GetRequiredService<IModelSecretAdmin>();
+
+    public IModelCapabilityProber ModelCapabilityProber =>
+        _services.GetRequiredService<IModelCapabilityProber>();
+
     public static async Task<AppRuntime> CreateAsync(CancellationToken ct = default)
     {
         var dataDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY");
@@ -110,6 +115,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton(options);
         services.AddSingleton<IDiagnosticLogReader>(structuredLogProvider);
         services.AddSingleton<IKeyStore>(keyStore);
+        services.AddSingleton<IModelSecretAdmin>(new ModelSecretAdmin(secretStore));
         services.AddSingleton(connectionFactory);
         services.AddSingleton<IMediaStore>(mediaStore);
         services.AddSingleton(mediaStore);
@@ -308,7 +314,8 @@ public sealed class AppRuntime : IAsyncDisposable
             new DiagnosticsViewModel(
                 _services.GetRequiredService<DiagnosticsUseCase>(),
                 _services.GetRequiredService<ILocalMcpControl>(),
-                Path.Combine(_dataDirectory, "reports")),
+                Path.Combine(_dataDirectory, "reports"),
+                _services.GetRequiredService<IModelSecretAdmin>()),
             new ReportsViewModel(
                 _services.GetRequiredService<ReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports")),

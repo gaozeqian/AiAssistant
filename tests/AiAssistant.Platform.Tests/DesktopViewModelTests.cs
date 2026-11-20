@@ -269,6 +269,30 @@ public sealed class DesktopViewModelTests
     });
 
     [Fact]
+    public Task Diagnostics_SecretAdminSavesAndDeletesWithoutEchoingValue() => RunInHeadlessSession(async () =>
+    {
+        var admin = new FakeSecretAdmin();
+        var diagnostics = new DiagnosticsUseCase(
+            new FakeCapabilityProvider(),
+            new FakeMaintenanceService(),
+            new FakeCaptureCoordinator(),
+            new FakeReportJobQueue());
+        var viewModel = new DiagnosticsViewModel(diagnostics, mcp: null, exportDirectory: null, secrets: admin);
+
+        viewModel.SecretName = "corp-key";
+        viewModel.SecretValue = "secret-value";
+        await viewModel.SaveSecretCommand.ExecuteAsync(null);
+
+        Assert.Contains("corp-key", viewModel.SecretNames);
+        Assert.Equal(string.Empty, viewModel.SecretValue);
+        Assert.DoesNotContain("secret-value", viewModel.SecretStatus, StringComparison.Ordinal);
+
+        viewModel.SelectedSecret = "corp-key";
+        await viewModel.DeleteSecretCommand.ExecuteAsync(null);
+        Assert.Empty(viewModel.SecretNames);
+    });
+
+    [Fact]
     public Task Shell_SectionShortcutsSwitchTabsAndRejectOutOfRange() => RunInHeadlessSession(async () =>
     {
         using var shell = CreateShell(out _);
@@ -576,6 +600,22 @@ public sealed class DesktopViewModelTests
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class FakeSecretAdmin : IModelSecretAdmin
+    {
+        private readonly List<string> _names = [];
+
+        public Task<IReadOnlyList<string>> ListNamesAsync(CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<string>>(_names.ToArray());
+
+        public Task SetAsync(string name, string value, CancellationToken ct)
+        {
+            _names.Add(name);
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> DeleteAsync(string name, CancellationToken ct) => Task.FromResult(_names.Remove(name));
     }
 
     private sealed class FakeDataDeletionService : IDataDeletionService

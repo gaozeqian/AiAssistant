@@ -11,7 +11,7 @@
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
 - **当前构建状态**：✅ 本地 Release 0 警告 0 错误；三平台自包含打包脚本实测（win zip / linux tar.gz / macOS app 布局）
-- **当前测试状态**：✅ 134/134 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 35、`Processing.Tests` 7、`Report.Tests` 53、`Voice.Tests` 7）
+- **当前测试状态**：✅ 136/136 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 36、`Processing.Tests` 7、`Report.Tests` 54、`Voice.Tests` 7）
 - **下一步待确认事项**：配置签名证书/公证凭据后执行 `release.yml`；在真机完成 24h/多日浸泡、安装升级卸载与无障碍走查；S9 遗留项见第 5 节
 
 ---
@@ -107,6 +107,21 @@ AiAssistant.Host --benchmark-model --output artifacts/benchmarks/model.md
 - 固定三用例：中文摘要、语义标签、结构化 JSON；报告含成功率、JSON 合规率、平均耗时与失败详情。
 - 模型不可用时仍写出报告并以退出码 `1` 结束，便于 CI 区分「未安装模型」与「崩溃」。
 - 本机 loopback 端点会显式绕过系统代理环境变量，避免公司代理导致 Ollama 请求失败。
+
+模型端点密钥与能力探测：
+
+```bash
+# 从标准输入读取密钥（终端下隐藏输入），写入 AES-GCM 加密库
+echo "sk-..." | AiAssistant.Host --import-model-secret corp-api-key
+
+AiAssistant.Host --list-model-secrets
+AiAssistant.Host --delete-model-secret corp-api-key --confirm-delete-secret
+AiAssistant.Host --probe-model
+```
+
+- 密钥值只写不读；`models.json` 用 `apiKeySecret` 引用名称。
+- 诊断页“模型端点密钥”卡片提供同样的保存/刷新/删除能力。
+- `--probe-model` 输出各档位的 chat/stream/embed/json/tools 能力与诊断信息。
 
 检索质量基准（合成语料，16 查询 / 48 事件）：
 
@@ -236,6 +251,7 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-20 [win-x64] [S8 智能检索与完整对话完成]**：新增 `AiAssistant.LocalApi` 项目并把检索/问答/区间报告提升为 Application 端口（`IEvidenceSearch`、`IEvidenceQuestionAnswerer`、`IRangeReportService`、`ILocalMcpControl`），Desktop 只依赖 Application。实现 `HybridSearchService`（时间过滤 + 关键词 + 向量 RRF 融合、统一 `[E#]` 证据、向量失败仅降级关键词）与 `EvidenceQuestionAnswerUseCase`（强制引用校验，无引用走抽取式降级，无证据返回 `no-evidence` 且不调用模型）。实现 `ActivityRangeReportService` 与 `RangeReportUseCase`：周一为界的周报、任意区间每日事件数/活跃分钟/主要应用、Markdown + stats JSON 双文件导出、模型不可用确定性统计降级。实现只读 loopback MCP：`TcpListener` 仅绑 `127.0.0.1`、AES-GCM 加密令牌（可轮换）、滑动窗口限流、JSON-RPC `initialize/ping/tools/list/tools/call`、四个只读工具、未知或写入工具返回 -32602；Host 生命周期接入且默认关闭。新增“检索与问答”面板（检索/提问/导出、证据卡片一键定位时间线、周报柱状与导出）、“本地诊断”MCP 令牌显示/轮换，语音“问一下…”复用同一证据用例。全仓 Release 0 警告 0 错误、106/106 测试通过（新增 16 项检索/报告/MCP 契约测试与 2 项 UI/语音测试），两平台发布通过。真实 embedding 质量与真实 MCP 客户端联调保留遗留项。
 - **2026-11-20 [win-x64] [S9 发布加固工具链完成]**：新增 `build/package/` 跨平台打包脚本与图标生成器（纯 Python 生成 PNG/ICO/MSIX 资源）：Windows 自包含 zip + 可选 Authenticode/MSIX、macOS `.app` + codesign/notarytool/stapler、Linux tar.gz + `.deb`；新增 `.github/workflows/release.yml` 签名发布流水线与 CI 打包作业。新增 `IDataDeletionService`/`DataDeletionService`（按日期或全量删除事件、媒体、日报、任务、语音日志、向量索引，WAL checkpoint）与“数据与导出”页面（二次确认删除）、Host 维护命令 `--backup` / `--restore --confirm-restore` / `--purge-data --confirm-purge`（实测备份 84KB、恢复、清空、清空后启动均成功）。新增 v1→v2 迁移保留数据、按日期删除、全量删除后可用、密钥丢失不损坏数据库四项门禁测试；修复报告后台任务测试的时段依赖缺陷（固定时钟）。补充键盘快捷键（Ctrl+D1…D7、Ctrl+F、F5）、关键控件无障碍名称、诊断页权限引导与确认导出。新增 `docs/release/` 隐私说明、已知限制、性能报告（启动 0.82s、包体积 83MB/58MB）、升级卸载、回滚手册与发布检查表。全仓 Release 0 警告 0 错误、112/112 测试通过；Windows zip、Linux tar.gz、macOS app 布局实测生成。真实签名公证、多日浸泡与人工无障碍验收保留遗留项。
 - **2026-11-20 [win-x64] [S9 供应链收尾]**：新增离线 CycloneDX 1.5 SBOM 生成器 `build/sbom/generate-sbom.py`（读取 `project.assets.json`，输出 SHA-512 哈希、purl 与依赖图，支持 `--verify` 与 `--check-manifest`），实测 103 个组件、104 条依赖边、校验通过；依赖清单补齐全部 28 个集中管理包。打包脚本自动生成 `SHA256SUMS` 并实测 `sha256sum -c` 通过；CI SBOM 作业改为离线生成（不再安装外部工具），Release 工作流合并产物后统一生成校验和并附 `bom.json`。新增 `docs/release/RELEASE-NOTES-TEMPLATE.md`。`S9-R4` 仅剩 CI 实际运行与 Release 附件待验证。
+- **2026-11-20 [win-x64] [S9 模型密钥导入与端点探测]**：新增 `IModelSecretAdmin` 端口与 `ModelSecretAdmin`，`ProtectedModelSecretStore` 支持只列名称、删除返回是否命中；新增 `--import-model-secret`（标准输入读取、终端隐藏输入）、`--list-model-secrets`、`--delete-model-secret --confirm-delete-secret` 与 `--probe-model`；诊断页新增“模型端点密钥”卡片（名称/密码框/保存/刷新/删除）。端到端实测导入、列出、未确认拒绝删除、删除与空列表均正确；`--probe-model` 输出 gemma4:12b 的 chat/stream/embed 能力。新增加密存储与诊断页交互测试，全仓 136/136 通过。
 - **2026-11-20 [win-x64] [S9 默认对话模型切换与旧模型配置清理]**：将 `ModelGatewayOptions`、`ModelEndpointDocument` 与 `models.example.json` 的默认对话模型切换为 `gemma4:12b`；移除旧检索指令常量、`EmbeddingProfile` 的旧模型分支，以及代码/测试/文档/示例中的全部旧模型引用。默认配置实测 `--benchmark-model` 识别 `gemma4:12b`，成功率与 JSON 合规率 100%。全仓 134/134 测试通过。
 - **2026-11-20 [win-x64] [S9 默认 embedding 切换为 embeddinggemma]**：将 `ModelGatewayOptions`、`ModelEndpointDocument` 与 `models.example.json` 的本机默认 embedding 从旧默认 embedding 切换为 `embeddinggemma-2:740m`；未显式设置 `AIASSISTANT_EMBEDDING_MODEL` 时默认走 gemma（768 维、官方查询前缀、`title/text` 文档格式）。实测默认配置 `--benchmark-retrieval` 输出 95.8%/MRR 1.000。已有数据需运行 `--rebuild-vectors` 重建索引。全仓 135/135 测试通过。
 - **2026-11-20 [win-x64] [S9 embeddinggemma 评测与生产接入]**：新增 `EmbeddingProfile` 统一解析模型相关默认值：embeddinggemma 使用 `task: search result | query:` 查询前缀与 `title: … | text: …` 文档格式。新增 `AIASSISTANT_EMBEDDING_DOCUMENT_STYLE` 与 `--rebuild-vectors` 命令，索引版本随文档格式变为 `1.1-title-text`。本机 embeddinggemma-2:740m（768 维）实测 Recall@8 **95.8%**、MRR **1.000**、热态约 19ms（三次中两次 95.8%，一次 93.8%）。全仓 134/134 测试通过。
@@ -263,7 +279,7 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S5-R1` | S5 模型 | 已用本机 `gemma4:12b` 实测：成功率 100%、JSON 合规率 100%、热态平均 4.6s（首次含加载 7.4s）；其它候选模型与内存曲线仍未评测 | 不同模型质量/延迟差异较大，默认档位未定 | 对目标候选模型分别运行 `AiAssistant.Host --benchmark-model`，按质量/延迟选默认档 |
 | `S5-R2` | S5 调度 | 每日定时、启动补偿与失败退避尚未进行多日浸泡 | 长时间休眠/跨日边界可能暴露时序问题 | S9 浸泡测试覆盖跨午夜、休眠唤醒、模型离线与重复触发 |
 | `S6-R1` | S6 企业端点 | 真实企业 mTLS、企业 CA、代理和公网 API 未联调；公网同意仅代码级门禁 | TLS/代理环境差异可能导致端点不可用 | 在企业网络与公网沙箱分别验证握手、证书轮换、代理认证、断网回退与策略审计 |
-| `S6-R2` | S6 密钥 | 模型端点密钥加密存储未提供管理 UI/CLI 导入流程 | 用户需手工准备密钥文件 | S9 前补充安全导入向导或 CLI，禁止明文命令行参数 |
+| `S6-R2` | S6 密钥 | 已提供 `--import-model-secret`（stdin、终端隐藏输入）、列表/删除命令与诊断页密钥卡片；值只写不读 | 仍需用户自行准备密钥值并确保不进入 shell 历史 | 发布说明中提示使用 stdin 管道，避免命令行明文 |
 | `S7-R1` | S7 语音 | 真实中文 KWS 唤醒率/误唤醒率、TTS 音质与端到端延迟未评测 | 阈值和体验未达发布基线 | 外挂 KWS/TTS 模型后运行安静/嘈杂/多人场景黄金集，按实测调整阈值 |
 | `S7-R2` | S7 macOS | macOS TTS 音频输出仍为 Degraded；命令文字反馈可用 | macOS 无语音播报 | 扩展 Swift Helper 的音频输出能力并做 TCC 麦克风/输出验收 |
 | `S7-R3` | S7 隐私 | 命令音频选择落盘（opt-in）尚未实现，当前仅加密文本日志 | 无法回听命令音频 | S9 前增加显式开关、加密媒体引用与自动清理 |

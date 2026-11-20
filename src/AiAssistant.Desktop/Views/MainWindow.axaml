@@ -452,6 +452,25 @@
                 </WrapPanel>
               </StackPanel>
             </Border>
+            <Border Background="White" CornerRadius="10" Padding="18" IsVisible="{Binding HasSecretAdmin}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="模型端点密钥" FontWeight="SemiBold" />
+                <TextBlock Text="密钥以 AES-GCM 加密保存在本机；写入后不可读取，models.json 通过 apiKeySecret 引用名称。"
+                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                <Grid ColumnDefinitions="*,*">
+                  <TextBox Text="{Binding SecretName}" PlaceholderText="密钥名称，例如 corp-api-key" Margin="0,0,6,0" />
+                  <TextBox Grid.Column="1" Text="{Binding SecretValue}" PasswordChar="●" PlaceholderText="密钥值" Margin="6,0,0,0" />
+                </Grid>
+                <WrapPanel>
+                  <Button Classes="primary" Content="保存密钥" Command="{Binding SaveSecretCommand}" Margin="0,0,8,8" />
+                  <Button Classes="secondary" Content="刷新列表" Command="{Binding RefreshSecretsCommand}" Margin="0,0,8,8" />
+                  <Button Classes="secondary" Content="删除选中" Command="{Binding DeleteSecretCommand}" Margin="0,0,8,8" />
+                </WrapPanel>
+                <ListBox ItemsSource="{Binding SecretNames}" SelectedItem="{Binding SelectedSecret}"
+                         MaxHeight="120" Background="Transparent" BorderThickness="0" />
+                <TextBlock Text="{Binding SecretStatus}" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
             <Border Background="White" CornerRadius="10" Padding="18" IsVisible="{Binding HasExportPreview}">
               <StackPanel Spacing="8">
                 <TextBlock Text="诊断导出预览（仅元数据，用户确认前不写外部文件）" FontWeight="SemiBold" />
