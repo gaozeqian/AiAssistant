@@ -535,6 +535,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.16：`--help` / `--version` / `--doctor` 运维自检命令（存储健康、模型探测、MCP 状态）。
 - [x] S9.17：无头 `--report-range`（Markdown/SVG/stats）与 `--ask`（证据问答、无证据退出码 1）命令。
 - [x] S9.18：周报 PNG/PDF 导出（`AiAssistant.Export` + SkiaSharp，PDF 字形轮廓避免字体嵌入）。
+- [x] S9.19：可检索 PDF（PDFsharp + 系统 TrueType 中文字体子集，无字体时回退矢量轮廓）。
 - [ ] S9-R：真实证书签名/公证、真实时间多日浸泡与设备热插拔、真机安装升级卸载与无障碍人工验收、CI 实际生成并随 Release 发布 SBOM/校验和。
 - [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
 

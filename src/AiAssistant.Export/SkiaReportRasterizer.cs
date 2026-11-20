@@ -45,6 +45,16 @@ public sealed class SkiaReportRasterizer : IReportRasterizer
     public byte[] RenderPdf(RangeReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
+        if (PdfSharpReportRenderer.TryRender(report, out var searchable))
+        {
+            return searchable;
+        }
+
+        return RenderVectorPdf(report);
+    }
+
+    private static byte[] RenderVectorPdf(RangeReport report)
+    {
         using var stream = new MemoryStream();
         using (var document = SKDocument.CreatePdf(stream))
         {

@@ -63,6 +63,7 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests \
   - 概念向量 RRF（离线替身）：Recall@8 100%、MRR 1.000；
   - **embeddinggemma-2:740m（768 维）**：官方查询前缀 + `title/text` 文档格式 **95.8%/1.000**（三次中两次 95.8%，一次 93.8%），热态约 19 ms/查询，首次含加载约 8 s。
 - 默认 embedding 已切换为 `embeddinggemma-2:740m`（768 维，查询前缀 + `title/text` 文档格式）；已有数据需执行 `AiAssistant.Host --rebuild-vectors`。
+- 周报导出：PNG 约 35KB（1920×840）；可检索 PDF 约 30KB（字体子集约 25KB），无合适字体时回退矢量 PDF。
 - 问答正确率仍未评测（`S8-R1`）；同义词「同行评审」「上线流水线」仍会漂移。
 
 ## 6. 复现命令

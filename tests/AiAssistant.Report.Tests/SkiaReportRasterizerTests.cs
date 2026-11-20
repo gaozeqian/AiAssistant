@@ -28,9 +28,12 @@ public sealed class SkiaReportRasterizerTests
         var rasterizer = new SkiaReportRasterizer();
 
         var pdf = rasterizer.RenderPdf(CreateReport(days: 7));
-
         Assert.True(pdf.Length > 1_000, $"pdf length {pdf.Length}");
         Assert.True(pdf.Length < 1_000_000, $"pdf unexpectedly large (font embedding?): {pdf.Length}");
+        if (PdfSharpReportRenderer.IsSearchableFontAvailable)
+        {
+            Assert.Contains("/ToUnicode", Encoding.ASCII.GetString(pdf), StringComparison.Ordinal);
+        }
         Assert.True(pdf.AsSpan(0, 4).SequenceEqual("%PDF"u8));
         Assert.Contains("%%EOF", Encoding.ASCII.GetString(pdf), StringComparison.Ordinal);
     }
