@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>PNG/PDF rasterization for range reports using the SkiaSharp build already shipped with Avalonia.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AiAssistant.Application\AiAssistant.Application.csproj" />
+    <ProjectReference Include="..\AiAssistant.Core\AiAssistant.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
+</Project>

@@ -17,6 +17,7 @@
     <ProjectReference Include="..\AiAssistant.Scheduler\AiAssistant.Scheduler.csproj" />
     <ProjectReference Include="..\AiAssistant.Voice\AiAssistant.Voice.csproj" />
     <ProjectReference Include="..\AiAssistant.LocalApi\AiAssistant.LocalApi.csproj" />
+    <ProjectReference Include="..\AiAssistant.Export\AiAssistant.Export.csproj" />
     <ProjectReference Include="..\AiAssistant.Platform.Windows\AiAssistant.Platform.Windows.csproj" />
     <ProjectReference Include="..\AiAssistant.Platform.MacOS\AiAssistant.Platform.MacOS.csproj" />
     <ProjectReference Include="..\AiAssistant.Platform.Linux\AiAssistant.Platform.Linux.csproj" />

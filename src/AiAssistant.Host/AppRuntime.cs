@@ -5,6 +5,7 @@ using AiAssistant.Capture;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Desktop.ViewModels;
+using AiAssistant.Export;
 using AiAssistant.LocalApi;
 using AiAssistant.Platform.Linux;
 using AiAssistant.Platform.Linux.Accessibility;
@@ -212,6 +213,7 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<IModelGateway>(),
             provider.GetRequiredService<ITextRedactor>(),
             provider.GetRequiredService<ILogger<ActivityRangeReportService>>()));
+        services.AddSingleton<IReportRasterizer, SkiaReportRasterizer>();
         services.AddSingleton<RangeReportUseCase>();
         var configuredEmbeddingModel = configuration.Endpoints
             .FirstOrDefault(endpoint => endpoint.Tier == ModelEndpointTier.LocalOffline)

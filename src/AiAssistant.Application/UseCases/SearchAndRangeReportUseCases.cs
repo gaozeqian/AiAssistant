@@ -4,10 +4,18 @@ using AiAssistant.Application.Ports;
 
 namespace AiAssistant.Application.UseCases;
 
-public sealed record RangeReportExport(string MarkdownPath, string StatsPath, string SvgPath);
+public sealed record RangeReportExport(
+    string MarkdownPath,
+    string StatsPath,
+    string SvgPath,
+    string? PngPath = null,
+    string? PdfPath = null);
 
 /// <summary>Weekly / arbitrary-range aggregation plus Markdown + stats export for the reports panel.</summary>
-public sealed class RangeReportUseCase(IRangeReportService service, IClock clock)
+public sealed class RangeReportUseCase(
+    IRangeReportService service,
+    IClock clock,
+    IReportRasterizer? rasterizer = null)
 {
     public DateOnly Today => clock.Now().LocalDate;
 
@@ -28,8 +36,10 @@ public sealed class RangeReportUseCase(IRangeReportService service, IClock clock
         return service.GenerateAsync(from, to, ct);
     }
 
-    /// <summary>Writes both the Markdown report and its deterministic stats sidecar; never overwrites silently.</summary>
-    public static async Task<RangeReportExport> ExportAsync(
+    /// <summary>
+    /// Writes the Markdown report, stats sidecar and SVG; PNG/PDF are added when a rasterizer is configured.
+    /// </summary>
+    public async Task<RangeReportExport> ExportAsync(
         RangeReport report,
         string destinationDirectory,
         CancellationToken ct = default)
@@ -46,7 +56,18 @@ public sealed class RangeReportUseCase(IRangeReportService service, IClock clock
         await File.WriteAllTextAsync(markdownPath, report.Markdown, ct);
         await File.WriteAllTextAsync(statsPath, report.StatsJson, ct);
         await File.WriteAllTextAsync(svgPath, RangeReportSvgRenderer.Render(report), ct);
-        return new RangeReportExport(markdownPath, statsPath, svgPath);
+
+        string? pngPath = null;
+        string? pdfPath = null;
+        if (rasterizer is not null)
+        {
+            pngPath = Path.Combine(destinationDirectory, stem + ".png");
+            await File.WriteAllBytesAsync(pngPath, rasterizer.RenderPng(report), ct);
+            pdfPath = Path.Combine(destinationDirectory, stem + ".pdf");
+            await File.WriteAllBytesAsync(pdfPath, rasterizer.RenderPdf(report), ct);
+        }
+
+        return new RangeReportExport(markdownPath, statsPath, svgPath, pngPath, pdfPath);
     }
 }
 

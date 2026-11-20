@@ -231,13 +231,23 @@ public static class Program
                 var to = ParseDateOption(args, "--to", today);
                 var outputDirectory = ResolveOutputDirectory(args, "reports");
                 var report = await runtime.RangeReport.GenerateAsync(from, to, CancellationToken.None);
-                var export = await RangeReportUseCase.ExportAsync(report, outputDirectory, CancellationToken.None);
+                var export = await runtime.RangeReport.ExportAsync(report, outputDirectory, CancellationToken.None);
                 Console.WriteLine(
                     $"Range report: from={from:yyyy-MM-dd} to={to:yyyy-MM-dd} events={report.TotalEvents} " +
                     $"model={report.ModelId} degraded={report.Degraded}");
                 Console.WriteLine($"markdown={export.MarkdownPath}");
                 Console.WriteLine($"svg={export.SvgPath}");
                 Console.WriteLine($"stats={export.StatsPath}");
+                if (export.PngPath is not null)
+                {
+                    Console.WriteLine($"png={export.PngPath}");
+                }
+
+                if (export.PdfPath is not null)
+                {
+                    Console.WriteLine($"pdf={export.PdfPath}");
+                }
+
                 return 0;
             }
 

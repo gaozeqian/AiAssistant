@@ -196,11 +196,19 @@ public sealed class RangeReportTests
             CancellationToken.None);
         var directory = TestDirectories.Create("range-export");
 
-        var export = await RangeReportUseCase.ExportAsync(report, directory);
+        var useCase = new RangeReportUseCase(
+            new FakeRangeReportService(),
+            new SystemClock(),
+            new FakeReportRasterizer());
+        var export = await useCase.ExportAsync(report, directory);
 
         Assert.True(File.Exists(export.MarkdownPath));
         Assert.True(File.Exists(export.StatsPath));
         Assert.True(File.Exists(export.SvgPath));
+        Assert.NotNull(export.PngPath);
+        Assert.NotNull(export.PdfPath);
+        Assert.True(File.Exists(export.PngPath));
+        Assert.True(File.Exists(export.PdfPath));
         Assert.EndsWith(".stats.json", export.StatsPath, StringComparison.Ordinal);
         Assert.EndsWith(".svg", export.SvgPath, StringComparison.Ordinal);
         Assert.Contains("20261116-20261122", export.MarkdownPath, StringComparison.Ordinal);
@@ -533,6 +541,19 @@ internal static class TestDirectories
         Directory.CreateDirectory(directory);
         return directory;
     }
+}
+
+internal sealed class FakeReportRasterizer : IReportRasterizer
+{
+    public byte[] RenderPng(RangeReport report) => [0x89, 0x50, 0x4E, 0x47];
+
+    public byte[] RenderPdf(RangeReport report) => "%PDF-fake"u8.ToArray();
+}
+
+internal sealed class FakeRangeReportService : IRangeReportService
+{
+    public Task<RangeReport> GenerateAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct) =>
+        Task.FromResult(new RangeReport(fromDate, toDate, "# report", "{}", [], "none", true, "no-evidence"));
 }
 
 internal sealed class QueryableEventRepository(IReadOnlyList<ActivityEvent> events) : IEventRepository
