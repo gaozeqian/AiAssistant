@@ -474,7 +474,11 @@ public sealed class EmbeddingAndBenchmarkTests
         public Task<ModelCompletionResult> CompleteAsync(ModelCompletionRequest request, CancellationToken ct)
         {
             var text = request.UserPrompt.Contains("只输出 JSON", StringComparison.Ordinal)
-                ? """{"overview":"总结","highlights":["成果"],"standup":{"today":"计划"}}"""
+                ? """
+                  ```json
+                  {"overview":"总结","highlights":["成果"],"standup":{"today":"计划"}}
+                  ```
+                  """
                 : "完成代码评审与数据库迁移。";
             return Task.FromResult(new ModelCompletionResult(text, ChatModelId, ModelEndpointTier.LocalOffline, false, TimeSpan.FromMilliseconds(5)));
         }

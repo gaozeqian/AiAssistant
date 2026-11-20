@@ -143,9 +143,22 @@ public sealed class ModelBenchmarkRunner(IModelGateway model)
 
     private static bool IsValidJson(string text)
     {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        // Match production report parsing: tolerate code fences or prose around the JSON object.
+        var start = text.IndexOf('{', StringComparison.Ordinal);
+        var end = text.LastIndexOf('}');
+        if (start < 0 || end <= start)
+        {
+            return false;
+        }
+
         try
         {
-            using var _ = JsonDocument.Parse(text);
+            using var _ = JsonDocument.Parse(text[start..(end + 1)]);
             return true;
         }
         catch (JsonException)
