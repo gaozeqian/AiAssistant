@@ -322,4 +322,53 @@ public sealed class EncryptedStorageAndPocTests : IDisposable
         Assert.True(health.IsHealthy);
         Assert.Equal(0, health.EventCount);
     }
+
+    [Fact]
+    public async Task AbnormalRestart_RecoversRunningJob_AndPreservesCommittedEventAndMedia()
+    {
+        var options = new StorageOptions { DataDirectory = Path.Combine(_tempRoot, "case7-restart") };
+        var keyStore = new StaticKeyStore(RandomNumberGenerator.GetBytes(32));
+        var factory = new EncryptedSqliteConnectionFactory(options, keyStore);
+        var clock = new SystemClock();
+        var maintenance = new SqliteDatabaseMaintenanceService(factory);
+        var mediaStore = new AesGcmMediaStore(factory, keyStore);
+        var repository = new SqliteEventRepository(factory, mediaStore);
+        var queue = new SqliteReportJobQueue(factory, clock);
+        await maintenance.InitializeAsync(CancellationToken.None);
+
+        var timestamp = ((IClock)clock).Now();
+        var eventId = StableId.NewEventId(timestamp.OccurredAtUtc);
+        var plaintext = Encoding.UTF8.GetBytes("encrypted media surviving restart");
+        await repository.AppendWithMediaBatchAsync(
+        [
+            new EventWithMediaWrite(
+                new ActivityEvent(eventId, timestamp, SourceKind.ScreenFrame, "Code", "Before restart"),
+                plaintext,
+                ContentKind.ScreenshotPng)
+        ], CancellationToken.None);
+        var enqueued = await queue.EnqueueAsync(
+            new ReportJobRequest(timestamp.LocalDate, ReportTriggerSource.Manual),
+            CancellationToken.None);
+        var running = await queue.ClaimNextPendingAsync(CancellationToken.None);
+        Assert.NotNull(running);
+        Assert.Equal(ReportJobStatus.Running, running.Status);
+
+        // All operation-scoped connections are closed. Rebuild the object graph as a new process would.
+        var restartedFactory = new EncryptedSqliteConnectionFactory(options, keyStore);
+        var restartedMaintenance = new SqliteDatabaseMaintenanceService(restartedFactory);
+        var restartedMedia = new AesGcmMediaStore(restartedFactory, keyStore);
+        var restartedRepository = new SqliteEventRepository(restartedFactory, restartedMedia);
+        var restartedQueue = new SqliteReportJobQueue(restartedFactory, clock);
+        await restartedMaintenance.InitializeAsync(CancellationToken.None);
+
+        Assert.Equal(1, await restartedQueue.RecoverInterruptedJobsAsync(CancellationToken.None));
+        var jobs = await restartedQueue.ListRecentJobsAsync(10, CancellationToken.None);
+        Assert.Equal(ReportJobStatus.Pending, Assert.Single(jobs).Status);
+        var restoredEvent = await restartedRepository.GetByIdAsync(eventId, CancellationToken.None);
+        Assert.NotNull(restoredEvent?.MediaRef);
+        var restoredMedia = await restartedMedia.ReadDecryptedAsync(restoredEvent.MediaRef.ContentId, CancellationToken.None);
+        Assert.Equal(plaintext, restoredMedia);
+        Assert.True((await restartedMaintenance.CheckHealthAsync(CancellationToken.None)).IsHealthy);
+        Assert.Equal(enqueued.JobId, running.Id);
+    }
 }

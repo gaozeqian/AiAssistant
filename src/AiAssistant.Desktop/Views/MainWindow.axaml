@@ -1,0 +1,269 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AiAssistant.Desktop.ViewModels"
+        x:Class="AiAssistant.Desktop.Views.MainWindow"
+        x:DataType="vm:ShellViewModel"
+        Title="时光 · AI 个人活动追踪助手"
+        Width="1240"
+        Height="800"
+        MinWidth="980"
+        MinHeight="660"
+        WindowStartupLocation="CenterScreen"
+        Background="#F4F6FA">
+  <Window.Resources>
+    <SolidColorBrush x:Key="AccentBrush" Color="#3157D5" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#64748B" />
+  </Window.Resources>
+  <Window.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Padding" Value="16,9" />
+      <Setter Property="CornerRadius" Value="7" />
+    </Style>
+    <Style Selector="Button.secondary">
+      <Setter Property="Padding" Value="14,8" />
+      <Setter Property="CornerRadius" Value="7" />
+    </Style>
+    <Style Selector="TextBox, ComboBox">
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="ListBoxItem">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,*">
+    <Border Grid.Row="0" Background="#111C36" Padding="24,16">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <Border Width="38" Height="38" CornerRadius="11" Background="#3157D5" VerticalAlignment="Center">
+          <TextBlock Text="时" Foreground="White" FontSize="20" FontWeight="SemiBold"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+          <TextBlock Text="时光" Foreground="White" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="个人活动追踪 · 默认仅在本机处理" Foreground="#B7C3D9" FontSize="12" />
+        </StackPanel>
+        <Border Grid.Column="2" Background="#22304D" CornerRadius="14" Padding="12,6" VerticalAlignment="Center">
+          <TextBlock Text="{Binding CaptureStatus}" Foreground="#DCE5F5" FontSize="12" />
+        </Border>
+      </Grid>
+    </Border>
+
+    <TabControl Grid.Row="1" Margin="20" SelectedIndex="{Binding SelectedSectionIndex}" Background="Transparent">
+      <TabItem Header="时间线">
+        <Grid DataContext="{Binding Timeline}" x:DataType="vm:TimelineViewModel"
+              ColumnDefinitions="360,*" Margin="0,12,0,0">
+          <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="16" Margin="0,0,12,0">
+            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+              <TextBlock Grid.Row="0" Text="活动记录" FontSize="18" FontWeight="SemiBold" />
+              <ComboBox Grid.Row="1" ItemsSource="{Binding ActiveDates}" SelectedItem="{Binding SelectedDate}"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Margin="0,14,0,10">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TimelineDateItem">
+                    <TextBlock Text="{Binding DisplayName}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="搜索应用、标题或正文" />
+                <Button Grid.Column="1" Classes="primary" Command="{Binding RefreshCommand}" Content="刷新" Margin="8,0,0,0" />
+              </Grid>
+
+              <Grid Grid.Row="3" Margin="0,14,0,0">
+                <ListBox ItemsSource="{Binding Events}" SelectedItem="{Binding SelectedEvent}"
+                         Background="Transparent" BorderThickness="0">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TimelineEventItem">
+                      <Border Padding="10,9" CornerRadius="7" Margin="0,2">
+                        <Grid ColumnDefinitions="62,*" RowDefinitions="Auto,Auto,Auto">
+                          <TextBlock Grid.RowSpan="3" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="12"
+                                     Foreground="{StaticResource MutedBrush}" VerticalAlignment="Top" Margin="0,2,8,0" />
+                          <TextBlock Grid.Column="1" Text="{Binding AppName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Title}" TextWrapping="Wrap"
+                                     MaxHeight="40" FontSize="12" Margin="0,3,0,0" />
+                          <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding SourceText}" FontSize="11"
+                                     Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock Text="暂无可显示的活动" Foreground="{StaticResource MutedBrush}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           IsVisible="{Binding !HasSelectedEvent}" />
+                <ProgressBar IsIndeterminate="True" VerticalAlignment="Top" IsVisible="{Binding IsLoading}" />
+              </Grid>
+
+              <StackPanel Grid.Row="4" Margin="0,12,0,0" Spacing="5">
+                <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="#B42318" TextWrapping="Wrap"
+                           IsVisible="{Binding HasError}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="24">
+            <Grid RowDefinitions="Auto,*">
+              <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <StackPanel DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem" IsVisible="{Binding $parent[Grid].DataContext.HasSelectedEvent}">
+                  <TextBlock Text="{Binding AppName}" FontSize="13" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Title}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,4" />
+                  <TextBlock Text="{Binding CapturedTimeText}" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                </StackPanel>
+                <Border Grid.Column="1" Background="#EEF2FF" CornerRadius="6" Padding="9,5" VerticalAlignment="Top">
+                  <TextBlock Text="LOCAL ONLY" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                </Border>
+              </Grid>
+
+              <ScrollViewer Grid.Row="1" Margin="0,20,0,0">
+                <StackPanel Spacing="16">
+                  <Border Background="#F8FAFC" CornerRadius="8" Padding="14" IsVisible="{Binding HasSelectedEvent}">
+                    <StackPanel DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem" Spacing="8">
+                      <TextBlock Text="活动内容" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding DetailText}" TextWrapping="Wrap" IsVisible="{Binding HasDetailText}" />
+                      <TextBlock Text="该事件没有提取文本或摘要。" Foreground="{StaticResource MutedBrush}"
+                                 IsVisible="{Binding !HasDetailText}" />
+                    </StackPanel>
+                  </Border>
+
+                  <StackPanel IsVisible="{Binding HasSelectedEvent}" Spacing="8">
+                    <TextBlock Text="媒体预览" FontWeight="SemiBold" />
+                    <TextBlock DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem"
+                               Text="{Binding MediaSizeText}" FontSize="11" Foreground="{StaticResource MutedBrush}" />
+                    <Border Background="#E8EDF5" CornerRadius="8" MinHeight="180" ClipToBounds="True"
+                            IsVisible="{Binding HasPreview}">
+                      <Image Source="{Binding PreviewImage}" Stretch="Uniform" MaxHeight="500" />
+                    </Border>
+                    <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsPreviewLoading}" />
+                    <Border Background="#FFF4E5" CornerRadius="7" Padding="12" IsVisible="{Binding HasPreviewError}">
+                      <TextBlock Text="{Binding PreviewError}" Foreground="#8A4B0F" TextWrapping="Wrap" />
+                    </Border>
+                    <TextBlock Text="此事件没有关联媒体。" Foreground="{StaticResource MutedBrush}" IsVisible="{Binding HasNoMedia}" />
+                  </StackPanel>
+
+                  <StackPanel IsVisible="{Binding !HasSelectedEvent}" HorizontalAlignment="Center" Margin="0,100,0,0" Spacing="8">
+                    <TextBlock Text="选择左侧事件开始回看" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Text="媒体只在选中时解密，明文不会写入临时文件" Foreground="{StaticResource MutedBrush}" />
+                  </StackPanel>
+                </StackPanel>
+              </ScrollViewer>
+            </Grid>
+          </Border>
+        </Grid>
+      </TabItem>
+
+      <TabItem Header="隐私与控制">
+        <ScrollViewer DataContext="{Binding Capture}" x:DataType="vm:CaptureControlViewModel" Margin="0,12,0,0">
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+            <Border Grid.Row="0" Grid.Column="0" Background="White" CornerRadius="10" Padding="24" Margin="0,0,8,12">
+              <StackPanel Spacing="14">
+                <TextBlock Text="采集状态" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding CaptureStateText}" FontSize="15" Foreground="{StaticResource AccentBrush}" />
+                <TextBlock Text="暂停会立即阻断入口并清空待处理队列。恢复后不会补写暂停期间的活动。"
+                           TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                <WrapPanel>
+                  <Button Classes="primary" Content="{Binding PauseButtonText}" Command="{Binding TogglePauseCommand}" Margin="0,0,8,8" />
+                  <Button Classes="secondary" Content="立即快照" Command="{Binding CaptureSnapshotCommand}" Margin="0,0,8,8" />
+                </WrapPanel>
+                <TextBlock Text="{Binding MetricsText}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Row="0" Grid.Column="1" Background="White" CornerRadius="10" Padding="24" Margin="8,0,0,12">
+              <StackPanel Spacing="14">
+                <TextBlock Text="开机与隐私" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding AutoStartText}" />
+                <Button Classes="secondary" Content="切换开机自启" Command="{Binding ToggleAutoStartCommand}" HorizontalAlignment="Left" />
+                <Border Background="#EFF6F1" CornerRadius="8" Padding="14">
+                  <TextBlock Text="数据库使用 SQLite3MC 加密，媒体使用 AES-GCM 加密；密钥由系统密钥库保护。默认不监视全盘、不记录按键或剪贴板。"
+                             TextWrapping="Wrap" Foreground="#256044" />
+                </Border>
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Row="1" Grid.ColumnSpan="2" Background="White" CornerRadius="10" Padding="24">
+              <StackPanel Spacing="12">
+                <TextBlock Text="应用与窗口黑名单" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="每行一个关键字，匹配应用名或窗口标题，不区分大小写。密码管理器与隐私浏览的内置规则也会显示在下方。"
+                           TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                <TextBox Text="{Binding BlacklistText}" AcceptsReturn="True" MinHeight="170" TextWrapping="NoWrap" />
+                <Button Classes="primary" Content="保存并立即生效" Command="{Binding SaveBlacklistCommand}" HorizontalAlignment="Left" />
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="本地诊断">
+        <ScrollViewer DataContext="{Binding Diagnostics}" x:DataType="vm:DiagnosticsViewModel" Margin="0,12,0,0">
+          <StackPanel Spacing="12">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel>
+                <TextBlock Text="系统健康与能力矩阵" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding PlatformName}" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" />
+              </StackPanel>
+              <Button Grid.Column="1" Classes="primary" Content="重新检查" Command="{Binding RefreshCommand}" />
+            </Grid>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" />
+            <Border Background="#FFF1F0" CornerRadius="8" Padding="14" IsVisible="{Binding HasError}">
+              <TextBlock Text="{Binding ErrorMessage}" Foreground="#B42318" TextWrapping="Wrap" />
+            </Border>
+            <Grid ColumnDefinitions="*,*">
+              <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="18" Margin="0,0,6,0">
+                <StackPanel Spacing="7">
+                  <TextBlock Text="加密数据库" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding DatabaseText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="18" Margin="6,0,0,0">
+                <StackPanel Spacing="7">
+                  <TextBlock Text="采集管道" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding PipelineText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                </StackPanel>
+              </Border>
+            </Grid>
+            <Border Background="White" CornerRadius="10" Padding="18">
+              <StackPanel Spacing="10">
+                <TextBlock Text="平台能力" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding Capabilities}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:CapabilityItem">
+                      <Border BorderBrush="#E7EBF1" BorderThickness="0,0,0,1" Padding="0,9">
+                        <Grid ColumnDefinitions="130,85,*,260">
+                          <TextBlock Text="{Binding KindText}" FontWeight="SemiBold" />
+                          <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{StaticResource AccentBrush}" />
+                          <TextBlock Grid.Column="2" Text="{Binding Summary}" TextWrapping="Wrap" Margin="8,0" />
+                          <TextBlock Grid.Column="3" Text="{Binding RemediationHint}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+            <Border Background="White" CornerRadius="10" Padding="18">
+              <StackPanel Spacing="10">
+                <TextBlock Text="最近后台任务" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding RecentJobs}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ReportJobItem">
+                      <Grid ColumnDefinitions="120,120,100,*" Margin="0,5">
+                        <TextBlock Text="{Binding DateText}" />
+                        <TextBlock Grid.Column="1" Text="{Binding StatusText}" />
+                        <TextBlock Grid.Column="2" Text="{Binding AttemptText}" />
+                        <TextBlock Grid.Column="3" Text="{Binding CreatedText}" Foreground="{StaticResource MutedBrush}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+            <TextBlock Text="{Binding LastRefreshText}" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+  </Grid>
+</Window>

@@ -5,7 +5,7 @@ namespace AiAssistant.Host;
 public static class Program
 {
     [STAThread]
-    public static int Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
         if (args.Contains("--smoke-check", StringComparer.OrdinalIgnoreCase))
         {
@@ -13,7 +13,24 @@ public static class Program
             return 0;
         }
 
-        return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        try
+        {
+            await using var runtime = AppRuntime.Create();
+            await runtime.StartAsync();
+            if (args.Contains("--startup-check", StringComparer.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"AiAssistant.Host startup-check OK; recovered jobs: {runtime.RecoveredJobCount}");
+                return 0;
+            }
+
+            Desktop.ShellApp.ViewModelFactory = runtime.CreateShellViewModel;
+            return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"AiAssistant startup failed ({ex.GetType().Name}). Check storage permissions and available disk space.");
+            return 2;
+        }
     }
 
     public static AppBuilder BuildAvaloniaApp()
