@@ -1,3 +1,4 @@
+using AiAssistant.Host.Benchmarks;
 using AiAssistant.Platform.Linux.Desktop;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -58,13 +59,20 @@ public static class Program
             if (args.Contains("--benchmark-model", StringComparer.OrdinalIgnoreCase))
             {
                 var report = await runtime.ModelBenchmark.RunAsync(CancellationToken.None);
-                var outputPath = ResolveBenchmarkOutput(args);
+                var outputPath = ResolveBenchmarkOutput(args, "model");
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
                 await File.WriteAllTextAsync(outputPath, report.ToMarkdown(), CancellationToken.None);
                 Console.WriteLine(
                     $"Model benchmark: model={report.ChatModel} success={report.SuccessRate:P0} json={report.JsonComplianceRate:P0} avg={report.AverageLatencyMilliseconds}ms");
                 Console.WriteLine($"report={outputPath}");
                 return report.SuccessRate > 0 ? 0 : 1;
+            }
+
+            if (args.Contains("--benchmark-retrieval", StringComparer.OrdinalIgnoreCase))
+            {
+                var outputPath = ResolveBenchmarkOutput(args, "retrieval");
+                return await new RetrievalBenchmarkCommand(runtime.ModelGateway)
+                    .RunAsync(outputPath, CancellationToken.None);
             }
 
             var isMaintenanceCommand = args.Any(argument =>
@@ -162,7 +170,7 @@ public static class Program
         return false;
     }
 
-    private static string ResolveBenchmarkOutput(string[] args)
+    private static string ResolveBenchmarkOutput(string[] args, string prefix)
     {
         if (TryGetOption(args, "--output", out var value))
         {
@@ -172,7 +180,7 @@ public static class Program
         return Path.GetFullPath(Path.Combine(
             "artifacts",
             "benchmarks",
-            $"model-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.md"));
+            $"{prefix}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.md"));
     }
 
     private static int StartLinuxDesktop(LinuxDisplayBackendState backendState, string[] args)

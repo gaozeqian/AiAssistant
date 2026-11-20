@@ -56,6 +56,8 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public ModelBenchmarkRunner ModelBenchmark => _services.GetRequiredService<ModelBenchmarkRunner>();
 
+    public IModelGateway ModelGateway => _services.GetRequiredService<IModelGateway>();
+
     public static async Task<AppRuntime> CreateAsync(CancellationToken ct = default)
     {
         var dataDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY");
@@ -183,11 +185,15 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<CaptureControlUseCase>();
         services.AddSingleton<DiagnosticsUseCase>();
         services.AddSingleton<ReportUseCase>();
-        RegisterSearchAndLocalApi(services, dataDirectory, keyStore);
+        RegisterSearchAndLocalApi(services, dataDirectory, keyStore, modelsConfiguration);
         return new AppRuntime(services.BuildServiceProvider(), dataDirectory) { LinuxBackendState = linuxBackendState };
     }
 
-    private static void RegisterSearchAndLocalApi(IServiceCollection services, string dataDirectory, IKeyStore keyStore)
+    private static void RegisterSearchAndLocalApi(
+        IServiceCollection services,
+        string dataDirectory,
+        IKeyStore keyStore,
+        ModelsConfiguration configuration)
     {
         services.AddSingleton<IRangeReportService>(provider => new ActivityRangeReportService(
             provider.GetRequiredService<IEventRepository>(),
@@ -195,7 +201,18 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<ITextRedactor>(),
             provider.GetRequiredService<ILogger<ActivityRangeReportService>>()));
         services.AddSingleton<RangeReportUseCase>();
-        services.AddSingleton(new HybridSearchOptions());
+        var configuredEmbeddingModel = configuration.Endpoints
+            .FirstOrDefault(endpoint => endpoint.Tier == ModelEndpointTier.LocalOffline)
+            ?.EmbeddingModel ?? string.Empty;
+        var queryPrefix = Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_QUERY_PREFIX");
+        if (queryPrefix is null)
+        {
+            queryPrefix = configuredEmbeddingModel.Contains("qwen3-embedding", StringComparison.OrdinalIgnoreCase)
+                ? HybridSearchOptions.Qwen3RetrievalInstruction
+                : string.Empty;
+        }
+
+        services.AddSingleton(new HybridSearchOptions { EmbeddingQueryPrefix = queryPrefix });
         services.AddSingleton<IEvidenceSearch>(provider => new HybridSearchService(
             provider.GetRequiredService<IEventRepository>(),
             provider.GetRequiredService<IVectorIndex>(),

@@ -11,7 +11,7 @@
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
 - **当前构建状态**：✅ 本地 Release 0 警告 0 错误；三平台自包含打包脚本实测（win zip / linux tar.gz / macOS app 布局）
-- **当前测试状态**：✅ 128/128 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 35、`Processing.Tests` 7、`Report.Tests` 47、`Voice.Tests` 7）
+- **当前测试状态**：✅ 129/129 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 35、`Processing.Tests` 7、`Report.Tests` 48、`Voice.Tests` 7）
 - **下一步待确认事项**：配置签名证书/公证凭据后执行 `release.yml`；在真机完成 24h/多日浸泡、安装升级卸载与无障碍走查；S9 遗留项见第 5 节
 
 ---
@@ -111,12 +111,16 @@ AiAssistant.Host --benchmark-model --output artifacts/benchmarks/model.md
 检索质量基准（合成语料，16 查询 / 48 事件）：
 
 ```bash
+# 概念向量替身（离线、无模型依赖）
 dotnet test tests/AiAssistant.Report.Tests -c Release --filter "FullyQualifiedName~S9RetrievalQuality"
-# 报告：artifacts/benchmarks/retrieval-benchmark.md
+
+# 真实 embedding（需要 Ollama + qwen3-embedding）
+AiAssistant.Host --benchmark-retrieval --output artifacts/benchmarks/retrieval-real.md
 ```
 
-- 对比「关键词-only」与「关键词 + 概念向量 RRF」，输出 Recall@K、命中率、MRR 与逐查询排名。
+- 对比「关键词-only」与「关键词 + 向量 RRF」，输出 Recall@K、命中率、MRR 与逐查询排名。
 - `HybridSearchOptions.EnableVectorRecall=false` 可关闭向量召回，用于离线降级与基线对照。
+- `AIASSISTANT_EMBEDDING_QUERY_PREFIX` 可覆盖查询指令前缀；qwen3-embedding 默认使用官方检索指令（`Instruct: Given a web search query, ...`）。
 
 ### 3.5 本地语音模型与命令
 
@@ -230,6 +234,7 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-20 [win-x64] [S8 智能检索与完整对话完成]**：新增 `AiAssistant.LocalApi` 项目并把检索/问答/区间报告提升为 Application 端口（`IEvidenceSearch`、`IEvidenceQuestionAnswerer`、`IRangeReportService`、`ILocalMcpControl`），Desktop 只依赖 Application。实现 `HybridSearchService`（时间过滤 + 关键词 + 向量 RRF 融合、统一 `[E#]` 证据、向量失败仅降级关键词）与 `EvidenceQuestionAnswerUseCase`（强制引用校验，无引用走抽取式降级，无证据返回 `no-evidence` 且不调用模型）。实现 `ActivityRangeReportService` 与 `RangeReportUseCase`：周一为界的周报、任意区间每日事件数/活跃分钟/主要应用、Markdown + stats JSON 双文件导出、模型不可用确定性统计降级。实现只读 loopback MCP：`TcpListener` 仅绑 `127.0.0.1`、AES-GCM 加密令牌（可轮换）、滑动窗口限流、JSON-RPC `initialize/ping/tools/list/tools/call`、四个只读工具、未知或写入工具返回 -32602；Host 生命周期接入且默认关闭。新增“检索与问答”面板（检索/提问/导出、证据卡片一键定位时间线、周报柱状与导出）、“本地诊断”MCP 令牌显示/轮换，语音“问一下…”复用同一证据用例。全仓 Release 0 警告 0 错误、106/106 测试通过（新增 16 项检索/报告/MCP 契约测试与 2 项 UI/语音测试），两平台发布通过。真实 embedding 质量与真实 MCP 客户端联调保留遗留项。
 - **2026-11-20 [win-x64] [S9 发布加固工具链完成]**：新增 `build/package/` 跨平台打包脚本与图标生成器（纯 Python 生成 PNG/ICO/MSIX 资源）：Windows 自包含 zip + 可选 Authenticode/MSIX、macOS `.app` + codesign/notarytool/stapler、Linux tar.gz + `.deb`；新增 `.github/workflows/release.yml` 签名发布流水线与 CI 打包作业。新增 `IDataDeletionService`/`DataDeletionService`（按日期或全量删除事件、媒体、日报、任务、语音日志、向量索引，WAL checkpoint）与“数据与导出”页面（二次确认删除）、Host 维护命令 `--backup` / `--restore --confirm-restore` / `--purge-data --confirm-purge`（实测备份 84KB、恢复、清空、清空后启动均成功）。新增 v1→v2 迁移保留数据、按日期删除、全量删除后可用、密钥丢失不损坏数据库四项门禁测试；修复报告后台任务测试的时段依赖缺陷（固定时钟）。补充键盘快捷键（Ctrl+D1…D7、Ctrl+F、F5）、关键控件无障碍名称、诊断页权限引导与确认导出。新增 `docs/release/` 隐私说明、已知限制、性能报告（启动 0.82s、包体积 83MB/58MB）、升级卸载、回滚手册与发布检查表。全仓 Release 0 警告 0 错误、112/112 测试通过；Windows zip、Linux tar.gz、macOS app 布局实测生成。真实签名公证、多日浸泡与人工无障碍验收保留遗留项。
 - **2026-11-20 [win-x64] [S9 供应链收尾]**：新增离线 CycloneDX 1.5 SBOM 生成器 `build/sbom/generate-sbom.py`（读取 `project.assets.json`，输出 SHA-512 哈希、purl 与依赖图，支持 `--verify` 与 `--check-manifest`），实测 103 个组件、104 条依赖边、校验通过；依赖清单补齐全部 28 个集中管理包。打包脚本自动生成 `SHA256SUMS` 并实测 `sha256sum -c` 通过；CI SBOM 作业改为离线生成（不再安装外部工具），Release 工作流合并产物后统一生成校验和并附 `bom.json`。新增 `docs/release/RELEASE-NOTES-TEMPLATE.md`。`S9-R4` 仅剩 CI 实际运行与 Release 附件待验证。
+- **2026-11-20 [win-x64] [S9 真实 embedding 检索评测]**：新增 `AiAssistant.Host --benchmark-retrieval`，用真实配置的 embedding 端点对合成语料建索引并对比关键词/混合检索；新增 `HybridSearchOptions.EmbeddingQueryPrefix`（qwen3-embedding 默认使用官方检索指令，可用 `AIASSISTANT_EMBEDDING_QUERY_PREFIX` 覆盖）。本机 qwen3-embedding:0.6b（1024 维）实测：关键词 Recall@8 50%/MRR 0.5；混合无指令 79.2%/0.875；加检索指令后 **88.5%/0.938**，热态平均 17 ms（首次含模型加载约 6.4 s）。同义词「同行评审」「上线流水线」仍有漂移，记录为后续调参样本。全仓 129/129 测试通过。
 - **2026-11-20 [win-x64] [S9 检索质量基准]**：新增 `RetrievalBenchmarkEvaluator`（Recall@K、命中率、MRR、逐查询排名与对比报告）与 `HybridSearchOptions.EnableVectorRecall` 开关；新增合成语料基准测试（48 条事件 / 16 查询，8 个主题各含精确词与同义词查询）。实测关键词-only Recall@8 50%、MRR 0.500；混合 RRF Recall@8 100%、MRR 1.000，验证了同义词召回与融合排序。报告写入 `artifacts/benchmarks/retrieval-benchmark.md` 并由 CI 上传。真实 embedding 质量仍为 `S8-R1` 遗留项。
 - **2026-11-20 [win-x64] [S9 模型评测命令]**：新增 `AiAssistant.Host --benchmark-model [--output <path>]`，复用固定中文基准集输出成功率、JSON 合规率、平均耗时与失败详情；模型不可用时仍写报告并以退出码 1 结束。基准结果新增 `ErrorDetail` 便于定位端点问题。修复本地模型端点在存在系统代理环境变量时误走代理的缺陷（`ModelHttpClientFactory` 对 loopback 默认禁用代理，显式代理仍优先），新增 3 项代理判定测试。用本地模拟 Ollama 端点完成端到端验证：成功路径 100% 成功/100% JSON/退出码 0，离线路径 0% 且报告含 `ModelGatewayException`。将两个浸泡测试放入禁用并行的 `Soak` 集合，消除全量并行时的计时抖动。全仓 126/126 测试通过。真实 Qwen 模型评测仍为 `S5-R1` 遗留项。
 - **2026-11-20 [win-x64] [S9 MCP 协议兼容与一致性校验]**：MCP 端点升级为 Streamable HTTP 兼容：支持 `application/json` 与单事件 `text/event-stream` 响应、`Mcp-Session-Id` 会话头、协议版本协商（`2024-11-05` / `2025-03-26` / `2025-06-18`）与 `DELETE /mcp`；新增无头 `--mcp-serve` 与 `--mcp-token` 命令。新增 10 项协议一致性测试（初始化/协商、通知 202、SSE、工具 schema、错误码 -32700/-32601/-32602、会话删除），并新增独立 Python 一致性客户端 `build/mcp/mcp-client.py`。端到端实测：JSON 模式 17/17、SSE 模式 18/18 通过（含未授权 401、写入工具拒绝）。全仓 123/123 测试通过。第三方 MCP 客户端实测仍为遗留项。
@@ -256,7 +261,7 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S7-R1` | S7 语音 | 真实中文 KWS 唤醒率/误唤醒率、TTS 音质与端到端延迟未评测 | 阈值和体验未达发布基线 | 外挂 KWS/TTS 模型后运行安静/嘈杂/多人场景黄金集，按实测调整阈值 |
 | `S7-R2` | S7 macOS | macOS TTS 音频输出仍为 Degraded；命令文字反馈可用 | macOS 无语音播报 | 扩展 Swift Helper 的音频输出能力并做 TCC 麦克风/输出验收 |
 | `S7-R3` | S7 隐私 | 命令音频选择落盘（opt-in）尚未实现，当前仅加密文本日志 | 无法回听命令音频 | S9 前增加显式开关、加密媒体引用与自动清理 |
-| `S8-R1` | S8 检索 | 已提供合成语料检索基准（关键词 50% → 混合 100% Recall@8、MRR 0.5 → 1.0）；真实 embedding 模型下的召回质量与 RRF 参数仍未评测 | 真实语义分布可能不同于合成语料 | 在目标机器安装 qwen3-embedding 后替换概念向量，跑同一查询集并调参 |
+| `S8-R1` | S8 检索 | 已完成 qwen3-embedding:0.6b 真实评测：关键词 Recall@8 50%/MRR 0.5 → 混合 88.5%/0.938（加检索指令后，无指令为 79.2%/0.875）；部分同义词仍会漂移 | 真实用户语料与合成语料分布不同；同义词召回仍有失败 | 用真实脱敏语料扩充查询集，按失败样本调整指令/候选数与 RRF 参数 |
 | `S8-R2` | S8 MCP | 已完成 Streamable HTTP 兼容（JSON/SSE、会话头、版本协商）与 17/18 项一致性客户端校验；尚未与第三方 MCP 客户端（Claude Desktop 等）实测 | 第三方客户端的会话/SSE 细节可能仍有差异 | 安装至少一个真实 MCP 客户端完成全链路联调并记录 |
 | `S8-R3` | S8 周报 | 周报图表为文本条形与 Markdown 表格，未提供 PNG/PDF 图形化导出 | 汇报场景需要手工截图 | 视需要增加图形化导出（本地渲染，不引入云服务） |
 | `S9-R1` | S9 签名 | Windows Authenticode/MSIX 与 macOS Developer ID/公证未用真实证书执行；脚本与工作流已就绪 | 未验证的签名链可能导致安装被拦截 | 配置证书与公证凭据后运行 `release.yml`，并保存 `signtool verify` / `spctl` 输出 |

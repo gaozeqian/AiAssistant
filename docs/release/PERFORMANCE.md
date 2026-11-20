@@ -8,7 +8,7 @@
 | 指标 | 数值 | 说明 |
 |---|---|---|
 | Release 全量构建 | 0 警告 / 0 错误 | `dotnet build AiAssistant.sln -c Release` |
-| 测试总数 | 128 | 8 个测试项目（含 3 天加速浸泡、MCP 协议一致性与检索基准） |
+| 测试总数 | 129 | 8 个测试项目（含 3 天加速浸泡、MCP 协议一致性与检索基准） |
 | 测试总耗时 | 约 24 秒 | 各项目并行；Platform 24s（浸泡串行执行）、Storage 3s、Report 0.7s |
 | 架构门禁 | 6 项 | 依赖方向与合成违规检测 |
 
@@ -57,7 +57,11 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests \
 
 - KWS/TTS、ASR 延迟与内存占用依赖外挂模型资产，未在本机评测（`S7-R1`）。
 - 本机模型（Ollama Qwen3 4B–9B）首 token 与吞吐未评测（`S5-R1`）；已提供 `AiAssistant.Host --benchmark-model --output artifacts/benchmarks/model.md`，并用本地模拟端点验证了成功（100% 成功 / 100% JSON）与离线降级（0% 且退出码 1）两条路径。
-- 混合检索：合成语料（48 事件 / 16 查询）关键词-only Recall@8 50%、MRR 0.500；加入概念向量 RRF 后 Recall@8 100%、MRR 1.000。真实 embedding 与问答正确率仍未评测（`S8-R1`）。
+- 混合检索（合成语料 48 事件 / 16 查询）：
+  - 关键词-only：Recall@8 50%、MRR 0.500；
+  - 概念向量 RRF（离线替身）：Recall@8 100%、MRR 1.000；
+  - **qwen3-embedding:0.6b（1024 维）**：无指令 Recall@8 79.2%/MRR 0.875；加官方检索指令后 **88.5%/0.938**，热态平均 17 ms/查询，首次调用含模型加载约 6.4 s。
+- 问答正确率仍未评测（`S8-R1`）；同义词「同行评审」「上线流水线」仍会漂移。
 
 ## 6. 复现命令
 

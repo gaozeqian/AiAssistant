@@ -9,12 +9,19 @@ namespace AiAssistant.Summarization;
 
 public sealed class HybridSearchOptions
 {
+    /// <summary>Recommended asymmetric query instruction for Qwen3-Embedding retrieval.</summary>
+    public const string Qwen3RetrievalInstruction =
+        "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: ";
+
     public int TopK { get; init; } = 8;
     public int CandidateLimit { get; init; } = 60;
     public double RrfConstant { get; init; } = 60;
 
     /// <summary>Disable to measure keyword-only recall (benchmarking, offline fallback).</summary>
     public bool EnableVectorRecall { get; init; } = true;
+
+    /// <summary>Optional instruction prefix for embedding models that support asymmetric query instructions.</summary>
+    public string EmbeddingQueryPrefix { get; init; } = string.Empty;
 }
 
 /// <summary>
@@ -63,8 +70,11 @@ public sealed class HybridSearchService(
         {
             try
             {
+                var embeddingText = string.IsNullOrEmpty(options.EmbeddingQueryPrefix)
+                    ? query
+                    : options.EmbeddingQueryPrefix + query;
                 var embedding = await model.EmbedAsync(
-                    new ModelEmbeddingRequest([query], Purpose: "evidence-search"),
+                    new ModelEmbeddingRequest([embeddingText], Purpose: "evidence-search"),
                     ct);
                 if (embedding.Vectors.Count > 0)
                 {

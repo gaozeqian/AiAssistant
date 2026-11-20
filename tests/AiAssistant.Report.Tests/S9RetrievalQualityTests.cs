@@ -14,21 +14,6 @@ namespace AiAssistant.Report.Tests;
 /// </summary>
 public sealed class S9RetrievalQualityTests
 {
-    private static readonly DateOnly FromDate = new(2026, 11, 16);
-    private static readonly DateOnly ToDate = new(2026, 11, 22);
-
-    private static readonly string[] ConceptNames =
-    [
-        "数据库迁移",
-        "支付回调",
-        "登录超时",
-        "团队周会",
-        "文档写作",
-        "界面改版",
-        "回归测试",
-        "部署脚本"
-    ];
-
     private static readonly string[][] ConceptKeywords =
     [
         ["数据库", "迁移", "存储", "引擎", "版本", "迭代"],
@@ -56,7 +41,7 @@ public sealed class S9RetrievalQualityTests
     [Fact]
     public async Task HybridRetrieval_OutperformsKeywordOnly_OnSynonymQueries()
     {
-        var corpus = BuildCorpus();
+        var corpus = RetrievalBenchmarkCorpus.CreateEvents();
         var repository = new QueryableEventRepository(corpus);
         var vectorIndex = new ConceptVectorIndex();
         foreach (var item in corpus)
@@ -77,12 +62,12 @@ public sealed class S9RetrievalQualityTests
             model,
             new HybridSearchOptions { EnableVectorRecall = true },
             NullLogger<HybridSearchService>.Instance);
-        var queries = BuildQueries();
+        var queries = RetrievalBenchmarkCorpus.CreateQueries();
 
         var keyword = await RetrievalBenchmarkEvaluator.EvaluateAsync(
-            keywordSearch, queries, FromDate, ToDate, "关键词", topK: 8, CancellationToken.None);
+            keywordSearch, queries, RetrievalBenchmarkCorpus.FromDate, RetrievalBenchmarkCorpus.ToDate, "关键词", topK: 8, CancellationToken.None);
         var hybrid = await RetrievalBenchmarkEvaluator.EvaluateAsync(
-            hybridSearch, queries, FromDate, ToDate, "混合（关键词 + 概念向量 RRF）", topK: 8, CancellationToken.None);
+            hybridSearch, queries, RetrievalBenchmarkCorpus.FromDate, RetrievalBenchmarkCorpus.ToDate, "混合（关键词 + 概念向量 RRF）", topK: 8, CancellationToken.None);
 
         await WriteReportAsync(keyword, hybrid);
 
@@ -96,9 +81,39 @@ public sealed class S9RetrievalQualityTests
     }
 
     [Fact]
+    public async Task QueryInstructionPrefix_IsAppliedToEmbeddingInput()
+    {
+        var corpus = RetrievalBenchmarkCorpus.CreateEvents();
+        var repository = new QueryableEventRepository(corpus);
+        var index = new ConceptVectorIndex();
+        foreach (var item in corpus)
+        {
+            index.Upsert(item.Id, ConceptEmbeddingModel.Embed(item.WindowTitle + " " + item.ExtractedText));
+        }
+
+        var model = new ConceptEmbeddingModel();
+        var search = new HybridSearchService(
+            repository,
+            index,
+            model,
+            new HybridSearchOptions { EmbeddingQueryPrefix = "Instruct: test\nQuery: " },
+            NullLogger<HybridSearchService>.Instance);
+
+        _ = await search.SearchAsync(
+            "数据库迁移",
+            RetrievalBenchmarkCorpus.FromDate,
+            RetrievalBenchmarkCorpus.ToDate,
+            CancellationToken.None);
+
+        Assert.NotNull(model.LastInput);
+        Assert.StartsWith("Instruct: test\nQuery: ", model.LastInput, StringComparison.Ordinal);
+        Assert.Contains("数据库迁移", model.LastInput, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task KeywordOnlyMode_SkipsEmbeddingCalls()
     {
-        var corpus = BuildCorpus();
+        var corpus = RetrievalBenchmarkCorpus.CreateEvents();
         var repository = new QueryableEventRepository(corpus);
         var model = new ConceptEmbeddingModel();
         var search = new HybridSearchService(
@@ -108,46 +123,13 @@ public sealed class S9RetrievalQualityTests
             new HybridSearchOptions { EnableVectorRecall = false },
             NullLogger<HybridSearchService>.Instance);
 
-        _ = await search.SearchAsync("数据库迁移", FromDate, ToDate, CancellationToken.None);
+        _ = await search.SearchAsync(
+            "数据库迁移",
+            RetrievalBenchmarkCorpus.FromDate,
+            RetrievalBenchmarkCorpus.ToDate,
+            CancellationToken.None);
 
         Assert.Equal(0, model.EmbedCalls);
-    }
-
-    private static List<ActivityEvent> BuildCorpus()
-    {
-        var events = new List<ActivityEvent>(48);
-        for (var concept = 0; concept < ConceptNames.Length; concept++)
-        {
-            for (var index = 1; index <= 6; index++)
-            {
-                var date = FromDate.AddDays((concept + index) % 6);
-                var timestamp = OccurredTimestamp.FromInstant(
-                    new DateTimeOffset(date.ToDateTime(new TimeOnly(9, index)), TimeSpan.Zero),
-                    TimeZoneInfo.Utc);
-                events.Add(new ActivityEvent(
-                    $"e{concept:D2}{index:D2}",
-                    timestamp,
-                    SourceKind.WindowActivity,
-                    index % 2 == 0 ? "Rider" : "Chrome",
-                    $"{ConceptNames[concept]} 记录 {index}",
-                    extractedText: $"{ConceptNames[concept]} 任务 {index}，用于合成检索评测。"));
-            }
-        }
-
-        return events;
-    }
-
-    private static List<RetrievalBenchmarkQuery> BuildQueries()
-    {
-        var queries = new List<RetrievalBenchmarkQuery>(ConceptNames.Length * 2);
-        for (var concept = 0; concept < ConceptNames.Length; concept++)
-        {
-            var expected = Enumerable.Range(1, 6).Select(index => $"e{concept:D2}{index:D2}").ToArray();
-            queries.Add(new RetrievalBenchmarkQuery(ConceptNames[concept], expected));
-            queries.Add(new RetrievalBenchmarkQuery(SynonymQueries[concept], expected));
-        }
-
-        return queries;
     }
 
     private static async Task WriteReportAsync(RetrievalBenchmarkReport keyword, RetrievalBenchmarkReport hybrid)
@@ -198,6 +180,8 @@ public sealed class S9RetrievalQualityTests
     {
         public int EmbedCalls { get; private set; }
 
+        public string? LastInput { get; private set; }
+
         public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.ModelGateway, "concept embedding");
         public string ChatModelId => "concept-chat";
         public string EmbeddingModelId => "concept-embedding";
@@ -233,6 +217,7 @@ public sealed class S9RetrievalQualityTests
         public Task<ModelEmbeddingResult> EmbedAsync(ModelEmbeddingRequest request, CancellationToken ct)
         {
             EmbedCalls++;
+            LastInput = request.Inputs.Count == 0 ? null : request.Inputs[0];
             var vectors = request.Inputs.Select(input => new ReadOnlyMemory<float>(Embed(input))).ToArray();
             return Task.FromResult(new ModelEmbeddingResult(vectors, EmbeddingModelId, ConceptKeywords.Length));
         }
