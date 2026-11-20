@@ -43,6 +43,7 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
         var launcher = new FakeMacHelperLauncher(behavior);
         await using var supervisor = CreateSupervisor(launcher, out var options);
         await supervisor.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => supervisor.Status == MacHelperSupervisorStatus.Healthy);
 
         Assert.Equal(MacHelperSupervisorStatus.Healthy, supervisor.Status);
         Assert.Equal(MacHelperProtocol.CurrentVersion, behavior.LastHandshakeProtocolVersion);
