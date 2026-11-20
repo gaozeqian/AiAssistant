@@ -78,11 +78,19 @@ public static class Program
             var isMaintenanceCommand = args.Any(argument =>
                 string.Equals(argument, "--backup", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(argument, "--restore", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(argument, "--purge-data", StringComparison.OrdinalIgnoreCase));
+                string.Equals(argument, "--purge-data", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(argument, "--rebuild-vectors", StringComparison.OrdinalIgnoreCase));
             if (isMaintenanceCommand)
             {
                 // Maintenance commands bypass StartAsync, so the encrypted schema must be initialized explicitly.
                 await runtime.DatabaseMaintenance.InitializeAsync(CancellationToken.None);
+            }
+
+            if (args.Contains("--rebuild-vectors", StringComparer.OrdinalIgnoreCase))
+            {
+                var indexed = await runtime.EmbeddingIndexer.RebuildAllAsync(CancellationToken.None);
+                Console.WriteLine($"Vector index rebuilt for {indexed} events using model {runtime.ModelGateway.EmbeddingModelId}.");
+                return 0;
             }
 
             if (TryGetOption(args, "--backup", out var backupPath))

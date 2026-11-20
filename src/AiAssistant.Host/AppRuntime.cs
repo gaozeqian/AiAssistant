@@ -58,6 +58,8 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public IModelGateway ModelGateway => _services.GetRequiredService<IModelGateway>();
 
+    public EventEmbeddingIndexer EmbeddingIndexer => _services.GetRequiredService<EventEmbeddingIndexer>();
+
     public static async Task<AppRuntime> CreateAsync(CancellationToken ct = default)
     {
         var dataDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY");
@@ -204,13 +206,9 @@ public sealed class AppRuntime : IAsyncDisposable
         var configuredEmbeddingModel = configuration.Endpoints
             .FirstOrDefault(endpoint => endpoint.Tier == ModelEndpointTier.LocalOffline)
             ?.EmbeddingModel ?? string.Empty;
-        var queryPrefix = Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_QUERY_PREFIX");
-        if (queryPrefix is null)
-        {
-            queryPrefix = configuredEmbeddingModel.Contains("qwen3-embedding", StringComparison.OrdinalIgnoreCase)
-                ? HybridSearchOptions.Qwen3RetrievalInstruction
-                : string.Empty;
-        }
+        var queryPrefix = EmbeddingProfile.ResolveQueryPrefix(
+            configuredEmbeddingModel,
+            Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_QUERY_PREFIX"));
 
         services.AddSingleton(new HybridSearchOptions { EmbeddingQueryPrefix = queryPrefix });
         services.AddSingleton<IEvidenceSearch>(provider => new HybridSearchService(
@@ -437,11 +435,18 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IReportRepository, SqliteReportRepository>();
         services.AddSingleton(new ReportGenerationOptions { DefaultTier = configuration.Policy.DefaultTier });
         services.AddSingleton<IReportGenerationRunner, ReportGenerationRunner>();
+        var localEmbeddingModel = configuration.Endpoints
+            .FirstOrDefault(endpoint => endpoint.Tier == ModelEndpointTier.LocalOffline)
+            ?.EmbeddingModel ?? string.Empty;
+        var documentStyle = EmbeddingProfile.ResolveDocumentStyle(
+            localEmbeddingModel,
+            Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_DOCUMENT_STYLE"));
         services.AddSingleton(provider => new EventEmbeddingIndexer(
             provider.GetRequiredService<IEventRepository>(),
             provider.GetRequiredService<IVectorIndex>(),
             gateway,
-            configuration.Policy.DefaultTier));
+            configuration.Policy.DefaultTier,
+            documentStyle));
         services.AddSingleton<ModelBenchmarkRunner>();
 
         var scheduleTime = TimeOnly.TryParse(

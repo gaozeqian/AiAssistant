@@ -80,6 +80,24 @@ public sealed class S9RetrievalQualityTests
         Assert.All(hybrid.Cases, item => Assert.True(item.ReturnedEventIds.Count <= 8));
     }
 
+    [Theory]
+    [InlineData("embeddinggemma-2:740m", HybridSearchOptions.EmbeddingGemmaQueryInstruction, EmbeddingProfile.TitleTextDocumentStyle)]
+    [InlineData("qwen3-embedding:0.6b", HybridSearchOptions.Qwen3RetrievalInstruction, EmbeddingProfile.DefaultDocumentStyle)]
+    [InlineData("custom-embed:latest", "", EmbeddingProfile.DefaultDocumentStyle)]
+    public void EmbeddingProfile_SelectsModelSpecificDefaults(string model, string expectedPrefix, string expectedStyle)
+    {
+        Assert.Equal(expectedPrefix, EmbeddingProfile.ResolveQueryPrefix(model));
+        Assert.Equal(expectedStyle, EmbeddingProfile.ResolveDocumentStyle(model));
+    }
+
+    [Fact]
+    public void EmbeddingProfile_HonoursExplicitOverrides()
+    {
+        Assert.Equal("custom-prefix", EmbeddingProfile.ResolveQueryPrefix("embeddinggemma-2:740m", "custom-prefix"));
+        Assert.Equal("plain", EmbeddingProfile.ResolveDocumentStyle("embeddinggemma-2:740m", "plain"));
+        Assert.Equal(string.Empty, EmbeddingProfile.ResolveQueryPrefix("qwen3-embedding:0.6b", string.Empty));
+    }
+
     [Fact]
     public async Task QueryInstructionPrefix_IsAppliedToEmbeddingInput()
     {

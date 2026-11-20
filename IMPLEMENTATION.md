@@ -527,6 +527,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.8：`--benchmark-model` 模型基准命令（报告、失败详情、离线退出码）与 loopback 端点绕过系统代理修复。
 - [x] S9.9：检索质量基准（关键词-only 开关、Recall@K/MRR 评估器、合成语料同义词测试与报告）。
 - [x] S9.10：`--benchmark-retrieval` 真实 embedding 评测、可配置查询指令前缀与 qwen3-embedding 默认指令。
+- [x] S9.11：embeddinggemma 评测与生产接入（`EmbeddingProfile`、`title/text` 文档格式、`--rebuild-vectors`、索引版本 1.1）。
 - [ ] S9-R：真实证书签名/公证、真实时间多日浸泡与设备热插拔、真机安装升级卸载与无障碍人工验收、CI 实际生成并随 Release 发布 SBOM/校验和。
 - [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
 

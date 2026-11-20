@@ -371,6 +371,26 @@ public sealed class EmbeddingAndBenchmarkTests
     }
 
     [Fact]
+    public async Task EmbeddingIndexer_TitleTextStyle_UsesStructuredDocumentTextAndVersion()
+    {
+        var events = new FakeEventRepository([Event("e1", "Rider", "Main.cs")]);
+        var model = new FakeEmbeddingModel();
+        var vectors = new FakeVectorIndex();
+        var indexer = new EventEmbeddingIndexer(
+            events,
+            vectors,
+            model,
+            ModelEndpointTier.LocalOffline,
+            documentStyle: "title-text");
+
+        var indexed = await indexer.IndexDateAsync(new DateOnly(2026, 11, 20), CancellationToken.None);
+
+        Assert.Equal(1, indexed);
+        Assert.Contains(model.Inputs, input => input.StartsWith("title: Main.cs | text:", StringComparison.Ordinal));
+        Assert.Equal("1.1-title-text", vectors.Upserts[0].Model.ModelVersion);
+    }
+
+    [Fact]
     public async Task BenchmarkRunner_ScoresJsonComplianceAndExportsMarkdown()
     {
         var report = await new ModelBenchmarkRunner(new BenchmarkModel()).RunAsync(CancellationToken.None);
@@ -416,6 +436,8 @@ public sealed class EmbeddingAndBenchmarkTests
 
     private sealed class FakeEmbeddingModel : IModelGateway
     {
+        public List<string> Inputs { get; } = [];
+
         public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.ModelGateway, "fake");
         public string ChatModelId => "fake-chat";
         public string EmbeddingModelId => "qwen3-embedding:0.6b";
@@ -423,11 +445,14 @@ public sealed class EmbeddingAndBenchmarkTests
         public Task<ModelCompletionResult> CompleteAsync(ModelCompletionRequest request, CancellationToken ct) =>
             Task.FromResult(new ModelCompletionResult("{}", ChatModelId, ModelEndpointTier.LocalOffline, false, TimeSpan.Zero));
 
-        public Task<ModelEmbeddingResult> EmbedAsync(ModelEmbeddingRequest request, CancellationToken ct) =>
-            Task.FromResult(new ModelEmbeddingResult(
+        public Task<ModelEmbeddingResult> EmbedAsync(ModelEmbeddingRequest request, CancellationToken ct)
+        {
+            Inputs.AddRange(request.Inputs);
+            return Task.FromResult(new ModelEmbeddingResult(
                 request.Inputs.Select((_, index) => new ReadOnlyMemory<float>([0.1f + index, 0.2f, 0.3f])).ToArray(),
                 EmbeddingModelId,
                 3));
+        }
 
         public Task<ModelCapabilitySnapshot> ProbeAsync(CancellationToken ct) =>
             Task.FromResult(new ModelCapabilitySnapshot(true, true, ChatModelId, EmbeddingModelId, ModelEndpointTier.LocalOffline, "ok"));

@@ -17,11 +17,13 @@ public sealed class RetrievalBenchmarkCommand(IModelGateway model)
     private const int BatchSize = 16;
     private const int TopK = 8;
 
-    private string QueryPrefix =>
-        Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_QUERY_PREFIX")
-        ?? (model.EmbeddingModelId.Contains("qwen3-embedding", StringComparison.OrdinalIgnoreCase)
-            ? HybridSearchOptions.Qwen3RetrievalInstruction
-            : string.Empty);
+    private string DocumentStyle => EmbeddingProfile.ResolveDocumentStyle(
+        model.EmbeddingModelId,
+        Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_DOCUMENT_STYLE"));
+
+    private string QueryPrefix => EmbeddingProfile.ResolveQueryPrefix(
+        model.EmbeddingModelId,
+        Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_QUERY_PREFIX"));
 
     public async Task<int> RunAsync(string outputPath, CancellationToken ct)
     {
@@ -38,7 +40,7 @@ public sealed class RetrievalBenchmarkCommand(IModelGateway model)
                 var batch = events
                     .Skip(offset)
                     .Take(BatchSize)
-                    .Select(RetrievalBenchmarkCorpus.BuildIndexText)
+                    .Select(BuildDocumentText)
                     .ToArray();
                 var embedding = await model.EmbedAsync(
                     new ModelEmbeddingRequest(batch, Purpose: "retrieval-benchmark"),
@@ -123,6 +125,11 @@ public sealed class RetrievalBenchmarkCommand(IModelGateway model)
         }
     }
 
+    private string BuildDocumentText(ActivityEvent item) =>
+        DocumentStyle.Equals("title-text", StringComparison.OrdinalIgnoreCase)
+            ? $"title: {item.WindowTitle} | text: {item.ExtractedText}"
+            : RetrievalBenchmarkCorpus.BuildIndexText(item);
+
     private string BuildMarkdown(
         IModelGateway model,
         int dimensions,
@@ -141,6 +148,7 @@ public sealed class RetrievalBenchmarkCommand(IModelGateway model)
         var displayPrefix = QueryPrefix.Replace("\n", "\\n", StringComparison.Ordinal);
         builder.AppendLine(CultureInfo.InvariantCulture,
             $"- 查询指令前缀：{(string.IsNullOrEmpty(displayPrefix) ? "无" : $"`{displayPrefix}`")}");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"- 文档格式：{DocumentStyle}");
         builder.AppendLine();
         builder.Append(keyword.ToMarkdown());
         builder.AppendLine();

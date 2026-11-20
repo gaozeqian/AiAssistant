@@ -13,6 +13,9 @@ public sealed class HybridSearchOptions
     public const string Qwen3RetrievalInstruction =
         "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: ";
 
+    /// <summary>Recommended asymmetric query prompt for EmbeddingGemma retrieval.</summary>
+    public const string EmbeddingGemmaQueryInstruction = "task: search result | query: ";
+
     public int TopK { get; init; } = 8;
     public int CandidateLimit { get; init; } = 60;
     public double RrfConstant { get; init; } = 60;

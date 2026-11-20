@@ -46,6 +46,7 @@
 - [ ] 运行 `AiAssistant.Host --benchmark-model --output artifacts/benchmarks/model.md` 并归档；成功率与 JSON 合规率达到发布阈值。
 - [ ] 运行 `dotnet test tests/AiAssistant.Report.Tests --filter "FullyQualifiedName~S9RetrievalQuality"`，归档 `artifacts/benchmarks/retrieval-benchmark.md`。
 - [ ] 配置真实 embedding 端点后运行 `AiAssistant.Host --benchmark-retrieval --output artifacts/benchmarks/retrieval-real.md` 并归档。
+- [ ] 更换 embedding 模型或文档格式后运行 `AiAssistant.Host --rebuild-vectors`，确认索引版本与维度正确。
 - [ ] 内存曲线无明显增长（记录峰值与采样方式）。
 
 ## 6. 隐私与无障碍

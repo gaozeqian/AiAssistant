@@ -21,6 +21,8 @@ public sealed record RetrievalBenchmarkReport(
     double Mrr,
     double HitRate,
     long AverageLatencyMilliseconds,
+    long MedianLatencyMilliseconds,
+    long WarmAverageLatencyMilliseconds,
     IReadOnlyList<RetrievalBenchmarkCase> Cases)
 {
     public string ToMarkdown()
@@ -32,7 +34,7 @@ public sealed record RetrievalBenchmarkReport(
         builder.AppendLine(CultureInfo.InvariantCulture, $"- Recall@K：{RecallAtK:P1}");
         builder.AppendLine(CultureInfo.InvariantCulture, $"- 命中率：{HitRate:P1}");
         builder.AppendLine(CultureInfo.InvariantCulture, $"- MRR：{Mrr:F3}");
-        builder.AppendLine(CultureInfo.InvariantCulture, $"- 平均耗时：{AverageLatencyMilliseconds} ms");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"- 平均耗时：{AverageLatencyMilliseconds} ms · 中位：{MedianLatencyMilliseconds} ms · 热态平均：{WarmAverageLatencyMilliseconds} ms");
         builder.AppendLine();
         builder.AppendLine("| 查询 | 首个命中排名 | 召回 | 耗时 | 返回证据（前 5） |");
         builder.AppendLine("|---|---|---|---|---|");
@@ -59,7 +61,9 @@ public sealed record RetrievalBenchmarkReport(
         AppendRow(builder, "命中率", baseline.HitRate, candidate.HitRate);
         AppendRow(builder, "MRR", baseline.Mrr, candidate.Mrr);
         builder.AppendLine(CultureInfo.InvariantCulture,
-            $"| 平均耗时 | {baseline.AverageLatencyMilliseconds} ms | {candidate.AverageLatencyMilliseconds} ms | {candidate.AverageLatencyMilliseconds - baseline.AverageLatencyMilliseconds:+0;-0;0} ms |");
+            $"| 中位耗时 | {baseline.MedianLatencyMilliseconds} ms | {candidate.MedianLatencyMilliseconds} ms | {candidate.MedianLatencyMilliseconds - baseline.MedianLatencyMilliseconds:+0;-0;0} ms |");
+        builder.AppendLine(CultureInfo.InvariantCulture,
+            $"| 热态平均耗时 | {baseline.WarmAverageLatencyMilliseconds} ms | {candidate.WarmAverageLatencyMilliseconds} ms | {candidate.WarmAverageLatencyMilliseconds - baseline.WarmAverageLatencyMilliseconds:+0;-0;0} ms |");
         return builder.ToString();
     }
 
@@ -122,6 +126,23 @@ public static class RetrievalBenchmarkEvaluator
         var hitRate = cases.Count == 0 ? 0 : cases.Count(item => item.Rank > 0) / (double)cases.Count;
         var mrr = cases.Count == 0 ? 0 : cases.Average(item => item.Rank > 0 ? 1.0 / item.Rank : 0);
         var averageLatency = cases.Count == 0 ? 0 : (long)cases.Average(item => item.DurationMilliseconds);
-        return new RetrievalBenchmarkReport(mode, topK, recallAtK, hitRate, mrr, averageLatency, cases);
+        var orderedLatency = cases.Select(item => item.DurationMilliseconds).OrderBy(value => value).ToArray();
+        var medianLatency = orderedLatency.Length == 0
+            ? 0
+            : orderedLatency.Length % 2 == 1
+                ? orderedLatency[orderedLatency.Length / 2]
+                : (orderedLatency[(orderedLatency.Length / 2) - 1] + orderedLatency[orderedLatency.Length / 2]) / 2;
+        var warmCases = cases.Count > 1 ? cases.Skip(1).ToArray() : cases.ToArray();
+        var warmAverage = warmCases.Length == 0 ? 0 : (long)warmCases.Average(item => item.DurationMilliseconds);
+        return new RetrievalBenchmarkReport(
+            mode,
+            topK,
+            recallAtK,
+            hitRate,
+            mrr,
+            averageLatency,
+            medianLatency,
+            warmAverage,
+            cases);
     }
 }

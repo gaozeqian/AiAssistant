@@ -11,9 +11,11 @@ public sealed class EventEmbeddingIndexer(
     IEventRepository events,
     IVectorIndex vectorIndex,
     IModelGateway model,
-    ModelEndpointTier tier = ModelEndpointTier.LocalOffline)
+    ModelEndpointTier tier = ModelEndpointTier.LocalOffline,
+    string documentStyle = "default")
 {
     private const string ModelVersion = "1.0";
+    private const int MaxIndexTextLength = 800;
     private const int BatchSize = 24;
 
     public async Task<int> IndexDateAsync(DateOnly localDate, CancellationToken ct)
@@ -48,7 +50,7 @@ public sealed class EventEmbeddingIndexer(
             return 0;
         }
 
-        var descriptor = new VectorModelDescriptor(model.EmbeddingModelId, ModelVersion, first.Dimensions);
+        var descriptor = new VectorModelDescriptor(model.EmbeddingModelId, IndexVersion, first.Dimensions);
         await vectorIndex.RebuildAsync(
             descriptor,
             token => GenerateBatchesAsync(all, descriptor, token),
@@ -75,7 +77,7 @@ public sealed class EventEmbeddingIndexer(
                 throw new InvalidOperationException("Embedding response did not match the requested batch.");
             }
 
-            var descriptor = new VectorModelDescriptor(model.EmbeddingModelId, ModelVersion, result.Dimensions);
+            var descriptor = new VectorModelDescriptor(model.EmbeddingModelId, IndexVersion, result.Dimensions);
             for (var i = 0; i < batch.Length; i++)
             {
                 await vectorIndex.UpsertAsync(batch[i].Id, result.Vectors[i], descriptor, ct);
@@ -109,9 +111,20 @@ public sealed class EventEmbeddingIndexer(
         }
     }
 
-    private static string BuildText(ActivityEvent item)
+    private string IndexVersion =>
+        documentStyle.Equals("title-text", StringComparison.OrdinalIgnoreCase)
+            ? "1.1-title-text"
+            : ModelVersion;
+
+    private string BuildText(ActivityEvent item)
     {
+        if (documentStyle.Equals("title-text", StringComparison.OrdinalIgnoreCase))
+        {
+            var structured = $"title: {item.WindowTitle} | text: {item.Summary ?? item.ExtractedText}";
+            return structured.Length <= MaxIndexTextLength ? structured : structured[..MaxIndexTextLength];
+        }
+
         var text = $"{item.AppName} | {item.WindowTitle} | {item.Summary ?? item.ExtractedText}";
-        return text.Length <= 800 ? text : text[..800];
+        return text.Length <= MaxIndexTextLength ? text : text[..MaxIndexTextLength];
     }
 }
