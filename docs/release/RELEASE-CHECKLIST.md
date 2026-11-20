@@ -49,6 +49,7 @@
 - [ ] 配置真实 embedding 端点后运行 `AiAssistant.Host --benchmark-retrieval --output artifacts/benchmarks/retrieval-real.md` 并归档。
 - [ ] 更换 embedding 模型或文档格式后运行 `AiAssistant.Host --rebuild-vectors`，确认索引版本与维度正确。
 - [ ] 用 `--import-model-secret` 导入企业端点密钥，`--probe-model` 确认各档位能力，再删除测试密钥。
+- [ ] 启动 `--mcp-serve` 后运行 `build/mcp/inspector-smoke.ps1`，确认握手、4 个只读工具与工具调用通过。
 - [ ] 生成周报并确认 Markdown、stats JSON、SVG、PNG、PDF 五个文件均可打开且中文无乱码；PDF 文本可选中/检索；`--doctor` 的 `pdfFont` 指向实际字体。
 - [ ] 用 `--report-range` 与 `--ask` 在无 UI 环境各执行一次，确认退出码与导出文件正确。
 - [ ] 内存曲线无明显增长（记录峰值与采样方式）。

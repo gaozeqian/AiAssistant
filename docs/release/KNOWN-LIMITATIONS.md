@@ -34,7 +34,7 @@
 
 | 限制 | 影响 | 现状 |
 |---|---|---|
-| 第三方 MCP 客户端未联调 | 会话/SSE 细节差异可能导致接入失败 | `S8-R2`，已支持 JSON/SSE、会话头与版本协商，并提供 17/18 项一致性客户端 |
+| 其他 MCP 客户端未联调 | Claude Desktop 等客户端可能仍有会话/SSE 差异 | `S8-R2`，已通过 MCP Inspector 2.16.0 全链路联调并提供冒烟脚本 |
 | PDF 可检索性依赖字体 | 自动扫描系统 TrueType CJK 字体；极简 Linux 无字体时回退矢量轮廓、文本不可检索 | 安装 CJK 字体或设置 `AIASSISTANT_PDF_FONT_PATH`；`--doctor` 显示当前选择 |
 | 多日浸泡未执行 | 休眠/唤醒、跨午夜长跑风险 | `S5-R2`，S2 已完成 24h 加速浸泡 |
 | Windows 签名/MSIX 未在本机构建 | 需证书与 Windows SDK | 脚本与清单已就绪，发布工作流需配置 Secrets |
