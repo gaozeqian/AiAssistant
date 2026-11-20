@@ -112,6 +112,7 @@ jobs:
             artifacts/packages/*.zip
             artifacts/packages/*.tar.gz
             artifacts/packages/*.deb
+            artifacts/packages/SHA256SUMS
           if-no-files-found: error
 
   sbom-and-licenses:
@@ -126,16 +127,10 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Install CycloneDX & NuGet-License tools
-        run: |
-          dotnet tool install --global CycloneDX
-          dotnet tool install --global dotnet-project-licenses
-
-      - name: Restore & Generate CycloneDX SBOM
+      - name: Restore, generate and verify offline CycloneDX SBOM
         run: |
           dotnet restore AiAssistant.sln
-          mkdir -p artifacts/sbom
-          dotnet CycloneDX AiAssistant.sln -o artifacts/sbom -fn bom.json --json
+          python3 build/sbom/generate-sbom.py --verify --check-manifest
 
       - name: Upload SBOM Artifact
         uses: actions/upload-artifact@v4

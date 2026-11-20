@@ -190,4 +190,18 @@ if ($Msix) {
     Write-Host "msix: $msixPath"
 }
 
+$checksumFiles = Get-ChildItem -Path $outputDir -File |
+    Where-Object { $_.Extension -in @(".zip", ".msix") } |
+    Sort-Object Name
+if ($checksumFiles.Count -gt 0) {
+    $checksumLines = foreach ($file in $checksumFiles) {
+        $hash = (Get-FileHash -Path $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$hash  $($file.Name)"
+    }
+
+    $checksumPath = Join-Path $outputDir "SHA256SUMS"
+    Set-Content -Path $checksumPath -Value $checksumLines -Encoding ASCII
+    Write-Host "checksums: $checksumPath"
+}
+
 Write-Host "Windows package complete."

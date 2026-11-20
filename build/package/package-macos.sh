@@ -140,4 +140,27 @@ echo "app bundle: $APP"
 if [[ -f "$ZIP_PATH" ]]; then
   echo "zip: $ZIP_PATH"
 fi
+
+write_checksums() {
+  local directory="$1"
+  (
+    cd "$directory" || return 1
+    : > SHA256SUMS
+    for file in *.zip *.tar.gz *.deb; do
+      [ -f "$file" ] || continue
+      if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$file" >> SHA256SUMS
+      else
+        shasum -a 256 "$file" >> SHA256SUMS
+      fi
+    done
+    if [ -s SHA256SUMS ]; then
+      echo "checksums: $directory/SHA256SUMS"
+    else
+      rm -f SHA256SUMS
+    fi
+  )
+}
+
+write_checksums "$REPO_ROOT/$OUTPUT_ROOT"
 echo "macOS package complete."

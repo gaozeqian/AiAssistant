@@ -79,4 +79,26 @@ else
   echo "warning: dpkg-deb not found; skipping .deb (tar.gz is still usable)" >&2
 fi
 
+write_checksums() {
+  local directory="$1"
+  (
+    cd "$directory" || return 1
+    : > SHA256SUMS
+    for file in *.tar.gz *.deb *.zip; do
+      [ -f "$file" ] || continue
+      if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$file" >> SHA256SUMS
+      else
+        shasum -a 256 "$file" >> SHA256SUMS
+      fi
+    done
+    if [ -s SHA256SUMS ]; then
+      echo "checksums: $directory/SHA256SUMS"
+    else
+      rm -f SHA256SUMS
+    fi
+  )
+}
+
+write_checksums "$REPO_ROOT/$OUTPUT_ROOT"
 echo "Linux package complete."

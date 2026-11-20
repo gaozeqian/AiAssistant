@@ -24,6 +24,10 @@ mono_crash.*
 [Rr]elease/
 [Rr]eleases/
 
+# Release documentation is versioned even though build output directories are not.
+!docs/release/
+!docs/release/**
+
 [Dd]ebug/x64/
 [Dd]ebugPublic/x64/
 [Rr]elease/x64/
