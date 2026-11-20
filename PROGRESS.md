@@ -7,12 +7,12 @@
 
 ## 1. 当前总体状态快照
 
-- **当前活跃阶段**：`S3 原生平台验收`（S3.1 macOS 与 S3.2 Linux 的代码、Host 接入及 Windows 契约测试均已完成；等待 macOS / Linux 真机或 CI 门禁复核）
+- **当前活跃阶段**：`S3 真实桌面权限与交互验收`（三平台 CI 已全绿；等待 macOS TCC 与 Linux Wayland/X11 真机人工复核）
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
-- **当前构建状态**：✅ `dotnet build AiAssistant.sln -c Release` 0 警告 0 错误；`osx-arm64` / `linux-x64` 交叉发布通过
-- **当前测试状态**：✅ 53/53 测试全部通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 10、`Capture.Tests` 3、`Platform.Tests` 28，含 macOS AF_UNIX IPC 6 项与 Linux portal/X11/AT-SPI 10 项专项契约测试）
-- **下一步待确认事项**：执行 S3 原生平台门禁——macOS 编译 Swift Helper、验证 TCC/签名公证与 Helper 恢复；Linux 桌面验证原生 Wayland、portal 授权/撤销、X11 回退与 AT-SPI。Wayland 当前按 `Degraded` 提供按需 Screenshot 像素回退，连续 PipeWire 像素流须在真实桌面复核；通过后进入 S4
+- **当前构建状态**：✅ 本地 Release 0 警告 0 错误；GitHub Actions 运行 `44701041589` 的 `win-x64` / `osx-arm64` / `linux-x64` 构建、测试、发布全部通过
+- **当前测试状态**：✅ 三平台各 53/53 测试全部通过；macOS Swift Helper 编译/冒烟/打包、Linux Portal 打包及 SBOM/许可证作业均通过
+- **下一步待确认事项**：在真实 macOS 桌面验证 TCC 权限、Helper 崩溃恢复与签名公证；在真实 Linux 桌面验证原生 Wayland、portal 授权/撤销、X11 回退与 AT-SPI。Wayland 当前按 `Degraded` 提供按需 Screenshot 像素回退，连续 PipeWire 像素流须在真实桌面复核；通过后进入 S4
 
 ---
 
@@ -23,7 +23,7 @@
 | **S0 工程奠基** | P0 前置 | ✅ 已完成 | `win-x64` 实测；`osx-arm64` / `linux-x64` 交叉打包验证 | 19 个项目解决方案、CPM、10 份 ADR、CI 矩阵、6 条架构依赖测试通过 |
 | **S1 核心与存储** | P0 | ✅ 已完成 | `win-x64` 实测通过；`osx-arm64` / `linux-x64` 待真机复跑 `Storage.Tests` | SQLite3MC 页级加密、DPAPI/Keychain/libsecret 密钥封装与轮换、AES-GCM 媒体库与引用计数、原子事件+媒体事务、加密备份恢复、`sqlite-vec` + SIMD 向量索引与重建 POC 全部通过 |
 | **S2 Windows 最小闭环** | P0 | ✅ 已完成 | `win-x64` 采集、Headless UI、真实桌面强杀重启、24h 全天加速浸泡均通过 | 完成采集与有界管道、Avalonia MVVM 时间线、选中后解密预览、暂停/黑名单、托盘、自启开关、基础保留清理 `MediaRetentionService`、零敏感泄露结构化日志 `SanitizedStructuredLoggerProvider` 与导出预览；24h 浸泡验证控制事件 100% 零丢失 |
-| **S3 三平台扩展** | P1 | 🔄 S3.1/S3.2 实现与 Windows 契约测试完成；待原生平台门禁 | `win-x64` 实测 AF_UNIX IPC、portal 状态机与 X11 像素转换；`osx-arm64` / `linux-x64` 交叉发布通过 | macOS Helper、Linux Wayland 默认与初始化失败 X11 回退、portal 加密令牌轮换、AT-SPI/EWMH、inotify/PulseAudio/XDG 均已接入；macOS TCC 与 Linux 真实桌面能力矩阵待验收 |
+| **S3 三平台扩展** | P1 | 🔄 三平台 CI 全绿；待真实桌面权限/交互验收 | GitHub Actions `win-x64` / `osx-arm64` / `linux-x64` 各 53/53 测试通过，发布/Helper/Portal 打包通过 | macOS Helper、Linux Wayland 默认与初始化失败 X11 回退、portal 加密令牌轮换、AT-SPI/EWMH、inotify/PulseAudio/XDG 均已接入；macOS TCC 与 Linux 真实桌面能力矩阵待人工验收 |
 | **S4 预处理与音频** | P1 | ⏳ 待开始 | — | 可组合 `IProcessingStage`、单路 `AudioHub`、sherpa-onnx ASR/VAD |
 | **S5 本机模型与日报** | P2 | ⏳ 待开始 | — | Microsoft.Extensions.AI 网关、Ollama、map-reduce、三通道日报 |
 | **S6 内网与公网档** | P2.5 | ⏳ 待开始 | — | `models.json`、企业策略锁定、能力探测、脱敏三道闸、审计 |
@@ -71,4 +71,4 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
 - **2026-11-20 [win-x64] [S2 最终门禁验收完成]**：补齐基础保留策略协调器 `MediaRetentionService`（启动清理 + 周期擦除到期 `.enc` 媒体并保留结构化历史事件）与隐私脱敏结构化日志 `SanitizedStructuredLoggerProvider`（有界 JSONL 滚动日志、强制拦截敏感键名/密钥/完整路径/URL 查询串，并在诊断页提供导出前透明预览）。修复软配额满时 `OpenConnectionForPathAsync` 误阻断查询/清理/控制审计的缺陷，并加固 `BoundedCaptureCoordinator` 退出控制通道排空与重试保证。通过跨午夜 24 小时加速全天浸泡验收测试（过载洪峰与配额压力下 48/48 控制事件零丢失、队列严格受限、日志与导出预览零正文/零密钥泄露）。全仓 Release 构建 0 警告 0 错误，37/37 测试通过。S2 正式收官，准备进入 S3。
 - **2026-11-20 [win-x64] [S3.1 macOS IPC 与 Helper 完成]**：实现 `MacHelperProtocol` v1（4 字节大端长度 + 有界 JSON 帧）、`UnixDomainSocketMacHelperClient`（并发请求关联、写锁、超时与断线处理）、`MacHelperSupervisor`（短 `sun_path`、一次性 256-bit 会话 Token、握手、心跳、指数退避重启、协议不兼容终止重启）。完成 ScreenCaptureKit、NSWorkspace/AX（排除 `AXSecureTextField`）、Vision OCR、原生 FSEvents、AVAudioEngine 16kHz 单声道、LaunchAgent 适配器与动态能力矩阵并接入 Host。补充 `Info.plist`、entitlements、CI Swift 编译/冒烟/打包断言；`osx-arm64` 交叉发布成功，Swift 6.4.2 对清单和全部源码语法解析通过。新增 6 项真实 AF_UNIX IPC 与故障注入契约测试，全量 Release 构建 0 警告 0 错误、43/43 测试通过。macOS 原生编译、TCC 权限与签名公证需真机或 CI 最终复核。
 - **2026-11-20 [win-x64] [S3.2 Linux 平台扩展完成]**：实现 `LinuxDisplayBackendState` 与仅在 Avalonia `SetupWithLifetime` 初始化阶段捕获的 Wayland→X11 回退；基于 `Tmds.DBus.Protocol 0.95.2` 实现 portal `CreateSession → SelectSources → Start → OpenPipeWireRemote`、请求前信号订阅、单次 `restore_token` AES-GCM 加密与逐次轮换，授权失败仅降级且用户取消不重复弹窗。实现 AT-SPI2（窗口焦点、文本接口、密码角色排除）、X11 EWMH/XGetImage、托管 PNG 编解码与像素转换、inotify 白名单文件、惰性 PulseAudio 和 XDG 自启；全部接入 Host 与动态能力矩阵。Wayland 不做周期弹窗，手动截图以 portal Screenshot 回退并标记 Degraded，连续 PipeWire 像素流待真实桌面复核。新增 10 项 Linux 专项契约测试，全仓 Release 0 警告 0 错误、53/53 测试通过，`linux-x64` 发布与 `Tmds.DBus.Protocol.dll` 打包验证通过。
-- **2026-11-20 [GitHub Actions] [S3 首轮 CI 修复]**：运行 `44696472530` 中 Windows 与 SBOM/许可证作业通过，macOS/Linux 测试暴露跨平台路径脱敏缺陷（Unix 宿主不能用 `Path.GetFileName` 解析反斜杠路径），macOS 另有 IPC 超时测试受监督器时序影响。已将脱敏改为同时识别 `/` 与 `\\` 的主机无关实现，并将超时/断线测试收窄为直接真实 AF_UNIX 传输测试；本地 Release 53/53 测试通过，待复验 CI。
+- **2026-11-20 [GitHub Actions] [S3 首轮 CI 修复]**：运行 `44696472530` 中 Windows 与 SBOM/许可证作业通过，macOS/Linux 测试暴露跨平台路径脱敏缺陷（Unix 宿主不能用 `Path.GetFileName` 解析反斜杠路径），macOS 另有 IPC 超时测试受监督器时序影响。已将脱敏改为同时识别 `/` 与 `\\` 的主机无关实现，并将超时/断线测试收窄为直接真实 AF_UNIX 传输测试；本地 Release 53/53 测试通过。复验运行 `44701041589` 中三平台各 53/53 测试、全部发布、Swift Helper 编译/冒烟/打包、Linux Portal 打包及 SBOM/许可证检查全部通过。

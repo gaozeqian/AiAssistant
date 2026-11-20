@@ -495,7 +495,8 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] 通过 S1/S2 验收后，再启动 macOS helper 与 Linux Wayland 工作。
 - [x] S3.1：完成 macOS 版本化 AF_UNIX IPC、一次性 Token 鉴权、心跳超时、崩溃退避监督器、Swift Helper 原生适配器、LaunchAgent 与 Windows 契约/故障测试。
 - [x] S3.2：完成 Linux 原生 Wayland 默认、X11 回退、portal 授权恢复、AT-SPI / EWMH、inotify 与 XDG 自启适配器及 Windows 契约测试。
-- [ ] 在 macOS 真机或 CI 完成 Swift 6 原生编译、TCC 权限与 Helper 打包联调；在 Linux 桌面完成 Wayland / X11 真机能力矩阵验收。
+- [x] 三平台 CI 完成构建、53 项测试、Swift 6 Helper 编译/冒烟/打包及 Linux Portal 打包验证（运行 `44701041589`）。
+- [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
 
 ---
 
