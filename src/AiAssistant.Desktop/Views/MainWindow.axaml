@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AiAssistant.Desktop.ViewModels"
+        xmlns:automation="using:Avalonia.Automation"
         x:Class="AiAssistant.Desktop.Views.MainWindow"
         x:DataType="vm:ShellViewModel"
         Title="时光 · AI 个人活动追踪助手"
@@ -32,6 +33,18 @@
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     </Style>
   </Window.Styles>
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+D1" Command="{Binding SelectSectionCommand}" CommandParameter="0" />
+    <KeyBinding Gesture="Ctrl+D2" Command="{Binding SelectSectionCommand}" CommandParameter="1" />
+    <KeyBinding Gesture="Ctrl+D3" Command="{Binding SelectSectionCommand}" CommandParameter="2" />
+    <KeyBinding Gesture="Ctrl+D4" Command="{Binding SelectSectionCommand}" CommandParameter="3" />
+    <KeyBinding Gesture="Ctrl+D5" Command="{Binding SelectSectionCommand}" CommandParameter="4" />
+    <KeyBinding Gesture="Ctrl+D6" Command="{Binding SelectSectionCommand}" CommandParameter="5" />
+    <KeyBinding Gesture="Ctrl+D7" Command="{Binding SelectSectionCommand}" CommandParameter="6" />
+    <KeyBinding Gesture="Ctrl+F" Command="{Binding ShowSearchCommand}" />
+    <KeyBinding Gesture="F5" Command="{Binding RefreshCurrentCommand}" />
+  </Window.KeyBindings>
 
   <Grid RowDefinitions="Auto,*">
     <Border Grid.Row="0" Background="#111C36" Padding="24,16">
@@ -71,8 +84,10 @@
                 </ComboBox.ItemTemplate>
               </ComboBox>
               <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
-                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="搜索应用、标题或正文" />
-                <Button Grid.Column="1" Classes="primary" Command="{Binding RefreshCommand}" Content="刷新" Margin="8,0,0,0" />
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="搜索应用、标题或正文"
+                         automation:AutomationProperties.Name="搜索应用、标题或正文" />
+                <Button Grid.Column="1" Classes="primary" Command="{Binding RefreshCommand}" Content="刷新" Margin="8,0,0,0"
+                        automation:AutomationProperties.Name="刷新时间线" />
               </Grid>
 
               <Grid Grid.Row="3" Margin="0,14,0,0">
@@ -166,15 +181,18 @@
               <TextBlock Text="证据检索与问答" FontSize="20" FontWeight="SemiBold" />
               <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
                 <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
-                         PlaceholderText="输入关键词或问题，例如：迁移进展如何" />
+                         PlaceholderText="输入关键词或问题，例如：迁移进展如何"
+                         automation:AutomationProperties.Name="检索关键词或问题" />
                 <Grid ColumnDefinitions="*,*">
                   <DatePicker Grid.Column="0" SelectedDate="{Binding FromDate}" Margin="0,0,6,0" />
                   <DatePicker Grid.Column="1" SelectedDate="{Binding ToDate}" Margin="6,0,0,0" />
                 </Grid>
               </StackPanel>
               <WrapPanel Grid.Row="2" Margin="0,12,0,0">
-                <Button Classes="primary" Content="检索证据" Command="{Binding SearchCommand}" Margin="0,0,8,8" />
-                <Button Classes="secondary" Content="提问" Command="{Binding AskCommand}" Margin="0,0,8,8" />
+                <Button Classes="primary" Content="检索证据" Command="{Binding SearchCommand}" Margin="0,0,8,8"
+                        automation:AutomationProperties.Name="检索证据" />
+                <Button Classes="secondary" Content="提问" Command="{Binding AskCommand}" Margin="0,0,8,8"
+                        automation:AutomationProperties.Name="基于证据提问" />
                 <Button Classes="secondary" Content="导出问答" Command="{Binding ExportAnswerCommand}"
                         IsEnabled="{Binding HasAnswer}" Margin="0,0,8,8" />
               </WrapPanel>
@@ -220,7 +238,8 @@
                             <TextBlock Text="{Binding MediaText}" FontSize="11" Foreground="{StaticResource MutedBrush}" />
                           </StackPanel>
                           <Button Grid.Column="1" Classes="secondary" Content="定位"
-                                  Command="{Binding NavigateCommand}" VerticalAlignment="Top" />
+                                  Command="{Binding NavigateCommand}" VerticalAlignment="Top"
+                                  automation:AutomationProperties.Name="定位到时间线对应记录" />
                         </Grid>
                       </Border>
                     </DataTemplate>
@@ -334,16 +353,60 @@
         </Grid>
       </TabItem>
 
+      <TabItem Header="数据与导出">
+        <Grid DataContext="{Binding Data}" x:DataType="vm:DataManagementViewModel"
+              ColumnDefinitions="*,*" Margin="0,12,0,0">
+          <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="24" Margin="0,0,8,0">
+            <StackPanel Spacing="14">
+              <TextBlock Text="删除本地数据" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding RetentionNotice}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+              <DatePicker SelectedDate="{Binding SelectedDate}" />
+              <WrapPanel>
+                <Button Classes="secondary" Content="{Binding DeleteDateButtonText}"
+                        Command="{Binding DeleteDateCommand}" Margin="0,0,8,8"
+                        automation:AutomationProperties.Name="{Binding DeleteDateButtonText}" />
+                <Button Classes="secondary" Content="{Binding DeleteAllButtonText}"
+                        Command="{Binding DeleteAllCommand}" Margin="0,0,8,8"
+                        automation:AutomationProperties.Name="{Binding DeleteAllButtonText}" />
+                <Button Classes="secondary" Content="取消" Command="{Binding CancelPendingCommand}"
+                        IsVisible="{Binding HasPending}" Margin="0,0,8,8" />
+              </WrapPanel>
+              <Border Background="#FFF1F0" CornerRadius="8" Padding="12" IsVisible="{Binding HasPending}">
+                <TextBlock Text="{Binding PendingText}" Foreground="#B42318" TextWrapping="Wrap" />
+              </Border>
+              <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+              <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding ErrorMessage}" Foreground="#B42318" TextWrapping="Wrap"
+                         IsVisible="{Binding HasError}" />
+            </StackPanel>
+          </Border>
+          <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="24" Margin="8,0,0,0">
+            <StackPanel Spacing="14">
+              <TextBlock Text="导出与保留" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding ExportNotice}" TextWrapping="Wrap" />
+              <Border Background="#EFF6F1" CornerRadius="8" Padding="14">
+                <TextBlock Text="所有导出均在本机生成，不经过云端。删除数据前请先导出需要保留的日报与问答。"
+                           TextWrapping="Wrap" Foreground="#256044" />
+              </Border>
+              <TextBlock Text="键盘快捷键：Ctrl+D1…D7 切换页面，Ctrl+F 打开检索，F5 刷新当前页。"
+                         TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+            </StackPanel>
+          </Border>
+        </Grid>
+      </TabItem>
+
       <TabItem Header="本地诊断">
         <ScrollViewer DataContext="{Binding Diagnostics}" x:DataType="vm:DiagnosticsViewModel" Margin="0,12,0,0">
           <StackPanel Spacing="12">
-            <Grid ColumnDefinitions="*,Auto,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
               <StackPanel>
                 <TextBlock Text="系统健康与能力矩阵" FontSize="20" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding PlatformName}" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" />
               </StackPanel>
               <Button Grid.Column="1" Classes="secondary" Content="生成脱敏导出预览" Command="{Binding GeneratePreviewCommand}" Margin="0,0,8,0" />
-              <Button Grid.Column="2" Classes="primary" Content="重新检查" Command="{Binding RefreshCommand}" />
+              <Button Grid.Column="2" Classes="secondary" Content="确认导出" Command="{Binding ExportPreviewCommand}" Margin="0,0,8,0" />
+              <Button Grid.Column="3" Classes="primary" Content="重新检查" Command="{Binding RefreshCommand}"
+                      automation:AutomationProperties.Name="重新检查平台能力" />
             </Grid>
             <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" />
             <Border Background="#FFF1F0" CornerRadius="8" Padding="14" IsVisible="{Binding HasError}">
@@ -393,6 +456,13 @@
               <StackPanel Spacing="8">
                 <TextBlock Text="诊断导出预览（仅元数据，用户确认前不写外部文件）" FontWeight="SemiBold" />
                 <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180" FontFamily="Consolas" FontSize="11" />
+                <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Border Background="White" CornerRadius="10" Padding="18">
+              <StackPanel Spacing="8">
+                <TextBlock Text="权限引导" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding PermissionGuidanceText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
               </StackPanel>
             </Border>
             <Border Background="White" CornerRadius="10" Padding="18">

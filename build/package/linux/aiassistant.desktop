@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=时光
+Name[en]=AiAssistant
+GenericName=个人活动追踪
+Comment=本地加密的活动记录、日报与证据问答
+Exec=aiassistant
+Icon=aiassistant
+Terminal=false
+Categories=Utility;Office;
+Keywords=activity;timeline;privacy;ai;
+StartupWMClass=AiAssistant.Host

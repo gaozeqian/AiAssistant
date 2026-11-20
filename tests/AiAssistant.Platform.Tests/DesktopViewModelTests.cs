@@ -250,7 +250,42 @@ public sealed class DesktopViewModelTests
         Assert.Contains("已定位", timeline.StatusMessage, StringComparison.Ordinal);
     });
 
-    private static ShellViewModel CreateShell()
+    [Fact]
+    public Task DataManagement_RequiresTwoStepsBeforeDeleting() => RunInHeadlessSession(async () =>
+    {
+        var deletion = new FakeDataDeletionService();
+        var viewModel = new DataManagementViewModel(deletion);
+
+        await viewModel.DeleteDateCommand.ExecuteAsync(null);
+        Assert.True(viewModel.HasPending);
+        Assert.Equal(0, deletion.Calls);
+        Assert.Contains("再次点击", viewModel.PendingText, StringComparison.Ordinal);
+        Assert.Equal("确认删除", viewModel.DeleteDateButtonText);
+
+        await viewModel.DeleteDateCommand.ExecuteAsync(null);
+        Assert.False(viewModel.HasPending);
+        Assert.Equal(1, deletion.Calls);
+        Assert.Contains("已删除", viewModel.StatusMessage, StringComparison.Ordinal);
+    });
+
+    [Fact]
+    public Task Shell_SectionShortcutsSwitchTabsAndRejectOutOfRange() => RunInHeadlessSession(async () =>
+    {
+        using var shell = CreateShell(out _);
+        await shell.InitializeAsync();
+
+        shell.SelectSectionCommand.Execute("4");
+        Assert.Equal(4, shell.SelectedSectionIndex);
+
+        shell.SelectSectionCommand.Execute("9");
+        Assert.Equal(4, shell.SelectedSectionIndex);
+
+        await shell.RefreshCurrentCommand.ExecuteAsync(null);
+    });
+
+    private static ShellViewModel CreateShell() => CreateShell(out _);
+
+    private static ShellViewModel CreateShell(out DataManagementViewModel data)
     {
         var repository = new InMemoryEventRepository();
         var mediaStore = new FakeMediaStore();
@@ -261,13 +296,18 @@ public sealed class DesktopViewModelTests
             new FakeMaintenanceService(),
             coordinator,
             new FakeReportJobQueue());
+        data = new DataManagementViewModel(new FakeDataDeletionService());
         return new ShellViewModel(
             new TimelineViewModel(new TimelineUseCase(repository, mediaStore, clock)),
             new CaptureControlViewModel(new CaptureControlUseCase(coordinator, new FakeAutoStartService())),
             new DiagnosticsViewModel(diagnostics),
             new ReportsViewModel(
                 new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
-                Path.Combine(AppContext.BaseDirectory, "test-temp", "reports-ui")));
+                Path.Combine(AppContext.BaseDirectory, "test-temp", "reports-ui")),
+            voice: null,
+            voiceNavigation: null,
+            search: null,
+            data: data);
     }
 
     private static async Task RunInHeadlessSession(Func<Task> test)
@@ -536,6 +576,23 @@ public sealed class DesktopViewModelTests
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class FakeDataDeletionService : IDataDeletionService
+    {
+        public int Calls { get; private set; }
+
+        public Task<DataDeletionResult> PurgeDateAsync(DateOnly localDate, CancellationToken ct)
+        {
+            Calls++;
+            return Task.FromResult(new DataDeletionResult(1, 1, 1, 0, 1));
+        }
+
+        public Task<DataDeletionResult> PurgeAllAsync(CancellationToken ct)
+        {
+            Calls++;
+            return Task.FromResult(new DataDeletionResult(2, 2, 2, 2, 2));
+        }
     }
 
     private sealed class FakeEvidenceSearch(EvidenceReference evidence) : IEvidenceSearch

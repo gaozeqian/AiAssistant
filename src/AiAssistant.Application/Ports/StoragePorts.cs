@@ -63,6 +63,28 @@ public interface IKeyStore
     Task RotateWrapperKeyAsync(string keyId, CancellationToken ct);
 }
 
+public sealed record DataDeletionResult(
+    int EventsDeleted,
+    int ReportsDeleted,
+    int JobsDeleted,
+    int VoiceCommandsDeleted,
+    int MediaFilesDeleted)
+{
+    public int Total => EventsDeleted + ReportsDeleted + JobsDeleted + VoiceCommandsDeleted + MediaFilesDeleted;
+
+    public static DataDeletionResult Empty { get; } = new(0, 0, 0, 0, 0);
+}
+
+/// <summary>User-initiated local data deletion. Never touches the OS key store or model configuration.</summary>
+public interface IDataDeletionService
+{
+    /// <summary>Deletes events, their encrypted media, reports and queued jobs for one local date.</summary>
+    Task<DataDeletionResult> PurgeDateAsync(DateOnly localDate, CancellationToken ct);
+
+    /// <summary>Deletes all captured events, media, reports, jobs, voice logs and vector rows.</summary>
+    Task<DataDeletionResult> PurgeAllAsync(CancellationToken ct);
+}
+
 public sealed record VectorModelDescriptor(string ModelId, string ModelVersion, int Dimensions);
 
 public sealed record VectorIndexMetadata(

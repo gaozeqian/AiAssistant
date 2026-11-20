@@ -49,6 +49,11 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public ILocalMcpControl McpControl => _services.GetRequiredService<ILocalMcpControl>();
 
+    public IDatabaseMaintenanceService DatabaseMaintenance =>
+        _services.GetRequiredService<IDatabaseMaintenanceService>();
+
+    public IDataDeletionService DataDeletion => _services.GetRequiredService<IDataDeletionService>();
+
     public static async Task<AppRuntime> CreateAsync(CancellationToken ct = default)
     {
         var dataDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY");
@@ -108,6 +113,9 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<StorageOptions>(),
             provider.GetRequiredService<ILogger<MediaRetentionService>>()));
         services.AddSingleton<IEventRepository>(eventRepository);
+        services.AddSingleton<IDataDeletionService>(provider => new DataDeletionService(
+            connectionFactory,
+            provider.GetRequiredService<IEventRepository>()));
         services.AddSingleton<IDatabaseMaintenanceService>(maintenance);
         services.AddSingleton<IReportJobQueue>(jobQueue);
         services.AddSingleton<IVectorIndex>(new HybridSqliteVectorIndex(connectionFactory));
@@ -275,7 +283,8 @@ public sealed class AppRuntime : IAsyncDisposable
             new CaptureControlViewModel(_services.GetRequiredService<CaptureControlUseCase>()),
             new DiagnosticsViewModel(
                 _services.GetRequiredService<DiagnosticsUseCase>(),
-                _services.GetRequiredService<ILocalMcpControl>()),
+                _services.GetRequiredService<ILocalMcpControl>(),
+                Path.Combine(_dataDirectory, "reports")),
             new ReportsViewModel(
                 _services.GetRequiredService<ReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports")),
@@ -284,7 +293,8 @@ public sealed class AppRuntime : IAsyncDisposable
             new SearchViewModel(
                 _services.GetRequiredService<EvidenceSearchUseCase>(),
                 _services.GetRequiredService<RangeReportUseCase>(),
-                Path.Combine(_dataDirectory, "reports")));
+                Path.Combine(_dataDirectory, "reports")),
+            new DataManagementViewModel(_services.GetRequiredService<IDataDeletionService>()));
 
     public async ValueTask DisposeAsync()
     {

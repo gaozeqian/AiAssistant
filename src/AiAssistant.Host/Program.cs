@@ -18,6 +18,51 @@ public static class Program
         try
         {
             await using var runtime = await AppRuntime.CreateAsync();
+
+            var isMaintenanceCommand = args.Any(argument =>
+                string.Equals(argument, "--backup", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(argument, "--restore", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(argument, "--purge-data", StringComparison.OrdinalIgnoreCase));
+            if (isMaintenanceCommand)
+            {
+                // Maintenance commands bypass StartAsync, so the encrypted schema must be initialized explicitly.
+                await runtime.DatabaseMaintenance.InitializeAsync(CancellationToken.None);
+            }
+
+            if (TryGetOption(args, "--backup", out var backupPath))
+            {
+                await runtime.DatabaseMaintenance.BackupEncryptedAsync(Path.GetFullPath(backupPath), CancellationToken.None);
+                Console.WriteLine($"AiAssistant encrypted backup written to {Path.GetFullPath(backupPath)}");
+                return 0;
+            }
+
+            if (TryGetOption(args, "--restore", out var restorePath))
+            {
+                if (!args.Contains("--confirm-restore", StringComparer.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine("Refusing to restore without --confirm-restore; existing data would be replaced.");
+                    return 3;
+                }
+
+                await runtime.DatabaseMaintenance.RestoreEncryptedAsync(Path.GetFullPath(restorePath), CancellationToken.None);
+                Console.WriteLine($"AiAssistant encrypted backup restored from {Path.GetFullPath(restorePath)}");
+                return 0;
+            }
+
+            if (args.Contains("--purge-data", StringComparer.OrdinalIgnoreCase))
+            {
+                if (!args.Contains("--confirm-purge", StringComparer.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine("Refusing to delete all local data without --confirm-purge.");
+                    return 3;
+                }
+
+                var deleted = await runtime.DataDeletion.PurgeAllAsync(CancellationToken.None);
+                Console.WriteLine(
+                    $"AiAssistant local data purged: events={deleted.EventsDeleted} media={deleted.MediaFilesDeleted} reports={deleted.ReportsDeleted} jobs={deleted.JobsDeleted} voice={deleted.VoiceCommandsDeleted}");
+                return 0;
+            }
+
             await runtime.StartAsync();
             if (args.Contains("--startup-check", StringComparer.OrdinalIgnoreCase))
             {
@@ -33,6 +78,11 @@ public static class Program
 
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine($"AiAssistant usage error: {ex.Message}");
+            return 3;
+        }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"AiAssistant startup failed ({ex.GetType().Name}). Check storage permissions and available disk space.");
@@ -41,6 +91,28 @@ public static class Program
     }
 
     public static AppBuilder BuildAvaloniaApp() => BuildAvaloniaApp(null);
+
+    private static bool TryGetOption(string[] args, string name, out string value)
+    {
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (!string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (i + 1 >= args.Length || string.IsNullOrWhiteSpace(args[i + 1]))
+            {
+                throw new ArgumentException($"Option {name} requires a value.");
+            }
+
+            value = args[i + 1];
+            return true;
+        }
+
+        value = string.Empty;
+        return false;
+    }
 
     private static int StartLinuxDesktop(LinuxDisplayBackendState backendState, string[] args)
     {

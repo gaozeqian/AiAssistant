@@ -7,12 +7,12 @@
 
 ## 1. 当前总体状态快照
 
-- **当前活跃阶段**：`S8 已完成代码与契约；待启动 S9 发布加固`
+- **当前活跃阶段**：`S9 发布加固：打包/删除/文档工具链完成；真机签名公证、浸泡与人工验收待执行`
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
-- **当前构建状态**：✅ 本地 Release 0 警告 0 错误；SQLite Schema v2、Host 启动自检与两平台发布通过
-- **当前测试状态**：✅ 106/106 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 12、`Capture.Tests` 4、`Platform.Tests` 32、`Processing.Tests` 7、`Report.Tests` 32、`Voice.Tests` 7）
-- **下一步待确认事项**：启动 S9 —— 安装包签名公证、浸泡与故障注入、升级迁移、SBOM 与回滚；S8 真实检索质量与 MCP 客户端联调见第 5 节遗留项
+- **当前构建状态**：✅ 本地 Release 0 警告 0 错误；三平台自包含打包脚本实测（win zip / linux tar.gz / macOS app 布局）
+- **当前测试状态**：✅ 112/112 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 34、`Processing.Tests` 7、`Report.Tests` 32、`Voice.Tests` 7）
+- **下一步待确认事项**：配置签名证书/公证凭据后执行 `release.yml`；在真机完成 24h/多日浸泡、安装升级卸载与无障碍走查；S9 遗留项见第 5 节
 
 ---
 
@@ -29,7 +29,7 @@
 | **S6 内网与公网档** | P2.5 | 🔄 代码与契约完成；真实企业端点遗留 | `win-x64` 配置/策略/三闸/探测测试通过；两平台发布通过 | 版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理、Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、三闸脱敏、五能力探测缓存与诊断展示 |
 | **S7 唤醒与基础命令** | P2.6 | 🔄 代码与契约完成；真实 KWS/TTS 评测遗留 | `win-x64` 状态机/命令/日志/UI 测试；两平台发布通过 | sherpa-onnx “你好时光” KWS、四态语音会话、8 秒命令窗口、误唤醒冷却、固定命令、敏感命令二次确认、TTS 反馈、加密 voice_commands 文本日志与状态栏/语音面板 |
 | **S8 智能检索与对话** | P3 | 🔄 代码与契约完成；真实检索质量与 MCP 客户端联调遗留 | `win-x64` 混合检索/证据问答/区间报告/MCP 契约与 Headless UI 测试；两平台发布通过 | 时间过滤+关键词+向量 RRF 混合检索与 `[E#]` 证据引用、无证据/无引用/媒体清理三类降级、周报与任意区间 Markdown+stats 导出、只读 loopback MCP（加密令牌/限流/四个只读工具）、检索问答面板与证据回跳、语音问答复用同一用例 |
-| **S9 发布加固** | 全阶段 | ⏳ 待开始 | — | 安装包签名公证、浸泡测试、故障注入、升级迁移、SBOM |
+| **S9 发布加固** | 全阶段 | 🔄 代码与工具链完成；真机签名/浸泡/人工验收遗留 | `win-x64` 打包与维护命令实测；`linux-x64` / `osx-arm64` 包布局验证 | 跨平台打包脚本（Windows zip+MSIX 模板+签名、macOS app+codesign/notarize、Linux tar.gz+deb）、应用图标、发布工作流、数据删除服务与 CLI（backup/restore/purge）、v1→v2 迁移与密钥丢失故障注入、数据与导出页面、键盘快捷键/无障碍名称/权限引导、隐私/限制/性能/升级卸载/回滚/发布检查表文档 |
 
 ---
 
@@ -137,6 +137,33 @@ AIASSISTANT_MCP_RPM=60          # 每分钟请求上限
 - 仅暴露四个只读工具：`search_events`、`activity_stats`、`list_reports`、`get_report`。不存在写入、采集、导出或删除工具；未授权、非 loopback、超限请求分别返回 401 / 直接断开 / 429。
 - 工具返回结构化证据与 `mediaAvailable` 标记，从不返回截图或音频字节；媒体到期清理后该标记为 `false`。
 
+### 3.7 维护命令（备份 / 恢复 / 清空）
+
+```bash
+# 加密备份（含完整 Schema）
+AiAssistant.Host --backup /path/to/backup.enc
+
+# 恢复（必须显式确认，会覆盖当前数据库）
+AiAssistant.Host --restore /path/to/backup.enc --confirm-restore
+
+# 清空采集数据（事件/媒体/日报/任务/语音日志/向量索引）
+AiAssistant.Host --purge-data --confirm-purge
+```
+
+退出码：`0` 成功、`2` 启动或维护失败、`3` 参数错误或缺少确认开关。维护命令会先初始化加密 Schema，再执行操作，不会启动采集与 UI。
+
+### 3.8 发布打包
+
+```powershell
+pwsh build/package/package-windows.ps1 -Version 0.1.0          # zip；-Msix 追加 MSIX
+```
+```bash
+bash build/package/package-macos.sh --skip-sign                 # 布局/CI；正式发布去掉 --skip-sign
+bash build/package/package-linux.sh                             # tar.gz；有 dpkg-deb 时追加 .deb
+```
+
+签名通过环境变量注入：`AIASSISTANT_SIGN_CERT_THUMBPRINT`（Windows）、`AIASSISTANT_CODESIGN_IDENTITY` + `AIASSISTANT_NOTARY_PROFILE`（macOS）。发布工作流见 `.github/workflows/release.yml`，详细说明见 `build/package/README.md` 与 `docs/release/`。
+
 ---
 
 ## 4. 实施日志（按时间顺序追加）
@@ -157,6 +184,7 @@ AIASSISTANT_MCP_RPM=60          # 每分钟请求上限
 - **2026-11-20 [win-x64] [S6 企业策略与三档模型完成]**：实现版本化 `models.json` 与 `models.example.json`，校验 schema/重复档位/远程本地端点；端点 API Key 与证书密码通过 AES-GCM 加密密钥库或 `env:` 引用，明文不入配置。实现每端点独立 HttpClient（代理、PFX/PEM mTLS、企业 CA 自定义信任、超时）。Host 改为多端点装配，`PolicyEnforcedModelGateway` 在应用层外强制档位策略，公网需显式 `PublicCloudConsentGate` 同意；`TierRoutingModelGateway` 支持内网故障回退本机、本机不可用明确失败。新增最小化→脱敏→残留检测/输出清洗三闸与敏感残留阻断；五能力（chat/streaming/embeddings/structured/tool）探测缓存 24 小时并接入诊断。全仓 Release 0 警告 0 错误、80/80 测试通过，Host 无配置安全回退启动与两平台发布通过。真实企业 mTLS/CA/代理和公网端点验证保留遗留项。
 - **2026-11-20 [win-x64] [S7 本地唤醒与基础命令完成]**：接入 `org.k2fsa.sherpa.onnx` KWS 与 VITS TTS，新增 `VoiceSessionController` 四态状态机（休眠/聆听/处理/反馈）、8 秒命令窗口、超时/取消、误唤醒冷却与同一 AudioHub 单路采集；固定命令映射到既有日报、采集和导航用例，退出应用需二次确认。实现加密 `voice_commands` 文本日志（Schema v2 新增可选 audio_content_id）与命令音频默认不落盘；新增 Windows/Linux 反馈播放，macOS 音频输出明确降级。新增“语音”面板、状态栏状态与语音开关。全仓 Release 0 警告 0 错误、87/87 测试通过，Host 启动与两平台发布通过。真实 KWS/TTS 评测和命令音频 opt-in 保留遗留项。
 - **2026-11-20 [win-x64] [S8 智能检索与完整对话完成]**：新增 `AiAssistant.LocalApi` 项目并把检索/问答/区间报告提升为 Application 端口（`IEvidenceSearch`、`IEvidenceQuestionAnswerer`、`IRangeReportService`、`ILocalMcpControl`），Desktop 只依赖 Application。实现 `HybridSearchService`（时间过滤 + 关键词 + 向量 RRF 融合、统一 `[E#]` 证据、向量失败仅降级关键词）与 `EvidenceQuestionAnswerUseCase`（强制引用校验，无引用走抽取式降级，无证据返回 `no-evidence` 且不调用模型）。实现 `ActivityRangeReportService` 与 `RangeReportUseCase`：周一为界的周报、任意区间每日事件数/活跃分钟/主要应用、Markdown + stats JSON 双文件导出、模型不可用确定性统计降级。实现只读 loopback MCP：`TcpListener` 仅绑 `127.0.0.1`、AES-GCM 加密令牌（可轮换）、滑动窗口限流、JSON-RPC `initialize/ping/tools/list/tools/call`、四个只读工具、未知或写入工具返回 -32602；Host 生命周期接入且默认关闭。新增“检索与问答”面板（检索/提问/导出、证据卡片一键定位时间线、周报柱状与导出）、“本地诊断”MCP 令牌显示/轮换，语音“问一下…”复用同一证据用例。全仓 Release 0 警告 0 错误、106/106 测试通过（新增 16 项检索/报告/MCP 契约测试与 2 项 UI/语音测试），两平台发布通过。真实 embedding 质量与真实 MCP 客户端联调保留遗留项。
+- **2026-11-20 [win-x64] [S9 发布加固工具链完成]**：新增 `build/package/` 跨平台打包脚本与图标生成器（纯 Python 生成 PNG/ICO/MSIX 资源）：Windows 自包含 zip + 可选 Authenticode/MSIX、macOS `.app` + codesign/notarytool/stapler、Linux tar.gz + `.deb`；新增 `.github/workflows/release.yml` 签名发布流水线与 CI 打包作业。新增 `IDataDeletionService`/`DataDeletionService`（按日期或全量删除事件、媒体、日报、任务、语音日志、向量索引，WAL checkpoint）与“数据与导出”页面（二次确认删除）、Host 维护命令 `--backup` / `--restore --confirm-restore` / `--purge-data --confirm-purge`（实测备份 84KB、恢复、清空、清空后启动均成功）。新增 v1→v2 迁移保留数据、按日期删除、全量删除后可用、密钥丢失不损坏数据库四项门禁测试；修复报告后台任务测试的时段依赖缺陷（固定时钟）。补充键盘快捷键（Ctrl+D1…D7、Ctrl+F、F5）、关键控件无障碍名称、诊断页权限引导与确认导出。新增 `docs/release/` 隐私说明、已知限制、性能报告（启动 0.82s、包体积 83MB/58MB）、升级卸载、回滚手册与发布检查表。全仓 Release 0 警告 0 错误、112/112 测试通过；Windows zip、Linux tar.gz、macOS app 布局实测生成。真实签名公证、多日浸泡与人工无障碍验收保留遗留项。
 
 ---
 
@@ -182,3 +210,7 @@ AIASSISTANT_MCP_RPM=60          # 每分钟请求上限
 | `S8-R1` | S8 检索 | 真实 embedding 模型下的召回质量、RRF 参数与中文问答准确性未评测；仅契约测试覆盖融合与降级路径 | 默认 TopK/候选数与融合权重可能不适合真实数据 | 在目标机器安装 qwen3-embedding 后跑固定问题集，记录命中率、引用正确率与延迟并调参 |
 | `S8-R2` | S8 MCP | 仅用本地 HTTP 契约测试验证，未与真实 MCP 客户端（Claude Desktop 等）联调；端口固定值与客户端兼容性未验证 | 客户端握手字段差异可能导致接入失败 | S9 前用至少一个真实 MCP 客户端完成 `initialize → tools/list → tools/call` 全链路联调 |
 | `S8-R3` | S8 周报 | 周报图表为文本条形与 Markdown 表格，未提供 PNG/PDF 图形化导出 | 汇报场景需要手工截图 | 视需要增加图形化导出（本地渲染，不引入云服务） |
+| `S9-R1` | S9 签名 | Windows Authenticode/MSIX 与 macOS Developer ID/公证未用真实证书执行；脚本与工作流已就绪 | 未验证的签名链可能导致安装被拦截 | 配置证书与公证凭据后运行 `release.yml`，并保存 `signtool verify` / `spctl` 输出 |
+| `S9-R2` | S9 浸泡 | 24h/多日浸泡、休眠唤醒、插拔显示器与麦克风未在真机执行；S2 仅有 24h 加速浸泡 | 长稳与设备热插拔风险未量化 | 按 `RELEASE-CHECKLIST.md` 第 5 节执行并记录 |
+| `S9-R3` | S9 人工验收 | 安装/升级/卸载、无障碍与键盘导航仅完成自动化与代码检查，未做人工走查 | 平台交互差异可能影响可用性 | 三平台各执行一次发布检查表第 3、6 节 |
+| `S9-R4` | S9 供应链 | SBOM 由 CI 生成，本地未安装 CycloneDX；`SHA256SUMS` 未随包自动发布 | 供应链证据不完整 | 发布时运行 SBOM 作业并附校验和到 Release |

@@ -3,6 +3,7 @@
     <OutputType>WinExe</OutputType>
     <Description>Composition Root, startup, DI registration, OS platform wiring, and application lifecycle.</Description>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('Windows'))">..\..\build\package\assets\aiassistant.ico</ApplicationIcon>
     <MacHelperBinaryPath>$(MSBuildProjectDirectory)/../../native/AiAssistant.MacHelper/.build/release/aiassistant-mac-helper</MacHelperBinaryPath>
   </PropertyGroup>
   <ItemGroup>

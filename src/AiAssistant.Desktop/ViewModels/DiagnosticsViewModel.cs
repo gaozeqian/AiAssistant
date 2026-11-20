@@ -13,6 +13,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
 {
     private readonly DiagnosticsUseCase _diagnostics;
     private readonly ILocalMcpControl? _mcp;
+    private readonly string? _exportDirectory;
     private string _platformName = "正在检测平台能力…";
     private string _databaseText = "尚未检查";
     private string _pipelineText = string.Empty;
@@ -24,14 +25,21 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string _errorMessage = string.Empty;
     private string _mcpStatusText = "本地 MCP 默认关闭";
     private string _mcpTokenText = "点击“显示令牌”获取本地凭据";
+    private string _permissionGuidanceText = "尚未检查平台权限";
+    private string _exportStatusText = string.Empty;
     private bool _isLoading;
 
-    public DiagnosticsViewModel(DiagnosticsUseCase diagnostics, ILocalMcpControl? mcp = null)
+    public DiagnosticsViewModel(
+        DiagnosticsUseCase diagnostics,
+        ILocalMcpControl? mcp = null,
+        string? exportDirectory = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _mcp = mcp;
+        _exportDirectory = exportDirectory;
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
+        ExportPreviewCommand = new AsyncRelayCommand(ExportPreviewAsync);
         RevealMcpTokenCommand = new AsyncRelayCommand(RevealMcpTokenAsync);
         RotateMcpTokenCommand = new AsyncRelayCommand(RotateMcpTokenAsync);
     }
@@ -45,6 +53,20 @@ public sealed class DiagnosticsViewModel : ObservableObject
     public IAsyncRelayCommand RefreshCommand { get; }
 
     public IAsyncRelayCommand GeneratePreviewCommand { get; }
+
+    public IAsyncRelayCommand ExportPreviewCommand { get; }
+
+    public string PermissionGuidanceText
+    {
+        get => _permissionGuidanceText;
+        private set => SetProperty(ref _permissionGuidanceText, value);
+    }
+
+    public string ExportStatusText
+    {
+        get => _exportStatusText;
+        private set => SetProperty(ref _exportStatusText, value);
+    }
 
     public IAsyncRelayCommand RevealMcpTokenCommand { get; }
 
@@ -192,6 +214,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
             McpStatusText = _mcp is null
                 ? "本地 MCP 未接入"
                 : BuildMcpStatus(_mcp.GetSnapshot());
+            var needsAttention = snapshot.Capabilities.Where(item => item.Status is not CapabilityStatus.Supported).ToArray();
+            PermissionGuidanceText = needsAttention.Length == 0
+                ? "当前平台权限齐全，无需额外授权。"
+                : string.Join(
+                    Environment.NewLine,
+                    needsAttention.Select(item => $"{item.Kind}：{item.RemediationHint ?? item.Summary}"));
             LastRefreshText = $"最后刷新：{DateTimeOffset.Now:HH:mm:ss} · 诊断不包含正文、密钥或完整文件路径";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
@@ -243,6 +271,37 @@ public sealed class DiagnosticsViewModel : ObservableObject
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.Cryptography.CryptographicException)
         {
             ErrorMessage = "无法轮换本地 MCP 令牌，请检查系统密钥库权限。";
+        }
+    }
+
+    private async Task ExportPreviewAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_exportDirectory))
+        {
+            ErrorMessage = "未配置导出目录。";
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = string.Empty;
+        try
+        {
+            var preview = await _diagnostics.BuildSanitizedExportPreviewAsync();
+            Directory.CreateDirectory(_exportDirectory);
+            var path = Path.Combine(
+                _exportDirectory,
+                $"AiAssistant-诊断导出-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.json");
+            await _diagnostics.ExportConfirmedPreviewAsync(path, preview, CancellationToken.None);
+            ExportPreviewJson = preview;
+            ExportStatusText = $"已导出脱敏诊断：{path}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
+        {
+            ErrorMessage = "诊断导出失败，请检查目标目录权限。";
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 

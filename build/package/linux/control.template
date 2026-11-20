@@ -1,0 +1,11 @@
+Package: aiassistant
+Version: __VERSION__
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: AiAssistant <noreply@localhost>
+Depends: libsecret-1-0, libx11-6, libice6, libsm6, libfontconfig1
+Recommends: xdg-desktop-portal, pipewire
+Description: 时光 · AI 个人活动追踪助手
+ 本地加密的个人活动追踪、日报、证据问答与只读 MCP 桌面应用。
+ 所有数据默认仅保存在本机，媒体使用 AES-GCM 加密。

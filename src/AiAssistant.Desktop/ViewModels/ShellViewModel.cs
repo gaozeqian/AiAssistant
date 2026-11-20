@@ -1,5 +1,7 @@
+using System.Globalization;
 using AiAssistant.Application.Ports;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace AiAssistant.Desktop.ViewModels;
 
@@ -16,7 +18,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         ReportsViewModel reports,
         VoiceControlViewModel? voice = null,
         VoiceNavigationHub? voiceNavigation = null,
-        SearchViewModel? search = null)
+        SearchViewModel? search = null,
+        DataManagementViewModel? data = null)
     {
         Timeline = timeline ?? throw new ArgumentNullException(nameof(timeline));
         Capture = capture ?? throw new ArgumentNullException(nameof(capture));
@@ -24,7 +27,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Reports = reports ?? throw new ArgumentNullException(nameof(reports));
         Voice = voice;
         Search = search;
+        Data = data;
         _voiceNavigation = voiceNavigation;
+        SelectSectionCommand = new RelayCommand<string>(SelectSection);
+        ShowSearchCommand = new RelayCommand(ShowSearch);
+        RefreshCurrentCommand = new AsyncRelayCommand(RefreshCurrentAsync);
         Capture.StateChanged += OnCaptureStateChanged;
         CaptureStatus = Capture.CaptureStateText;
         if (_voiceNavigation is not null)
@@ -51,6 +58,14 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public VoiceControlViewModel? Voice { get; }
 
     public SearchViewModel? Search { get; }
+
+    public DataManagementViewModel? Data { get; }
+
+    public IRelayCommand<string> SelectSectionCommand { get; }
+
+    public IRelayCommand ShowSearchCommand { get; }
+
+    public IAsyncRelayCommand RefreshCurrentCommand { get; }
 
     public event EventHandler? ExitRequested;
 
@@ -88,12 +103,37 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     public void ShowDiagnostics()
     {
-        SelectedSectionIndex = 4;
+        SelectedSectionIndex = 5;
     }
 
     public void ShowReports()
     {
-        SelectedSectionIndex = 5;
+        SelectedSectionIndex = 6;
+    }
+
+    private void SelectSection(string? value)
+    {
+        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) &&
+            index >= 0 && index <= 6)
+        {
+            SelectedSectionIndex = index;
+        }
+    }
+
+    private async Task RefreshCurrentAsync()
+    {
+        switch (SelectedSectionIndex)
+        {
+            case 5:
+                await Diagnostics.RefreshCommand.ExecuteAsync(null);
+                break;
+            case 6:
+                await Reports.RefreshCommand.ExecuteAsync(null);
+                break;
+            default:
+                await Timeline.RefreshCommand.ExecuteAsync(null);
+                break;
+        }
     }
 
     public void Dispose()

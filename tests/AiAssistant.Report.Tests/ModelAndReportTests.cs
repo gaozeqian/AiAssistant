@@ -495,7 +495,8 @@ public sealed class ReportWorkerTests
         var queue = new FakeReportQueue();
         var runner = new FakeRunner();
         var reports = new InMemoryReportRepository();
-        var clock = new SystemClock();
+        // Fixed at 09:00 local so the "today after 18:30" branch never fires; the test asserts only the catch-up job.
+        var clock = new FixedClock(new DateTimeOffset(2026, 11, 20, 9, 0, 0, TimeSpan.Zero));
         var worker = new ReportJobWorker(
             queue,
             runner,
@@ -515,7 +516,7 @@ public sealed class ReportWorkerTests
         await worker.DisposeAsync();
 
         Assert.Equal(1, runner.Calls);
-        Assert.Equal(DateOnly.FromDateTime(DateTime.Today).AddDays(-1), queue.Jobs[0].TargetDate);
+        Assert.Equal(new DateOnly(2026, 11, 19), queue.Jobs[0].TargetDate);
         Assert.Equal(ReportTriggerSource.StartupCatchUp, queue.Jobs[0].TriggerSource);
     }
 
@@ -528,6 +529,13 @@ public sealed class ReportWorkerTests
         }
 
         Assert.True(condition());
+    }
+
+    private sealed class FixedClock(DateTimeOffset utcNow) : IClock
+    {
+        public DateTimeOffset UtcNow { get; } = utcNow;
+
+        public TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
     }
 
     private sealed class FakeReportQueue : IReportJobQueue
