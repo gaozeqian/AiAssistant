@@ -4,7 +4,7 @@ using AiAssistant.Application.Ports;
 
 namespace AiAssistant.Application.UseCases;
 
-public sealed record RangeReportExport(string MarkdownPath, string StatsPath);
+public sealed record RangeReportExport(string MarkdownPath, string StatsPath, string SvgPath);
 
 /// <summary>Weekly / arbitrary-range aggregation plus Markdown + stats export for the reports panel.</summary>
 public sealed class RangeReportUseCase(IRangeReportService service, IClock clock)
@@ -42,9 +42,11 @@ public sealed class RangeReportUseCase(IRangeReportService service, IClock clock
             $"AiAssistant-区间报告-{report.FromDate:yyyyMMdd}-{report.ToDate:yyyyMMdd}");
         var markdownPath = Path.Combine(destinationDirectory, stem + ".md");
         var statsPath = Path.Combine(destinationDirectory, stem + ".stats.json");
+        var svgPath = Path.Combine(destinationDirectory, stem + ".svg");
         await File.WriteAllTextAsync(markdownPath, report.Markdown, ct);
         await File.WriteAllTextAsync(statsPath, report.StatsJson, ct);
-        return new RangeReportExport(markdownPath, statsPath);
+        await File.WriteAllTextAsync(svgPath, RangeReportSvgRenderer.Render(report), ct);
+        return new RangeReportExport(markdownPath, statsPath, svgPath);
     }
 }
 

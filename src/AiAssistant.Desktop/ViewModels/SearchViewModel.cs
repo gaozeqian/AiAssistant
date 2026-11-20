@@ -245,7 +245,7 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
         await RunAsync(async ct =>
         {
             var export = await RangeReportUseCase.ExportAsync(_weeklyReport, _exportDirectory, ct);
-            StatusMessage = $"已导出周报：{export.MarkdownPath}";
+            StatusMessage = $"已导出周报（Markdown / SVG / 统计 JSON）：{export.MarkdownPath}";
         });
     }
 

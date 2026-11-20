@@ -200,9 +200,56 @@ public sealed class RangeReportTests
 
         Assert.True(File.Exists(export.MarkdownPath));
         Assert.True(File.Exists(export.StatsPath));
+        Assert.True(File.Exists(export.SvgPath));
         Assert.EndsWith(".stats.json", export.StatsPath, StringComparison.Ordinal);
+        Assert.EndsWith(".svg", export.SvgPath, StringComparison.Ordinal);
         Assert.Contains("20261116-20261122", export.MarkdownPath, StringComparison.Ordinal);
         Assert.Contains("每日统计", await File.ReadAllTextAsync(export.MarkdownPath), StringComparison.Ordinal);
+        var svg = await File.ReadAllTextAsync(export.SvgPath);
+        Assert.Contains("<svg", svg, StringComparison.Ordinal);
+        Assert.Contains("<rect", svg, StringComparison.Ordinal);
+        Assert.Contains("2026年11月16日", svg, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SvgRenderer_EscapesDynamicText_AndRendersEveryDay()
+    {
+        var stats = Enumerable.Range(0, 7)
+            .Select(index => new DailyActivityStat(
+                new DateOnly(2026, 11, 16).AddDays(index),
+                index == 0 ? 3 : index,
+                30,
+                new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Rider"] = index + 1 }))
+            .ToArray();
+        var report = new RangeReport(
+            new DateOnly(2026, 11, 16),
+            new DateOnly(2026, 11, 22),
+            "# report",
+            "{}",
+            stats,
+            "model<&>",
+            true,
+            "model-unavailable");
+
+        var svg = RangeReportSvgRenderer.Render(report);
+
+        Assert.Contains("model&lt;&amp;&gt;", svg, StringComparison.Ordinal);
+        Assert.Contains("（统计模式）", svg, StringComparison.Ordinal);
+        Assert.Equal(7, CountOccurrences(svg, " 分钟</text>"));
+        Assert.Contains("11-22", svg, StringComparison.Ordinal);
+    }
+
+    private static int CountOccurrences(string value, string token)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = value.IndexOf(token, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += token.Length;
+        }
+
+        return count;
     }
 
     [Fact]

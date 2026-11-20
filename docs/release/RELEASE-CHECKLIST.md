@@ -48,6 +48,7 @@
 - [ ] 配置真实 embedding 端点后运行 `AiAssistant.Host --benchmark-retrieval --output artifacts/benchmarks/retrieval-real.md` 并归档。
 - [ ] 更换 embedding 模型或文档格式后运行 `AiAssistant.Host --rebuild-vectors`，确认索引版本与维度正确。
 - [ ] 用 `--import-model-secret` 导入企业端点密钥，`--probe-model` 确认各档位能力，再删除测试密钥。
+- [ ] 生成周报并确认 Markdown、stats JSON、SVG 三个文件均可打开且 SVG 无乱码。
 - [ ] 内存曲线无明显增长（记录峰值与采样方式）。
 
 ## 6. 隐私与无障碍
