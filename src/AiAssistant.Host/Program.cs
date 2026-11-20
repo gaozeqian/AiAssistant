@@ -19,6 +19,42 @@ public static class Program
         {
             await using var runtime = await AppRuntime.CreateAsync();
 
+            if (args.Contains("--mcp-token", StringComparer.OrdinalIgnoreCase))
+            {
+                // Explicit local action: prints the bearer token so the user can paste it into an MCP client.
+                Console.WriteLine(await runtime.McpControl.RevealTokenAsync(CancellationToken.None));
+                return 0;
+            }
+
+            if (args.Contains("--mcp-serve", StringComparer.OrdinalIgnoreCase))
+            {
+                await runtime.StartMcpOnlyAsync(CancellationToken.None);
+                var mcpStatus = runtime.McpControl.GetSnapshot();
+                if (!mcpStatus.Running || mcpStatus.Endpoint is null)
+                {
+                    Console.Error.WriteLine("Local MCP is disabled. Set AIASSISTANT_MCP_ENABLED=true to enable it.");
+                    return 3;
+                }
+
+                Console.WriteLine($"Local read-only MCP listening on {mcpStatus.Endpoint}");
+                using var shutdown = new CancellationTokenSource();
+                Console.CancelKeyPress += (_, eventArgs) =>
+                {
+                    eventArgs.Cancel = true;
+                    shutdown.Cancel();
+                };
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, shutdown.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Normal Ctrl+C shutdown
+                }
+
+                return 0;
+            }
+
             var isMaintenanceCommand = args.Any(argument =>
                 string.Equals(argument, "--backup", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(argument, "--restore", StringComparison.OrdinalIgnoreCase) ||

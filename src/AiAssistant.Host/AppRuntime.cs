@@ -277,6 +277,13 @@ public sealed class AppRuntime : IAsyncDisposable
         _started = true;
     }
 
+    /// <summary>Headless MCP-only startup for client conformance checks; never starts capture, reports or the UI.</summary>
+    public async Task StartMcpOnlyAsync(CancellationToken ct = default)
+    {
+        await _services.GetRequiredService<IDatabaseMaintenanceService>().InitializeAsync(ct);
+        await _services.GetRequiredService<LoopbackMcpServer>().StartAsync(ct);
+    }
+
     public ShellViewModel CreateShellViewModel() =>
         new(
             new TimelineViewModel(_services.GetRequiredService<TimelineUseCase>()),

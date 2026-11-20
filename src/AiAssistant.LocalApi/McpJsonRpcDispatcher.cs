@@ -2,7 +2,11 @@ using System.Text.Json;
 
 namespace AiAssistant.LocalApi;
 
-public sealed record McpDispatchOutcome(string? Json, bool IsNotification, bool ToolInvoked = false);
+public sealed record McpDispatchOutcome(
+    string? Json,
+    bool IsNotification,
+    bool ToolInvoked = false,
+    string? SessionId = null);
 
 /// <summary>
 /// Minimal JSON-RPC 2.0 dispatcher for the MCP tool subset. Notifications are acknowledged with an empty body;
@@ -10,8 +14,15 @@ public sealed record McpDispatchOutcome(string? Json, bool IsNotification, bool 
 /// </summary>
 public sealed class McpJsonRpcDispatcher
 {
-    public const string ProtocolVersion = "2024-11-05";
+    public const string ProtocolVersion = "2025-03-26";
     public const string ServerName = "aiassistant-local";
+
+    private static readonly string[] SupportedProtocolVersions =
+    [
+        "2024-11-05",
+        "2025-03-26",
+        "2025-06-18"
+    ];
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly McpToolCatalog _tools;
@@ -59,7 +70,10 @@ public sealed class McpJsonRpcDispatcher
 
             return method switch
             {
-                "initialize" => new McpDispatchOutcome(Success(id, InitializeResult()), false),
+                "initialize" => new McpDispatchOutcome(
+                    Success(id, InitializeResult(ReadRequestedProtocolVersion(root))),
+                    false,
+                    SessionId: Guid.NewGuid().ToString("N")),
                 "ping" => new McpDispatchOutcome(Success(id, new { }), false),
                 "tools/list" => new McpDispatchOutcome(Success(id, ToolsResult()), false),
                 "tools/call" => new McpDispatchOutcome(await CallToolAsync(_tools, id, root, ct), false, true),
@@ -104,9 +118,24 @@ public sealed class McpJsonRpcDispatcher
         }
     }
 
-    private static object InitializeResult() => new
+    private static string? ReadRequestedProtocolVersion(JsonElement root)
     {
-        protocolVersion = ProtocolVersion,
+        if (!root.TryGetProperty("params", out var parameters) ||
+            parameters.ValueKind != JsonValueKind.Object ||
+            !parameters.TryGetProperty("protocolVersion", out var version) ||
+            version.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        return version.GetString();
+    }
+
+    private static object InitializeResult(string? requestedVersion) => new
+    {
+        protocolVersion = requestedVersion is not null && SupportedProtocolVersions.Contains(requestedVersion, StringComparer.Ordinal)
+            ? requestedVersion
+            : ProtocolVersion,
         capabilities = new { tools = new { listChanged = false } },
         serverInfo = new { name = ServerName, version = "1.0.0" },
         instructions = "只读本地活动检索。所有工具仅返回结构化证据，不返回截图或音频字节。"

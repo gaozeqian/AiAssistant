@@ -283,9 +283,11 @@ public sealed class LoopbackMcpServer : IAsyncDisposable
             return;
         }
 
-        if (!string.Equals(request.Method, "POST", StringComparison.OrdinalIgnoreCase))
+        var isPost = string.Equals(request.Method, "POST", StringComparison.OrdinalIgnoreCase);
+        var isDelete = string.Equals(request.Method, "DELETE", StringComparison.OrdinalIgnoreCase);
+        if (!isPost && !isDelete)
         {
-            await WriteResponseAsync(stream, 405, "Method Not Allowed", token, "Allow: POST\r\n");
+            await WriteResponseAsync(stream, 405, "Method Not Allowed", token, "Allow: POST, DELETE\r\n");
             return;
         }
 
@@ -302,19 +304,68 @@ public sealed class LoopbackMcpServer : IAsyncDisposable
             return;
         }
 
+        if (isDelete)
+        {
+            // Streamable HTTP clients may terminate a session explicitly; this server is stateless.
+            await WriteResponseAsync(stream, 204, "No Content", token);
+            return;
+        }
+
         var dispatch = await _dispatcher.DispatchAsync(request.Body, token);
         if (dispatch.ToolInvoked)
         {
             Interlocked.Increment(ref _toolCalls);
         }
 
+        var sessionId = dispatch.SessionId;
+        if (sessionId is null &&
+            request.Headers.TryGetValue("Mcp-Session-Id", out var incomingSession) &&
+            !string.IsNullOrWhiteSpace(incomingSession))
+        {
+            sessionId = incomingSession.Trim();
+        }
+
         if (dispatch.Json is null)
         {
-            await WriteResponseAsync(stream, 202, "Accepted", token);
+            await WriteResponseAsync(stream, 202, "Accepted", token, sessionId: sessionId);
             return;
         }
 
-        await WriteResponseAsync(stream, 200, "OK", token, json: dispatch.Json);
+        if (PrefersEventStream(request.Headers))
+        {
+            var sse = $"event: message\ndata: {dispatch.Json}\n\n";
+            await WriteResponseAsync(
+                stream,
+                200,
+                "OK",
+                token,
+                json: sse,
+                contentType: "text/event-stream; charset=utf-8",
+                sessionId: sessionId);
+            return;
+        }
+
+        await WriteResponseAsync(
+            stream,
+            200,
+            "OK",
+            token,
+            json: dispatch.Json,
+            contentType: "application/json; charset=utf-8",
+            sessionId: sessionId);
+    }
+
+    private static bool PrefersEventStream(Dictionary<string, string> headers)
+    {
+        if (!headers.TryGetValue("Accept", out var accept) || string.IsNullOrWhiteSpace(accept))
+        {
+            return false;
+        }
+
+        var wantsSse = accept.Contains("text/event-stream", StringComparison.OrdinalIgnoreCase);
+        var acceptsJson = accept.Contains("application/json", StringComparison.OrdinalIgnoreCase) ||
+                          accept.Contains("*/*", StringComparison.Ordinal);
+        return wantsSse && !acceptsJson;
     }
 
     private bool IsAuthorized(Dictionary<string, string> headers)
@@ -451,15 +502,22 @@ public sealed class LoopbackMcpServer : IAsyncDisposable
         string reason,
         CancellationToken ct,
         string? extraHeaders = null,
-        string? json = null)
+        string? json = null,
+        string? contentType = null,
+        string? sessionId = null)
     {
         var body = json is null ? [] : Encoding.UTF8.GetBytes(json);
         var builder = new StringBuilder()
             .Append(CultureInfo.InvariantCulture, $"HTTP/1.1 {statusCode} {reason}\r\n")
-            .Append("Content-Type: application/json; charset=utf-8\r\n")
+            .Append(CultureInfo.InvariantCulture, $"Content-Type: {contentType ?? "application/json; charset=utf-8"}\r\n")
             .Append(CultureInfo.InvariantCulture, $"Content-Length: {body.Length}\r\n")
             .Append("Cache-Control: no-store\r\n")
             .Append("Connection: close\r\n");
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            builder.Append(CultureInfo.InvariantCulture, $"Mcp-Session-Id: {sessionId}\r\n");
+        }
+
         if (!string.IsNullOrEmpty(extraHeaders))
         {
             builder.Append(extraHeaders);
