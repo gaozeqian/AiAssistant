@@ -9,5 +9,6 @@
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="NAudio" />
   </ItemGroup>
 </Project>

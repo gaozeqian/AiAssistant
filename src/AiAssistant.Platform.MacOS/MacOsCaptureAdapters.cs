@@ -400,6 +400,13 @@ public sealed class MacOsTextExtractor(IMacHelperSupervisor supervisor) : ITextE
 /// macOS CoreAudio / AVAudioEngine 16kHz mono float32 capture adapter via Swift Helper IPC.
 /// Feeds the unified S4 AudioHub so multiple consumers never contend for the microphone.
 /// </summary>
+public sealed class MacOsAudioCaptureFactory(IMacHelperSupervisor supervisor, IClock clock) : IAudioCaptureFactory
+{
+    public CapabilityState Capability => new MacOsAudioCapture(supervisor, clock).Capability;
+
+    public IAudioCapture Create() => new MacOsAudioCapture(supervisor, clock);
+}
+
 public sealed class MacOsAudioCapture(
     IMacHelperSupervisor supervisor,
     IClock clock,

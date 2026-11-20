@@ -34,6 +34,11 @@
     <PackageVersion Include="System.Numerics.Tensors" Version="10.0.15" />
   </ItemGroup>
 
+  <ItemGroup Label="Audio and Local Speech">
+    <PackageVersion Include="org.k2fsa.sherpa.onnx" Version="2.0.2" />
+    <PackageVersion Include="NAudio" Version="3.3.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />

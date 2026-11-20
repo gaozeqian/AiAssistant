@@ -17,6 +17,8 @@
 | `HiraokaHyperTools.sqlite-vec` | `0.1.9` | `Storage` | MIT | `sqlite-vec` 向量检索扩展（由 `IVectorIndex` 隔离，含加密库内 SIMD 兜底实现） |
 | `System.Security.Cryptography.ProtectedData` | `10.0.15` | `Storage` / `Platform.Windows` | MIT | Windows DPAPI 系统密钥保护 |
 | `Microsoft.Extensions.AI` / `Abstractions` | `10.11.0` | `Application` / `Models` | MIT | 标准 `IChatClient` / `IEmbeddingGenerator` 模型抽象 |
+| `org.k2fsa.sherpa.onnx` | `2.0.2` | `Processing` | Apache-2.0 | 离线中文 ASR、Silero VAD、pyannote 说话人分离；按 RID 携带原生 `sherpa-onnx` 运行库，模型资产不入库 |
+| `NAudio` | `3.3.0` | `Platform.Windows` | MIT | WASAPI 共享模式单路麦克风采集（仅 Windows 生效） |
 | `Microsoft.Extensions.Hosting` / `DI` / `Logging` | `10.0.15` | `Host` / 各业务模块 | MIT | 宿主生命周期、依赖注入与结构化日志 |
 | `NetArchTest.Rules` | `1.3.2` | `Architecture.Tests` | MIT | 编译产物与依赖方向自动化门禁 |
 | `xunit` / `Microsoft.NET.Test.Sdk` | `2.9.3` / `17.14.1` | `tests/*` | Apache-2.0 / MIT | 自动化测试套件 |

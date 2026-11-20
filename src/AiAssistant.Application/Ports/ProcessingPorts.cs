@@ -1,3 +1,4 @@
+using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 
 namespace AiAssistant.Application.Ports;
@@ -36,6 +37,74 @@ public interface ITextExtractor
 public interface IProcessingStage<TInput, TOutput>
 {
     string StageName { get; }
+    string StageVersion { get; }
     TimeSpan DefaultTimeout { get; }
+
+    /// <summary>Declared resource claims such as "ocr", "asr" or "cpu" used for scheduling and diagnostics.</summary>
+    IReadOnlyCollection<string> ResourceClaims { get; }
+
     Task<TOutput> ProcessAsync(TInput input, CancellationToken ct);
+}
+
+public sealed record AudioTranscriptionRequest(
+    ReadOnlyMemory<float> Samples,
+    int SampleRateHz,
+    string Language = "zh");
+
+public sealed record AudioTranscriptionResult(
+    string Text,
+    double Confidence,
+    string ModelVersion)
+{
+    public static readonly AudioTranscriptionResult Empty = new(string.Empty, 0, "unavailable");
+}
+
+/// <summary>Replaceable offline ASR engine (sherpa-onnx default, Whisper optional).</summary>
+public interface IAsrEngine : IAsyncDisposable
+{
+    CapabilityState Capability { get; }
+    Task<AudioTranscriptionResult> TranscribeAsync(AudioTranscriptionRequest request, CancellationToken ct);
+}
+
+public sealed record VadSegment(
+    TimeSpan Start,
+    TimeSpan End,
+    ReadOnlyMemory<float> Samples);
+
+/// <summary>Voice activity segmentation over the shared AudioHub stream.</summary>
+public interface IVadSegmenter : IDisposable
+{
+    CapabilityState Capability { get; }
+    IReadOnlyList<VadSegment> Accept(AudioFrame frame);
+    IReadOnlyList<VadSegment> Flush();
+}
+
+public sealed record SpeakerTurn(
+    string SpeakerId,
+    TimeSpan Start,
+    TimeSpan End);
+
+public interface ISpeakerDiarizationEngine : IAsyncDisposable
+{
+    CapabilityState Capability { get; }
+    string ModelVersion { get; }
+    Task<IReadOnlyList<SpeakerTurn>> DiarizeAsync(
+        ReadOnlyMemory<float> samples,
+        int sampleRateHz,
+        CancellationToken ct);
+}
+
+/// <summary>
+/// Best-effort enrichment pipeline. Implementations must return the original event when any stage fails;
+/// raw capture persistence is never contingent on OCR, ASR or model availability.
+/// </summary>
+public sealed record EventProcessingRequest(
+    ActivityEvent Event,
+    byte[]? ScreenshotPng = null,
+    AudioFrame? Audio = null,
+    nint NativeWindowHandle = 0);
+
+public interface IEventEnrichmentPipeline
+{
+    Task<ActivityEvent> EnrichAsync(EventProcessingRequest request, CancellationToken ct);
 }

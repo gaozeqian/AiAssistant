@@ -198,6 +198,43 @@ public sealed class BoundedCaptureCoordinatorTests
         Assert.True(coordinator.GetMetricsSnapshot().ControlCommandsProcessed >= 1);
     }
 
+    [Fact]
+    public async Task EnrichmentFailure_DoesNotBlockRawEventPersistence()
+    {
+        var clock = new FakeClock(new DateTimeOffset(2026, 11, 20, 3, 0, 0, TimeSpan.Zero));
+        var repo = new InMemoryEventRepository();
+        await using var coordinator = new BoundedCaptureCoordinator(
+            [],
+            new FakeTextExtractor(),
+            repo,
+            new PrivacyBlacklistPolicy(),
+            clock,
+            new CapturePipelineOptions { BoundedQueueCapacity = 4 },
+            NullLogger<BoundedCaptureCoordinator>.Instance,
+            enrichmentPipeline: new ThrowingEnrichmentPipeline());
+
+        await coordinator.StartAsync(CancellationToken.None);
+        await coordinator.SubmitSampleAsync(
+            new CapturedSample(
+                ((IClock)clock).Now(),
+                SourceKind.WindowActivity,
+                "Editor",
+                "Raw event survives",
+                ExtractedText: "raw captured text"),
+            CancellationToken.None);
+
+        await WaitUntilAsync(() => repo.Snapshot().Count == 1);
+        var persisted = Assert.Single(repo.Snapshot());
+        Assert.Equal("Raw event survives", persisted.WindowTitle);
+        Assert.Equal("raw captured text", persisted.ExtractedText);
+    }
+
+    private sealed class ThrowingEnrichmentPipeline : IEventEnrichmentPipeline
+    {
+        public Task<ActivityEvent> EnrichAsync(EventProcessingRequest request, CancellationToken ct) =>
+            throw new InvalidOperationException("preprocessing unavailable");
+    }
+
     private static async Task WaitUntilAsync(Func<bool> predicate, int timeoutMs = 5000)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();

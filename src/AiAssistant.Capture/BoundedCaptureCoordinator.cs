@@ -45,6 +45,7 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
     private readonly IClock _clock;
     private readonly CapturePipelineOptions _options;
     private readonly ILogger<BoundedCaptureCoordinator> _logger;
+    private readonly IEventEnrichmentPipeline? _enrichmentPipeline;
 
     private readonly Channel<ControlCommand> _controlChannel;
     private readonly Channel<CapturedSample> _dataChannel;
@@ -75,7 +76,8 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
         CapturePipelineOptions options,
         ILogger<BoundedCaptureCoordinator> logger,
         IScreenCapture? screenCapture = null,
-        IWindowActivitySource? windowActivitySource = null)
+        IWindowActivitySource? windowActivitySource = null,
+        IEventEnrichmentPipeline? enrichmentPipeline = null)
     {
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(textExtractor);
@@ -94,6 +96,7 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
         _logger = logger;
         _screenCapture = screenCapture;
         _windowActivitySource = windowActivitySource;
+        _enrichmentPipeline = enrichmentPipeline;
 
         // Control channel is never dropped by data flood; commands carry TCS acknowledgements.
         _controlChannel = Channel.CreateUnbounded<ControlCommand>(new UnboundedChannelOptions
@@ -499,6 +502,31 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
             extractedText: extractedText,
             perceptualHash: sample.PerceptualHash,
             metadata: sample.Metadata);
+
+        if (_enrichmentPipeline is not null)
+        {
+            try
+            {
+                domainEvent = await _enrichmentPipeline.EnrichAsync(
+                    new EventProcessingRequest(
+                        domainEvent,
+                        sample.RawMediaBytes,
+                        Audio: null,
+                        NativeWindowHandle: sample.NativeWindowHandle),
+                    ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Preprocessing is best-effort; the original raw event must still be persisted.
+                _logger.LogWarning(
+                    "Event enrichment degraded with {ExceptionType}; persisting raw event.",
+                    ex.GetType().Name);
+            }
+        }
 
         try
         {

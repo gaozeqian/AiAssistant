@@ -148,6 +148,13 @@ public sealed class LinuxInotifyFileActivitySource(IClock clock) : IFileActivity
 /// Lazy PulseAudio/PipeWire-compatible capture through libpulse-simple.
 /// The microphone is opened only when a consumer subscribes; no resident audio stream is created at registration time.
 /// </summary>
+public sealed class LinuxAudioCaptureFactory(IClock clock) : IAudioCaptureFactory
+{
+    public CapabilityState Capability => new LinuxPulseAudioCapture(clock).Capability;
+
+    public IAudioCapture Create() => new LinuxPulseAudioCapture(clock);
+}
+
 public sealed class LinuxPulseAudioCapture(IClock clock) : IAudioCapture
 {
     private volatile string? _lastErrorType;

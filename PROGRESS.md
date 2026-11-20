@@ -7,12 +7,12 @@
 
 ## 1. 当前总体状态快照
 
-- **当前活跃阶段**：`S3 真实桌面权限与交互验收`（三平台 CI 已全绿；等待 macOS TCC 与 Linux Wayland/X11 真机人工复核）
+- **当前活跃阶段**：`S4 已完成代码与契约；待启动 S5 本机模型与日报`（真实 macOS/Linux 桌面验收与语音/OCR 模型质量评测已按用户决定转为遗留项）
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
-- **当前构建状态**：✅ 本地 Release 0 警告 0 错误；GitHub Actions 运行 `44703620747` 的 `win-x64` / `osx-arm64` / `linux-x64` 构建、测试、发布全部通过
-- **当前测试状态**：✅ 三平台各 53/53 测试全部通过；macOS Swift Helper 编译/冒烟/打包、Linux Portal 打包及 SBOM/许可证作业均通过
-- **下一步待确认事项**：在真实 macOS 桌面验证 TCC 权限、Helper 崩溃恢复与签名公证；在真实 Linux 桌面验证原生 Wayland、portal 授权/撤销、X11 回退与 AT-SPI。Wayland 当前按 `Degraded` 提供按需 Screenshot 像素回退，连续 PipeWire 像素流须在真实桌面复核；通过后进入 S4
+- **当前构建状态**：✅ 本地 Release 0 警告 0 错误；`win-x64` 启动自检、`linux-x64` / `osx-arm64` 发布及 sherpa-onnx 原生库打包通过
+- **当前测试状态**：✅ 62/62 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 10、`Capture.Tests` 4、`Platform.Tests` 29、`Processing.Tests` 7）
+- **下一步待确认事项**：启动 S5 —— Microsoft.Extensions.AI 模型网关、Ollama 本机档、活动分段/map-reduce 日报、持久 `report_jobs` 三通道与日报面板；S4 模型资产与真实桌面验收见第 5 节遗留项
 
 ---
 
@@ -24,7 +24,7 @@
 | **S1 核心与存储** | P0 | ✅ 已完成 | `win-x64` 实测通过；`osx-arm64` / `linux-x64` 待真机复跑 `Storage.Tests` | SQLite3MC 页级加密、DPAPI/Keychain/libsecret 密钥封装与轮换、AES-GCM 媒体库与引用计数、原子事件+媒体事务、加密备份恢复、`sqlite-vec` + SIMD 向量索引与重建 POC 全部通过 |
 | **S2 Windows 最小闭环** | P0 | ✅ 已完成 | `win-x64` 采集、Headless UI、真实桌面强杀重启、24h 全天加速浸泡均通过 | 完成采集与有界管道、Avalonia MVVM 时间线、选中后解密预览、暂停/黑名单、托盘、自启开关、基础保留清理 `MediaRetentionService`、零敏感泄露结构化日志 `SanitizedStructuredLoggerProvider` 与导出预览；24h 浸泡验证控制事件 100% 零丢失 |
 | **S3 三平台扩展** | P1 | 🔄 三平台 CI 全绿；待真实桌面权限/交互验收 | GitHub Actions `win-x64` / `osx-arm64` / `linux-x64` 各 53/53 测试通过，发布/Helper/Portal 打包通过 | macOS Helper、Linux Wayland 默认与初始化失败 X11 回退、portal 加密令牌轮换、AT-SPI/EWMH、inotify/PulseAudio/XDG 均已接入；macOS TCC 与 Linux 真实桌面能力矩阵待人工验收 |
-| **S4 预处理与音频** | P1 | ⏳ 待开始 | — | 可组合 `IProcessingStage`、单路 `AudioHub`、sherpa-onnx ASR/VAD |
+| **S4 预处理与音频** | P1 | 🔄 代码与契约完成；模型资产评测遗留 | `win-x64` 流水线/AudioHub/WASAPI 实测；`linux-x64` / `osx-arm64` 发布与 sherpa-onnx 原生库打包通过 | 可组合阶段、超时/失败隔离、脱敏、pHash 去重、单路 AudioHub、三平台音频工厂、sherpa-onnx ASR/VAD/说话人分离与缺失模型降级；真实中文语音与 OCR 质量待遗留项验收 |
 | **S5 本机模型与日报** | P2 | ⏳ 待开始 | — | Microsoft.Extensions.AI 网关、Ollama、map-reduce、三通道日报 |
 | **S6 内网与公网档** | P2.5 | ⏳ 待开始 | — | `models.json`、企业策略锁定、能力探测、脱敏三道闸、审计 |
 | **S7 唤醒与基础命令** | P2.6 | ⏳ 待开始 | — | “你好时光” KWS、语音状态机、8s 命令窗口、TTS、固定命令 |
@@ -73,3 +73,19 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
 - **2026-11-20 [win-x64] [S3.2 Linux 平台扩展完成]**：实现 `LinuxDisplayBackendState` 与仅在 Avalonia `SetupWithLifetime` 初始化阶段捕获的 Wayland→X11 回退；基于 `Tmds.DBus.Protocol 0.95.2` 实现 portal `CreateSession → SelectSources → Start → OpenPipeWireRemote`、请求前信号订阅、单次 `restore_token` AES-GCM 加密与逐次轮换，授权失败仅降级且用户取消不重复弹窗。实现 AT-SPI2（窗口焦点、文本接口、密码角色排除）、X11 EWMH/XGetImage、托管 PNG 编解码与像素转换、inotify 白名单文件、惰性 PulseAudio 和 XDG 自启；全部接入 Host 与动态能力矩阵。Wayland 不做周期弹窗，手动截图以 portal Screenshot 回退并标记 Degraded，连续 PipeWire 像素流待真实桌面复核。新增 10 项 Linux 专项契约测试，全仓 Release 0 警告 0 错误、53/53 测试通过，`linux-x64` 发布与 `Tmds.DBus.Protocol.dll` 打包验证通过。
 - **2026-11-20 [GitHub Actions] [S3 首轮 CI 修复]**：运行 `44696472530` 中 Windows 与 SBOM/许可证作业通过，macOS/Linux 测试暴露跨平台路径脱敏缺陷（Unix 宿主不能用 `Path.GetFileName` 解析反斜杠路径），macOS 另有 IPC 超时测试受监督器时序影响。已将脱敏改为同时识别 `/` 与 `\\` 的主机无关实现，并将超时/断线测试收窄为直接真实 AF_UNIX 传输测试；本地 Release 53/53 测试通过。复验运行 `44701041589` 中三平台各 53/53 测试、全部发布、Swift Helper 编译/冒烟/打包、Linux Portal 打包及 SBOM/许可证检查全部通过。
 - **2026-11-20 [GitHub Actions] [CI 测试稳定性修复]**：后续文档提交的 Windows 作业偶发暴露 `BoundedCaptureCoordinatorTests` 断言竞态：测试仅等待首个事件落库便读取重复合并/黑名单计数。生产逻辑无回归；测试改为同时等待三项指标并在 CI 负载下延长有界等待。专项与全量 Release 53/53 复跑通过。修复提交 `4df8f4c` 的运行 `44703620747` 中三平台各 53/53 测试、发布、Swift Helper 编译/冒烟/打包、Linux Portal 打包与 SBOM/许可证检查全部通过。
+- **2026-11-20 [win-x64] [S4 预处理与统一音频入口完成]**：实现 `ProcessingPipeline`（阶段版本/资源声明、单阶段超时、取消与异常隔离、失败仅降级元数据）、`PerceptualDeduplicationStage`、`TextExtractionStage`、`SensitiveDataRedactor`/`RedactionStage`、`AudioTranscriptionStage` 与 `SpeakerDiarizationStage`，并接入 `BoundedCaptureCoordinator`；预处理失败仍持久化原始事件。实现单路 `AudioHub`（多订阅有界广播、2 秒纯内存预滚、最后订阅退出关闭设备、再次订阅重开）。接入 `org.k2fsa.sherpa.onnx 2.0.2` 的 Paraformer 中文 ASR、Silero VAD、pyannote 说话人分离及模型缺失明确降级；新增 NAudio 3.3 WASAPI 工厂、macOS AVAudioEngine 工厂和 Linux PulseAudio 工厂。全仓 Release 0 警告 0 错误、62/62 测试通过，Host 启动自检与 `linux-x64`/`osx-arm64` 发布（含 sherpa-onnx 原生库）通过。真实模型质量、Linux RapidOCR 与 Whisper 批处理保留在第 5 节遗留项。
+
+---
+
+## 5. 遗留项与门禁豁免（按用户决定暂缓）
+
+> 这些项目不阻塞 S4–S8 的代码开发，但在 S9 发布门禁前必须完成。
+
+| ID | 来源 | 遗留内容 | 风险 | 后续处理 |
+|---|---|---|---|---|
+| `S3-R1` | S3 macOS | 真实 macOS 桌面的 TCC 屏幕录制/辅助功能授权、Helper 崩溃监督与签名公证未人工验收 | 原生权限路径与打包签名仍可能有平台差异 | 在 macOS Apple Silicon 真机执行 Helper 冒烟、权限拒绝/撤销与重启测试 |
+| `S3-R2` | S3 Linux | 真实 Wayland 合成器的 portal 授权/撤销、X11 回退、AT-SPI 与托盘能力矩阵未人工验收 | 合成器差异可能影响窗口与抓屏可用性 | 在 GNOME/KDE Wayland 与 X11 会话逐项签字 |
+| `S3-R3` | S3 Linux | Wayland 连续 PipeWire 像素流未消费；当前按 `Degraded` 使用按需 portal Screenshot 回退 | 无法提供高频 Wayland 截屏 | S4/S8 前评估 PipeWire 消费库，或保持按需截图并明确能力降级 |
+| `S4-R1` | S4 语音 | sherpa-onnx 模型资产（Paraformer、Silero VAD、说话人嵌入）不进入 Git，真实中文语音黄金集未评测 | 仅验证适配与降级路径，未证明识别质量 | 在本地/CI 外挂模型目录运行黄金集与唤醒词评测 |
+| `S4-R2` | S4 OCR | Linux RapidOCR ONNX 模型接入与中文 OCR 质量评测 | Linux OCR 仍只有 AT-SPI，无图像文字兜底 | 在 S5 前引入 RapidOCR 模型资产并跑中文截图集 |
+| `S4-R3` | S4 语音 | Whisper.net 高质量批处理适配器未启用 | 高质量离线转写缺少备选实现 | 需要长音频/高精度场景时再接入，保持 `IAsrEngine` 可替换 |

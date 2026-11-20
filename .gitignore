@@ -429,3 +429,7 @@ FodyWeavers.xsd
 # Local AI workspace state (PROGRESS.md is tracked for cross-machine handoff)
 .workbuddy-ai/
 
+# Local speech/OCR model assets are never committed
+models/
+*.onnx
+

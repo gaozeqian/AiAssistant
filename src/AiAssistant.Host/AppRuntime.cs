@@ -12,6 +12,7 @@ using AiAssistant.Platform.Linux.X11;
 using AiAssistant.Platform.MacOS;
 using AiAssistant.Platform.MacOS.Ipc;
 using AiAssistant.Platform.Windows;
+using AiAssistant.Processing;
 using AiAssistant.Storage;
 using AiAssistant.Storage.KeyStores;
 using AiAssistant.Storage.Media;
@@ -107,8 +108,30 @@ public sealed class AppRuntime : IAsyncDisposable
             RegisterLinux(services, clock, keyStore, options, linuxBackendState ?? new LinuxDisplayBackendState());
         }
 
-        services.AddSingleton<ICaptureCoordinator>(provider => new BoundedCaptureCoordinator(
-            provider.GetServices<ICaptureSource>(),
+        var sherpaModelDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_SHERPA_MODEL_DIR");
+        if (string.IsNullOrWhiteSpace(sherpaModelDirectory))
+        {
+            sherpaModelDirectory = Path.Combine(dataDirectory, "models", "sherpa");
+        }
+
+        services.AddSingleton(new SherpaOnnxOptions { ModelDirectory = Path.GetFullPath(sherpaModelDirectory) });
+        services.AddSingleton<IAsrEngine, SherpaOnnxAsrEngine>();
+        services.AddSingleton<IVadSegmenter, SherpaOnnxVadSegmenter>();
+        services.AddSingleton<ISpeakerDiarizationEngine, SherpaOnnxDiarizationEngine>();
+        services.AddSingleton<IEventEnrichmentPipeline>(provider => new ProcessingPipeline(
+            [
+                new PerceptualDeduplicationStage(),
+                new TextExtractionStage(provider.GetRequiredService<ITextExtractor>()),
+                new RedactionStage(),
+                new AudioTranscriptionStage(provider.GetRequiredService<IAsrEngine>()),
+                new SpeakerDiarizationStage(provider.GetRequiredService<ISpeakerDiarizationEngine>())
+            ],
+            provider.GetRequiredService<ILogger<ProcessingPipeline>>()));
+        services.AddSingleton<IAudioHub>(provider => new AudioHub(
+            provider.GetRequiredService<IAudioCaptureFactory>(),
+            provider.GetRequiredService<ILogger<AudioHub>>()));
+
+        services.AddSingleton<ICaptureCoordinator>(provider => new BoundedCaptureCoordinator(            provider.GetServices<ICaptureSource>(),
             provider.GetRequiredService<ITextExtractor>(),
             provider.GetRequiredService<IEventRepository>(),
             provider.GetRequiredService<PrivacyBlacklistPolicy>(),
@@ -116,7 +139,8 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<CapturePipelineOptions>(),
             provider.GetRequiredService<ILogger<BoundedCaptureCoordinator>>(),
             provider.GetService<IScreenCapture>(),
-            provider.GetService<IWindowActivitySource>()));
+            provider.GetService<IWindowActivitySource>(),
+            provider.GetService<IEventEnrichmentPipeline>()));
         services.AddSingleton<TimelineUseCase>();
         services.AddSingleton<CaptureControlUseCase>();
         services.AddSingleton<DiagnosticsUseCase>();
@@ -175,6 +199,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<ICaptureSource>(fileSource);
         services.AddSingleton<ITextExtractor>(textExtractor);
         services.AddSingleton<IAutoStartService>(autoStart);
+        services.AddSingleton<IAudioCaptureFactory>(new WindowsAudioCaptureFactory(clock));
         services.AddSingleton<ICapabilityProvider>(new WindowsCapabilityProvider(
             screenCapture,
             windowSource,
@@ -213,6 +238,8 @@ public sealed class AppRuntime : IAsyncDisposable
             new MacOsTextExtractor(provider.GetRequiredService<IMacHelperSupervisor>()));
         services.AddSingleton<IAudioCapture>(provider =>
             new MacOsAudioCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
+        services.AddSingleton<IAudioCaptureFactory>(provider =>
+            new MacOsAudioCaptureFactory(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
         services.AddSingleton<IAutoStartService>(autoStart);
         services.AddSingleton<ICapabilityProvider>(provider => new MacOsCapabilityProvider(
             provider.GetRequiredService<IScreenCapture>(),
@@ -263,6 +290,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IFileActivitySource>());
         services.AddSingleton<ITextExtractor>(provider => new LinuxTextExtractor(provider.GetRequiredService<IAtSpiAccessibilityClient>()));
         services.AddSingleton<IAudioCapture>(new LinuxPulseAudioCapture(clock));
+        services.AddSingleton<IAudioCaptureFactory>(new LinuxAudioCaptureFactory(clock));
         services.AddSingleton<IAutoStartService>(autoStart);
         services.AddSingleton<ICapabilityProvider>(provider => new LinuxCapabilityProvider(
             provider.GetRequiredService<IScreenCapture>(),

@@ -106,6 +106,27 @@ public sealed class WindowsPlatformAdapterTests : IDisposable
     }
 
     [Fact]
+    public void WasapiAudioNormalization_MixesStereoAndResamplesTo16KhzMono()
+    {
+        const int sourceRate = 48_000;
+        const int sourceFrames = 480;
+        var format = new NAudio.Wave.WaveFormat(sourceRate, 16, 2);
+        var pcm = new byte[sourceFrames * 2 * 2];
+        for (var frame = 0; frame < sourceFrames; frame++)
+        {
+            var left = BitConverter.GetBytes((short)16_384);
+            var right = BitConverter.GetBytes((short)16_384);
+            left.CopyTo(pcm, frame * 4);
+            right.CopyTo(pcm, frame * 4 + 2);
+        }
+
+        var normalized = WindowsWasapiAudioCapture.NormalizeTo16KhzMono(pcm, pcm.Length, format);
+
+        Assert.Equal(160, normalized.Length);
+        Assert.All(normalized, sample => Assert.InRange(sample, 0.49f, 0.51f));
+    }
+
+    [Fact]
     public void CrossPlatformCapabilityProviders_ReturnNonEmptyAccurateMatrices()
     {
         var keyStore = new StaticKeyStore(RandomNumberGenerator.GetBytes(32));

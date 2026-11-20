@@ -56,6 +56,13 @@ public interface IAudioCapture : IAsyncDisposable
     IAsyncEnumerable<AudioFrame> ReadFramesAsync(CancellationToken ct);
 }
 
+/// <summary>Creates a fresh single-consumer microphone capture when the AudioHub has subscribers.</summary>
+public interface IAudioCaptureFactory
+{
+    CapabilityState Capability { get; }
+    IAudioCapture Create();
+}
+
 public sealed record AudioFrame(
     DateTimeOffset TimestampUtc,
     int SampleRateHz,

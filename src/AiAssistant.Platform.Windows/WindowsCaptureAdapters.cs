@@ -685,7 +685,7 @@ public sealed class WindowsCapabilityProvider(
         keyStore.Capability,
         autoStartService.Capability,
         CapabilityState.Supported(CapabilityKind.SystemTray, "Avalonia TrayIcon active"),
-        CapabilityState.Degraded(CapabilityKind.AudioCapture, "Pending S4 sherpa-onnx AudioHub"),
+        CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI shared-mode capture through AudioHub"),
         CapabilityState.Degraded(CapabilityKind.WakeWord, "Pending S7 sherpa-onnx '你好时光' KWS")
     ];
 }
