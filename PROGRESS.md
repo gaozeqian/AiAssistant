@@ -7,12 +7,12 @@
 
 ## 1. 当前总体状态快照
 
-- **当前活跃阶段**：`S6 已完成代码与契约；待启动 S7 本地唤醒与基础语音命令`
+- **当前活跃阶段**：`S7 已完成代码与契约；待启动 S8 智能检索与完整对话`
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
-- **当前构建状态**：✅ 本地 Release 0 警告 0 错误；Host 启动自检、`linux-x64` / `osx-arm64` 发布通过
-- **当前测试状态**：✅ 80/80 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 11、`Capture.Tests` 4、`Platform.Tests` 30、`Processing.Tests` 7、`Report.Tests` 16）
-- **下一步待确认事项**：启动 S7 —— sherpa-onnx “你好时光” KWS、语音状态机、8 秒命令窗口、TTS 与固定命令；S6 企业真实端点和公网授权验证见第 5 节遗留项
+- **当前构建状态**：✅ 本地 Release 0 警告 0 错误；SQLite Schema v2、Host 启动自检与两平台发布通过
+- **当前测试状态**：✅ 87/87 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 12、`Capture.Tests` 4、`Platform.Tests` 31、`Processing.Tests` 7、`Report.Tests` 16、`Voice.Tests` 5）
+- **下一步待确认事项**：启动 S8 —— 时间过滤+向量+关键词混合检索、证据回链问答、周报/导出、只读 loopback MCP 与完整语音对话；S7 真实唤醒率/TTS 评测见第 5 节遗留项
 
 ---
 
@@ -27,7 +27,7 @@
 | **S4 预处理与音频** | P1 | 🔄 代码与契约完成；模型资产评测遗留 | `win-x64` 流水线/AudioHub/WASAPI 实测；`linux-x64` / `osx-arm64` 发布与 sherpa-onnx 原生库打包通过 | 可组合阶段、超时/失败隔离、脱敏、pHash 去重、单路 AudioHub、三平台音频工厂、sherpa-onnx ASR/VAD/说话人分离与缺失模型降级；真实中文语音与 OCR 质量待遗留项验收 |
 | **S5 本机模型与日报** | P2 | 🔄 代码与契约完成；真实模型评测遗留 | `win-x64` 网关/分段/调度/UI 实测；`linux-x64` / `osx-arm64` 发布通过 | Microsoft.Extensions.AI 网关、Ollama/LM Studio 兼容适配、脱敏/审计/超时装饰器、事件向量索引、分段+map-reduce+JSON 校验重试、版本化加密日报、单消费者三通道与日报/站会 UI；真实 Qwen 质量待遗留项评测 |
 | **S6 内网与公网档** | P2.5 | 🔄 代码与契约完成；真实企业端点遗留 | `win-x64` 配置/策略/三闸/探测测试通过；两平台发布通过 | 版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理、Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、三闸脱敏、五能力探测缓存与诊断展示 |
-| **S7 唤醒与基础命令** | P2.6 | ⏳ 待开始 | — | “你好时光” KWS、语音状态机、8s 命令窗口、TTS、固定命令 |
+| **S7 唤醒与基础命令** | P2.6 | 🔄 代码与契约完成；真实 KWS/TTS 评测遗留 | `win-x64` 状态机/命令/日志/UI 测试；两平台发布通过 | sherpa-onnx “你好时光” KWS、四态语音会话、8 秒命令窗口、误唤醒冷却、固定命令、敏感命令二次确认、TTS 反馈、加密 voice_commands 文本日志与状态栏/语音面板 |
 | **S8 智能检索与对话** | P3 | ⏳ 待开始 | — | 混合检索、证据回链问答、周报、只读 loopback MCP、完整语音对话 |
 | **S9 发布加固** | 全阶段 | ⏳ 待开始 | — | 安装包签名公证、浸泡测试、故障注入、升级迁移、SBOM |
 
@@ -98,6 +98,18 @@ AIASSISTANT_REPORT_TIME=18:30
 AIASSISTANT_REPORT_DISABLE_SCHEDULE=true
 ```
 
+### 3.5 本地语音模型与命令
+
+`AIASSISTANT_SHERPA_MODEL_DIR` 指向同一语音模型根目录，建议结构：
+
+```text
+sherpa/
+├── kws/  encoder.onnx · decoder.onnx · joiner.onnx · tokens.txt · keywords.txt
+└── tts/  model.onnx · tokens.txt · lexicon.txt
+```
+
+`keywords.txt` 使用 sherpa-onnx KWS 关键词格式，至少包含“你好时光”及备选词；阈值在真实环境实测后调整。语音默认关闭，由“语音”页显式启用；`AIASSISTANT_VOICE_DISABLE_CHIME=true` 可关闭唤醒提示音。
+
 ---
 
 ## 4. 实施日志（按时间顺序追加）
@@ -116,6 +128,7 @@ AIASSISTANT_REPORT_DISABLE_SCHEDULE=true
 - **2026-11-20 [win-x64] [S4 预处理与统一音频入口完成]**：实现 `ProcessingPipeline`（阶段版本/资源声明、单阶段超时、取消与异常隔离、失败仅降级元数据）、`PerceptualDeduplicationStage`、`TextExtractionStage`、`SensitiveDataRedactor`/`RedactionStage`、`AudioTranscriptionStage` 与 `SpeakerDiarizationStage`，并接入 `BoundedCaptureCoordinator`；预处理失败仍持久化原始事件。实现单路 `AudioHub`（多订阅有界广播、2 秒纯内存预滚、最后订阅退出关闭设备、再次订阅重开）。接入 `org.k2fsa.sherpa.onnx 2.0.2` 的 Paraformer 中文 ASR、Silero VAD、pyannote 说话人分离及模型缺失明确降级；新增 NAudio 3.3 WASAPI 工厂、macOS AVAudioEngine 工厂和 Linux PulseAudio 工厂。全仓 Release 0 警告 0 错误、62/62 测试通过，Host 启动自检与 `linux-x64`/`osx-arm64` 发布（含 sherpa-onnx 原生库）通过。真实模型质量、Linux RapidOCR 与 Whisper 批处理保留在第 5 节遗留项。
 - **2026-11-20 [win-x64] [S5 本机模型与日报完成]**：实现 `HttpModelBackend`（Ollama 与 OpenAI 兼容端点，标准 `IChatClient`/`IEmbeddingGenerator`）、仅 loopback 的 `LocalModelGateway`、超时/脱敏/审计装饰器与无正文模型审计；模型标签全部由环境配置。实现 `EventEmbeddingIndexer`（qwen3-embedding 默认，版本化写入与重建）和固定中文基准集。实现活动分段、map 摘要、reduce 结构化 JSON、Schema 校验与两次重试、Markdown/站会输出及加密版本化 `daily_reports` 仓储。实现单消费者 `ReportJobWorker`、手动/启动补偿/每日定时三通道、幂等与失败保留；新增日报/站会面板、强制重生成与 Markdown 导出。全仓 Release 0 警告 0 错误、73/73 测试通过，Host 启动自检与两平台发布通过。首轮 CI `44710041839` 的 Linux/macOS/SBOM 通过，Windows 暴露 macOS IPC 启动瞬时断言竞态；改为等待监督器最终 Healthy 后本地全量复跑通过，由修复提交触发三平台复验。真实 Qwen 质量评测与调度浸泡保留遗留项。
 - **2026-11-20 [win-x64] [S6 企业策略与三档模型完成]**：实现版本化 `models.json` 与 `models.example.json`，校验 schema/重复档位/远程本地端点；端点 API Key 与证书密码通过 AES-GCM 加密密钥库或 `env:` 引用，明文不入配置。实现每端点独立 HttpClient（代理、PFX/PEM mTLS、企业 CA 自定义信任、超时）。Host 改为多端点装配，`PolicyEnforcedModelGateway` 在应用层外强制档位策略，公网需显式 `PublicCloudConsentGate` 同意；`TierRoutingModelGateway` 支持内网故障回退本机、本机不可用明确失败。新增最小化→脱敏→残留检测/输出清洗三闸与敏感残留阻断；五能力（chat/streaming/embeddings/structured/tool）探测缓存 24 小时并接入诊断。全仓 Release 0 警告 0 错误、80/80 测试通过，Host 无配置安全回退启动与两平台发布通过。真实企业 mTLS/CA/代理和公网端点验证保留遗留项。
+- **2026-11-20 [win-x64] [S7 本地唤醒与基础命令完成]**：接入 `org.k2fsa.sherpa.onnx` KWS 与 VITS TTS，新增 `VoiceSessionController` 四态状态机（休眠/聆听/处理/反馈）、8 秒命令窗口、超时/取消、误唤醒冷却与同一 AudioHub 单路采集；固定命令映射到既有日报、采集和导航用例，退出应用需二次确认。实现加密 `voice_commands` 文本日志（Schema v2 新增可选 audio_content_id）与命令音频默认不落盘；新增 Windows/Linux 反馈播放，macOS 音频输出明确降级。新增“语音”面板、状态栏状态与语音开关。全仓 Release 0 警告 0 错误、87/87 测试通过，Host 启动与两平台发布通过。真实 KWS/TTS 评测和命令音频 opt-in 保留遗留项。
 
 ---
 
@@ -135,3 +148,6 @@ AIASSISTANT_REPORT_DISABLE_SCHEDULE=true
 | `S5-R2` | S5 调度 | 每日定时、启动补偿与失败退避尚未进行多日浸泡 | 长时间休眠/跨日边界可能暴露时序问题 | S9 浸泡测试覆盖跨午夜、休眠唤醒、模型离线与重复触发 |
 | `S6-R1` | S6 企业端点 | 真实企业 mTLS、企业 CA、代理和公网 API 未联调；公网同意仅代码级门禁 | TLS/代理环境差异可能导致端点不可用 | 在企业网络与公网沙箱分别验证握手、证书轮换、代理认证、断网回退与策略审计 |
 | `S6-R2` | S6 密钥 | 模型端点密钥加密存储未提供管理 UI/CLI 导入流程 | 用户需手工准备密钥文件 | S9 前补充安全导入向导或 CLI，禁止明文命令行参数 |
+| `S7-R1` | S7 语音 | 真实中文 KWS 唤醒率/误唤醒率、TTS 音质与端到端延迟未评测 | 阈值和体验未达发布基线 | 外挂 KWS/TTS 模型后运行安静/嘈杂/多人场景黄金集，按实测调整阈值 |
+| `S7-R2` | S7 macOS | macOS TTS 音频输出仍为 Degraded；命令文字反馈可用 | macOS 无语音播报 | 扩展 Swift Helper 的音频输出能力并做 TCC 麦克风/输出验收 |
+| `S7-R3` | S7 隐私 | 命令音频选择落盘（opt-in）尚未实现，当前仅加密文本日志 | 无法回听命令音频 | S9 前增加显式开关、加密媒体引用与自动清理 |

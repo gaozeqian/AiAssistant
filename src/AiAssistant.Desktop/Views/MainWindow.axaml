@@ -44,9 +44,14 @@
           <TextBlock Text="时光" Foreground="White" FontSize="20" FontWeight="SemiBold" />
           <TextBlock Text="个人活动追踪 · 默认仅在本机处理" Foreground="#B7C3D9" FontSize="12" />
         </StackPanel>
-        <Border Grid.Column="2" Background="#22304D" CornerRadius="14" Padding="12,6" VerticalAlignment="Center">
-          <TextBlock Text="{Binding CaptureStatus}" Foreground="#DCE5F5" FontSize="12" />
-        </Border>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Border Background="#22304D" CornerRadius="14" Padding="12,6">
+            <TextBlock Text="{Binding CaptureStatus}" Foreground="#DCE5F5" FontSize="12" />
+          </Border>
+          <Border Background="#22304D" CornerRadius="14" Padding="12,6">
+            <TextBlock Text="{Binding Voice.StatusText}" Foreground="#DCE5F5" FontSize="12" />
+          </Border>
+        </StackPanel>
       </Grid>
     </Border>
 
@@ -194,6 +199,38 @@
             </Border>
           </Grid>
         </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="语音">
+        <Grid DataContext="{Binding Voice}" x:DataType="vm:VoiceControlViewModel"
+              ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" Margin="0,12,0,0">
+          <Border Grid.Row="0" Grid.Column="0" Background="White" CornerRadius="10" Padding="24" Margin="0,0,8,12">
+            <StackPanel Spacing="14">
+              <TextBlock Text="本地语音命令" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding StatusText}" FontSize="16" Foreground="{StaticResource AccentBrush}" />
+              <TextBlock Text="唤醒词：你好时光。唤醒后 8 秒内说出固定命令，命令音频仅驻留内存。"
+                         TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+              <WrapPanel>
+                <Button Classes="primary" Content="{Binding ToggleButtonText}" Command="{Binding ToggleCommand}" Margin="0,0,8,8" />
+              </WrapPanel>
+              <TextBlock Text="{Binding CapabilityText}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+              <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Foreground="#B42318" IsVisible="{Binding HasError}" />
+            </StackPanel>
+          </Border>
+          <Border Grid.Row="0" Grid.Column="1" Background="White" CornerRadius="10" Padding="24" Margin="8,0,0,12">
+            <StackPanel Spacing="14">
+              <TextBlock Text="最近一次交互" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="识别文本" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding LastTranscript}" TextWrapping="Wrap" />
+              <TextBlock Text="反馈" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding LastFeedback}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+              <Border Background="#EFF6F1" CornerRadius="8" Padding="14">
+                <TextBlock Text="固定命令：生成日报、暂停采集、恢复采集、打开时间线、打开日报。退出应用需要二次确认。"
+                           TextWrapping="Wrap" Foreground="#256044" />
+              </Border>
+            </StackPanel>
+          </Border>
+        </Grid>
       </TabItem>
 
       <TabItem Header="本地诊断">

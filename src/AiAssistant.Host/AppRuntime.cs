@@ -23,6 +23,7 @@ using AiAssistant.Storage.Sqlite;
 using AiAssistant.Storage.Vectors;
 using AiAssistant.Summarization;
 using AiAssistant.Models;
+using AiAssistant.Voice;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -152,6 +153,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IAudioHub>(provider => new AudioHub(
             provider.GetRequiredService<IAudioCaptureFactory>(),
             provider.GetRequiredService<ILogger<AudioHub>>()));
+        RegisterVoice(services, dataDirectory, clock);
 
         services.AddSingleton<ICaptureCoordinator>(provider => new BoundedCaptureCoordinator(
             provider.GetServices<ICaptureSource>(),
@@ -223,11 +225,51 @@ public sealed class AppRuntime : IAsyncDisposable
             new DiagnosticsViewModel(_services.GetRequiredService<DiagnosticsUseCase>()),
             new ReportsViewModel(
                 _services.GetRequiredService<ReportUseCase>(),
-                Path.Combine(_dataDirectory, "reports")));
+                Path.Combine(_dataDirectory, "reports")),
+            new VoiceControlViewModel(_services.GetRequiredService<IVoiceSession>()),
+            _services.GetRequiredService<VoiceNavigationHub>());
 
     public async ValueTask DisposeAsync()
     {
         await _services.DisposeAsync();
+    }
+
+    private static void RegisterVoice(IServiceCollection services, string dataDirectory, IClock clock)
+    {
+        var modelDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_SHERPA_MODEL_DIR");
+        if (string.IsNullOrWhiteSpace(modelDirectory))
+        {
+            modelDirectory = Path.Combine(dataDirectory, "models", "sherpa");
+        }
+
+        var voiceOptions = new SherpaVoiceOptions { ModelDirectory = Path.GetFullPath(modelDirectory) };
+        var sessionOptions = new VoiceSessionOptions
+        {
+            EnableWakeChime = !string.Equals(
+                Environment.GetEnvironmentVariable("AIASSISTANT_VOICE_DISABLE_CHIME"),
+                "true",
+                StringComparison.OrdinalIgnoreCase)
+        };
+        var navigation = new VoiceNavigationHub();
+        services.AddSingleton(voiceOptions);
+        services.AddSingleton(sessionOptions);
+        services.AddSingleton(navigation);
+        services.AddSingleton<IVoiceViewNavigator>(navigation);
+        services.AddSingleton<IWakeWordDetector, SherpaOnnxWakeWordDetector>();
+        services.AddSingleton<ITtsService, SherpaOnnxTtsService>();
+        services.AddSingleton<IVoiceCommandLog, SqliteVoiceCommandLog>();
+        services.AddSingleton<VoiceCommandRouter>();
+        services.AddSingleton<IVoiceSession>(provider => new VoiceSessionController(
+            provider.GetRequiredService<IAudioHub>(),
+            provider.GetRequiredService<IWakeWordDetector>(),
+            provider.GetRequiredService<IAsrEngine>(),
+            provider.GetRequiredService<ITtsService>(),
+            provider.GetRequiredService<IAudioPlayback>(),
+            provider.GetRequiredService<VoiceCommandRouter>(),
+            provider.GetRequiredService<IVoiceCommandLog>(),
+            clock,
+            sessionOptions,
+            provider.GetRequiredService<ILogger<VoiceSessionController>>()));
     }
 
     private static void RegisterReports(
@@ -344,6 +386,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<ITextExtractor>(textExtractor);
         services.AddSingleton<IAutoStartService>(autoStart);
         services.AddSingleton<IAudioCaptureFactory>(new WindowsAudioCaptureFactory(clock));
+        services.AddSingleton<IAudioPlayback>(new WindowsAudioPlayback());
         services.AddSingleton<ICapabilityProvider>(new WindowsCapabilityProvider(
             screenCapture,
             windowSource,
@@ -384,6 +427,7 @@ public sealed class AppRuntime : IAsyncDisposable
             new MacOsAudioCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
         services.AddSingleton<IAudioCaptureFactory>(provider =>
             new MacOsAudioCaptureFactory(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
+        services.AddSingleton<IAudioPlayback>(new MacOsAudioPlayback());
         services.AddSingleton<IAutoStartService>(autoStart);
         services.AddSingleton<ICapabilityProvider>(provider => new MacOsCapabilityProvider(
             provider.GetRequiredService<IScreenCapture>(),
@@ -435,6 +479,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<ITextExtractor>(provider => new LinuxTextExtractor(provider.GetRequiredService<IAtSpiAccessibilityClient>()));
         services.AddSingleton<IAudioCapture>(new LinuxPulseAudioCapture(clock));
         services.AddSingleton<IAudioCaptureFactory>(new LinuxAudioCaptureFactory(clock));
+        services.AddSingleton<IAudioPlayback>(new LinuxAudioPlayback());
         services.AddSingleton<IAutoStartService>(autoStart);
         services.AddSingleton<ICapabilityProvider>(provider => new LinuxCapabilityProvider(
             provider.GetRequiredService<IScreenCapture>(),

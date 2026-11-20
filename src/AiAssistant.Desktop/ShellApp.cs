@@ -40,6 +40,7 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             desktop.MainWindow = window;
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             ConfigureTray(desktop, window, shell, icon);
+            shell.ExitRequested += (_, _) => desktop.Shutdown();
             desktop.ShutdownRequested += (_, _) =>
             {
                 Dispose();

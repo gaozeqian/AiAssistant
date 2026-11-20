@@ -104,6 +104,13 @@ public static class SchemaMigrator
                 norm REAL NOT NULL
             );
             """)
+        ,
+        new(
+            new SchemaVersion(2, "S7_VoiceCommandAudioOptIn"),
+            """
+            ALTER TABLE voice_commands ADD COLUMN audio_content_id TEXT NULL;
+            CREATE INDEX IF NOT EXISTS ix_voice_commands_occurred ON voice_commands(occurred_at_utc);
+            """)
     ];
 
     public static async Task<SchemaVersion> MigrateAsync(SqliteConnection connection, CancellationToken ct = default)

@@ -407,6 +407,17 @@ public sealed class MacOsAudioCaptureFactory(IMacHelperSupervisor supervisor, IC
     public IAudioCapture Create() => new MacOsAudioCapture(supervisor, clock);
 }
 
+/// <summary>macOS feedback playback is deferred to the S9 helper extension; voice text feedback remains available.</summary>
+public sealed class MacOsAudioPlayback : IAudioPlayback
+{
+    public CapabilityState Capability => CapabilityState.Degraded(
+        CapabilityKind.WakeWord,
+        "macOS TTS playback requires the native helper audio output extension");
+
+    public Task PlayAsync(ReadOnlyMemory<float> samples, int sampleRateHz, CancellationToken ct) =>
+        Task.CompletedTask;
+}
+
 public sealed class MacOsAudioCapture(
     IMacHelperSupervisor supervisor,
     IClock clock,

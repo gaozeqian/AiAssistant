@@ -508,6 +508,10 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S6.2：Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、最小化/脱敏/残留检测三闸。
 - [x] S6.3：chat/streaming/embeddings/structured output/tool calling 探测缓存与诊断展示。
 - [ ] S6-R：真实企业 mTLS/CA/代理、公网端点和密钥导入流程联调。
+- [x] S7.1：sherpa-onnx KWS/TTS 适配、语音端口、模型缺失降级与唤醒提示音。
+- [x] S7.2：四态语音状态机、8 秒命令窗口、误唤醒冷却、固定命令、敏感二次确认与加密文本日志。
+- [x] S7.3：语音面板与状态栏、Host 单路 AudioHub 装配、Windows/Linux 反馈播放与 macOS 明确降级。
+- [ ] S7-R：真实中文 KWS/TTS 黄金集、macOS 音频输出与命令音频 opt-in 落盘。
 - [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
 
 ---

@@ -28,6 +28,7 @@ public interface IVoiceSession : IAsyncDisposable
     VoiceSessionState State { get; }
     CapabilityState Capability { get; }
     event EventHandler<VoiceSessionState>? StateChanged;
+    event EventHandler<VoiceInteraction>? Interaction;
     Task StartAsync(CancellationToken ct);
     Task StopAsync(CancellationToken ct);
 }

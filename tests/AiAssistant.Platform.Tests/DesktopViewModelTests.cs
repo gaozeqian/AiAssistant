@@ -176,6 +176,24 @@ public sealed class DesktopViewModelTests
         Directory.Delete(exportDirectory, recursive: true);
     });
 
+    [Fact]
+    public Task VoicePanel_TogglesSessionAndReflectsListeningState() => RunInHeadlessSession(async () =>
+    {
+        var session = new FakeVoiceSession();
+        using var viewModel = new VoiceControlViewModel(session);
+        Assert.False(viewModel.IsEnabled);
+        Assert.Equal("语音休眠", viewModel.StatusText);
+
+        await viewModel.ToggleCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsEnabled);
+        Assert.Equal("正在聆听", viewModel.StatusText);
+        Assert.Contains("fake KWS", viewModel.CapabilityText, StringComparison.Ordinal);
+
+        await viewModel.ToggleCommand.ExecuteAsync(null);
+        Assert.False(viewModel.IsEnabled);
+        Assert.Equal("语音休眠", viewModel.StatusText);
+    });
+
     private static ShellViewModel CreateShell()
     {
         var repository = new InMemoryEventRepository();
@@ -437,6 +455,31 @@ public sealed class DesktopViewModelTests
             _enabled = enabled;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeVoiceSession : IVoiceSession
+    {
+        public VoiceSessionState State { get; private set; } = VoiceSessionState.Sleeping;
+        public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.WakeWord, "fake KWS");
+        public event EventHandler<VoiceSessionState>? StateChanged;
+        public event EventHandler<VoiceInteraction>? Interaction;
+
+        public Task StartAsync(CancellationToken ct)
+        {
+            State = VoiceSessionState.Listening;
+            StateChanged?.Invoke(this, State);
+            Interaction?.Invoke(this, new VoiceInteraction(State, "你好时光", string.Empty, "我在听", DateTimeOffset.UtcNow));
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken ct)
+        {
+            State = VoiceSessionState.Sleeping;
+            StateChanged?.Invoke(this, State);
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class FakeRetentionService : IRetentionService
