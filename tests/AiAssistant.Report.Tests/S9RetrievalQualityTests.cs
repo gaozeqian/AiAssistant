@@ -3,6 +3,7 @@ using System.Text;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
+using AiAssistant.Models;
 using AiAssistant.Summarization;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -78,6 +79,12 @@ public sealed class S9RetrievalQualityTests
         Assert.True(hybrid.Mrr > keyword.Mrr, $"hybrid MRR {hybrid.Mrr:F3} <= keyword {keyword.Mrr:F3}");
         Assert.True(hybrid.Mrr >= 0.99, $"hybrid MRR {hybrid.Mrr:F3}");
         Assert.All(hybrid.Cases, item => Assert.True(item.ReturnedEventIds.Count <= 8));
+    }
+
+    [Fact]
+    public void DefaultEmbeddingModel_IsEmbeddingGemma()
+    {
+        Assert.Equal("embeddinggemma-2:740m", new ModelGatewayOptions().EmbeddingModel);
     }
 
     [Theory]

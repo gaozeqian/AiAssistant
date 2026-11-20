@@ -25,7 +25,7 @@ public sealed class ModelEndpointDocument
     public string Provider { get; init; } = "ollama";
     public string BaseUrl { get; init; } = "http://127.0.0.1:11434";
     public string ChatModel { get; init; } = string.Empty;
-    public string EmbeddingModel { get; init; } = "qwen3-embedding:0.6b";
+    public string EmbeddingModel { get; init; } = "embeddinggemma-2:740m";
     public int TimeoutSeconds { get; init; } = 120;
     public string? ApiKeySecret { get; init; }
     public string? ClientCertificatePath { get; init; }

@@ -19,6 +19,7 @@
 | 真实模型质量仅部分评测 | gemma4:12b 100%/100%、4.6s 热态；Qwen3 与其它候选未测 | `S5-R1`，按候选模型分别跑基准后定默认档 |
 | 企业 mTLS/CA/代理未联调 | 企业网络可能握手失败 | `S6-R1` |
 | 公网端点未联调 | 仅代码级策略与同意门禁 | `S6-R1` |
+| 默认 embedding 依赖 Ollama 模型 | 未安装 `embeddinggemma-2:740m` 时向量召回降级为关键词 | 安装模型或设置 `AIASSISTANT_EMBEDDING_MODEL`；`--rebuild-vectors` 重建索引 |
 | 检索融合参数未调优 | TopK=8、候选 60、RRF k=60 为初始值；embeddinggemma 实测 95.8%、qwen3 89.6%，个别同义词仍漂移 | `S8-R1`，需用真实脱敏语料继续调参 |
 
 ## 语音

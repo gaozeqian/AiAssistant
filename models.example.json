@@ -13,7 +13,7 @@
       "provider": "ollama",
       "baseUrl": "http://127.0.0.1:11434",
       "chatModel": "qwen3:8b",
-      "embeddingModel": "qwen3-embedding:0.6b",
+      "embeddingModel": "embeddinggemma-2:740m",
       "timeoutSeconds": 120
     },
     {
