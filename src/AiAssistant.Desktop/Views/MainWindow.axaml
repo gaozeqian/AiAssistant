@@ -68,8 +68,9 @@
       </Grid>
     </Border>
 
-    <TabControl Grid.Row="1" Margin="20" SelectedIndex="{Binding SelectedSectionIndex}" Background="Transparent">
-      <TabItem Header="时间线">
+    <TabControl Grid.Row="1" Margin="20" SelectedIndex="{Binding SelectedSectionIndex}" Background="Transparent"
+                automation:AutomationProperties.Name="主导航">
+      <TabItem Header="时间线" automation:AutomationProperties.Name="时间线" automation:AutomationProperties.AcceleratorKey="Ctrl+1">
         <Grid DataContext="{Binding Timeline}" x:DataType="vm:TimelineViewModel"
               ColumnDefinitions="360,*" Margin="0,12,0,0">
           <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="16" Margin="0,0,12,0">
@@ -173,7 +174,7 @@
         </Grid>
       </TabItem>
 
-      <TabItem Header="检索与问答">
+      <TabItem Header="检索与问答" automation:AutomationProperties.Name="检索与问答" automation:AutomationProperties.AcceleratorKey="Ctrl+2">
         <Grid DataContext="{Binding Search}" x:DataType="vm:SearchViewModel"
               ColumnDefinitions="400,*" Margin="0,12,0,0">
           <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="18" Margin="0,0,12,0">
@@ -278,7 +279,7 @@
         </Grid>
       </TabItem>
 
-      <TabItem Header="隐私与控制">
+      <TabItem Header="隐私与控制" automation:AutomationProperties.Name="隐私与控制" automation:AutomationProperties.AcceleratorKey="Ctrl+3">
         <ScrollViewer DataContext="{Binding Capture}" x:DataType="vm:CaptureControlViewModel" Margin="0,12,0,0">
           <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
             <Border Grid.Row="0" Grid.Column="0" Background="White" CornerRadius="10" Padding="24" Margin="0,0,8,12">
@@ -321,7 +322,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <TabItem Header="语音">
+      <TabItem Header="语音" automation:AutomationProperties.Name="语音" automation:AutomationProperties.AcceleratorKey="Ctrl+4">
         <Grid DataContext="{Binding Voice}" x:DataType="vm:VoiceControlViewModel"
               ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" Margin="0,12,0,0">
           <Border Grid.Row="0" Grid.Column="0" Background="White" CornerRadius="10" Padding="24" Margin="0,0,8,12">
@@ -353,7 +354,7 @@
         </Grid>
       </TabItem>
 
-      <TabItem Header="数据与导出">
+      <TabItem Header="数据与导出" automation:AutomationProperties.Name="数据与导出" automation:AutomationProperties.AcceleratorKey="Ctrl+5">
         <Grid DataContext="{Binding Data}" x:DataType="vm:DataManagementViewModel"
               ColumnDefinitions="*,*" Margin="0,12,0,0">
           <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="24" Margin="0,0,8,0">
@@ -395,7 +396,7 @@
         </Grid>
       </TabItem>
 
-      <TabItem Header="本地诊断">
+      <TabItem Header="本地诊断" automation:AutomationProperties.Name="本地诊断" automation:AutomationProperties.AcceleratorKey="Ctrl+6">
         <ScrollViewer DataContext="{Binding Diagnostics}" x:DataType="vm:DiagnosticsViewModel" Margin="0,12,0,0">
           <StackPanel Spacing="12">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
@@ -541,7 +542,7 @@
           </StackPanel>
         </ScrollViewer>
       </TabItem>
-      <TabItem Header="日报">
+      <TabItem Header="日报" automation:AutomationProperties.Name="日报" automation:AutomationProperties.AcceleratorKey="Ctrl+7">
         <Grid DataContext="{Binding Reports}" x:DataType="vm:ReportsViewModel"
               ColumnDefinitions="360,*" Margin="0,12,0,0">
           <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="18" Margin="0,0,12,0">

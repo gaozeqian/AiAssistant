@@ -8,7 +8,11 @@ using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Desktop.Views;
 using AiAssistant.Platform.Windows;
 using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 
 namespace AiAssistant.Platform.Tests;
 
@@ -29,6 +33,85 @@ public sealed class DesktopViewModelTests
         window.Close();
         return Task.CompletedTask;
     });
+
+    [Fact]
+    public Task MainWindow_ExposesAccessibleTabNamesAndAccelerators() => RunInHeadlessSession(async () =>
+    {
+        using var shell = CreateShell();
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+
+        var tabs = window.GetVisualDescendants().OfType<TabItem>().ToArray();
+        Assert.Equal(7, tabs.Length);
+        Assert.Equal(
+            new[] { "时间线", "检索与问答", "隐私与控制", "语音", "数据与导出", "本地诊断", "日报" },
+            tabs.Select(tab => AutomationProperties.GetName(tab)).ToArray());
+        Assert.All(tabs, tab =>
+        {
+            var accelerator = AutomationProperties.GetAcceleratorKey(tab);
+            Assert.True(accelerator?.StartsWith("Ctrl+", StringComparison.Ordinal) == true, $"missing accelerator for {tab.Header}");
+        });
+
+        var tabControl = window.GetVisualDescendants().OfType<TabControl>().Single();
+        Assert.Equal("主导航", AutomationProperties.GetName(tabControl));
+        window.Close();
+    });
+
+    [Fact]
+    public Task MainWindow_PrimaryControlsExposeAutomationNames() => RunInHeadlessSession(async () =>
+    {
+        using var shell = CreateShell();
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+
+        Assert.Contains("搜索应用、标题或正文", Names(window));
+        Assert.Contains("刷新时间线", Names(window));
+
+        shell.SelectedSectionIndex = 1;
+        await WaitUntilAsync(() => Names(window).Contains("基于证据提问"));
+        Assert.Contains("检索关键词或问题", Names(window));
+        Assert.Contains("检索证据", Names(window));
+        Assert.Contains("基于证据提问", Names(window));
+
+        shell.SelectedSectionIndex = 5;
+        await WaitUntilAsync(() => Names(window).Contains("重新检查平台能力"));
+        Assert.Contains("重新检查平台能力", Names(window));
+        window.Close();
+    });
+
+    [Fact]
+    public Task Window_KeyboardShortcutsSwitchTabs() => RunInHeadlessSession(async () =>
+    {
+        using var shell = CreateShell();
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        window.Activate();
+
+        Assert.Equal(0, shell.SelectedSectionIndex);
+        window.KeyPress(Key.D2, RawInputModifiers.Control, PhysicalKey.Digit2, "2");
+        await WaitUntilAsync(() => shell.SelectedSectionIndex == 1);
+        Assert.Equal(1, shell.SelectedSectionIndex);
+
+        window.KeyPress(Key.D7, RawInputModifiers.Control, PhysicalKey.Digit7, "7");
+        await WaitUntilAsync(() => shell.SelectedSectionIndex == 6);
+        Assert.Equal(6, shell.SelectedSectionIndex);
+
+        window.KeyPress(Key.F, RawInputModifiers.Control, PhysicalKey.F, "f");
+        await WaitUntilAsync(() => shell.SelectedSectionIndex == 1);
+        Assert.Equal(1, shell.SelectedSectionIndex);
+        window.Close();
+    });
+
+    private static HashSet<string> Names(Window window) =>
+        window.GetVisualDescendants()
+            .OfType<Control>()
+            .Select(control => AutomationProperties.GetName(control))
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name!)
+            .ToHashSet(StringComparer.Ordinal);
 
     [Fact]
     public Task MainWindow_CloseHidesAndCanRestoreFromTray() => RunInHeadlessSession(async () =>

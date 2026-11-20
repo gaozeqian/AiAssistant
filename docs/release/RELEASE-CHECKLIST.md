@@ -60,6 +60,7 @@
 - [ ] 诊断导出预览不含正文、密钥、完整路径；确认导出后文件同样脱敏。
 - [ ] 键盘可完成主要流程：Ctrl+D1…D7 切页、Ctrl+F 检索、F5 刷新、Tab 顺序合理。
 - [ ] 关键按钮与输入框具备无障碍名称。
+- [ ] 自动化门禁通过：`dotnet test tests/AiAssistant.Platform.Tests --filter "FullyQualifiedName~AccessibleTab|FullyQualifiedName~PrimaryControls|FullyQualifiedName~KeyboardShortcuts"`。
 - [ ] 权限缺失时诊断页给出可执行的修复建议。
 - [ ] 数据删除需二次确认，删除后 UI 状态正确刷新。
 
