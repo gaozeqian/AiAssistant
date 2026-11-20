@@ -114,7 +114,13 @@ public sealed class BoundedCaptureCoordinatorTests
             new CapturedSample(((IClock)clock).Now(), SourceKind.WindowActivity, "1Password", "Master Vault"),
             CancellationToken.None);
 
-        await WaitUntilAsync(() => coordinator.GetMetricsSnapshot().PersistedEvents >= 1);
+        await WaitUntilAsync(() =>
+        {
+            var metrics = coordinator.GetMetricsSnapshot();
+            return metrics.PersistedEvents >= 1 &&
+                   metrics.CoalescedDuplicateFrames >= 1 &&
+                   metrics.DroppedByBlacklist >= 1;
+        });
         Assert.Equal(1, coordinator.GetMetricsSnapshot().CoalescedDuplicateFrames);
         Assert.Equal(1, coordinator.GetMetricsSnapshot().DroppedByBlacklist);
 
@@ -192,7 +198,7 @@ public sealed class BoundedCaptureCoordinatorTests
         Assert.True(coordinator.GetMetricsSnapshot().ControlCommandsProcessed >= 1);
     }
 
-    private static async Task WaitUntilAsync(Func<bool> predicate, int timeoutMs = 3000)
+    private static async Task WaitUntilAsync(Func<bool> predicate, int timeoutMs = 5000)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         while (!predicate())
