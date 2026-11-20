@@ -12,6 +12,7 @@ namespace AiAssistant.Desktop.ViewModels;
 public sealed class DiagnosticsViewModel : ObservableObject
 {
     private readonly DiagnosticsUseCase _diagnostics;
+    private readonly ILocalMcpControl? _mcp;
     private string _platformName = "正在检测平台能力…";
     private string _databaseText = "尚未检查";
     private string _pipelineText = string.Empty;
@@ -21,13 +22,18 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string _exportPreviewJson = string.Empty;
     private string _lastRefreshText = "尚未刷新";
     private string _errorMessage = string.Empty;
+    private string _mcpStatusText = "本地 MCP 默认关闭";
+    private string _mcpTokenText = "点击“显示令牌”获取本地凭据";
     private bool _isLoading;
 
-    public DiagnosticsViewModel(DiagnosticsUseCase diagnostics)
+    public DiagnosticsViewModel(DiagnosticsUseCase diagnostics, ILocalMcpControl? mcp = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        _mcp = mcp;
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
+        RevealMcpTokenCommand = new AsyncRelayCommand(RevealMcpTokenAsync);
+        RotateMcpTokenCommand = new AsyncRelayCommand(RotateMcpTokenAsync);
     }
 
     public ObservableCollection<CapabilityItem> Capabilities { get; } = [];
@@ -39,6 +45,24 @@ public sealed class DiagnosticsViewModel : ObservableObject
     public IAsyncRelayCommand RefreshCommand { get; }
 
     public IAsyncRelayCommand GeneratePreviewCommand { get; }
+
+    public IAsyncRelayCommand RevealMcpTokenCommand { get; }
+
+    public IAsyncRelayCommand RotateMcpTokenCommand { get; }
+
+    public string McpStatusText
+    {
+        get => _mcpStatusText;
+        private set => SetProperty(ref _mcpStatusText, value);
+    }
+
+    public string McpTokenText
+    {
+        get => _mcpTokenText;
+        private set => SetProperty(ref _mcpTokenText, value);
+    }
+
+    public bool HasMcpControl => _mcp is not null;
 
     public string PlatformName
     {
@@ -165,6 +189,9 @@ public sealed class DiagnosticsViewModel : ObservableObject
                 }
             }
 
+            McpStatusText = _mcp is null
+                ? "本地 MCP 未接入"
+                : BuildMcpStatus(_mcp.GetSnapshot());
             LastRefreshText = $"最后刷新：{DateTimeOffset.Now:HH:mm:ss} · 诊断不包含正文、密钥或完整文件路径";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
@@ -174,6 +201,48 @@ public sealed class DiagnosticsViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    private static string BuildMcpStatus(LocalMcpSnapshot snapshot) => snapshot switch
+    {
+        { Enabled: false } => "默认关闭（设置 AIASSISTANT_MCP_ENABLED=true 启用，仅监听 127.0.0.1）",
+        { Running: false } => "已启用但监听未启动",
+        _ => $"运行中 · {snapshot.Endpoint} · 请求 {snapshot.RequestCount} · 未授权拒绝 {snapshot.UnauthorizedCount} · 限流 {snapshot.RateLimitedCount} · 工具调用 {snapshot.ToolCallCount}"
+    };
+
+    private async Task RevealMcpTokenAsync()
+    {
+        if (_mcp is null)
+        {
+            return;
+        }
+
+        try
+        {
+            McpTokenText = await _mcp.RevealTokenAsync(CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.Cryptography.CryptographicException)
+        {
+            ErrorMessage = "无法读取本地 MCP 令牌，请检查系统密钥库权限。";
+        }
+    }
+
+    private async Task RotateMcpTokenAsync()
+    {
+        if (_mcp is null)
+        {
+            return;
+        }
+
+        try
+        {
+            McpTokenText = await _mcp.RotateTokenAsync(CancellationToken.None);
+            McpStatusText = BuildMcpStatus(_mcp.GetSnapshot());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.Cryptography.CryptographicException)
+        {
+            ErrorMessage = "无法轮换本地 MCP 令牌，请检查系统密钥库权限。";
         }
     }
 

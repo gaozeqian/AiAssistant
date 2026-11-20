@@ -7,5 +7,6 @@
     <ProjectReference Include="..\..\src\AiAssistant.Scheduler\AiAssistant.Scheduler.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Storage\AiAssistant.Storage.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Processing\AiAssistant.Processing.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.LocalApi\AiAssistant.LocalApi.csproj" />
   </ItemGroup>
 </Project>

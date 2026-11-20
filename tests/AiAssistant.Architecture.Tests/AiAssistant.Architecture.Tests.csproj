@@ -9,6 +9,7 @@
     <ProjectReference Include="..\..\src\AiAssistant.Summarization\AiAssistant.Summarization.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Scheduler\AiAssistant.Scheduler.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Voice\AiAssistant.Voice.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.LocalApi\AiAssistant.LocalApi.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Platform.Windows\AiAssistant.Platform.Windows.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Platform.MacOS\AiAssistant.Platform.MacOS.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Platform.Linux\AiAssistant.Platform.Linux.csproj" />

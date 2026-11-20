@@ -127,6 +127,18 @@ public sealed class SqliteEventRepository : IEventRepository
             cmd.Parameters.AddWithValue("$localDate", query.LocalDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         }
 
+        if (query.FromLocalDate.HasValue)
+        {
+            clauses.Add("e.local_date >= $fromLocalDate");
+            cmd.Parameters.AddWithValue("$fromLocalDate", query.FromLocalDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        }
+
+        if (query.ToLocalDate.HasValue)
+        {
+            clauses.Add("e.local_date <= $toLocalDate");
+            cmd.Parameters.AddWithValue("$toLocalDate", query.ToLocalDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        }
+
         if (query.FromUtc.HasValue)
         {
             clauses.Add("e.occurred_at_utc >= $fromUtc");

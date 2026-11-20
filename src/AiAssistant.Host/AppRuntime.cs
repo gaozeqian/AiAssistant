@@ -5,6 +5,7 @@ using AiAssistant.Capture;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Desktop.ViewModels;
+using AiAssistant.LocalApi;
 using AiAssistant.Platform.Linux;
 using AiAssistant.Platform.Linux.Accessibility;
 using AiAssistant.Platform.Linux.Desktop;
@@ -45,6 +46,8 @@ public sealed class AppRuntime : IAsyncDisposable
     public int RecoveredJobCount { get; private set; }
 
     public LinuxDisplayBackendState? LinuxBackendState { get; private set; }
+
+    public ILocalMcpControl McpControl => _services.GetRequiredService<ILocalMcpControl>();
 
     public static async Task<AppRuntime> CreateAsync(CancellationToken ct = default)
     {
@@ -170,8 +173,55 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<CaptureControlUseCase>();
         services.AddSingleton<DiagnosticsUseCase>();
         services.AddSingleton<ReportUseCase>();
+        RegisterSearchAndLocalApi(services, dataDirectory, keyStore);
         return new AppRuntime(services.BuildServiceProvider(), dataDirectory) { LinuxBackendState = linuxBackendState };
     }
+
+    private static void RegisterSearchAndLocalApi(IServiceCollection services, string dataDirectory, IKeyStore keyStore)
+    {
+        services.AddSingleton<IRangeReportService>(provider => new ActivityRangeReportService(
+            provider.GetRequiredService<IEventRepository>(),
+            provider.GetRequiredService<IModelGateway>(),
+            provider.GetRequiredService<ITextRedactor>(),
+            provider.GetRequiredService<ILogger<ActivityRangeReportService>>()));
+        services.AddSingleton<RangeReportUseCase>();
+        services.AddSingleton(new HybridSearchOptions());
+        services.AddSingleton<IEvidenceSearch>(provider => new HybridSearchService(
+            provider.GetRequiredService<IEventRepository>(),
+            provider.GetRequiredService<IVectorIndex>(),
+            provider.GetRequiredService<IModelGateway>(),
+            provider.GetRequiredService<HybridSearchOptions>(),
+            provider.GetRequiredService<ILogger<HybridSearchService>>()));
+        services.AddSingleton<IEvidenceQuestionAnswerer>(provider => new EvidenceQuestionAnswerUseCase(
+            provider.GetRequiredService<IEvidenceSearch>(),
+            provider.GetRequiredService<IModelGateway>(),
+            provider.GetRequiredService<ILogger<EvidenceQuestionAnswerUseCase>>()));
+        services.AddSingleton<EvidenceSearchUseCase>();
+
+        services.AddSingleton(CreateMcpOptions());
+        services.AddSingleton(new LocalMcpTokenStore(Path.Combine(dataDirectory, "security"), keyStore));
+        services.AddSingleton(provider => new McpToolCatalog(
+            provider.GetRequiredService<IEventRepository>(),
+            provider.GetRequiredService<IReportRepository>(),
+            provider.GetRequiredService<IClock>()));
+        services.AddSingleton<LoopbackMcpServer>();
+        services.AddSingleton<ILocalMcpControl, LocalMcpControl>();
+    }
+
+    private static McpServerOptions CreateMcpOptions() => new()
+    {
+        Enabled = string.Equals(
+            Environment.GetEnvironmentVariable("AIASSISTANT_MCP_ENABLED"),
+            "true",
+            StringComparison.OrdinalIgnoreCase),
+        Port = ParseBoundedInt(Environment.GetEnvironmentVariable("AIASSISTANT_MCP_PORT"), 47831, 0, 65535),
+        MaxRequestsPerMinute = ParseBoundedInt(Environment.GetEnvironmentVariable("AIASSISTANT_MCP_RPM"), 60, 1, 10_000)
+    };
+
+    private static int ParseBoundedInt(string? raw, int fallback, int min, int max) =>
+        int.TryParse(raw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? Math.Clamp(value, min, max)
+            : fallback;
 
     public async Task StartAsync(CancellationToken ct = default)
     {
@@ -211,6 +261,7 @@ public sealed class AppRuntime : IAsyncDisposable
         }
 
         await _services.GetRequiredService<ReportJobWorker>().StartAsync(ct);
+        await _services.GetRequiredService<LoopbackMcpServer>().StartAsync(ct);
         await _services.GetRequiredService<ICaptureCoordinator>().StartAsync(ct);
         _services.GetRequiredService<ILogger<AppRuntime>>().LogInformation(
             "Runtime initialized cleanly; recoveredJobs={RecoveredJobs}.",
@@ -222,12 +273,18 @@ public sealed class AppRuntime : IAsyncDisposable
         new(
             new TimelineViewModel(_services.GetRequiredService<TimelineUseCase>()),
             new CaptureControlViewModel(_services.GetRequiredService<CaptureControlUseCase>()),
-            new DiagnosticsViewModel(_services.GetRequiredService<DiagnosticsUseCase>()),
+            new DiagnosticsViewModel(
+                _services.GetRequiredService<DiagnosticsUseCase>(),
+                _services.GetRequiredService<ILocalMcpControl>()),
             new ReportsViewModel(
                 _services.GetRequiredService<ReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports")),
             new VoiceControlViewModel(_services.GetRequiredService<IVoiceSession>()),
-            _services.GetRequiredService<VoiceNavigationHub>());
+            _services.GetRequiredService<VoiceNavigationHub>(),
+            new SearchViewModel(
+                _services.GetRequiredService<EvidenceSearchUseCase>(),
+                _services.GetRequiredService<RangeReportUseCase>(),
+                Path.Combine(_dataDirectory, "reports")));
 
     public async ValueTask DisposeAsync()
     {

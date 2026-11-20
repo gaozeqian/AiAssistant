@@ -142,6 +142,52 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
 
     public async Task InitializeAsync() => await RefreshAsync();
 
+    /// <summary>Jumps from a search/QA evidence citation to the exact timeline row, loading its date on demand.</summary>
+    public async Task NavigateToEventAsync(DateOnly date, string eventId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
+        if (_disposed)
+        {
+            return;
+        }
+
+        var target = ActiveDates.FirstOrDefault(item => item.Date == date);
+        if (target is null)
+        {
+            target = new TimelineDateItem(date);
+            var index = 0;
+            while (index < ActiveDates.Count && ActiveDates[index].Date > date)
+            {
+                index++;
+            }
+
+            ActiveDates.Insert(index, target);
+        }
+
+        _suppressDateSelection = true;
+        SelectedDate = target;
+        _suppressDateSelection = false;
+        try
+        {
+            await LoadEventsAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex) when (ex is AiAssistantDomainException or IOException or UnauthorizedAccessException)
+        {
+            ErrorMessage = "无法加载证据所在日期，请稍后重试。";
+            StatusMessage = "定位失败";
+            return;
+        }
+
+        SelectedEvent = Events.FirstOrDefault(item => item.Event.Id == eventId) ?? SelectedEvent;
+        StatusMessage = SelectedEvent?.Event.Id == eventId
+            ? "已定位到证据对应的活动记录。"
+            : "该记录不在当前日期列表中，可能已被保留策略清理。";
+    }
+
     public void Dispose()
     {
         if (_disposed)

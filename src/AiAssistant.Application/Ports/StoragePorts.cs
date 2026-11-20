@@ -9,7 +9,9 @@ public sealed record EventQuery(
     DateTimeOffset? ToUtc = null,
     SourceKind? Source = null,
     string? SearchKeyword = null,
-    int Limit = 500);
+    int Limit = 500,
+    DateOnly? FromLocalDate = null,
+    DateOnly? ToLocalDate = null);
 
 public sealed record EventWithMediaWrite(
     ActivityEvent Event,

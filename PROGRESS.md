@@ -7,12 +7,12 @@
 
 ## 1. 当前总体状态快照
 
-- **当前活跃阶段**：`S7 已完成代码与契约；待启动 S8 智能检索与完整对话`
+- **当前活跃阶段**：`S8 已完成代码与契约；待启动 S9 发布加固`
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
 - **当前构建状态**：✅ 本地 Release 0 警告 0 错误；SQLite Schema v2、Host 启动自检与两平台发布通过
-- **当前测试状态**：✅ 87/87 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 12、`Capture.Tests` 4、`Platform.Tests` 31、`Processing.Tests` 7、`Report.Tests` 16、`Voice.Tests` 5）
-- **下一步待确认事项**：启动 S8 —— 时间过滤+向量+关键词混合检索、证据回链问答、周报/导出、只读 loopback MCP 与完整语音对话；S7 真实唤醒率/TTS 评测见第 5 节遗留项
+- **当前测试状态**：✅ 106/106 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 12、`Capture.Tests` 4、`Platform.Tests` 32、`Processing.Tests` 7、`Report.Tests` 32、`Voice.Tests` 7）
+- **下一步待确认事项**：启动 S9 —— 安装包签名公证、浸泡与故障注入、升级迁移、SBOM 与回滚；S8 真实检索质量与 MCP 客户端联调见第 5 节遗留项
 
 ---
 
@@ -28,7 +28,7 @@
 | **S5 本机模型与日报** | P2 | 🔄 代码与契约完成；真实模型评测遗留 | `win-x64` 网关/分段/调度/UI 实测；`linux-x64` / `osx-arm64` 发布通过 | Microsoft.Extensions.AI 网关、Ollama/LM Studio 兼容适配、脱敏/审计/超时装饰器、事件向量索引、分段+map-reduce+JSON 校验重试、版本化加密日报、单消费者三通道与日报/站会 UI；真实 Qwen 质量待遗留项评测 |
 | **S6 内网与公网档** | P2.5 | 🔄 代码与契约完成；真实企业端点遗留 | `win-x64` 配置/策略/三闸/探测测试通过；两平台发布通过 | 版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理、Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、三闸脱敏、五能力探测缓存与诊断展示 |
 | **S7 唤醒与基础命令** | P2.6 | 🔄 代码与契约完成；真实 KWS/TTS 评测遗留 | `win-x64` 状态机/命令/日志/UI 测试；两平台发布通过 | sherpa-onnx “你好时光” KWS、四态语音会话、8 秒命令窗口、误唤醒冷却、固定命令、敏感命令二次确认、TTS 反馈、加密 voice_commands 文本日志与状态栏/语音面板 |
-| **S8 智能检索与对话** | P3 | ⏳ 待开始 | — | 混合检索、证据回链问答、周报、只读 loopback MCP、完整语音对话 |
+| **S8 智能检索与对话** | P3 | 🔄 代码与契约完成；真实检索质量与 MCP 客户端联调遗留 | `win-x64` 混合检索/证据问答/区间报告/MCP 契约与 Headless UI 测试；两平台发布通过 | 时间过滤+关键词+向量 RRF 混合检索与 `[E#]` 证据引用、无证据/无引用/媒体清理三类降级、周报与任意区间 Markdown+stats 导出、只读 loopback MCP（加密令牌/限流/四个只读工具）、检索问答面板与证据回跳、语音问答复用同一用例 |
 | **S9 发布加固** | 全阶段 | ⏳ 待开始 | — | 安装包签名公证、浸泡测试、故障注入、升级迁移、SBOM |
 
 ---
@@ -108,7 +108,34 @@ sherpa/
 └── tts/  model.onnx · tokens.txt · lexicon.txt
 ```
 
-`keywords.txt` 使用 sherpa-onnx KWS 关键词格式，至少包含“你好时光”及备选词；阈值在真实环境实测后调整。语音默认关闭，由“语音”页显式启用；`AIASSISTANT_VOICE_DISABLE_CHIME=true` 可关闭唤醒提示音。
+`keywords.txt` 使用 sherpa-onnx KWS 关键词格式，至少包含“你好时光”及备选词；阈值在真实环境实测后调整。语音默认关闭，由“语音”页显式启用；`AIASSISTANT_VOICE_DISABLE_CHIME=true` 可关闭唤醒提示音。语音问答只在“问一下 / 请问 / 查询 / 搜索”触发词后进入，回答与“检索与问答”面板共用同一证据用例。
+
+### 3.6 只读本地 MCP（默认关闭）
+
+本地 MCP 服务只监听 `127.0.0.1`，默认不绑定任何端口；启用与限流通过环境变量控制：
+
+```bash
+AIASSISTANT_MCP_ENABLED=true
+AIASSISTANT_MCP_PORT=47831      # 端口占用时自动回退到临时端口
+AIASSISTANT_MCP_RPM=60          # 每分钟请求上限
+```
+
+- 令牌由 32 字节随机数生成，以 AES-GCM 加密存放于 `<data>/security/local-mcp-token.enc`，包装密钥来自系统密钥库；在“本地诊断”页可显示或轮换令牌。
+- 客户端配置示例（Claude Desktop / 任意 MCP 客户端）：
+
+```json
+{
+  "mcpServers": {
+    "aiassistant-local": {
+      "url": "http://127.0.0.1:47831/mcp",
+      "headers": { "Authorization": "Bearer <诊断页复制的令牌>" }
+    }
+  }
+}
+```
+
+- 仅暴露四个只读工具：`search_events`、`activity_stats`、`list_reports`、`get_report`。不存在写入、采集、导出或删除工具；未授权、非 loopback、超限请求分别返回 401 / 直接断开 / 429。
+- 工具返回结构化证据与 `mediaAvailable` 标记，从不返回截图或音频字节；媒体到期清理后该标记为 `false`。
 
 ---
 
@@ -129,6 +156,7 @@ sherpa/
 - **2026-11-20 [win-x64] [S5 本机模型与日报完成]**：实现 `HttpModelBackend`（Ollama 与 OpenAI 兼容端点，标准 `IChatClient`/`IEmbeddingGenerator`）、仅 loopback 的 `LocalModelGateway`、超时/脱敏/审计装饰器与无正文模型审计；模型标签全部由环境配置。实现 `EventEmbeddingIndexer`（qwen3-embedding 默认，版本化写入与重建）和固定中文基准集。实现活动分段、map 摘要、reduce 结构化 JSON、Schema 校验与两次重试、Markdown/站会输出及加密版本化 `daily_reports` 仓储。实现单消费者 `ReportJobWorker`、手动/启动补偿/每日定时三通道、幂等与失败保留；新增日报/站会面板、强制重生成与 Markdown 导出。全仓 Release 0 警告 0 错误、73/73 测试通过，Host 启动自检与两平台发布通过。首轮 CI `44710041839` 的 Linux/macOS/SBOM 通过，Windows 暴露 macOS IPC 启动瞬时断言竞态；改为等待监督器最终 Healthy 后本地全量复跑通过，由修复提交触发三平台复验。真实 Qwen 质量评测与调度浸泡保留遗留项。
 - **2026-11-20 [win-x64] [S6 企业策略与三档模型完成]**：实现版本化 `models.json` 与 `models.example.json`，校验 schema/重复档位/远程本地端点；端点 API Key 与证书密码通过 AES-GCM 加密密钥库或 `env:` 引用，明文不入配置。实现每端点独立 HttpClient（代理、PFX/PEM mTLS、企业 CA 自定义信任、超时）。Host 改为多端点装配，`PolicyEnforcedModelGateway` 在应用层外强制档位策略，公网需显式 `PublicCloudConsentGate` 同意；`TierRoutingModelGateway` 支持内网故障回退本机、本机不可用明确失败。新增最小化→脱敏→残留检测/输出清洗三闸与敏感残留阻断；五能力（chat/streaming/embeddings/structured/tool）探测缓存 24 小时并接入诊断。全仓 Release 0 警告 0 错误、80/80 测试通过，Host 无配置安全回退启动与两平台发布通过。真实企业 mTLS/CA/代理和公网端点验证保留遗留项。
 - **2026-11-20 [win-x64] [S7 本地唤醒与基础命令完成]**：接入 `org.k2fsa.sherpa.onnx` KWS 与 VITS TTS，新增 `VoiceSessionController` 四态状态机（休眠/聆听/处理/反馈）、8 秒命令窗口、超时/取消、误唤醒冷却与同一 AudioHub 单路采集；固定命令映射到既有日报、采集和导航用例，退出应用需二次确认。实现加密 `voice_commands` 文本日志（Schema v2 新增可选 audio_content_id）与命令音频默认不落盘；新增 Windows/Linux 反馈播放，macOS 音频输出明确降级。新增“语音”面板、状态栏状态与语音开关。全仓 Release 0 警告 0 错误、87/87 测试通过，Host 启动与两平台发布通过。真实 KWS/TTS 评测和命令音频 opt-in 保留遗留项。
+- **2026-11-20 [win-x64] [S8 智能检索与完整对话完成]**：新增 `AiAssistant.LocalApi` 项目并把检索/问答/区间报告提升为 Application 端口（`IEvidenceSearch`、`IEvidenceQuestionAnswerer`、`IRangeReportService`、`ILocalMcpControl`），Desktop 只依赖 Application。实现 `HybridSearchService`（时间过滤 + 关键词 + 向量 RRF 融合、统一 `[E#]` 证据、向量失败仅降级关键词）与 `EvidenceQuestionAnswerUseCase`（强制引用校验，无引用走抽取式降级，无证据返回 `no-evidence` 且不调用模型）。实现 `ActivityRangeReportService` 与 `RangeReportUseCase`：周一为界的周报、任意区间每日事件数/活跃分钟/主要应用、Markdown + stats JSON 双文件导出、模型不可用确定性统计降级。实现只读 loopback MCP：`TcpListener` 仅绑 `127.0.0.1`、AES-GCM 加密令牌（可轮换）、滑动窗口限流、JSON-RPC `initialize/ping/tools/list/tools/call`、四个只读工具、未知或写入工具返回 -32602；Host 生命周期接入且默认关闭。新增“检索与问答”面板（检索/提问/导出、证据卡片一键定位时间线、周报柱状与导出）、“本地诊断”MCP 令牌显示/轮换，语音“问一下…”复用同一证据用例。全仓 Release 0 警告 0 错误、106/106 测试通过（新增 16 项检索/报告/MCP 契约测试与 2 项 UI/语音测试），两平台发布通过。真实 embedding 质量与真实 MCP 客户端联调保留遗留项。
 
 ---
 
@@ -151,3 +179,6 @@ sherpa/
 | `S7-R1` | S7 语音 | 真实中文 KWS 唤醒率/误唤醒率、TTS 音质与端到端延迟未评测 | 阈值和体验未达发布基线 | 外挂 KWS/TTS 模型后运行安静/嘈杂/多人场景黄金集，按实测调整阈值 |
 | `S7-R2` | S7 macOS | macOS TTS 音频输出仍为 Degraded；命令文字反馈可用 | macOS 无语音播报 | 扩展 Swift Helper 的音频输出能力并做 TCC 麦克风/输出验收 |
 | `S7-R3` | S7 隐私 | 命令音频选择落盘（opt-in）尚未实现，当前仅加密文本日志 | 无法回听命令音频 | S9 前增加显式开关、加密媒体引用与自动清理 |
+| `S8-R1` | S8 检索 | 真实 embedding 模型下的召回质量、RRF 参数与中文问答准确性未评测；仅契约测试覆盖融合与降级路径 | 默认 TopK/候选数与融合权重可能不适合真实数据 | 在目标机器安装 qwen3-embedding 后跑固定问题集，记录命中率、引用正确率与延迟并调参 |
+| `S8-R2` | S8 MCP | 仅用本地 HTTP 契约测试验证，未与真实 MCP 客户端（Claude Desktop 等）联调；端口固定值与客户端兼容性未验证 | 客户端握手字段差异可能导致接入失败 | S9 前用至少一个真实 MCP 客户端完成 `initialize → tools/list → tools/call` 全链路联调 |
+| `S8-R3` | S8 周报 | 周报图表为文本条形与 Markdown 表格，未提供 PNG/PDF 图形化导出 | 汇报场景需要手工截图 | 视需要增加图形化导出（本地渲染，不引入云服务） |

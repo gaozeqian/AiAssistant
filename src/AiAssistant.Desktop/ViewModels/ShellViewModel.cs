@@ -15,13 +15,15 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         DiagnosticsViewModel diagnostics,
         ReportsViewModel reports,
         VoiceControlViewModel? voice = null,
-        VoiceNavigationHub? voiceNavigation = null)
+        VoiceNavigationHub? voiceNavigation = null,
+        SearchViewModel? search = null)
     {
         Timeline = timeline ?? throw new ArgumentNullException(nameof(timeline));
         Capture = capture ?? throw new ArgumentNullException(nameof(capture));
         Diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         Reports = reports ?? throw new ArgumentNullException(nameof(reports));
         Voice = voice;
+        Search = search;
         _voiceNavigation = voiceNavigation;
         Capture.StateChanged += OnCaptureStateChanged;
         CaptureStatus = Capture.CaptureStateText;
@@ -30,6 +32,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
             _voiceNavigation.TimelineRequested += OnTimelineRequested;
             _voiceNavigation.ReportsRequested += OnReportsRequested;
             _voiceNavigation.ExitRequested += OnExitRequested;
+        }
+
+        if (Search is not null)
+        {
+            Search.NavigationRequested += OnEvidenceNavigationRequested;
         }
     }
 
@@ -42,6 +49,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public ReportsViewModel Reports { get; }
 
     public VoiceControlViewModel? Voice { get; }
+
+    public SearchViewModel? Search { get; }
 
     public event EventHandler? ExitRequested;
 
@@ -72,14 +81,19 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         SelectedSectionIndex = 0;
     }
 
+    public void ShowSearch()
+    {
+        SelectedSectionIndex = 1;
+    }
+
     public void ShowDiagnostics()
     {
-        SelectedSectionIndex = 3;
+        SelectedSectionIndex = 4;
     }
 
     public void ShowReports()
     {
-        SelectedSectionIndex = 4;
+        SelectedSectionIndex = 5;
     }
 
     public void Dispose()
@@ -90,6 +104,12 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
             _voiceNavigation.TimelineRequested -= OnTimelineRequested;
             _voiceNavigation.ReportsRequested -= OnReportsRequested;
             _voiceNavigation.ExitRequested -= OnExitRequested;
+        }
+
+        if (Search is not null)
+        {
+            Search.NavigationRequested -= OnEvidenceNavigationRequested;
+            Search.Dispose();
         }
 
         Timeline.Dispose();
@@ -105,6 +125,23 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     private void OnTimelineRequested(object? sender, EventArgs e) => ShowTimeline();
 
     private void OnReportsRequested(object? sender, EventArgs e) => ShowReports();
+
+    private void OnEvidenceNavigationRequested(object? sender, EvidenceNavigationRequest request)
+    {
+        SelectedSectionIndex = 0;
+        _ = NavigateTimelineAsync(request);
+    }
+
+    private async Task NavigateTimelineAsync(EvidenceNavigationRequest request)
+    {
+        try
+        {
+            await Timeline.NavigateToEventAsync(request.LocalDate, request.EventId);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
 
     private void OnExitRequested(object? sender, EventArgs e)
     {

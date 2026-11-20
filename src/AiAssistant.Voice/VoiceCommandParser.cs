@@ -16,7 +16,8 @@ public enum VoiceCommandKind
     OpenReports = 5,
     ExitApplication = 6,
     Confirm = 7,
-    Cancel = 8
+    Cancel = 8,
+    AskQuestion = 9
 }
 
 public sealed record ParsedVoiceCommand(
@@ -24,7 +25,8 @@ public sealed record ParsedVoiceCommand(
     string Transcript,
     string Feedback,
     bool RequiresConfirmation,
-    string ParamsJson = "{}");
+    string ParamsJson = "{}",
+    string? Question = null);
 
 public sealed class VoiceCommandParser
 {
@@ -92,7 +94,38 @@ public sealed class VoiceCommandParser
                 true);
         }
 
-        return Unknown(raw, "暂不支持该命令。可说：生成日报、暂停采集、恢复采集、打开时间线或打开日报。");
+        var question = ExtractQuestion(normalized);
+        if (question is not null)
+        {
+            return new ParsedVoiceCommand(
+                VoiceCommandKind.AskQuestion,
+                raw,
+                "正在检索本地证据。",
+                false,
+                JsonSerializer.Serialize(new { question }),
+                question);
+        }
+
+        return Unknown(raw, "暂不支持该命令。可说：生成日报、暂停采集、恢复采集、打开时间线、打开日报，或以“问一下”开头提问。");
+    }
+
+    private static readonly string[] QuestionPrefixes = ["问一下", "请问", "查询", "搜索", "问"];
+
+    /// <summary>Only fixed trigger phrases open free-form Q&amp;A, so the wake window never becomes always-on recording.</summary>
+    private static string? ExtractQuestion(string normalized)
+    {
+        foreach (var prefix in QuestionPrefixes)
+        {
+            if (!normalized.StartsWith(prefix, StringComparison.Ordinal) || normalized.Length <= prefix.Length + 1)
+            {
+                continue;
+            }
+
+            var question = normalized[prefix.Length..];
+            return question.Length >= 2 ? question : null;
+        }
+
+        return null;
     }
 
     private static ParsedVoiceCommand Unknown(string transcript, string feedback) =>
@@ -105,7 +138,8 @@ public sealed class VoiceCommandRouter(
     ReportUseCase reportUseCase,
     CaptureControlUseCase captureControl,
     IVoiceViewNavigator navigator,
-    IClock clock)
+    IClock clock,
+    EvidenceSearchUseCase? evidence = null)
 {
     public async Task<VoiceCommandOutcome> ExecuteAsync(ParsedVoiceCommand command, CancellationToken ct)
     {
@@ -133,8 +167,35 @@ public sealed class VoiceCommandRouter(
             case VoiceCommandKind.ExitApplication:
                 navigator.RequestExit();
                 return new VoiceCommandOutcome(true, "正在退出应用。");
+            case VoiceCommandKind.AskQuestion:
+                return await AnswerQuestionAsync(command, ct);
             default:
                 return new VoiceCommandOutcome(false, command.Feedback);
         }
+    }
+
+    /// <summary>Voice Q&amp;A reuses the exact same evidence use case as the search panel; no separate answer logic.</summary>
+    private async Task<VoiceCommandOutcome> AnswerQuestionAsync(ParsedVoiceCommand command, CancellationToken ct)
+    {
+        if (evidence is null)
+        {
+            return new VoiceCommandOutcome(false, "问答暂不可用，请打开检索面板。");
+        }
+
+        var question = command.Question ?? command.Transcript;
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            return new VoiceCommandOutcome(false, "没有听清问题，请再说一次。");
+        }
+
+        var answer = await evidence.AskRecentAsync(question, days: 7, ct);
+        if (!answer.HasEvidence)
+        {
+            return new VoiceCommandOutcome(true, "没有找到可验证的本地证据，暂不回答。");
+        }
+
+        var text = answer.Answer.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        var feedback = text.Length <= 140 ? text : text[..140] + "…";
+        return new VoiceCommandOutcome(true, feedback);
     }
 }

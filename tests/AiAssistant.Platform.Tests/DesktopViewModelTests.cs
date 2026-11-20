@@ -194,6 +194,62 @@ public sealed class DesktopViewModelTests
         Assert.Equal("语音休眠", viewModel.StatusText);
     });
 
+    [Fact]
+    public Task SearchEvidence_JumpNavigatesTimelineToCitedEvent() => RunInHeadlessSession(async () =>
+    {
+        var repository = new InMemoryEventRepository();
+        var clock = new SystemClock();
+        var timestamp = ((IClock)clock).Now();
+        repository.Events.Add(CreateEvent("cited", timestamp));
+        repository.Events.Add(CreateEvent("other", timestamp));
+
+        var timeline = new TimelineViewModel(new TimelineUseCase(repository, new FakeMediaStore(), clock));
+        await timeline.InitializeAsync();
+
+        var evidence = new EvidenceReference(
+            "E1",
+            "cited",
+            timestamp.LocalDate,
+            timestamp.OccurredAtUtc,
+            "TestApp",
+            "Synthetic test event",
+            "结构化证据摘录",
+            false,
+            "keyword+vector",
+            0.5);
+        var search = new SearchViewModel(
+            new EvidenceSearchUseCase(new FakeEvidenceSearch(evidence), new FakeAnswerer(), clock),
+            new RangeReportUseCase(new FakeRangeReportService(), clock),
+            Path.Combine(AppContext.BaseDirectory, "test-temp", "search-ui"));
+        search.Query = "迁移";
+        await search.SearchCommand.ExecuteAsync(null);
+        Assert.Single(search.Evidence);
+
+        var diagnostics = new DiagnosticsUseCase(
+            new FakeCapabilityProvider(),
+            new FakeMaintenanceService(),
+            new FakeCaptureCoordinator(),
+            new FakeReportJobQueue());
+        using var shell = new ShellViewModel(
+            timeline,
+            new CaptureControlViewModel(new CaptureControlUseCase(new FakeCaptureCoordinator(), new FakeAutoStartService())),
+            new DiagnosticsViewModel(diagnostics),
+            new ReportsViewModel(
+                new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
+                Path.Combine(AppContext.BaseDirectory, "test-temp", "reports-ui")),
+            voice: null,
+            voiceNavigation: null,
+            search: search);
+
+        shell.SelectedSectionIndex = 1;
+        search.Evidence[0].NavigateCommand.Execute(null);
+
+        await WaitUntilAsync(() => timeline.SelectedEvent?.Event.Id == "cited");
+        Assert.Equal(0, shell.SelectedSectionIndex);
+        Assert.Equal("cited", timeline.SelectedEvent?.Event.Id);
+        Assert.Contains("已定位", timeline.StatusMessage, StringComparison.Ordinal);
+    });
+
     private static ShellViewModel CreateShell()
     {
         var repository = new InMemoryEventRepository();
@@ -480,6 +536,48 @@ public sealed class DesktopViewModelTests
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class FakeEvidenceSearch(EvidenceReference evidence) : IEvidenceSearch
+    {
+        public Task<SearchQueryResult> SearchAsync(
+            string query,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken ct) =>
+            Task.FromResult(new SearchQueryResult(query, fromDate, toDate, [evidence], 1, 0));
+    }
+
+    private sealed class FakeAnswerer : IEvidenceQuestionAnswerer
+    {
+        public Task<EvidenceQaAnswer> AnswerAsync(
+            string question,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken ct) =>
+            Task.FromResult(new EvidenceQaAnswer(
+                question,
+                "没有找到可验证的本地活动证据，因此不生成推测性回答。",
+                [],
+                [],
+                "none",
+                ModelEndpointTier.LocalOffline,
+                true,
+                "no-evidence"));
+    }
+
+    private sealed class FakeRangeReportService : IRangeReportService
+    {
+        public Task<RangeReport> GenerateAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct) =>
+            Task.FromResult(new RangeReport(
+                fromDate,
+                toDate,
+                "# 区间报告",
+                "{}",
+                [],
+                "none",
+                true,
+                "no-evidence"));
     }
 
     private sealed class FakeRetentionService : IRetentionService

@@ -50,6 +50,60 @@ public sealed class VoiceCommandAndSessionTests
     }
 
     [Fact]
+    public void Parser_OpensFreeFormQuestionOnlyAfterFixedTrigger()
+    {
+        var asked = VoiceCommandParser.Parse("问一下昨天做了什么");
+        Assert.Equal(VoiceCommandKind.AskQuestion, asked.Kind);
+        Assert.Equal("昨天做了什么", asked.Question);
+
+        var searched = VoiceCommandParser.Parse("搜索迁移记录");
+        Assert.Equal(VoiceCommandKind.AskQuestion, searched.Kind);
+        Assert.Equal("迁移记录", searched.Question);
+
+        Assert.Equal(VoiceCommandKind.Unknown, VoiceCommandParser.Parse("问").Kind);
+        Assert.Equal(VoiceCommandKind.Unknown, VoiceCommandParser.Parse("今天天气怎么样").Kind);
+        Assert.Equal(VoiceCommandKind.PauseCapture, VoiceCommandParser.Parse("暂停采集").Kind);
+    }
+
+    [Fact]
+    public async Task Router_AnswersQuestionWithSharedEvidenceUseCase()
+    {
+        var evidence = new EvidenceReference(
+            "E1",
+            "e1",
+            new DateOnly(2026, 11, 20),
+            new DateTimeOffset(2026, 11, 20, 1, 0, 0, TimeSpan.Zero),
+            "Rider",
+            "迁移方案",
+            "结构化证据摘录",
+            false,
+            "keyword",
+            0.4);
+        var answer = new EvidenceQaAnswer(
+            "迁移进展",
+            "已完成迁移方案评审 [E1]。",
+            [evidence],
+            ["E1"],
+            "fake-chat",
+            ModelEndpointTier.LocalOffline,
+            false,
+            null);
+        var router = new VoiceCommandRouter(
+            new ReportUseCase(new FakeReportQueue(), new FakeReportRepository(), new FakeClock()),
+            new CaptureControlUseCase(new FakeCoordinator(), new FakeAutoStart()),
+            new VoiceNavigationHub(),
+            new FakeClock(),
+            new EvidenceSearchUseCase(new FakeEvidenceSearch(evidence), new FakeAnswerer(answer), new FakeClock()));
+
+        var outcome = await router.ExecuteAsync(
+            VoiceCommandParser.Parse("问一下迁移进展"),
+            CancellationToken.None);
+
+        Assert.True(outcome.Handled);
+        Assert.Contains("已完成迁移方案评审", outcome.Feedback, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Session_WakeListenProcessRespondSleep_ExecutesCommandAndLogsTextOnly()
     {
         var harness = new Harness();
@@ -164,6 +218,26 @@ public sealed class VoiceCommandAndSessionTests
                 NullLogger<VoiceSessionController>.Instance);
             Session.StateChanged += (_, state) => States.Add(state);
         }
+    }
+
+    private sealed class FakeEvidenceSearch(EvidenceReference evidence) : IEvidenceSearch
+    {
+        public Task<SearchQueryResult> SearchAsync(
+            string query,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken ct) =>
+            Task.FromResult(new SearchQueryResult(query, fromDate, toDate, [evidence], 1, 0));
+    }
+
+    private sealed class FakeAnswerer(EvidenceQaAnswer answer) : IEvidenceQuestionAnswerer
+    {
+        public Task<EvidenceQaAnswer> AnswerAsync(
+            string question,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken ct) =>
+            Task.FromResult(answer);
     }
 
     private sealed class FakeClock : IClock

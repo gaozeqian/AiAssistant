@@ -1,10 +1,11 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Xml.Linq;
 using AiAssistant.Application;
 using AiAssistant.Capture;
 using AiAssistant.Core;
 using AiAssistant.Desktop;
 using AiAssistant.Host;
+using AiAssistant.LocalApi;
 using AiAssistant.Models;
 using AiAssistant.Platform.Linux;
 using AiAssistant.Platform.MacOS;
@@ -34,6 +35,7 @@ public sealed class DependencyRuleTests
         typeof(SummarizationAssemblyMarker).Assembly,
         typeof(SchedulerAssemblyMarker).Assembly,
         typeof(VoiceAssemblyMarker).Assembly,
+        typeof(LocalApiAssemblyMarker).Assembly,
         typeof(PlatformWindowsAssemblyMarker).Assembly,
         typeof(PlatformMacOSAssemblyMarker).Assembly,
         typeof(PlatformLinuxAssemblyMarker).Assembly,
@@ -90,6 +92,7 @@ public sealed class DependencyRuleTests
             "AiAssistant.Summarization",
             "AiAssistant.Scheduler",
             "AiAssistant.Voice",
+            "AiAssistant.LocalApi",
             "Avalonia",
             "Microsoft.Data.Sqlite"
         };
