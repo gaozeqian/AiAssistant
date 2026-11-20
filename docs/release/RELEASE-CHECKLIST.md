@@ -40,7 +40,7 @@
 ## 5. 浸泡与性能
 
 - [ ] 24 小时浸泡（待机 + 活跃 + 休眠唤醒）通过，控制事件零丢失。
-- [ ] 多日浸泡（≥3 天）通过，跨午夜日报与保留清理正确。
+- [ ] 多日浸泡（≥3 天）通过：`AIASSISTANT_SOAK_DAYS=3 dotnet test tests/AiAssistant.Platform.Tests -c Release --filter "FullyQualifiedName~MultiDayAcceleratedSoak"`，报告写入 `artifacts/soak/`。
 - [ ] 插拔显示器/麦克风后采集与语音可恢复。
 - [ ] 启动耗时、包体积、测试耗时更新到 `PERFORMANCE.md`。
 - [ ] 内存曲线无明显增长（记录峰值与采样方式）。

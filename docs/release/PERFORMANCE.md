@@ -8,8 +8,8 @@
 | 指标 | 数值 | 说明 |
 |---|---|---|
 | Release 全量构建 | 0 警告 / 0 错误 | `dotnet build AiAssistant.sln -c Release` |
-| 测试总数 | 106 | 8 个测试项目 |
-| 测试总耗时 | 约 11 秒 | 各项目并行；Storage 3s、Platform 6s、Report 0.8s |
+| 测试总数 | 113 | 8 个测试项目（含 3 天加速浸泡） |
+| 测试总耗时 | 约 17 秒 | 各项目并行；Platform 17s（其中 3 天浸泡 15.8s）、Storage 5s、Report 0.9s |
 | 架构门禁 | 6 项 | 依赖方向与合成违规检测 |
 
 ## 2. 启动
@@ -39,7 +39,17 @@
 | 加密数据库初始化（新建） | 包含在 0.82 s 启动自检内 |
 | 16 项存储/迁移/删除测试 | 3 s（含多次新建加密库、媒体写入、备份恢复） |
 | 24h 加速浸泡（S2） | 48/48 控制事件零丢失，队列严格受限，日志零正文泄露 |
+| **3 天加速浸泡（S9）** | **15.8 s** 完成 72 小时模拟：146/146 控制事件零丢失、144 条黑名单拦截、队列峰值 12/12、289 条事件、72 个媒体、8 小时休眠窗口零事件、完整性 `ok`、保留清理 72/72 |
 | 向量检索 | `sqlite-vec` 原生加载；失败时同接口 SIMD 兜底，不降低加密要求 |
+
+多日浸泡可用环境变量扩展到 14 天等效：
+
+```bash
+AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests \
+  -c Release --filter "FullyQualifiedName~MultiDayAcceleratedSoak"
+```
+
+报告写入 `artifacts/soak/soak-<days>d.md`，包含控制事件、黑名单、队列峰值、活跃日期、完整性、保留清理与泄露检查结论。
 
 > 未做 10 万级事件压测与长稳内存曲线；`S9` 浸泡阶段应在目标机器补齐。
 

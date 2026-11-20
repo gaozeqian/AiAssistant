@@ -42,7 +42,17 @@ jobs:
         run: dotnet build AiAssistant.sln -c Release --no-restore
 
       - name: Run Architecture, Unit, Integration & Contract Tests
+        env:
+          AIASSISTANT_SOAK_DAYS: "3"
         run: dotnet test AiAssistant.sln -c Release --no-build --logger "trx;LogFileName=test-results-${{ matrix.rid }}.trx"
+
+      - name: Upload multi-day soak report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-report-${{ matrix.rid }}
+          path: artifacts/soak/*.md
+          if-no-files-found: ignore
 
       - name: Build & Smoke-Test Swift Helper (macOS arm64)
         if: matrix.rid == 'osx-arm64'

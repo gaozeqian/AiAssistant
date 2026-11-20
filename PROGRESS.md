@@ -11,7 +11,7 @@
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
 - **当前构建状态**：✅ 本地 Release 0 警告 0 错误；三平台自包含打包脚本实测（win zip / linux tar.gz / macOS app 布局）
-- **当前测试状态**：✅ 112/112 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 34、`Processing.Tests` 7、`Report.Tests` 32、`Voice.Tests` 7）
+- **当前测试状态**：✅ 113/113 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 35、`Processing.Tests` 7、`Report.Tests` 32、`Voice.Tests` 7）
 - **下一步待确认事项**：配置签名证书/公证凭据后执行 `release.yml`；在真机完成 24h/多日浸泡、安装升级卸载与无障碍走查；S9 遗留项见第 5 节
 
 ---
@@ -172,6 +172,19 @@ python build/sbom/generate-sbom.py --verify --check-manifest
 # 输出 artifacts/sbom/bom.json（CycloneDX 1.5，含 SHA-512 与依赖图）
 ```
 
+### 3.9 多日加速浸泡
+
+```bash
+# 默认 3 天（72 小时等效，含 8 小时休眠窗口），约 16 秒
+dotnet test tests/AiAssistant.Platform.Tests -c Release --filter "FullyQualifiedName~MultiDayAcceleratedSoak"
+
+# 扩展到 14 天等效
+AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release \
+  --filter "FullyQualifiedName~MultiDayAcceleratedSoak"
+```
+
+报告写入 `artifacts/soak/soak-<days>d.md`，包含控制事件、黑名单拦截、队列峰值、活跃日期、完整性、保留清理与泄露检查结论。CI 会随测试上传该报告。
+
 ---
 
 ## 4. 实施日志（按时间顺序追加）
@@ -194,6 +207,7 @@ python build/sbom/generate-sbom.py --verify --check-manifest
 - **2026-11-20 [win-x64] [S8 智能检索与完整对话完成]**：新增 `AiAssistant.LocalApi` 项目并把检索/问答/区间报告提升为 Application 端口（`IEvidenceSearch`、`IEvidenceQuestionAnswerer`、`IRangeReportService`、`ILocalMcpControl`），Desktop 只依赖 Application。实现 `HybridSearchService`（时间过滤 + 关键词 + 向量 RRF 融合、统一 `[E#]` 证据、向量失败仅降级关键词）与 `EvidenceQuestionAnswerUseCase`（强制引用校验，无引用走抽取式降级，无证据返回 `no-evidence` 且不调用模型）。实现 `ActivityRangeReportService` 与 `RangeReportUseCase`：周一为界的周报、任意区间每日事件数/活跃分钟/主要应用、Markdown + stats JSON 双文件导出、模型不可用确定性统计降级。实现只读 loopback MCP：`TcpListener` 仅绑 `127.0.0.1`、AES-GCM 加密令牌（可轮换）、滑动窗口限流、JSON-RPC `initialize/ping/tools/list/tools/call`、四个只读工具、未知或写入工具返回 -32602；Host 生命周期接入且默认关闭。新增“检索与问答”面板（检索/提问/导出、证据卡片一键定位时间线、周报柱状与导出）、“本地诊断”MCP 令牌显示/轮换，语音“问一下…”复用同一证据用例。全仓 Release 0 警告 0 错误、106/106 测试通过（新增 16 项检索/报告/MCP 契约测试与 2 项 UI/语音测试），两平台发布通过。真实 embedding 质量与真实 MCP 客户端联调保留遗留项。
 - **2026-11-20 [win-x64] [S9 发布加固工具链完成]**：新增 `build/package/` 跨平台打包脚本与图标生成器（纯 Python 生成 PNG/ICO/MSIX 资源）：Windows 自包含 zip + 可选 Authenticode/MSIX、macOS `.app` + codesign/notarytool/stapler、Linux tar.gz + `.deb`；新增 `.github/workflows/release.yml` 签名发布流水线与 CI 打包作业。新增 `IDataDeletionService`/`DataDeletionService`（按日期或全量删除事件、媒体、日报、任务、语音日志、向量索引，WAL checkpoint）与“数据与导出”页面（二次确认删除）、Host 维护命令 `--backup` / `--restore --confirm-restore` / `--purge-data --confirm-purge`（实测备份 84KB、恢复、清空、清空后启动均成功）。新增 v1→v2 迁移保留数据、按日期删除、全量删除后可用、密钥丢失不损坏数据库四项门禁测试；修复报告后台任务测试的时段依赖缺陷（固定时钟）。补充键盘快捷键（Ctrl+D1…D7、Ctrl+F、F5）、关键控件无障碍名称、诊断页权限引导与确认导出。新增 `docs/release/` 隐私说明、已知限制、性能报告（启动 0.82s、包体积 83MB/58MB）、升级卸载、回滚手册与发布检查表。全仓 Release 0 警告 0 错误、112/112 测试通过；Windows zip、Linux tar.gz、macOS app 布局实测生成。真实签名公证、多日浸泡与人工无障碍验收保留遗留项。
 - **2026-11-20 [win-x64] [S9 供应链收尾]**：新增离线 CycloneDX 1.5 SBOM 生成器 `build/sbom/generate-sbom.py`（读取 `project.assets.json`，输出 SHA-512 哈希、purl 与依赖图，支持 `--verify` 与 `--check-manifest`），实测 103 个组件、104 条依赖边、校验通过；依赖清单补齐全部 28 个集中管理包。打包脚本自动生成 `SHA256SUMS` 并实测 `sha256sum -c` 通过；CI SBOM 作业改为离线生成（不再安装外部工具），Release 工作流合并产物后统一生成校验和并附 `bom.json`。新增 `docs/release/RELEASE-NOTES-TEMPLATE.md`。`S9-R4` 仅剩 CI 实际运行与 Release 附件待验证。
+- **2026-11-20 [win-x64] [S9 多日浸泡完成]**：新增可配置 3–14 天的加速浸泡 `S9MultiDaySoakTests`（默认 3 天/72 小时，约 16 秒），覆盖持续工作、过载洪峰、黑名单、暂停/恢复、配额耗尽、**8 小时休眠窗口**、保留清理与日志/导出泄露检查；产出 `artifacts/soak/soak-<days>d.md` 报告并由 CI 上传。实测 146/146 控制事件零丢失、144 条黑名单拦截、队列峰值 12/12、289 条事件、72 个媒体、休眠窗口零事件、完整性 `ok`、保留清理 72/72。全仓 113/113 测试通过。真实时间多日浸泡与显示器/麦克风热插拔仍待真机执行。
 
 ---
 
@@ -220,6 +234,6 @@ python build/sbom/generate-sbom.py --verify --check-manifest
 | `S8-R2` | S8 MCP | 仅用本地 HTTP 契约测试验证，未与真实 MCP 客户端（Claude Desktop 等）联调；端口固定值与客户端兼容性未验证 | 客户端握手字段差异可能导致接入失败 | S9 前用至少一个真实 MCP 客户端完成 `initialize → tools/list → tools/call` 全链路联调 |
 | `S8-R3` | S8 周报 | 周报图表为文本条形与 Markdown 表格，未提供 PNG/PDF 图形化导出 | 汇报场景需要手工截图 | 视需要增加图形化导出（本地渲染，不引入云服务） |
 | `S9-R1` | S9 签名 | Windows Authenticode/MSIX 与 macOS Developer ID/公证未用真实证书执行；脚本与工作流已就绪 | 未验证的签名链可能导致安装被拦截 | 配置证书与公证凭据后运行 `release.yml`，并保存 `signtool verify` / `spctl` 输出 |
-| `S9-R2` | S9 浸泡 | 24h/多日浸泡、休眠唤醒、插拔显示器与麦克风未在真机执行；S2 仅有 24h 加速浸泡 | 长稳与设备热插拔风险未量化 | 按 `RELEASE-CHECKLIST.md` 第 5 节执行并记录 |
+| `S9-R2` | S9 浸泡 | 已实现 3–14 天加速浸泡（含 8 小时休眠窗口）并纳入 CI；真实时间多日浸泡、插拔显示器/麦克风未在真机执行 | 真实设备热插拔与长稳内存曲线未量化 | 按 `RELEASE-CHECKLIST.md` 第 5 节在真机执行并记录 |
 | `S9-R3` | S9 人工验收 | 安装/升级/卸载、无障碍与键盘导航仅完成自动化与代码检查，未做人工走查 | 平台交互差异可能影响可用性 | 三平台各执行一次发布检查表第 3、6 节 |
 | `S9-R4` | S9 供应链 | 离线 SBOM 与 `SHA256SUMS` 已实现并本地验证；CI 因账单未运行，Release 附件未实际生成 | 供应链证据尚未随发布物提供 | 恢复 Actions 后运行 SBOM 作业与 `release.yml`，确认 `bom.json` 与 `SHA256SUMS` 出现在 Release |
