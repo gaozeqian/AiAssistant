@@ -12,6 +12,9 @@ public sealed class HybridSearchOptions
     public int TopK { get; init; } = 8;
     public int CandidateLimit { get; init; } = 60;
     public double RrfConstant { get; init; } = 60;
+
+    /// <summary>Disable to measure keyword-only recall (benchmarking, offline fallback).</summary>
+    public bool EnableVectorRecall { get; init; } = true;
 }
 
 /// <summary>
@@ -56,30 +59,33 @@ public sealed class HybridSearchService(
         }
 
         var vectorEvents = new List<ActivityEvent>();
-        try
+        if (options.EnableVectorRecall)
         {
-            var embedding = await model.EmbedAsync(
-                new ModelEmbeddingRequest([query], Purpose: "evidence-search"),
-                ct);
-            if (embedding.Vectors.Count > 0)
+            try
             {
-                var hits = await vectors.SearchAsync(embedding.Vectors[0], options.CandidateLimit, ct);
-                for (var rank = 0; rank < hits.Count; rank++)
+                var embedding = await model.EmbedAsync(
+                    new ModelEmbeddingRequest([query], Purpose: "evidence-search"),
+                    ct);
+                if (embedding.Vectors.Count > 0)
                 {
-                    var item = await events.GetByIdAsync(hits[rank].EventId, ct);
-                    if (item is null || item.Timestamp.LocalDate < fromDate || item.Timestamp.LocalDate > toDate)
+                    var hits = await vectors.SearchAsync(embedding.Vectors[0], options.CandidateLimit, ct);
+                    for (var rank = 0; rank < hits.Count; rank++)
                     {
-                        continue;
-                    }
+                        var item = await events.GetByIdAsync(hits[rank].EventId, ct);
+                        if (item is null || item.Timestamp.LocalDate < fromDate || item.Timestamp.LocalDate > toDate)
+                        {
+                            continue;
+                        }
 
-                    vectorEvents.Add(item);
-                    AddScore(scores, matchedBy, item.Id, "vector", rank);
+                        vectorEvents.Add(item);
+                        AddScore(scores, matchedBy, item.Id, "vector", rank);
+                    }
                 }
             }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogInformation("Vector recall skipped with {ExceptionType}; keyword results remain.", ex.GetType().Name);
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogInformation("Vector recall skipped with {ExceptionType}; keyword results remain.", ex.GetType().Name);
+            }
         }
 
         var allEvents = keywordEvents.Concat(vectorEvents)

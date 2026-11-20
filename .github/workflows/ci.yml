@@ -54,6 +54,14 @@ jobs:
           path: artifacts/soak/*.md
           if-no-files-found: ignore
 
+      - name: Upload benchmark reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports-${{ matrix.rid }}
+          path: artifacts/benchmarks/*.md
+          if-no-files-found: ignore
+
       - name: Build & Smoke-Test Swift Helper (macOS arm64)
         if: matrix.rid == 'osx-arm64'
         working-directory: native/AiAssistant.MacHelper
