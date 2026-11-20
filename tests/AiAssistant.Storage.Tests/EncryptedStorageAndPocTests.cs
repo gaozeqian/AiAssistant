@@ -255,13 +255,13 @@ public sealed class EncryptedStorageAndPocTests : IDisposable
         var evMeeting = new ActivityEvent("evt_meeting", ts, SourceKind.MicrophoneAudio, "TencentMeeting", "Architecture Sync");
         await repo.AppendBatchAsync([evCoding, evMeeting], CancellationToken.None);
 
-        var modelV1 = new VectorModelDescriptor("qwen3-embedding:0.6b", "1.0", Dimensions: 4);
+        var modelV1 = new VectorModelDescriptor("embeddinggemma-2:740m", "1.0", Dimensions: 4);
         await vectorIndex.UpsertAsync("evt_coding", new float[] { 0.95f, 0.10f, 0.0f, 0.0f }, modelV1, CancellationToken.None);
         await vectorIndex.UpsertAsync("evt_meeting", new float[] { 0.05f, 0.98f, 0.0f, 0.0f }, modelV1, CancellationToken.None);
 
         var meta = await vectorIndex.GetMetadataAsync(CancellationToken.None);
         Assert.Equal(2, meta.IndexedCount);
-        Assert.Equal("qwen3-embedding:0.6b", meta.ActiveModel?.ModelId);
+        Assert.Equal("embeddinggemma-2:740m", meta.ActiveModel?.ModelId);
         Assert.False(string.IsNullOrWhiteSpace(meta.BackendName));
 
         var hits = await vectorIndex.SearchAsync(new float[] { 1.0f, 0.0f, 0.0f, 0.0f }, topK: 2, CancellationToken.None);

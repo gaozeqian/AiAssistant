@@ -319,8 +319,8 @@ Supported / PermissionRequired / Degraded / Unavailable / DisabledByPolicy
 1. 用 Microsoft.Extensions.AI 注册 IChatClient 与 IEmbeddingGenerator，接入 Ollama/LM Studio。
 2. 自定义装饰器只实现：档位路由、脱敏、审计、能力探测、超时与回退。
 3. 建立模型基准集与评分表：中文摘要质量、语义标签、JSON 合规、耗时、内存/显存。
-4. 评测 Qwen3 / Qwen3.5 的 4B–9B 档，确定轻量与质量配置，不在代码中写死模型 tag。
-5. 默认嵌入使用 qwen3-embedding:0.6b；实现向量写入、重建和版本元数据。
+4. 评测本机候选对话模型（默认 `gemma4:12b`），确定轻量与质量配置，不在代码中写死模型 tag。
+5. 默认嵌入使用 `embeddinggemma-2:740m`；实现向量写入、重建和版本元数据。
 6. 实现活动分段、map-reduce、结构化 schema 校验、有限重试与失败保留。
 7. 实现持久 report_jobs、单消费者、三通道触发、版本化日报、启动补偿和进度通知。
 8. 完成日报面板、站会视图、手动重生成与导出 Markdown。
@@ -503,7 +503,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S5.1：Microsoft.Extensions.AI 本机网关、Ollama/LM Studio 适配、loopback 策略、超时/脱敏/审计装饰器与能力探测。
 - [x] S5.2：事件向量索引、活动分段、map-reduce、结构化 JSON 校验重试、版本化加密日报与站会 Markdown。
 - [x] S5.3：单消费者三通道调度、启动补偿、幂等/失败保留、日报/站会面板、强制重生成与 Markdown 导出。
-- [ ] S5-R：安装真实 Qwen 模型运行固定中文基准集并确定默认轻量/质量档位；多日调度浸泡并入 S9。
+- [ ] S5-R：安装真实候选模型运行固定中文基准集并确定默认轻量/质量档位；多日调度浸泡并入 S9。
 - [x] S6.1：版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理与三档端点装配。
 - [x] S6.2：Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、最小化/脱敏/残留检测三闸。
 - [x] S6.3：chat/streaming/embeddings/structured output/tool calling 探测缓存与诊断展示。
@@ -526,8 +526,9 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.7：MCP Streamable HTTP 兼容（JSON/SSE、会话头、版本协商、DELETE）、无头 `--mcp-serve`/`--mcp-token`、10 项协议一致性测试与独立客户端脚本。
 - [x] S9.8：`--benchmark-model` 模型基准命令（报告、失败详情、离线退出码）与 loopback 端点绕过系统代理修复。
 - [x] S9.9：检索质量基准（关键词-only 开关、Recall@K/MRR 评估器、合成语料同义词测试与报告）。
-- [x] S9.10：`--benchmark-retrieval` 真实 embedding 评测、可配置查询指令前缀与 qwen3-embedding 默认指令。
+- [x] S9.10：`--benchmark-retrieval` 真实 embedding 评测、可配置查询指令前缀与 embeddinggemma 默认指令。
 - [x] S9.11：embeddinggemma 评测与生产接入（`EmbeddingProfile`、`title/text` 文档格式、`--rebuild-vectors`、索引版本 1.1）。
+- [x] S9.12：默认对话模型切换为 `gemma4:12b`，移除代码/测试/文档/示例中的旧模型配置。
 - [ ] S9-R：真实证书签名/公证、真实时间多日浸泡与设备热插拔、真机安装升级卸载与无障碍人工验收、CI 实际生成并随 Release 发布 SBOM/校验和。
 - [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
 

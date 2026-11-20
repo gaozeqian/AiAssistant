@@ -89,7 +89,6 @@ public sealed class S9RetrievalQualityTests
 
     [Theory]
     [InlineData("embeddinggemma-2:740m", HybridSearchOptions.EmbeddingGemmaQueryInstruction, EmbeddingProfile.TitleTextDocumentStyle)]
-    [InlineData("qwen3-embedding:0.6b", HybridSearchOptions.Qwen3RetrievalInstruction, EmbeddingProfile.DefaultDocumentStyle)]
     [InlineData("custom-embed:latest", "", EmbeddingProfile.DefaultDocumentStyle)]
     public void EmbeddingProfile_SelectsModelSpecificDefaults(string model, string expectedPrefix, string expectedStyle)
     {
@@ -102,7 +101,7 @@ public sealed class S9RetrievalQualityTests
     {
         Assert.Equal("custom-prefix", EmbeddingProfile.ResolveQueryPrefix("embeddinggemma-2:740m", "custom-prefix"));
         Assert.Equal("plain", EmbeddingProfile.ResolveDocumentStyle("embeddinggemma-2:740m", "plain"));
-        Assert.Equal(string.Empty, EmbeddingProfile.ResolveQueryPrefix("qwen3-embedding:0.6b", string.Empty));
+        Assert.Equal(string.Empty, EmbeddingProfile.ResolveQueryPrefix("embeddinggemma-2:740m", string.Empty));
     }
 
     [Fact]

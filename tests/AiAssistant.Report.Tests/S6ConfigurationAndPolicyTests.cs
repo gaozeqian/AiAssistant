@@ -50,14 +50,14 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
                   "tier": "LocalOffline",
                   "provider": "ollama",
                   "baseUrl": "http://127.0.0.1:11434",
-                  "chatModel": "qwen3:8b",
-                  "embeddingModel": "qwen3-embedding:0.6b"
+                  "chatModel": "gemma4:12b",
+                  "embeddingModel": "embeddinggemma-2:740m"
                 },
                 {
                   "tier": "CorporateIntranet",
                   "provider": "openai",
                   "baseUrl": "https://llm.corp.example",
-                  "chatModel": "corp-qwen",
+                  "chatModel": "corp-chat",
                   "embeddingModel": "corp-embedding",
                   "timeoutSeconds": 60,
                   "allowRemoteEndpoint": true,
@@ -218,8 +218,8 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
             ModelEndpointTier.LocalOffline,
             ModelProviderKind.Ollama,
             new Uri("http://127.0.0.1:11434"),
-            "qwen3:8b",
-            "qwen3-embedding:0.6b",
+            "gemma4:12b",
+            "embeddinggemma-2:740m",
             TimeSpan.FromSeconds(5),
             null,
             null,

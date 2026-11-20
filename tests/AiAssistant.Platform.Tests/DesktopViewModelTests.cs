@@ -154,7 +154,7 @@ public sealed class DesktopViewModelTests
             date,
             "# 今日日报\n\n## 概览\n完成 S5 日报闭环。",
             """{"Standup":{"Yesterday":"完成模型网关","Today":"接入日报面板","Blockers":[]}}""",
-            "qwen3:8b",
+            "gemma4:12b",
             ModelEndpointTier.LocalOffline,
             true,
             ReportTriggerSource.Manual,

@@ -47,8 +47,8 @@ public sealed class ModelGatewayTests
         var handler = new OllamaHandler();
         var options = new ModelGatewayOptions
         {
-            ChatModel = "qwen3:8b",
-            EmbeddingModel = "qwen3-embedding:0.6b"
+            ChatModel = "gemma4:12b",
+            EmbeddingModel = "embeddinggemma-2:740m"
         };
         using var http = new HttpClient(handler);
         var backend = new HttpModelBackend(http, options);
@@ -59,7 +59,7 @@ public sealed class ModelGatewayTests
 
         var response = await backend.GetResponseAsync(
             [new ChatMessage(ChatRole.User, "生成日报")],
-            new ChatOptions { ModelId = "qwen3:8b" },
+            new ChatOptions { ModelId = "gemma4:12b" },
             CancellationToken.None);
         Assert.Equal("测试回复", response.Messages[0].Text);
 
@@ -105,7 +105,7 @@ public sealed class ModelGatewayTests
             var path = request.RequestUri!.AbsolutePath;
             if (path == "/api/tags")
             {
-                return Json("""{"models":[{"name":"qwen3:8b"},{"name":"qwen3-embedding:0.6b"}]}""");
+                return Json("""{"models":[{"name":"gemma4:12b"},{"name":"embeddinggemma-2:740m"}]}""");
             }
 
             if (path == "/api/chat")
@@ -243,8 +243,8 @@ public sealed class ReportGenerationTests
         public int ReduceCalls { get; private set; }
         public bool AlwaysInvalidReduce { get; init; }
         public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.AccessibilityText, "fake model");
-        public string ChatModelId => "qwen3:8b";
-        public string EmbeddingModelId => "qwen3-embedding:0.6b";
+        public string ChatModelId => "gemma4:12b";
+        public string EmbeddingModelId => "embeddinggemma-2:740m";
 
         public Task<ModelCompletionResult> CompleteAsync(ModelCompletionRequest request, CancellationToken ct)
         {
@@ -265,13 +265,13 @@ public sealed class ReportGenerationTests
         }
 
         public Task<ModelEmbeddingResult> EmbedAsync(ModelEmbeddingRequest request, CancellationToken ct) =>
-            Task.FromResult(new ModelEmbeddingResult([], "qwen3-embedding:0.6b", 0));
+            Task.FromResult(new ModelEmbeddingResult([], "embeddinggemma-2:740m", 0));
 
         public Task<ModelCapabilitySnapshot> ProbeAsync(CancellationToken ct) =>
-            Task.FromResult(new ModelCapabilitySnapshot(true, true, "qwen3:8b", "qwen3-embedding:0.6b", ModelEndpointTier.LocalOffline, "ok"));
+            Task.FromResult(new ModelCapabilitySnapshot(true, true, "gemma4:12b", "embeddinggemma-2:740m", ModelEndpointTier.LocalOffline, "ok"));
 
         private static ModelCompletionResult Result(string text) =>
-            new(text, "qwen3:8b", ModelEndpointTier.LocalOffline, false, TimeSpan.Zero);
+            new(text, "gemma4:12b", ModelEndpointTier.LocalOffline, false, TimeSpan.Zero);
     }
 
     private sealed class InMemoryEventRepository(IReadOnlyList<ActivityEvent> events) : IEventRepository
@@ -361,7 +361,7 @@ public sealed class EmbeddingAndBenchmarkTests
         var indexed = await indexer.IndexDateAsync(new DateOnly(2026, 11, 20), CancellationToken.None);
         Assert.Equal(2, indexed);
         Assert.Equal(2, vectors.Upserts.Count);
-        Assert.Equal("qwen3-embedding:0.6b", vectors.Upserts[0].Model.ModelId);
+        Assert.Equal("embeddinggemma-2:740m", vectors.Upserts[0].Model.ModelId);
         Assert.Equal(3, vectors.Upserts[0].Model.Dimensions);
 
         var rebuilt = await indexer.RebuildAllAsync(CancellationToken.None);
@@ -440,7 +440,7 @@ public sealed class EmbeddingAndBenchmarkTests
 
         public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.ModelGateway, "fake");
         public string ChatModelId => "fake-chat";
-        public string EmbeddingModelId => "qwen3-embedding:0.6b";
+        public string EmbeddingModelId => "embeddinggemma-2:740m";
 
         public Task<ModelCompletionResult> CompleteAsync(ModelCompletionRequest request, CancellationToken ct) =>
             Task.FromResult(new ModelCompletionResult("{}", ChatModelId, ModelEndpointTier.LocalOffline, false, TimeSpan.Zero));
@@ -493,8 +493,8 @@ public sealed class EmbeddingAndBenchmarkTests
     private sealed class BenchmarkModel : IModelGateway
     {
         public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.ModelGateway, "fake");
-        public string ChatModelId => "qwen3:8b";
-        public string EmbeddingModelId => "qwen3-embedding:0.6b";
+        public string ChatModelId => "gemma4:12b";
+        public string EmbeddingModelId => "embeddinggemma-2:740m";
 
         public Task<ModelCompletionResult> CompleteAsync(ModelCompletionRequest request, CancellationToken ct)
         {

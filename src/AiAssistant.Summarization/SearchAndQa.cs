@@ -9,10 +9,6 @@ namespace AiAssistant.Summarization;
 
 public sealed class HybridSearchOptions
 {
-    /// <summary>Recommended asymmetric query instruction for Qwen3-Embedding retrieval.</summary>
-    public const string Qwen3RetrievalInstruction =
-        "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: ";
-
     /// <summary>Recommended asymmetric query prompt for EmbeddingGemma retrieval.</summary>
     public const string EmbeddingGemmaQueryInstruction = "task: search result | query: ";
 

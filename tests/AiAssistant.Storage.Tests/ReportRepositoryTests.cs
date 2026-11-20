@@ -45,7 +45,7 @@ public sealed class ReportRepositoryTests : IDisposable
             date,
             $"# 日报 v1\n{secretMarker}",
             """{"EventCount":10}""",
-            "qwen3:8b",
+            "gemma4:12b",
             ModelEndpointTier.LocalOffline,
             true,
             ReportTriggerSource.Manual,
@@ -55,7 +55,7 @@ public sealed class ReportRepositoryTests : IDisposable
             date,
             "# 日报 v2",
             """{"EventCount":12}""",
-            "qwen3:8b",
+            "gemma4:12b",
             ModelEndpointTier.LocalOffline,
             true,
             ReportTriggerSource.Manual,
@@ -83,7 +83,7 @@ public sealed class ReportRepositoryTests : IDisposable
         var restartedRepository = new SqliteReportRepository(restartedFactory);
         var restored = await restartedRepository.GetLatestAsync(date, CancellationToken.None);
         Assert.Equal(2, restored!.Version);
-        Assert.Equal("qwen3:8b", restored.ModelId);
+        Assert.Equal("gemma4:12b", restored.ModelId);
         Assert.True(restored.RedactionApplied);
     }
 }

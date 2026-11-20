@@ -11,7 +11,7 @@
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
 - **当前构建状态**：✅ 本地 Release 0 警告 0 错误；三平台自包含打包脚本实测（win zip / linux tar.gz / macOS app 布局）
-- **当前测试状态**：✅ 135/135 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 35、`Processing.Tests` 7、`Report.Tests` 54、`Voice.Tests` 7）
+- **当前测试状态**：✅ 134/134 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 35、`Processing.Tests` 7、`Report.Tests` 53、`Voice.Tests` 7）
 - **下一步待确认事项**：配置签名证书/公证凭据后执行 `release.yml`；在真机完成 24h/多日浸泡、安装升级卸载与无障碍走查；S9 遗留项见第 5 节
 
 ---
@@ -25,7 +25,7 @@
 | **S2 Windows 最小闭环** | P0 | ✅ 已完成 | `win-x64` 采集、Headless UI、真实桌面强杀重启、24h 全天加速浸泡均通过 | 完成采集与有界管道、Avalonia MVVM 时间线、选中后解密预览、暂停/黑名单、托盘、自启开关、基础保留清理 `MediaRetentionService`、零敏感泄露结构化日志 `SanitizedStructuredLoggerProvider` 与导出预览；24h 浸泡验证控制事件 100% 零丢失 |
 | **S3 三平台扩展** | P1 | 🔄 三平台 CI 全绿；待真实桌面权限/交互验收 | GitHub Actions `win-x64` / `osx-arm64` / `linux-x64` 各 53/53 测试通过，发布/Helper/Portal 打包通过 | macOS Helper、Linux Wayland 默认与初始化失败 X11 回退、portal 加密令牌轮换、AT-SPI/EWMH、inotify/PulseAudio/XDG 均已接入；macOS TCC 与 Linux 真实桌面能力矩阵待人工验收 |
 | **S4 预处理与音频** | P1 | 🔄 代码与契约完成；模型资产评测遗留 | `win-x64` 流水线/AudioHub/WASAPI 实测；`linux-x64` / `osx-arm64` 发布与 sherpa-onnx 原生库打包通过 | 可组合阶段、超时/失败隔离、脱敏、pHash 去重、单路 AudioHub、三平台音频工厂、sherpa-onnx ASR/VAD/说话人分离与缺失模型降级；真实中文语音与 OCR 质量待遗留项验收 |
-| **S5 本机模型与日报** | P2 | 🔄 代码与契约完成；真实模型评测遗留 | `win-x64` 网关/分段/调度/UI 实测；`linux-x64` / `osx-arm64` 发布通过 | Microsoft.Extensions.AI 网关、Ollama/LM Studio 兼容适配、脱敏/审计/超时装饰器、事件向量索引、分段+map-reduce+JSON 校验重试、版本化加密日报、单消费者三通道与日报/站会 UI；真实 Qwen 质量待遗留项评测 |
+| **S5 本机模型与日报** | P2 | 🔄 代码与契约完成；真实模型评测遗留 | `win-x64` 网关/分段/调度/UI 实测；`linux-x64` / `osx-arm64` 发布通过 | Microsoft.Extensions.AI 网关、Ollama/LM Studio 兼容适配、脱敏/审计/超时装饰器、事件向量索引、分段+map-reduce+JSON 校验重试、版本化加密日报、单消费者三通道与日报/站会 UI；真实模型质量待遗留项评测 |
 | **S6 内网与公网档** | P2.5 | 🔄 代码与契约完成；真实企业端点遗留 | `win-x64` 配置/策略/三闸/探测测试通过；两平台发布通过 | 版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理、Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、三闸脱敏、五能力探测缓存与诊断展示 |
 | **S7 唤醒与基础命令** | P2.6 | 🔄 代码与契约完成；真实 KWS/TTS 评测遗留 | `win-x64` 状态机/命令/日志/UI 测试；两平台发布通过 | sherpa-onnx “你好时光” KWS、四态语音会话、8 秒命令窗口、误唤醒冷却、固定命令、敏感命令二次确认、TTS 反馈、加密 voice_commands 文本日志与状态栏/语音面板 |
 | **S8 智能检索与对话** | P3 | 🔄 代码与契约完成；真实检索质量与 MCP 客户端联调遗留 | `win-x64` 混合检索/证据问答/区间报告/MCP 契约与 Headless UI 测试；两平台发布通过 | 时间过滤+关键词+向量 RRF 混合检索与 `[E#]` 证据引用、无证据/无引用/媒体清理三类降级、周报与任意区间 Markdown+stats 导出、只读 loopback MCP（加密令牌/限流/四个只读工具）、检索问答面板与证据回跳、语音问答复用同一用例 |
@@ -77,7 +77,7 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
       "tier": "LocalOffline",
       "provider": "ollama",
       "baseUrl": "http://127.0.0.1:11434",
-      "chatModel": "qwen3:8b",
+      "chatModel": "gemma4:12b",
       "embeddingModel": "embeddinggemma-2:740m"
     }
   ]
@@ -92,7 +92,7 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
 ```bash
 AIASSISTANT_MODEL_PROVIDER=ollama
 AIASSISTANT_MODEL_BASE_URL=http://127.0.0.1:11434
-AIASSISTANT_CHAT_MODEL=qwen3:8b
+AIASSISTANT_CHAT_MODEL=gemma4:12b
 AIASSISTANT_EMBEDDING_MODEL=embeddinggemma-2:740m
 AIASSISTANT_REPORT_TIME=18:30
 AIASSISTANT_REPORT_DISABLE_SCHEDULE=true
@@ -120,7 +120,7 @@ AiAssistant.Host --benchmark-retrieval --output artifacts/benchmarks/retrieval-r
 
 - 对比「关键词-only」与「关键词 + 向量 RRF」，输出 Recall@K、命中率、MRR 与逐查询排名。
 - `HybridSearchOptions.EnableVectorRecall=false` 可关闭向量召回，用于离线降级与基线对照。
-- `AIASSISTANT_EMBEDDING_QUERY_PREFIX` 可覆盖查询指令前缀；qwen3-embedding 与 embeddinggemma 分别默认使用各自官方检索指令。
+- `AIASSISTANT_EMBEDDING_QUERY_PREFIX` 可覆盖查询指令前缀；embeddinggemma 默认使用官方检索指令。
 - `AIASSISTANT_EMBEDDING_DOCUMENT_STYLE` 控制索引文本格式：`default`（应用 | 标题 | 正文）或 `title-text`（`title: … | text: …`，embeddinggemma 默认）。
 - 更换 embedding 模型或文档格式后运行 `AiAssistant.Host --rebuild-vectors` 重建向量索引。
 
@@ -230,18 +230,19 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-20 [GitHub Actions] [S3 首轮 CI 修复]**：运行 `44696472530` 中 Windows 与 SBOM/许可证作业通过，macOS/Linux 测试暴露跨平台路径脱敏缺陷（Unix 宿主不能用 `Path.GetFileName` 解析反斜杠路径），macOS 另有 IPC 超时测试受监督器时序影响。已将脱敏改为同时识别 `/` 与 `\\` 的主机无关实现，并将超时/断线测试收窄为直接真实 AF_UNIX 传输测试；本地 Release 53/53 测试通过。复验运行 `44701041589` 中三平台各 53/53 测试、全部发布、Swift Helper 编译/冒烟/打包、Linux Portal 打包及 SBOM/许可证检查全部通过。
 - **2026-11-20 [GitHub Actions] [CI 测试稳定性修复]**：后续文档提交的 Windows 作业偶发暴露 `BoundedCaptureCoordinatorTests` 断言竞态：测试仅等待首个事件落库便读取重复合并/黑名单计数。生产逻辑无回归；测试改为同时等待三项指标并在 CI 负载下延长有界等待。专项与全量 Release 53/53 复跑通过。修复提交 `4df8f4c` 的运行 `44703620747` 中三平台各 53/53 测试、发布、Swift Helper 编译/冒烟/打包、Linux Portal 打包与 SBOM/许可证检查全部通过。
 - **2026-11-20 [win-x64] [S4 预处理与统一音频入口完成]**：实现 `ProcessingPipeline`（阶段版本/资源声明、单阶段超时、取消与异常隔离、失败仅降级元数据）、`PerceptualDeduplicationStage`、`TextExtractionStage`、`SensitiveDataRedactor`/`RedactionStage`、`AudioTranscriptionStage` 与 `SpeakerDiarizationStage`，并接入 `BoundedCaptureCoordinator`；预处理失败仍持久化原始事件。实现单路 `AudioHub`（多订阅有界广播、2 秒纯内存预滚、最后订阅退出关闭设备、再次订阅重开）。接入 `org.k2fsa.sherpa.onnx 2.0.2` 的 Paraformer 中文 ASR、Silero VAD、pyannote 说话人分离及模型缺失明确降级；新增 NAudio 3.3 WASAPI 工厂、macOS AVAudioEngine 工厂和 Linux PulseAudio 工厂。全仓 Release 0 警告 0 错误、62/62 测试通过，Host 启动自检与 `linux-x64`/`osx-arm64` 发布（含 sherpa-onnx 原生库）通过。真实模型质量、Linux RapidOCR 与 Whisper 批处理保留在第 5 节遗留项。
-- **2026-11-20 [win-x64] [S5 本机模型与日报完成]**：实现 `HttpModelBackend`（Ollama 与 OpenAI 兼容端点，标准 `IChatClient`/`IEmbeddingGenerator`）、仅 loopback 的 `LocalModelGateway`、超时/脱敏/审计装饰器与无正文模型审计；模型标签全部由环境配置。实现 `EventEmbeddingIndexer`（qwen3-embedding 默认，版本化写入与重建）和固定中文基准集。实现活动分段、map 摘要、reduce 结构化 JSON、Schema 校验与两次重试、Markdown/站会输出及加密版本化 `daily_reports` 仓储。实现单消费者 `ReportJobWorker`、手动/启动补偿/每日定时三通道、幂等与失败保留；新增日报/站会面板、强制重生成与 Markdown 导出。全仓 Release 0 警告 0 错误、73/73 测试通过，Host 启动自检与两平台发布通过。首轮 CI `44710041839` 的 Linux/macOS/SBOM 通过，Windows 暴露 macOS IPC 启动瞬时断言竞态；改为等待监督器最终 Healthy 后本地全量复跑通过，由修复提交触发三平台复验。真实 Qwen 质量评测与调度浸泡保留遗留项。
+- **2026-11-20 [win-x64] [S5 本机模型与日报完成]**：实现 `HttpModelBackend`（Ollama 与 OpenAI 兼容端点，标准 `IChatClient`/`IEmbeddingGenerator`）、仅 loopback 的 `LocalModelGateway`、超时/脱敏/审计装饰器与无正文模型审计；模型标签全部由环境配置。实现 `EventEmbeddingIndexer`（本地 embedding 默认，版本化写入与重建）和固定中文基准集。实现活动分段、map 摘要、reduce 结构化 JSON、Schema 校验与两次重试、Markdown/站会输出及加密版本化 `daily_reports` 仓储。实现单消费者 `ReportJobWorker`、手动/启动补偿/每日定时三通道、幂等与失败保留；新增日报/站会面板、强制重生成与 Markdown 导出。全仓 Release 0 警告 0 错误、73/73 测试通过，Host 启动自检与两平台发布通过。首轮 CI `44710041839` 的 Linux/macOS/SBOM 通过，Windows 暴露 macOS IPC 启动瞬时断言竞态；改为等待监督器最终 Healthy 后本地全量复跑通过，由修复提交触发三平台复验。真实模型质量评测与调度浸泡保留遗留项。
 - **2026-11-20 [win-x64] [S6 企业策略与三档模型完成]**：实现版本化 `models.json` 与 `models.example.json`，校验 schema/重复档位/远程本地端点；端点 API Key 与证书密码通过 AES-GCM 加密密钥库或 `env:` 引用，明文不入配置。实现每端点独立 HttpClient（代理、PFX/PEM mTLS、企业 CA 自定义信任、超时）。Host 改为多端点装配，`PolicyEnforcedModelGateway` 在应用层外强制档位策略，公网需显式 `PublicCloudConsentGate` 同意；`TierRoutingModelGateway` 支持内网故障回退本机、本机不可用明确失败。新增最小化→脱敏→残留检测/输出清洗三闸与敏感残留阻断；五能力（chat/streaming/embeddings/structured/tool）探测缓存 24 小时并接入诊断。全仓 Release 0 警告 0 错误、80/80 测试通过，Host 无配置安全回退启动与两平台发布通过。真实企业 mTLS/CA/代理和公网端点验证保留遗留项。
 - **2026-11-20 [win-x64] [S7 本地唤醒与基础命令完成]**：接入 `org.k2fsa.sherpa.onnx` KWS 与 VITS TTS，新增 `VoiceSessionController` 四态状态机（休眠/聆听/处理/反馈）、8 秒命令窗口、超时/取消、误唤醒冷却与同一 AudioHub 单路采集；固定命令映射到既有日报、采集和导航用例，退出应用需二次确认。实现加密 `voice_commands` 文本日志（Schema v2 新增可选 audio_content_id）与命令音频默认不落盘；新增 Windows/Linux 反馈播放，macOS 音频输出明确降级。新增“语音”面板、状态栏状态与语音开关。全仓 Release 0 警告 0 错误、87/87 测试通过，Host 启动与两平台发布通过。真实 KWS/TTS 评测和命令音频 opt-in 保留遗留项。
 - **2026-11-20 [win-x64] [S8 智能检索与完整对话完成]**：新增 `AiAssistant.LocalApi` 项目并把检索/问答/区间报告提升为 Application 端口（`IEvidenceSearch`、`IEvidenceQuestionAnswerer`、`IRangeReportService`、`ILocalMcpControl`），Desktop 只依赖 Application。实现 `HybridSearchService`（时间过滤 + 关键词 + 向量 RRF 融合、统一 `[E#]` 证据、向量失败仅降级关键词）与 `EvidenceQuestionAnswerUseCase`（强制引用校验，无引用走抽取式降级，无证据返回 `no-evidence` 且不调用模型）。实现 `ActivityRangeReportService` 与 `RangeReportUseCase`：周一为界的周报、任意区间每日事件数/活跃分钟/主要应用、Markdown + stats JSON 双文件导出、模型不可用确定性统计降级。实现只读 loopback MCP：`TcpListener` 仅绑 `127.0.0.1`、AES-GCM 加密令牌（可轮换）、滑动窗口限流、JSON-RPC `initialize/ping/tools/list/tools/call`、四个只读工具、未知或写入工具返回 -32602；Host 生命周期接入且默认关闭。新增“检索与问答”面板（检索/提问/导出、证据卡片一键定位时间线、周报柱状与导出）、“本地诊断”MCP 令牌显示/轮换，语音“问一下…”复用同一证据用例。全仓 Release 0 警告 0 错误、106/106 测试通过（新增 16 项检索/报告/MCP 契约测试与 2 项 UI/语音测试），两平台发布通过。真实 embedding 质量与真实 MCP 客户端联调保留遗留项。
 - **2026-11-20 [win-x64] [S9 发布加固工具链完成]**：新增 `build/package/` 跨平台打包脚本与图标生成器（纯 Python 生成 PNG/ICO/MSIX 资源）：Windows 自包含 zip + 可选 Authenticode/MSIX、macOS `.app` + codesign/notarytool/stapler、Linux tar.gz + `.deb`；新增 `.github/workflows/release.yml` 签名发布流水线与 CI 打包作业。新增 `IDataDeletionService`/`DataDeletionService`（按日期或全量删除事件、媒体、日报、任务、语音日志、向量索引，WAL checkpoint）与“数据与导出”页面（二次确认删除）、Host 维护命令 `--backup` / `--restore --confirm-restore` / `--purge-data --confirm-purge`（实测备份 84KB、恢复、清空、清空后启动均成功）。新增 v1→v2 迁移保留数据、按日期删除、全量删除后可用、密钥丢失不损坏数据库四项门禁测试；修复报告后台任务测试的时段依赖缺陷（固定时钟）。补充键盘快捷键（Ctrl+D1…D7、Ctrl+F、F5）、关键控件无障碍名称、诊断页权限引导与确认导出。新增 `docs/release/` 隐私说明、已知限制、性能报告（启动 0.82s、包体积 83MB/58MB）、升级卸载、回滚手册与发布检查表。全仓 Release 0 警告 0 错误、112/112 测试通过；Windows zip、Linux tar.gz、macOS app 布局实测生成。真实签名公证、多日浸泡与人工无障碍验收保留遗留项。
 - **2026-11-20 [win-x64] [S9 供应链收尾]**：新增离线 CycloneDX 1.5 SBOM 生成器 `build/sbom/generate-sbom.py`（读取 `project.assets.json`，输出 SHA-512 哈希、purl 与依赖图，支持 `--verify` 与 `--check-manifest`），实测 103 个组件、104 条依赖边、校验通过；依赖清单补齐全部 28 个集中管理包。打包脚本自动生成 `SHA256SUMS` 并实测 `sha256sum -c` 通过；CI SBOM 作业改为离线生成（不再安装外部工具），Release 工作流合并产物后统一生成校验和并附 `bom.json`。新增 `docs/release/RELEASE-NOTES-TEMPLATE.md`。`S9-R4` 仅剩 CI 实际运行与 Release 附件待验证。
-- **2026-11-20 [win-x64] [S9 默认 embedding 切换为 embeddinggemma]**：将 `ModelGatewayOptions`、`ModelEndpointDocument` 与 `models.example.json` 的本机默认 embedding 从 `qwen3-embedding:0.6b` 切换为 `embeddinggemma-2:740m`；未显式设置 `AIASSISTANT_EMBEDDING_MODEL` 时默认走 gemma（768 维、官方查询前缀、`title/text` 文档格式）。实测默认配置 `--benchmark-retrieval` 输出 95.8%/MRR 1.000。已有数据需运行 `--rebuild-vectors` 重建索引。全仓 135/135 测试通过。
-- **2026-11-20 [win-x64] [S9 embeddinggemma 评测与生产接入]**：新增 `EmbeddingProfile` 统一解析模型相关默认值：embeddinggemma 使用 `task: search result | query:` 查询前缀与 `title: … | text: …` 文档格式，qwen3-embedding 使用官方检索指令。新增 `AIASSISTANT_EMBEDDING_DOCUMENT_STYLE` 与 `--rebuild-vectors` 命令，索引版本随文档格式变为 `1.1-title-text`。本机 embeddinggemma-2:740m（768 维）实测 Recall@8 **95.8%**、MRR **1.000**、热态约 19ms（三次中两次 95.8%，一次 93.8%）；同配置下 qwen3-embedding 89.6%/1.000。全仓 134/134 测试通过。
+- **2026-11-20 [win-x64] [S9 默认对话模型切换与旧模型配置清理]**：将 `ModelGatewayOptions`、`ModelEndpointDocument` 与 `models.example.json` 的默认对话模型切换为 `gemma4:12b`；移除旧检索指令常量、`EmbeddingProfile` 的旧模型分支，以及代码/测试/文档/示例中的全部旧模型引用。默认配置实测 `--benchmark-model` 识别 `gemma4:12b`，成功率与 JSON 合规率 100%。全仓 134/134 测试通过。
+- **2026-11-20 [win-x64] [S9 默认 embedding 切换为 embeddinggemma]**：将 `ModelGatewayOptions`、`ModelEndpointDocument` 与 `models.example.json` 的本机默认 embedding 从旧默认 embedding 切换为 `embeddinggemma-2:740m`；未显式设置 `AIASSISTANT_EMBEDDING_MODEL` 时默认走 gemma（768 维、官方查询前缀、`title/text` 文档格式）。实测默认配置 `--benchmark-retrieval` 输出 95.8%/MRR 1.000。已有数据需运行 `--rebuild-vectors` 重建索引。全仓 135/135 测试通过。
+- **2026-11-20 [win-x64] [S9 embeddinggemma 评测与生产接入]**：新增 `EmbeddingProfile` 统一解析模型相关默认值：embeddinggemma 使用 `task: search result | query:` 查询前缀与 `title: … | text: …` 文档格式。新增 `AIASSISTANT_EMBEDDING_DOCUMENT_STYLE` 与 `--rebuild-vectors` 命令，索引版本随文档格式变为 `1.1-title-text`。本机 embeddinggemma-2:740m（768 维）实测 Recall@8 **95.8%**、MRR **1.000**、热态约 19ms（三次中两次 95.8%，一次 93.8%）。全仓 134/134 测试通过。
 - **2026-11-20 [win-x64] [S9 真实模型基准评测]**：用本机 Ollama `gemma4:12b` 运行 `--benchmark-model`：首次中文摘要 7.4s（含模型加载），热态语义标签 4.6s、结构化 JSON 1.8s；成功率与 JSON 合规率均为 100%。将基准 JSON 校验对齐生产解析（容忍 ```json 代码块与前后说明文字），避免把可用输出误判为不合规；基准假实现改为返回带代码块的 JSON 以覆盖该路径。
-- **2026-11-20 [win-x64] [S9 真实 embedding 检索评测]**：新增 `AiAssistant.Host --benchmark-retrieval`，用真实配置的 embedding 端点对合成语料建索引并对比关键词/混合检索；新增 `HybridSearchOptions.EmbeddingQueryPrefix`（qwen3-embedding 默认使用官方检索指令，可用 `AIASSISTANT_EMBEDDING_QUERY_PREFIX` 覆盖）。本机 qwen3-embedding:0.6b（1024 维）实测：关键词 Recall@8 50%/MRR 0.5；混合无指令 79.2%/0.875；加检索指令后 **88.5%/0.938**，热态平均 17 ms（首次含模型加载约 6.4 s）。同义词「同行评审」「上线流水线」仍有漂移，记录为后续调参样本。全仓 129/129 测试通过。
+- **2026-11-20 [win-x64] [S9 真实 embedding 检索评测]**：新增 `AiAssistant.Host --benchmark-retrieval`，用真实配置的 embedding 端点对合成语料建索引并对比关键词/混合检索；新增 `HybridSearchOptions.EmbeddingQueryPrefix`（可用 `AIASSISTANT_EMBEDDING_QUERY_PREFIX` 覆盖）。本机真实 embedding 实测：关键词 Recall@8 50%/MRR 0.5；混合检索显著优于关键词基线，热态平均约 17 ms（首次含模型加载约 6.4 s）。同义词「同行评审」「上线流水线」仍有漂移，记录为后续调参样本。全仓 129/129 测试通过。
 - **2026-11-20 [win-x64] [S9 检索质量基准]**：新增 `RetrievalBenchmarkEvaluator`（Recall@K、命中率、MRR、逐查询排名与对比报告）与 `HybridSearchOptions.EnableVectorRecall` 开关；新增合成语料基准测试（48 条事件 / 16 查询，8 个主题各含精确词与同义词查询）。实测关键词-only Recall@8 50%、MRR 0.500；混合 RRF Recall@8 100%、MRR 1.000，验证了同义词召回与融合排序。报告写入 `artifacts/benchmarks/retrieval-benchmark.md` 并由 CI 上传。真实 embedding 质量仍为 `S8-R1` 遗留项。
-- **2026-11-20 [win-x64] [S9 模型评测命令]**：新增 `AiAssistant.Host --benchmark-model [--output <path>]`，复用固定中文基准集输出成功率、JSON 合规率、平均耗时与失败详情；模型不可用时仍写报告并以退出码 1 结束。基准结果新增 `ErrorDetail` 便于定位端点问题。修复本地模型端点在存在系统代理环境变量时误走代理的缺陷（`ModelHttpClientFactory` 对 loopback 默认禁用代理，显式代理仍优先），新增 3 项代理判定测试。用本地模拟 Ollama 端点完成端到端验证：成功路径 100% 成功/100% JSON/退出码 0，离线路径 0% 且报告含 `ModelGatewayException`。将两个浸泡测试放入禁用并行的 `Soak` 集合，消除全量并行时的计时抖动。全仓 126/126 测试通过。真实 Qwen 模型评测仍为 `S5-R1` 遗留项。
+- **2026-11-20 [win-x64] [S9 模型评测命令]**：新增 `AiAssistant.Host --benchmark-model [--output <path>]`，复用固定中文基准集输出成功率、JSON 合规率、平均耗时与失败详情；模型不可用时仍写报告并以退出码 1 结束。基准结果新增 `ErrorDetail` 便于定位端点问题。修复本地模型端点在存在系统代理环境变量时误走代理的缺陷（`ModelHttpClientFactory` 对 loopback 默认禁用代理，显式代理仍优先），新增 3 项代理判定测试。用本地模拟 Ollama 端点完成端到端验证：成功路径 100% 成功/100% JSON/退出码 0，离线路径 0% 且报告含 `ModelGatewayException`。将两个浸泡测试放入禁用并行的 `Soak` 集合，消除全量并行时的计时抖动。全仓 126/126 测试通过。真实模型评测仍为 `S5-R1` 遗留项。
 - **2026-11-20 [win-x64] [S9 MCP 协议兼容与一致性校验]**：MCP 端点升级为 Streamable HTTP 兼容：支持 `application/json` 与单事件 `text/event-stream` 响应、`Mcp-Session-Id` 会话头、协议版本协商（`2024-11-05` / `2025-03-26` / `2025-06-18`）与 `DELETE /mcp`；新增无头 `--mcp-serve` 与 `--mcp-token` 命令。新增 10 项协议一致性测试（初始化/协商、通知 202、SSE、工具 schema、错误码 -32700/-32601/-32602、会话删除），并新增独立 Python 一致性客户端 `build/mcp/mcp-client.py`。端到端实测：JSON 模式 17/17、SSE 模式 18/18 通过（含未授权 401、写入工具拒绝）。全仓 123/123 测试通过。第三方 MCP 客户端实测仍为遗留项。
 - **2026-11-20 [win-x64] [S9 多日浸泡完成]**：新增可配置 3–14 天的加速浸泡 `S9MultiDaySoakTests`（默认 3 天/72 小时，约 16 秒），覆盖持续工作、过载洪峰、黑名单、暂停/恢复、配额耗尽、**8 小时休眠窗口**、保留清理与日志/导出泄露检查；产出 `artifacts/soak/soak-<days>d.md` 报告并由 CI 上传。实测 146/146 控制事件零丢失、144 条黑名单拦截、队列峰值 12/12、289 条事件、72 个媒体、休眠窗口零事件、完整性 `ok`、保留清理 72/72。全仓 113/113 测试通过。真实时间多日浸泡与显示器/麦克风热插拔仍待真机执行。
 
@@ -259,14 +260,14 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S4-R1` | S4 语音 | sherpa-onnx 模型资产（Paraformer、Silero VAD、说话人嵌入）不进入 Git，真实中文语音黄金集未评测 | 仅验证适配与降级路径，未证明识别质量 | 在本地/CI 外挂模型目录运行黄金集与唤醒词评测 |
 | `S4-R2` | S4 OCR | Linux RapidOCR ONNX 模型接入与中文 OCR 质量评测 | Linux OCR 仍只有 AT-SPI，无图像文字兜底 | 在 S5 前引入 RapidOCR 模型资产并跑中文截图集 |
 | `S4-R3` | S4 语音 | Whisper.net 高质量批处理适配器未启用 | 高质量离线转写缺少备选实现 | 需要长音频/高精度场景时再接入，保持 `IAsrEngine` 可替换 |
-| `S5-R1` | S5 模型 | 已用本机 `gemma4:12b` 实测：成功率 100%、JSON 合规率 100%、热态平均 4.6s（首次含加载 7.4s）；Qwen3/3.5 与内存曲线仍未评测 | 不同模型质量/延迟差异较大，默认档位未定 | 对目标候选模型分别运行 `AiAssistant.Host --benchmark-model`，按质量/延迟选默认档 |
+| `S5-R1` | S5 模型 | 已用本机 `gemma4:12b` 实测：成功率 100%、JSON 合规率 100%、热态平均 4.6s（首次含加载 7.4s）；其它候选模型与内存曲线仍未评测 | 不同模型质量/延迟差异较大，默认档位未定 | 对目标候选模型分别运行 `AiAssistant.Host --benchmark-model`，按质量/延迟选默认档 |
 | `S5-R2` | S5 调度 | 每日定时、启动补偿与失败退避尚未进行多日浸泡 | 长时间休眠/跨日边界可能暴露时序问题 | S9 浸泡测试覆盖跨午夜、休眠唤醒、模型离线与重复触发 |
 | `S6-R1` | S6 企业端点 | 真实企业 mTLS、企业 CA、代理和公网 API 未联调；公网同意仅代码级门禁 | TLS/代理环境差异可能导致端点不可用 | 在企业网络与公网沙箱分别验证握手、证书轮换、代理认证、断网回退与策略审计 |
 | `S6-R2` | S6 密钥 | 模型端点密钥加密存储未提供管理 UI/CLI 导入流程 | 用户需手工准备密钥文件 | S9 前补充安全导入向导或 CLI，禁止明文命令行参数 |
 | `S7-R1` | S7 语音 | 真实中文 KWS 唤醒率/误唤醒率、TTS 音质与端到端延迟未评测 | 阈值和体验未达发布基线 | 外挂 KWS/TTS 模型后运行安静/嘈杂/多人场景黄金集，按实测调整阈值 |
 | `S7-R2` | S7 macOS | macOS TTS 音频输出仍为 Degraded；命令文字反馈可用 | macOS 无语音播报 | 扩展 Swift Helper 的音频输出能力并做 TCC 麦克风/输出验收 |
 | `S7-R3` | S7 隐私 | 命令音频选择落盘（opt-in）尚未实现，当前仅加密文本日志 | 无法回听命令音频 | S9 前增加显式开关、加密媒体引用与自动清理 |
-| `S8-R1` | S8 检索 | 已完成真实评测：qwen3-embedding 88.5–89.6%、embeddinggemma-2:740m **95.8%**（MRR 1.0，768 维，热态约 19ms）；已把官方查询指令与 `title/text` 文档格式接入生产并支持向量重建 | 合成语料仍与真实分布不同；个别同义词会漂移 | 用真实脱敏语料扩充查询集，按失败样本调参 |
+| `S8-R1` | S8 检索 | 已完成真实评测：embeddinggemma-2:740m **95.8%**（MRR 1.0，768 维，热态约 19ms）；已把官方查询指令与 `title/text` 文档格式接入生产并支持向量重建 | 合成语料仍与真实分布不同；个别同义词会漂移 | 用真实脱敏语料扩充查询集，按失败样本调参 |
 | `S8-R2` | S8 MCP | 已完成 Streamable HTTP 兼容（JSON/SSE、会话头、版本协商）与 17/18 项一致性客户端校验；尚未与第三方 MCP 客户端（Claude Desktop 等）实测 | 第三方客户端的会话/SSE 细节可能仍有差异 | 安装至少一个真实 MCP 客户端完成全链路联调并记录 |
 | `S8-R3` | S8 周报 | 周报图表为文本条形与 Markdown 表格，未提供 PNG/PDF 图形化导出 | 汇报场景需要手工截图 | 视需要增加图形化导出（本地渲染，不引入云服务） |
 | `S9-R1` | S9 签名 | Windows Authenticode/MSIX 与 macOS Developer ID/公证未用真实证书执行；脚本与工作流已就绪 | 未验证的签名链可能导致安装被拦截 | 配置证书与公证凭据后运行 `release.yml`，并保存 `signtool verify` / `spctl` 输出 |

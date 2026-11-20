@@ -56,11 +56,10 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests \
 ## 5. 语音与模型（未评测项）
 
 - KWS/TTS、ASR 延迟与内存占用依赖外挂模型资产，未在本机评测（`S7-R1`）。
-- 本机模型实测（Ollama `gemma4:12b`，`--benchmark-model`）：成功率 **100%**、JSON 合规率 **100%**、热态平均 **4.6 s**（中文摘要 7.4 s 含首次加载、语义标签 4.6 s、结构化 JSON 1.8 s）；离线降级路径 0% 且退出码 1。Qwen3 系列与内存曲线仍未评测（`S5-R1`）。
+- 默认对话模型为 `gemma4:12b`。本机模型实测（Ollama `gemma4:12b`，`--benchmark-model`）：成功率 **100%**、JSON 合规率 **100%**、热态平均 **4.6 s**（中文摘要 7.4 s 含首次加载、语义标签 4.6 s、结构化 JSON 1.8 s）；离线降级路径 0% 且退出码 1。其它候选模型与内存曲线仍未评测（`S5-R1`）。
 - 混合检索（合成语料 48 事件 / 16 查询）：
   - 关键词-only：Recall@8 50%、MRR 0.500；
   - 概念向量 RRF（离线替身）：Recall@8 100%、MRR 1.000；
-  - **qwen3-embedding:0.6b（1024 维）**：无指令 Recall@8 79.2%/MRR 0.875；加官方检索指令后 **88.5%/0.938**，使用 `title/text` 文档格式 **89.6%/1.000**，热态约 16 ms/查询；
   - **embeddinggemma-2:740m（768 维）**：官方查询前缀 + `title/text` 文档格式 **95.8%/1.000**（三次中两次 95.8%，一次 93.8%），热态约 19 ms/查询，首次含加载约 8 s。
 - 默认 embedding 已切换为 `embeddinggemma-2:740m`（768 维，查询前缀 + `title/text` 文档格式）；已有数据需执行 `AiAssistant.Host --rebuild-vectors`。
 - 问答正确率仍未评测（`S8-R1`）；同义词「同行评审」「上线流水线」仍会漂移。

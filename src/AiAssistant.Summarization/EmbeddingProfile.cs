@@ -16,13 +16,8 @@ public static class EmbeddingProfile
             return overrideValue;
         }
 
-        if (embeddingModel.Contains("embeddinggemma", StringComparison.OrdinalIgnoreCase))
-        {
-            return HybridSearchOptions.EmbeddingGemmaQueryInstruction;
-        }
-
-        return embeddingModel.Contains("qwen3-embedding", StringComparison.OrdinalIgnoreCase)
-            ? HybridSearchOptions.Qwen3RetrievalInstruction
+        return embeddingModel.Contains("embeddinggemma", StringComparison.OrdinalIgnoreCase)
+            ? HybridSearchOptions.EmbeddingGemmaQueryInstruction
             : string.Empty;
     }
 

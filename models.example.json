@@ -12,7 +12,7 @@
       "tier": "LocalOffline",
       "provider": "ollama",
       "baseUrl": "http://127.0.0.1:11434",
-      "chatModel": "qwen3:8b",
+      "chatModel": "gemma4:12b",
       "embeddingModel": "embeddinggemma-2:740m",
       "timeoutSeconds": 120
     },
