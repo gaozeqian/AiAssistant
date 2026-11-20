@@ -17,7 +17,7 @@ public static class Program
 
         try
         {
-            await using var runtime = AppRuntime.Create();
+            await using var runtime = await AppRuntime.CreateAsync();
             await runtime.StartAsync();
             if (args.Contains("--startup-check", StringComparer.OrdinalIgnoreCase))
             {

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "allowIntranet": true,
+    "allowPublicCloud": false,
+    "defaultTier": "LocalOffline",
+    "allowLocalFallback": true,
+    "requirePublicCloudConsent": true
+  },
+  "endpoints": [
+    {
+      "tier": "LocalOffline",
+      "provider": "ollama",
+      "baseUrl": "http://127.0.0.1:11434",
+      "chatModel": "qwen3:8b",
+      "embeddingModel": "qwen3-embedding:0.6b",
+      "timeoutSeconds": 120
+    },
+    {
+      "tier": "CorporateIntranet",
+      "provider": "openai",
+      "baseUrl": "https://llm.intranet.example/v1",
+      "chatModel": "corp-chat-model",
+      "embeddingModel": "corp-embedding-model",
+      "timeoutSeconds": 60,
+      "allowRemoteEndpoint": true,
+      "apiKeySecret": "intranet-api-key",
+      "enterpriseCaPath": "/etc/ssl/certs/company-root-ca.pem",
+      "proxyUrl": "http://proxy.intranet.example:8080"
+    },
+    {
+      "tier": "PublicCloud",
+      "provider": "openai",
+      "baseUrl": "https://api.example.com/v1",
+      "chatModel": "public-chat-model",
+      "embeddingModel": "public-embedding-model",
+      "timeoutSeconds": 60,
+      "allowRemoteEndpoint": true,
+      "apiKeySecret": "public-api-key"
+    }
+  ]
+}

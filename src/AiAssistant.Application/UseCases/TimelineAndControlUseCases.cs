@@ -90,7 +90,8 @@ public sealed record SystemDiagnosticsSnapshot(
     MediaRetentionMetrics? RetentionMetrics = null,
     IReadOnlyList<DiagnosticLogEntry>? RecentLogs = null,
     ModelCapabilitySnapshot? ModelCapability = null,
-    IReadOnlyList<ModelAuditEntry>? ModelAudit = null);
+    IReadOnlyList<ModelAuditEntry>? ModelAudit = null,
+    IReadOnlyList<ModelEndpointCapability>? ModelEndpoints = null);
 
 public sealed class DiagnosticsUseCase(
     ICapabilityProvider capabilityProvider,
@@ -100,7 +101,8 @@ public sealed class DiagnosticsUseCase(
     IRetentionService? retentionService = null,
     IDiagnosticLogReader? logReader = null,
     IModelGateway? modelGateway = null,
-    IModelAuditSink? modelAuditSink = null)
+    IModelAuditSink? modelAuditSink = null,
+    IModelCapabilityProber? modelCapabilityProber = null)
 {
     private static readonly JsonSerializerOptions PreviewJsonOptions = new()
     {
@@ -134,6 +136,21 @@ public sealed class DiagnosticsUseCase(
             }
         }
 
+        IReadOnlyList<ModelEndpointCapability>? modelEndpoints = null;
+        if (modelCapabilityProber is not null)
+        {
+            using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            probeCts.CancelAfter(TimeSpan.FromSeconds(3));
+            try
+            {
+                modelEndpoints = await modelCapabilityProber.ProbeAllAsync(forceRefresh: false, probeCts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                modelEndpoints = null;
+            }
+        }
+
         return new SystemDiagnosticsSnapshot(
             capabilityProvider.PlatformName,
             dbHealth,
@@ -143,7 +160,8 @@ public sealed class DiagnosticsUseCase(
             retention,
             recentLogs,
             modelCapability,
-            modelAuditSink?.GetRecent(20));
+            modelAuditSink?.GetRecent(20),
+            modelEndpoints);
     }
 
     /// <summary>

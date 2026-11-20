@@ -17,6 +17,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string _pipelineText = string.Empty;
     private string _retentionText = "尚未执行清理扫描";
     private string _modelText = "尚未探测本机模型";
+    private string _modelEndpointsText = "尚未探测端点能力";
     private string _exportPreviewJson = string.Empty;
     private string _lastRefreshText = "尚未刷新";
     private string _errorMessage = string.Empty;
@@ -67,6 +68,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
     {
         get => _modelText;
         private set => SetProperty(ref _modelText, value);
+    }
+
+    public string ModelEndpointsText
+    {
+        get => _modelEndpointsText;
+        private set => SetProperty(ref _modelEndpointsText, value);
     }
 
     public string ExportPreviewJson
@@ -132,6 +139,10 @@ public sealed class DiagnosticsViewModel : ObservableObject
             ModelText = snapshot.ModelCapability is null
                 ? "未配置模型网关"
                 : $"{(snapshot.ModelCapability.ChatAvailable ? "可用" : "降级")} · Chat {snapshot.ModelCapability.ChatModel ?? "未配置"} · Embedding {snapshot.ModelCapability.EmbeddingModel} · {snapshot.ModelCapability.Diagnostic}";
+            ModelEndpointsText = snapshot.ModelEndpoints is { Count: > 0 }
+                ? string.Join(Environment.NewLine, snapshot.ModelEndpoints.Select(endpoint =>
+                    $"{endpoint.Tier}: chat={endpoint.ChatAvailable} stream={endpoint.StreamingAvailable} embed={endpoint.EmbeddingsAvailable} json={endpoint.StructuredOutputAvailable} tools={endpoint.ToolCallingAvailable} · {endpoint.Diagnostic}"))
+                : "尚未探测或没有可用端点";
 
             Capabilities.Clear();
             foreach (var capability in snapshot.Capabilities)

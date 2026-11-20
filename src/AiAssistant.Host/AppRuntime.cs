@@ -2,6 +2,7 @@ using AiAssistant.Application.Policies;
 using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
 using AiAssistant.Capture;
+using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Platform.Linux;
@@ -44,7 +45,7 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public LinuxDisplayBackendState? LinuxBackendState { get; private set; }
 
-    public static AppRuntime Create()
+    public static async Task<AppRuntime> CreateAsync(CancellationToken ct = default)
     {
         var dataDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY");
         if (string.IsNullOrWhiteSpace(dataDirectory))
@@ -73,6 +74,16 @@ public sealed class AppRuntime : IAsyncDisposable
         var jobQueue = new SqliteReportJobQueue(connectionFactory, clock);
         var structuredLogProvider = new SanitizedStructuredLoggerProvider(options, clock);
         var linuxBackendState = OperatingSystem.IsLinux() ? new LinuxDisplayBackendState() : null;
+        var secretStore = new ProtectedModelSecretStore(Path.Combine(dataDirectory, "secrets"), keyStore);
+        var modelsConfigPath = Environment.GetEnvironmentVariable("AIASSISTANT_MODELS_CONFIG");
+        if (string.IsNullOrWhiteSpace(modelsConfigPath))
+        {
+            modelsConfigPath = Path.Combine(dataDirectory, "models.json");
+        }
+
+        var modelsConfiguration = await new ModelsConfigurationLoader(
+                new ModelSecretResolver(secretStore))
+            .LoadAsync(Path.GetFullPath(modelsConfigPath), ct);
         var services = new ServiceCollection();
 
         services.AddLogging(builder =>
@@ -96,7 +107,9 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IDatabaseMaintenanceService>(maintenance);
         services.AddSingleton<IReportJobQueue>(jobQueue);
         services.AddSingleton<IVectorIndex>(new HybridSqliteVectorIndex(connectionFactory));
-        RegisterReports(services);
+        services.AddSingleton(secretStore);
+        services.AddSingleton(modelsConfiguration);
+        RegisterReports(services, modelsConfiguration, dataDirectory);
         services.AddSingleton(new CapturePipelineOptions { WhitelistedDirectories = whitelist });
         services.AddSingleton<PrivacyBlacklistPolicy>();
         if (linuxBackendState is not null)
@@ -140,7 +153,8 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<IAudioCaptureFactory>(),
             provider.GetRequiredService<ILogger<AudioHub>>()));
 
-        services.AddSingleton<ICaptureCoordinator>(provider => new BoundedCaptureCoordinator(            provider.GetServices<ICaptureSource>(),
+        services.AddSingleton<ICaptureCoordinator>(provider => new BoundedCaptureCoordinator(
+            provider.GetServices<ICaptureSource>(),
             provider.GetRequiredService<ITextExtractor>(),
             provider.GetRequiredService<IEventRepository>(),
             provider.GetRequiredService<PrivacyBlacklistPolicy>(),
@@ -181,6 +195,11 @@ public sealed class AppRuntime : IAsyncDisposable
             {
                 var model = _services.GetRequiredService<IModelGateway>();
                 _ = await model.ProbeAsync(probeCts.Token);
+                var prober = _services.GetService<IModelCapabilityProber>();
+                if (prober is not null)
+                {
+                    _ = await prober.ProbeAllAsync(forceRefresh: false, probeCts.Token);
+                }
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
@@ -211,35 +230,83 @@ public sealed class AppRuntime : IAsyncDisposable
         await _services.DisposeAsync();
     }
 
-    private static void RegisterReports(IServiceCollection services)
+    private static void RegisterReports(
+        IServiceCollection services,
+        ModelsConfiguration configuration,
+        string dataDirectory)
     {
-        var modelOptions = ModelGatewayOptions.FromEnvironment();
-        var httpClient = new HttpClient();
-        var backend = new HttpModelBackend(httpClient, modelOptions);
         var auditSink = new InMemoryModelAuditSink();
         var redactor = new SensitiveDataRedactor();
-
-        services.AddSingleton(httpClient);
-        services.AddSingleton(modelOptions);
-        services.AddSingleton(backend);
-        services.AddSingleton<IChatClient>(backend);
-        services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(backend);
+        var consent = new PublicCloudConsentGate();
+        services.AddSingleton(configuration.Policy);
+        services.AddSingleton(consent);
         services.AddSingleton<IModelAuditSink>(auditSink);
         services.AddSingleton<ITextRedactor>(redactor);
-        services.AddSingleton<IModelGateway>(provider => new AuditedModelGateway(
-            new RedactingModelGateway(
-                new TimeoutModelGateway(
-                    new LocalModelGateway(
-                        backend,
-                        modelOptions,
-                        provider.GetRequiredService<ILogger<LocalModelGateway>>()),
-                    modelOptions),
-                redactor),
-            auditSink));
+
+        var endpointGateways = new Dictionary<ModelEndpointTier, IModelGateway>();
+        foreach (var endpoint in configuration.Endpoints)
+        {
+            var client = ModelHttpClientFactory.Create(endpoint);
+            services.AddSingleton(client);
+            var backendOptions = new ModelGatewayOptions
+            {
+                Provider = endpoint.Provider,
+                BaseAddress = endpoint.BaseAddress,
+                ChatModel = endpoint.ChatModel,
+                EmbeddingModel = endpoint.EmbeddingModel,
+                ApiKey = endpoint.ApiKey,
+                RequestTimeout = endpoint.Timeout,
+                AllowRemoteEndpoint = true
+            };
+            var backend = new HttpModelBackend(client, backendOptions);
+            services.AddSingleton(backend);
+            endpointGateways[endpoint.Tier] = new EndpointModelGateway(
+                backend,
+                endpoint,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<EndpointModelGateway>.Instance);
+        }
+
+        var router = new TierRoutingModelGateway(
+            endpointGateways,
+            configuration.Policy,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TierRoutingModelGateway>.Instance);
+        var gateway = new AuditedModelGateway(
+            new PolicyEnforcedModelGateway(
+                new ThreeGateModelGateway(router, redactor),
+                configuration.Policy,
+                consent),
+            auditSink);
+        services.AddSingleton(gateway);
+        services.AddSingleton<IModelGateway>(gateway);
+        var standardClient = new GatewayChatClient(gateway, configuration.Policy.DefaultTier);
+        services.AddSingleton<IChatClient>(standardClient);
+        services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(standardClient);
+
+        var capabilityCache = new ModelCapabilityCache(Path.Combine(dataDirectory, "model-capabilities.json"));
+        services.AddSingleton(capabilityCache);
+        var probeEndpoints = configuration.Endpoints
+            .Where(endpoint => endpoint.Tier switch
+            {
+                ModelEndpointTier.LocalOffline => true,
+                ModelEndpointTier.CorporateIntranet => configuration.Policy.AllowIntranet,
+                ModelEndpointTier.PublicCloud => configuration.Policy.AllowPublicCloud &&
+                                                 (!configuration.Policy.RequirePublicCloudConsent || consent.IsGranted),
+                _ => false
+            })
+            .ToArray();
+        services.AddSingleton<IModelCapabilityProber>(new ModelCapabilityProber(
+            probeEndpoints,
+            capabilityCache,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ModelCapabilityProber>.Instance));
+
         services.AddSingleton<IReportRepository, SqliteReportRepository>();
-        services.AddSingleton(new ReportGenerationOptions());
+        services.AddSingleton(new ReportGenerationOptions { DefaultTier = configuration.Policy.DefaultTier });
         services.AddSingleton<IReportGenerationRunner, ReportGenerationRunner>();
-        services.AddSingleton<EventEmbeddingIndexer>();
+        services.AddSingleton(provider => new EventEmbeddingIndexer(
+            provider.GetRequiredService<IEventRepository>(),
+            provider.GetRequiredService<IVectorIndex>(),
+            gateway,
+            configuration.Policy.DefaultTier));
         services.AddSingleton<ModelBenchmarkRunner>();
 
         var scheduleTime = TimeOnly.TryParse(

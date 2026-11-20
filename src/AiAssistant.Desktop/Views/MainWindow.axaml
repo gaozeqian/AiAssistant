@@ -235,6 +235,7 @@
               <StackPanel Spacing="7">
                 <TextBlock Text="本机模型网关" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding ModelText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                <TextBlock Text="{Binding ModelEndpointsText}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
               </StackPanel>
             </Border>
             <Border Background="White" CornerRadius="10" Padding="18" IsVisible="{Binding HasExportPreview}">

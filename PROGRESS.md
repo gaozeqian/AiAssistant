@@ -7,12 +7,12 @@
 
 ## 1. 当前总体状态快照
 
-- **当前活跃阶段**：`S5 已完成代码与契约；待启动 S6 内网/公网档与企业策略`（真实 Ollama 模型质量评测与平台真机验收转为遗留项）
+- **当前活跃阶段**：`S6 已完成代码与契约；待启动 S7 本地唤醒与基础语音命令`
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
 - **当前构建状态**：✅ 本地 Release 0 警告 0 错误；Host 启动自检、`linux-x64` / `osx-arm64` 发布通过
-- **当前测试状态**：✅ 73/73 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 11、`Capture.Tests` 4、`Platform.Tests` 30、`Processing.Tests` 7、`Report.Tests` 9）
-- **下一步待确认事项**：启动 S6 —— `models.json` 三档端点、企业策略锁定、能力探测、外发脱敏三道闸与审计；S5 真实 Qwen 模型评测见第 5 节遗留项
+- **当前测试状态**：✅ 80/80 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 11、`Capture.Tests` 4、`Platform.Tests` 30、`Processing.Tests` 7、`Report.Tests` 16）
+- **下一步待确认事项**：启动 S7 —— sherpa-onnx “你好时光” KWS、语音状态机、8 秒命令窗口、TTS 与固定命令；S6 企业真实端点和公网授权验证见第 5 节遗留项
 
 ---
 
@@ -26,7 +26,7 @@
 | **S3 三平台扩展** | P1 | 🔄 三平台 CI 全绿；待真实桌面权限/交互验收 | GitHub Actions `win-x64` / `osx-arm64` / `linux-x64` 各 53/53 测试通过，发布/Helper/Portal 打包通过 | macOS Helper、Linux Wayland 默认与初始化失败 X11 回退、portal 加密令牌轮换、AT-SPI/EWMH、inotify/PulseAudio/XDG 均已接入；macOS TCC 与 Linux 真实桌面能力矩阵待人工验收 |
 | **S4 预处理与音频** | P1 | 🔄 代码与契约完成；模型资产评测遗留 | `win-x64` 流水线/AudioHub/WASAPI 实测；`linux-x64` / `osx-arm64` 发布与 sherpa-onnx 原生库打包通过 | 可组合阶段、超时/失败隔离、脱敏、pHash 去重、单路 AudioHub、三平台音频工厂、sherpa-onnx ASR/VAD/说话人分离与缺失模型降级；真实中文语音与 OCR 质量待遗留项验收 |
 | **S5 本机模型与日报** | P2 | 🔄 代码与契约完成；真实模型评测遗留 | `win-x64` 网关/分段/调度/UI 实测；`linux-x64` / `osx-arm64` 发布通过 | Microsoft.Extensions.AI 网关、Ollama/LM Studio 兼容适配、脱敏/审计/超时装饰器、事件向量索引、分段+map-reduce+JSON 校验重试、版本化加密日报、单消费者三通道与日报/站会 UI；真实 Qwen 质量待遗留项评测 |
-| **S6 内网与公网档** | P2.5 | ⏳ 待开始 | — | `models.json`、企业策略锁定、能力探测、脱敏三道闸、审计 |
+| **S6 内网与公网档** | P2.5 | 🔄 代码与契约完成；真实企业端点遗留 | `win-x64` 配置/策略/三闸/探测测试通过；两平台发布通过 | 版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理、Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、三闸脱敏、五能力探测缓存与诊断展示 |
 | **S7 唤醒与基础命令** | P2.6 | ⏳ 待开始 | — | “你好时光” KWS、语音状态机、8s 命令窗口、TTS、固定命令 |
 | **S8 智能检索与对话** | P3 | ⏳ 待开始 | — | 混合检索、证据回链问答、周报、只读 loopback MCP、完整语音对话 |
 | **S9 发布加固** | 全阶段 | ⏳ 待开始 | — | 安装包签名公证、浸泡测试、故障注入、升级迁移、SBOM |
@@ -58,19 +58,45 @@ dotnet test AiAssistant.sln -c Release
 dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
 ```
 
-### 3.4 本机模型与日报配置
+### 3.4 模型端点与日报配置
 
-```bash
-# Ollama（默认）或 LM Studio 的 OpenAI 兼容端点
-AIASSISTANT_MODEL_PROVIDER=ollama            # ollama | lmstudio
-AIASSISTANT_MODEL_BASE_URL=http://127.0.0.1:11434
-AIASSISTANT_CHAT_MODEL=qwen3:8b              # 不在代码中写死，按实测档位填写
-AIASSISTANT_EMBEDDING_MODEL=qwen3-embedding:0.6b
-AIASSISTANT_REPORT_TIME=18:30                # 每日定时生成
-AIASSISTANT_REPORT_DISABLE_SCHEDULE=true     # 可选，仅关闭定时通道
+优先使用 `models.json`（示例见仓库根目录 `models.example.json`）。默认路径为数据目录下 `models.json`，也可用 `AIASSISTANT_MODELS_CONFIG` 指定。
+
+```json
+{
+  "schemaVersion": 1,
+  "policy": {
+    "allowIntranet": true,
+    "allowPublicCloud": false,
+    "defaultTier": "LocalOffline",
+    "allowLocalFallback": true,
+    "requirePublicCloudConsent": true
+  },
+  "endpoints": [
+    {
+      "tier": "LocalOffline",
+      "provider": "ollama",
+      "baseUrl": "http://127.0.0.1:11434",
+      "chatModel": "qwen3:8b",
+      "embeddingModel": "qwen3-embedding:0.6b"
+    }
+  ]
+}
 ```
 
-默认仅允许 loopback 模型端点；远程端点必须等待 S6 企业策略显式开启。
+- 密钥字段使用 `apiKeySecret` / `clientCertificatePasswordSecret` 引用 `data/secrets/model-secrets.enc` 中的名称，或使用 `env:变量名`；明文密钥不得写入 `models.json`。
+- 企业端点支持 `enterpriseCaPath`、`clientCertificatePath`、`clientCertificateKeyPath`、`proxyUrl`、`timeoutSeconds`。
+- 公网档即使配置，也必须 `allowPublicCloud=true` 且运行时显式同意；Host 外层策略门禁会阻断绕过 UI 的调用。
+- 未提供 `models.json` 时回退到环境变量配置：
+
+```bash
+AIASSISTANT_MODEL_PROVIDER=ollama
+AIASSISTANT_MODEL_BASE_URL=http://127.0.0.1:11434
+AIASSISTANT_CHAT_MODEL=qwen3:8b
+AIASSISTANT_EMBEDDING_MODEL=qwen3-embedding:0.6b
+AIASSISTANT_REPORT_TIME=18:30
+AIASSISTANT_REPORT_DISABLE_SCHEDULE=true
+```
 
 ---
 
@@ -89,6 +115,7 @@ AIASSISTANT_REPORT_DISABLE_SCHEDULE=true     # 可选，仅关闭定时通道
 - **2026-11-20 [GitHub Actions] [CI 测试稳定性修复]**：后续文档提交的 Windows 作业偶发暴露 `BoundedCaptureCoordinatorTests` 断言竞态：测试仅等待首个事件落库便读取重复合并/黑名单计数。生产逻辑无回归；测试改为同时等待三项指标并在 CI 负载下延长有界等待。专项与全量 Release 53/53 复跑通过。修复提交 `4df8f4c` 的运行 `44703620747` 中三平台各 53/53 测试、发布、Swift Helper 编译/冒烟/打包、Linux Portal 打包与 SBOM/许可证检查全部通过。
 - **2026-11-20 [win-x64] [S4 预处理与统一音频入口完成]**：实现 `ProcessingPipeline`（阶段版本/资源声明、单阶段超时、取消与异常隔离、失败仅降级元数据）、`PerceptualDeduplicationStage`、`TextExtractionStage`、`SensitiveDataRedactor`/`RedactionStage`、`AudioTranscriptionStage` 与 `SpeakerDiarizationStage`，并接入 `BoundedCaptureCoordinator`；预处理失败仍持久化原始事件。实现单路 `AudioHub`（多订阅有界广播、2 秒纯内存预滚、最后订阅退出关闭设备、再次订阅重开）。接入 `org.k2fsa.sherpa.onnx 2.0.2` 的 Paraformer 中文 ASR、Silero VAD、pyannote 说话人分离及模型缺失明确降级；新增 NAudio 3.3 WASAPI 工厂、macOS AVAudioEngine 工厂和 Linux PulseAudio 工厂。全仓 Release 0 警告 0 错误、62/62 测试通过，Host 启动自检与 `linux-x64`/`osx-arm64` 发布（含 sherpa-onnx 原生库）通过。真实模型质量、Linux RapidOCR 与 Whisper 批处理保留在第 5 节遗留项。
 - **2026-11-20 [win-x64] [S5 本机模型与日报完成]**：实现 `HttpModelBackend`（Ollama 与 OpenAI 兼容端点，标准 `IChatClient`/`IEmbeddingGenerator`）、仅 loopback 的 `LocalModelGateway`、超时/脱敏/审计装饰器与无正文模型审计；模型标签全部由环境配置。实现 `EventEmbeddingIndexer`（qwen3-embedding 默认，版本化写入与重建）和固定中文基准集。实现活动分段、map 摘要、reduce 结构化 JSON、Schema 校验与两次重试、Markdown/站会输出及加密版本化 `daily_reports` 仓储。实现单消费者 `ReportJobWorker`、手动/启动补偿/每日定时三通道、幂等与失败保留；新增日报/站会面板、强制重生成与 Markdown 导出。全仓 Release 0 警告 0 错误、73/73 测试通过，Host 启动自检与两平台发布通过。首轮 CI `44710041839` 的 Linux/macOS/SBOM 通过，Windows 暴露 macOS IPC 启动瞬时断言竞态；改为等待监督器最终 Healthy 后本地全量复跑通过，由修复提交触发三平台复验。真实 Qwen 质量评测与调度浸泡保留遗留项。
+- **2026-11-20 [win-x64] [S6 企业策略与三档模型完成]**：实现版本化 `models.json` 与 `models.example.json`，校验 schema/重复档位/远程本地端点；端点 API Key 与证书密码通过 AES-GCM 加密密钥库或 `env:` 引用，明文不入配置。实现每端点独立 HttpClient（代理、PFX/PEM mTLS、企业 CA 自定义信任、超时）。Host 改为多端点装配，`PolicyEnforcedModelGateway` 在应用层外强制档位策略，公网需显式 `PublicCloudConsentGate` 同意；`TierRoutingModelGateway` 支持内网故障回退本机、本机不可用明确失败。新增最小化→脱敏→残留检测/输出清洗三闸与敏感残留阻断；五能力（chat/streaming/embeddings/structured/tool）探测缓存 24 小时并接入诊断。全仓 Release 0 警告 0 错误、80/80 测试通过，Host 无配置安全回退启动与两平台发布通过。真实企业 mTLS/CA/代理和公网端点验证保留遗留项。
 
 ---
 
@@ -106,3 +133,5 @@ AIASSISTANT_REPORT_DISABLE_SCHEDULE=true     # 可选，仅关闭定时通道
 | `S4-R3` | S4 语音 | Whisper.net 高质量批处理适配器未启用 | 高质量离线转写缺少备选实现 | 需要长音频/高精度场景时再接入，保持 `IAsrEngine` 可替换 |
 | `S5-R1` | S5 模型 | 真实 Ollama Qwen3/3.5 4B–9B 质量、耗时与内存评测未运行；仅提供固定中文基准集与报告格式 | 无法确定默认轻量/质量档位 | 在目标机器安装模型后运行 `ModelBenchmarkRunner`，记录成功率、JSON 合规率与延迟 |
 | `S5-R2` | S5 调度 | 每日定时、启动补偿与失败退避尚未进行多日浸泡 | 长时间休眠/跨日边界可能暴露时序问题 | S9 浸泡测试覆盖跨午夜、休眠唤醒、模型离线与重复触发 |
+| `S6-R1` | S6 企业端点 | 真实企业 mTLS、企业 CA、代理和公网 API 未联调；公网同意仅代码级门禁 | TLS/代理环境差异可能导致端点不可用 | 在企业网络与公网沙箱分别验证握手、证书轮换、代理认证、断网回退与策略审计 |
+| `S6-R2` | S6 密钥 | 模型端点密钥加密存储未提供管理 UI/CLI 导入流程 | 用户需手工准备密钥文件 | S9 前补充安全导入向导或 CLI，禁止明文命令行参数 |

@@ -432,4 +432,5 @@ FodyWeavers.xsd
 # Local speech/OCR model assets are never committed
 models/
 *.onnx
+models.json
 

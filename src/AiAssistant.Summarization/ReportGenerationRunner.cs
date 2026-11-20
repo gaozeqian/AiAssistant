@@ -13,6 +13,7 @@ public sealed class ReportGenerationOptions
     public int MaxSegments { get; init; } = 24;
     public int MaxEventsPerSegment { get; init; } = 80;
     public TimeSpan InactivityGap { get; init; } = TimeSpan.FromMinutes(12);
+    public ModelEndpointTier DefaultTier { get; init; } = ModelEndpointTier.LocalOffline;
 }
 
 /// <summary>
@@ -93,6 +94,7 @@ public sealed class ReportGenerationRunner : IReportGenerationRunner
                         new ModelCompletionRequest(
                             BuildMapSystemPrompt(),
                             BuildMapUserPrompt(segment),
+                            Tier: _options.DefaultTier,
                             Purpose: "report-map",
                             Temperature: 0.2,
                             MaxOutputTokens: 600),
@@ -179,6 +181,7 @@ public sealed class ReportGenerationRunner : IReportGenerationRunner
                     new ModelCompletionRequest(
                         BuildReduceSystemPrompt(),
                         userPrompt,
+                        Tier: _options.DefaultTier,
                         Purpose: "report-reduce",
                         Temperature: attempt == 0 ? 0.2 : 0.0,
                         MaxOutputTokens: 2400),

@@ -1,0 +1,94 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+
+namespace AiAssistant.Models;
+
+/// <summary>
+/// Builds a dedicated HttpClient per endpoint with proxy, client certificate (mTLS) and enterprise CA trust.
+/// Credentials are held only in memory and never written to logs.
+/// </summary>
+public static class ModelHttpClientFactory
+{
+    public static HttpClient Create(ModelEndpointSettings endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+            ConnectTimeout = TimeSpan.FromSeconds(Math.Min(30, endpoint.Timeout.TotalSeconds))
+        };
+
+        if (endpoint.Proxy is not null)
+        {
+            handler.UseProxy = true;
+            handler.Proxy = new WebProxy(endpoint.Proxy);
+        }
+
+        var ssl = new SslClientAuthenticationOptions();
+        if (!string.IsNullOrWhiteSpace(endpoint.ClientCertificatePath))
+        {
+            ssl.ClientCertificates = new X509CertificateCollection
+            {
+                LoadClientCertificate(endpoint)
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(endpoint.EnterpriseCaPath))
+        {
+            var ca = X509Certificate2.CreateFromPemFile(endpoint.EnterpriseCaPath);
+            ssl.RemoteCertificateValidationCallback = (_, certificate, _, errors) =>
+                ValidateWithEnterpriseCa(certificate, errors, ca);
+        }
+
+        handler.SslOptions = ssl;
+        var client = new HttpClient(handler)
+        {
+            BaseAddress = endpoint.BaseAddress,
+            Timeout = endpoint.Timeout
+        };
+        if (!string.IsNullOrWhiteSpace(endpoint.ApiKey))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", endpoint.ApiKey);
+        }
+
+        return client;
+    }
+
+    private static X509Certificate2 LoadClientCertificate(ModelEndpointSettings endpoint)
+    {
+        var path = endpoint.ClientCertificatePath!;
+        var extension = Path.GetExtension(path);
+        if (string.Equals(extension, ".pem", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extension, ".crt", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(endpoint.ClientCertificateKeyPath)
+                ? X509Certificate2.CreateFromPemFile(path)
+                : X509Certificate2.CreateFromPemFile(path, endpoint.ClientCertificateKeyPath);
+        }
+
+        return string.IsNullOrWhiteSpace(endpoint.ClientCertificatePassword)
+            ? X509CertificateLoader.LoadPkcs12FromFile(path, null)
+            : X509CertificateLoader.LoadPkcs12FromFile(path, endpoint.ClientCertificatePassword);
+    }
+
+    private static bool ValidateWithEnterpriseCa(
+        X509Certificate? certificate,
+        SslPolicyErrors errors,
+        X509Certificate2 ca)
+    {
+        if (certificate is null || (errors & SslPolicyErrors.RemoteCertificateNameMismatch) != 0)
+        {
+            return false;
+        }
+
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(ca);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+        using var leaf = new X509Certificate2(certificate);
+        return chain.Build(leaf);
+    }
+}

@@ -10,7 +10,8 @@ namespace AiAssistant.Models;
 public sealed class EventEmbeddingIndexer(
     IEventRepository events,
     IVectorIndex vectorIndex,
-    IModelGateway model)
+    IModelGateway model,
+    ModelEndpointTier tier = ModelEndpointTier.LocalOffline)
 {
     private const string ModelVersion = "1.0";
     private const int BatchSize = 24;
@@ -40,7 +41,7 @@ public sealed class EventEmbeddingIndexer(
         }
 
         var first = await model.EmbedAsync(
-            new ModelEmbeddingRequest([BuildText(all[0])], Purpose: "event-index"),
+            new ModelEmbeddingRequest([BuildText(all[0])], tier, Purpose: "event-index"),
             ct);
         if (first.Vectors.Count == 0 || first.Dimensions == 0)
         {
@@ -67,7 +68,7 @@ public sealed class EventEmbeddingIndexer(
         {
             ct.ThrowIfCancellationRequested();
             var result = await model.EmbedAsync(
-                new ModelEmbeddingRequest(batch.Select(BuildText).ToArray(), Purpose: "event-index"),
+                new ModelEmbeddingRequest(batch.Select(BuildText).ToArray(), tier, Purpose: "event-index"),
                 ct);
             if (result.Vectors.Count != batch.Length || result.Dimensions == 0)
             {
@@ -94,7 +95,7 @@ public sealed class EventEmbeddingIndexer(
         {
             ct.ThrowIfCancellationRequested();
             var result = await model.EmbedAsync(
-                new ModelEmbeddingRequest(batch.Select(BuildText).ToArray(), Purpose: "event-index-rebuild"),
+                new ModelEmbeddingRequest(batch.Select(BuildText).ToArray(), tier, Purpose: "event-index-rebuild"),
                 ct);
             if (result.Dimensions != descriptor.Dimensions)
             {

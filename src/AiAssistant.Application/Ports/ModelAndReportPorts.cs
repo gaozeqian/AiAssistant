@@ -34,7 +34,28 @@ public sealed record ModelCapabilitySnapshot(
     string? ChatModel,
     string EmbeddingModel,
     ModelEndpointTier Tier,
-    string Diagnostic);
+    string Diagnostic,
+    bool StreamingAvailable = false,
+    bool StructuredOutputAvailable = false,
+    bool ToolCallingAvailable = false);
+
+public sealed record ModelEndpointCapability(
+    ModelEndpointTier Tier,
+    string BaseUrl,
+    string ChatModel,
+    string EmbeddingModel,
+    bool ChatAvailable,
+    bool StreamingAvailable,
+    bool EmbeddingsAvailable,
+    bool StructuredOutputAvailable,
+    bool ToolCallingAvailable,
+    string Diagnostic,
+    DateTimeOffset ProbedAtUtc);
+
+public interface IModelCapabilityProber
+{
+    Task<IReadOnlyList<ModelEndpointCapability>> ProbeAllAsync(bool forceRefresh, CancellationToken ct);
+}
 
 /// <summary>Single model boundary for chat and embeddings; all outbound calls pass through redaction and audit.</summary>
 public interface IModelGateway
