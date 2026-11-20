@@ -537,6 +537,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.18：周报 PNG/PDF 导出（`AiAssistant.Export` + SkiaSharp，PDF 字形轮廓避免字体嵌入）。
 - [x] S9.19：可检索 PDF（PDFsharp + 系统 TrueType 中文字体子集，无字体时回退矢量轮廓）。
 - [x] S9.20：PDF 字体自动发现（扫描系统字体并用 SkiaSharp 校验 CJK 覆盖）与 `--doctor` 字体输出。
+- [x] S9.21：MSIX 自签名打包/签名/注册/启动/卸载演练；关闭 AppData 虚拟化，卸载保留数据；脚本支持 `-SkipTimestamp`/`-VerifyRootPath`。
 - [ ] S9-R：真实证书签名/公证、真实时间多日浸泡与设备热插拔、真机安装升级卸载与无障碍人工验收、CI 实际生成并随 Release 发布 SBOM/校验和。
 - [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
 

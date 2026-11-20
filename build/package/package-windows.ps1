@@ -24,9 +24,11 @@ param(
     [string]$OutputRoot = "artifacts/packages",
     [string]$SignThumbprint = $env:AIASSISTANT_SIGN_CERT_THUMBPRINT,
     [string]$TimestampUrl = $env:AIASSISTANT_TIMESTAMP_URL,
+    [string]$VerifyRootPath = $env:AIASSISTANT_SIGN_ROOT_CER,
     [switch]$FrameworkDependent,
     [switch]$Msix,
     [switch]$RequireSigning,
+    [switch]$SkipTimestamp,
     [string]$Publisher = "CN=AiAssistant"
 )
 
@@ -114,14 +116,27 @@ if (-not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
 
     Write-Host "Signing $($binaries.Count) binaries with certificate $SignThumbprint"
     foreach ($binary in $binaries) {
-        & $signtool sign /fd SHA256 /td SHA256 /tr $TimestampUrl /sha1 $SignThumbprint $binary.FullName
+        if ($SkipTimestamp) {
+            & $signtool sign /fd SHA256 /sha1 $SignThumbprint $binary.FullName
+        }
+        else {
+            & $signtool sign /fd SHA256 /td SHA256 /tr $TimestampUrl /sha1 $SignThumbprint $binary.FullName
+        }
+
         if ($LASTEXITCODE -ne 0) {
             throw "signtool failed for $($binary.FullName)"
         }
     }
 
     foreach ($binary in $binaries) {
-        & $signtool verify /pa $binary.FullName | Out-Null
+        if ([string]::IsNullOrWhiteSpace($VerifyRootPath)) {
+            & $signtool verify /pa $binary.FullName | Out-Null
+        }
+        else {
+            # Self-signed rehearsal: treat the supplied certificate as the trusted root.
+            & $signtool verify /pa /r $VerifyRootPath $binary.FullName | Out-Null
+        }
+
         if ($LASTEXITCODE -ne 0) {
             throw "Signature verification failed for $($binary.FullName)"
         }
@@ -181,7 +196,13 @@ if ($Msix) {
 
     if (-not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
         $signtool = Find-SdkTool -Name "signtool.exe"
-        & $signtool sign /fd SHA256 /td SHA256 /tr $TimestampUrl /sha1 $SignThumbprint $msixPath
+        if ($SkipTimestamp) {
+            & $signtool sign /fd SHA256 /sha1 $SignThumbprint $msixPath
+        }
+        else {
+            & $signtool sign /fd SHA256 /td SHA256 /tr $TimestampUrl /sha1 $SignThumbprint $msixPath
+        }
+
         if ($LASTEXITCODE -ne 0) {
             throw "MSIX signing failed"
         }

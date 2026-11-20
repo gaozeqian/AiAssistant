@@ -59,9 +59,13 @@ AiAssistant.Host --purge-data --confirm-purge
 ### Windows
 
 1. 设置 → 应用 → 时光 → 卸载（或删除自包含发布目录）。
-2. 可选彻底清除：
+2. 数据位置与保留：
+   - 自包含 zip 与当前 MSIX 都写入真实 `%LOCALAPPDATA%\AiAssistant`（MSIX 清单已关闭 AppData 虚拟化）。
+   - 卸载不会删除该目录；密钥文件在 `%LOCALAPPDATA%\AiAssistant\keystore`，同样保留。
+   - 旧版 MSIX（未关闭虚拟化的构建）数据在 `%LOCALAPPDATA%\Packages\AiAssistant.Desktop_*\LocalCache\Local\AiAssistant`，卸载会随包容器删除，升级前请先导出/备份。
+3. 可选彻底清除：
    - 删除 `%LOCALAPPDATA%\AiAssistant`
-   - 删除凭据管理器中与 `AiAssistant` 相关的条目（DPAPI 保护的密钥文件位于 `%LOCALAPPDATA%\AiAssistant\keystore`，删除目录即可）
+   - 删除凭据管理器中与 `AiAssistant` 相关的条目（DPAPI 保护的密钥文件位于上述 `keystore`，删除目录即可）
 
 ### macOS
 

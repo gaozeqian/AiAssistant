@@ -19,6 +19,7 @@
 | 真实模型质量仅部分评测 | gemma4:12b 100%/100%、4.6s 热态；其它候选模型未测 | `S5-R1`，按候选模型分别跑基准后定默认档 |
 | 企业 mTLS/CA/代理未联调 | 企业网络可能握手失败 | `S6-R1` |
 | 公网端点未联调 | 仅代码级策略与同意门禁 | `S6-R1` |
+| MSIX 签名安装需机器级信任 | 非管理员无法导入根证书，`Add-AppxPackage` 签名安装会被拒（0x800B0109） | 管理员导入证书，或使用 `-Register` 做布局演练 |
 | 默认模型依赖 Ollama | 未安装 `gemma4:12b` / `embeddinggemma-2:740m` 时对话或向量召回降级 | 安装模型或设置 `AIASSISTANT_CHAT_MODEL` / `AIASSISTANT_EMBEDDING_MODEL`；`--rebuild-vectors` 重建索引 |
 | 检索融合参数未调优 | TopK=8、候选 60、RRF k=60 为初始值；embeddinggemma 实测 95.8%，个别同义词仍漂移 | `S8-R1`，需用真实脱敏语料继续调参 |
 
