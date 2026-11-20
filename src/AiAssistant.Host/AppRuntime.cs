@@ -62,6 +62,10 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public IModelSecretAdmin ModelSecretAdmin => _services.GetRequiredService<IModelSecretAdmin>();
 
+    public RangeReportUseCase RangeReport => _services.GetRequiredService<RangeReportUseCase>();
+
+    public EvidenceSearchUseCase EvidenceSearch => _services.GetRequiredService<EvidenceSearchUseCase>();
+
     public IModelCapabilityProber ModelCapabilityProber =>
         _services.GetRequiredService<IModelCapabilityProber>();
 

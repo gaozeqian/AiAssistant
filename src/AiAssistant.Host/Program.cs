@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Reflection;
 using System.Text;
+using AiAssistant.Application.UseCases;
 using AiAssistant.Host.Benchmarks;
 using AiAssistant.Platform.Linux.Desktop;
 using Avalonia;
@@ -12,6 +14,15 @@ public static class Program
     [STAThread]
     public static async Task<int> Main(string[] args)
     {
+        try
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+        }
+        catch (IOException)
+        {
+            // No console attached (service/tray mode); keep default encoding.
+        }
+
         if (args.Contains("--smoke-check", StringComparer.OrdinalIgnoreCase))
         {
             Console.WriteLine("AiAssistant.Host smoke-check OK");
@@ -204,11 +215,55 @@ public static class Program
                 string.Equals(argument, "--backup", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(argument, "--restore", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(argument, "--purge-data", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(argument, "--rebuild-vectors", StringComparison.OrdinalIgnoreCase));
+                string.Equals(argument, "--rebuild-vectors", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(argument, "--report-range", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(argument, "--ask", StringComparison.OrdinalIgnoreCase));
             if (isMaintenanceCommand)
             {
                 // Maintenance commands bypass StartAsync, so the encrypted schema must be initialized explicitly.
                 await runtime.DatabaseMaintenance.InitializeAsync(CancellationToken.None);
+            }
+
+            if (args.Contains("--report-range", StringComparer.OrdinalIgnoreCase))
+            {
+                var today = DateOnly.FromDateTime(DateTime.Today);
+                var from = ParseDateOption(args, "--from", today.AddDays(-6));
+                var to = ParseDateOption(args, "--to", today);
+                var outputDirectory = ResolveOutputDirectory(args, "reports");
+                var report = await runtime.RangeReport.GenerateAsync(from, to, CancellationToken.None);
+                var export = await RangeReportUseCase.ExportAsync(report, outputDirectory, CancellationToken.None);
+                Console.WriteLine(
+                    $"Range report: from={from:yyyy-MM-dd} to={to:yyyy-MM-dd} events={report.TotalEvents} " +
+                    $"model={report.ModelId} degraded={report.Degraded}");
+                Console.WriteLine($"markdown={export.MarkdownPath}");
+                Console.WriteLine($"svg={export.SvgPath}");
+                Console.WriteLine($"stats={export.StatsPath}");
+                return 0;
+            }
+
+            if (TryGetOption(args, "--ask", out var question))
+            {
+                var days = ParseIntOption(args, "--days", 7, 1, 366);
+                var answer = await runtime.EvidenceSearch.AskRecentAsync(question, days, CancellationToken.None);
+                Console.WriteLine(answer.Answer);
+                Console.WriteLine(
+                    $"citations={string.Join(",", answer.CitedEvidenceIds)} model={answer.ModelId} degraded={answer.Degraded}");
+                foreach (var evidence in answer.Evidence)
+                {
+                    Console.WriteLine(
+                        $"[{evidence.EvidenceId}] {evidence.LocalDate:yyyy-MM-dd} {evidence.AppName} | {evidence.Title}");
+                }
+
+                if (TryGetOption(args, "--output", out var exportDirectory))
+                {
+                    var path = await runtime.EvidenceSearch.ExportAnswerAsync(
+                        answer,
+                        Path.GetFullPath(exportDirectory),
+                        CancellationToken.None);
+                    Console.WriteLine($"export={path}");
+                }
+
+                return answer.HasEvidence ? 0 : 1;
             }
 
             if (args.Contains("--rebuild-vectors", StringComparer.OrdinalIgnoreCase))
@@ -313,6 +368,12 @@ public static class Program
           --startup-check                    Initialize storage and exit
           --doctor                           Storage health + model probe + MCP status
 
+        Reports & Q&A:
+          --report-range --from <date> --to <date> [--output <dir>]
+                                             Generate Markdown + SVG + stats without the UI
+          --ask "<question>" [--days 7] [--output <dir>]
+                                             Evidence-grounded Q&A over recent local events
+
         Maintenance:
           --backup <path>                    Write an encrypted backup
           --restore <path> --confirm-restore Restore an encrypted backup
@@ -331,6 +392,38 @@ public static class Program
           --mcp-serve                        Run the read-only MCP endpoint headlessly
           --mcp-token                        Print the local bearer token
         """;
+
+    private static DateOnly ParseDateOption(string[] args, string name, DateOnly fallback)
+    {
+        if (!TryGetOption(args, name, out var value))
+        {
+            return fallback;
+        }
+
+        return DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+            ? date
+            : throw new ArgumentException($"Option {name} must use yyyy-MM-dd.");
+    }
+
+    private static int ParseIntOption(string[] args, string name, int fallback, int min, int max)
+    {
+        if (!TryGetOption(args, name, out var value))
+        {
+            return fallback;
+        }
+
+        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+        {
+            throw new ArgumentException($"Option {name} must be an integer.");
+        }
+
+        return Math.Clamp(parsed, min, max);
+    }
+
+    private static string ResolveOutputDirectory(string[] args, string defaultFolder) =>
+        TryGetOption(args, "--output", out var value)
+            ? Path.GetFullPath(value)
+            : Path.GetFullPath(Path.Combine("artifacts", defaultFolder));
 
     private static string? ReadSecretFromConsole()
     {
