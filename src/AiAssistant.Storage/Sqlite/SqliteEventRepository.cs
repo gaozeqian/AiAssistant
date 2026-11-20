@@ -70,7 +70,14 @@ public sealed class SqliteEventRepository : IEventRepository
                 finalEvents.Add((ev, staged));
             }
 
-            _connectionFactory.EnsureQuotaAllowsWrite(items.Count * 1024L);
+            var isPureControlBatch = items.All(i =>
+                i.Event.Source == SourceKind.SystemControl &&
+                (i.RawMediaBytes is null || i.RawMediaBytes.Length == 0));
+
+            if (!isPureControlBatch)
+            {
+                _connectionFactory.EnsureQuotaAllowsWrite(items.Count * 1024L);
+            }
 
             await using var conn = await _connectionFactory.OpenConnectionAsync(ct);
             await using var tx = (SqliteTransaction)await conn.BeginTransactionAsync(ct);

@@ -42,7 +42,6 @@ public sealed class EncryptedSqliteConnectionFactory
     public async Task<SqliteConnection> OpenConnectionForPathAsync(string databasePath, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
-        EnsureQuotaAllowsWrite(0);
 
         var parentDir = Path.GetDirectoryName(databasePath);
         if (!string.IsNullOrEmpty(parentDir))

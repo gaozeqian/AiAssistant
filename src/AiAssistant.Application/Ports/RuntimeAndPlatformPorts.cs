@@ -55,3 +55,27 @@ public interface ICaptureCoordinator : IAsyncDisposable
     Task SubmitSampleAsync(CapturedSample sample, CancellationToken ct);
     Task CaptureImmediateSnapshotAsync(CancellationToken ct);
 }
+
+public sealed record MediaRetentionMetrics(
+    long TotalSweeps,
+    long TotalPurgedBlobs,
+    DateTimeOffset? LastSweepAtUtc);
+
+public interface IRetentionService : IAsyncDisposable
+{
+    MediaRetentionMetrics GetMetricsSnapshot();
+    Task StartAsync(CancellationToken ct);
+    Task<int> RunSweepNowAsync(CancellationToken ct);
+}
+
+public sealed record DiagnosticLogEntry(
+    DateTimeOffset TimestampUtc,
+    string Level,
+    string Category,
+    string SanitizedMessage);
+
+public interface IDiagnosticLogReader
+{
+    IReadOnlyList<DiagnosticLogEntry> GetRecentEntries(int maxCount = 50);
+    Task ExportConfirmedPreviewAsync(string destinationPath, string confirmedJsonPreview, CancellationToken ct);
+}

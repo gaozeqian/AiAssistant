@@ -15,6 +15,8 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string _platformName = "正在检测平台能力…";
     private string _databaseText = "尚未检查";
     private string _pipelineText = string.Empty;
+    private string _retentionText = "尚未执行清理扫描";
+    private string _exportPreviewJson = string.Empty;
     private string _lastRefreshText = "尚未刷新";
     private string _errorMessage = string.Empty;
     private bool _isLoading;
@@ -23,13 +25,18 @@ public sealed class DiagnosticsViewModel : ObservableObject
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
+        GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
     }
 
     public ObservableCollection<CapabilityItem> Capabilities { get; } = [];
 
     public ObservableCollection<ReportJobItem> RecentJobs { get; } = [];
 
+    public ObservableCollection<DiagnosticLogItem> RecentLogs { get; } = [];
+
     public IAsyncRelayCommand RefreshCommand { get; }
+
+    public IAsyncRelayCommand GeneratePreviewCommand { get; }
 
     public string PlatformName
     {
@@ -48,6 +55,26 @@ public sealed class DiagnosticsViewModel : ObservableObject
         get => _pipelineText;
         private set => SetProperty(ref _pipelineText, value);
     }
+
+    public string RetentionText
+    {
+        get => _retentionText;
+        private set => SetProperty(ref _retentionText, value);
+    }
+
+    public string ExportPreviewJson
+    {
+        get => _exportPreviewJson;
+        private set
+        {
+            if (SetProperty(ref _exportPreviewJson, value))
+            {
+                OnPropertyChanged(nameof(HasExportPreview));
+            }
+        }
+    }
+
+    public bool HasExportPreview => !string.IsNullOrEmpty(ExportPreviewJson);
 
     public string LastRefreshText
     {
@@ -92,6 +119,9 @@ public sealed class DiagnosticsViewModel : ObservableObject
                 ? $"正常 · Schema v{snapshot.DatabaseHealth.SchemaVersion.Number} · {snapshot.DatabaseHealth.EventCount} 条事件 · {snapshot.DatabaseHealth.EncryptedBlobCount} 个加密媒体"
                 : "数据库健康检查未通过";
             PipelineText = $"队列 {snapshot.PipelineMetrics.QueuedDataItems} / 已保存 {snapshot.PipelineMetrics.PersistedEvents} / 控制命令 {snapshot.PipelineMetrics.ControlCommandsProcessed}";
+            RetentionText = snapshot.RetentionMetrics is null
+                ? "默认保留策略已配置"
+                : $"已扫描 {snapshot.RetentionMetrics.TotalSweeps} 次 · 安全擦除过期媒体 {snapshot.RetentionMetrics.TotalPurgedBlobs} 个";
 
             Capabilities.Clear();
             foreach (var capability in snapshot.Capabilities)
@@ -105,11 +135,43 @@ public sealed class DiagnosticsViewModel : ObservableObject
                 RecentJobs.Add(new ReportJobItem(job));
             }
 
+            RecentLogs.Clear();
+            if (snapshot.RecentLogs is not null)
+            {
+                foreach (var log in snapshot.RecentLogs)
+                {
+                    RecentLogs.Add(new DiagnosticLogItem(log));
+                }
+            }
+
             LastRefreshText = $"最后刷新：{DateTimeOffset.Now:HH:mm:ss} · 诊断不包含正文、密钥或完整文件路径";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
         {
             ErrorMessage = "诊断读取未完成。数据库或平台能力可能不可用，请检查权限与剩余磁盘空间。";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task GenerateExportPreviewAsync()
+    {
+        if (IsLoading)
+        {
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = string.Empty;
+        try
+        {
+            ExportPreviewJson = await _diagnostics.BuildSanitizedExportPreviewAsync();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
+        {
+            ErrorMessage = "无法生成诊断预览，请检查存储状态。";
         }
         finally
         {
@@ -171,4 +233,12 @@ public sealed class ReportJobItem(ReportJob job)
     public string AttemptText => $"第 {job.Attempts} 次";
 
     public string CreatedText => job.CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.CurrentCulture);
+}
+
+public sealed class DiagnosticLogItem(DiagnosticLogEntry entry)
+{
+    public string TimeText => entry.TimestampUtc.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture);
+    public string LevelText => entry.Level;
+    public string CategoryText => entry.Category;
+    public string MessageText => entry.SanitizedMessage;
 }

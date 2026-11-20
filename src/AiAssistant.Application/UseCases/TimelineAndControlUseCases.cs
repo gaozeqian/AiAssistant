@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
@@ -84,23 +86,95 @@ public sealed record SystemDiagnosticsSnapshot(
     DatabaseHealthReport DatabaseHealth,
     CapturePipelineMetrics PipelineMetrics,
     IReadOnlyList<CapabilityState> Capabilities,
-    IReadOnlyList<ReportJob> RecentJobs);
+    IReadOnlyList<ReportJob> RecentJobs,
+    MediaRetentionMetrics? RetentionMetrics = null,
+    IReadOnlyList<DiagnosticLogEntry>? RecentLogs = null);
 
 public sealed class DiagnosticsUseCase(
     ICapabilityProvider capabilityProvider,
     IDatabaseMaintenanceService maintenanceService,
     ICaptureCoordinator coordinator,
-    IReportJobQueue jobQueue)
+    IReportJobQueue jobQueue,
+    IRetentionService? retentionService = null,
+    IDiagnosticLogReader? logReader = null)
 {
+    private static readonly JsonSerializerOptions PreviewJsonOptions = new()
+    {
+        WriteIndented = true
+    };
+
     public async Task<SystemDiagnosticsSnapshot> GetSnapshotAsync(CancellationToken ct = default)
     {
         var dbHealth = await maintenanceService.CheckHealthAsync(ct);
         var jobs = await jobQueue.ListRecentJobsAsync(20, ct);
+        var retention = retentionService?.GetMetricsSnapshot();
+        var recentLogs = logReader?.GetRecentEntries(30) ?? [];
         return new SystemDiagnosticsSnapshot(
             capabilityProvider.PlatformName,
             dbHealth,
             coordinator.GetMetricsSnapshot(),
             capabilityProvider.GetCapabilities(),
-            jobs);
+            jobs,
+            retention,
+            recentLogs);
+    }
+
+    /// <summary>
+    /// Builds a sanitized, metadata-only JSON preview so the user can inspect every field before exporting (IMPLEMENTATION.md §7.3).
+    /// </summary>
+    public async Task<string> BuildSanitizedExportPreviewAsync(CancellationToken ct = default)
+    {
+        var snapshot = await GetSnapshotAsync(ct);
+        var payload = new
+        {
+            exportedAtUtc = DateTimeOffset.UtcNow,
+            platform = snapshot.PlatformName,
+            schemaVersion = snapshot.DatabaseHealth.SchemaVersion.Number,
+            database = new
+            {
+                isHealthy = snapshot.DatabaseHealth.IsHealthy,
+                cipher = snapshot.DatabaseHealth.CipherDescription,
+                vectorBackend = snapshot.DatabaseHealth.VectorBackend,
+                eventCount = snapshot.DatabaseHealth.EventCount,
+                encryptedBlobCount = snapshot.DatabaseHealth.EncryptedBlobCount
+            },
+            capturePipeline = snapshot.PipelineMetrics,
+            retention = snapshot.RetentionMetrics,
+            capabilities = snapshot.Capabilities.Select(c => new
+            {
+                kind = c.Kind.ToString(),
+                status = c.Status.ToString(),
+                summary = c.Summary
+            }),
+            recentJobs = snapshot.RecentJobs.Select(j => new
+            {
+                targetDate = j.TargetDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                status = j.Status.ToString(),
+                attempts = j.Attempts
+            }),
+            recentSanitizedLogs = snapshot.RecentLogs ?? []
+        };
+
+        return JsonSerializer.Serialize(payload, PreviewJsonOptions);
+    }
+
+    public async Task ExportConfirmedPreviewAsync(string destinationPath, string confirmedJsonPreview, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(confirmedJsonPreview);
+
+        if (logReader is not null)
+        {
+            await logReader.ExportConfirmedPreviewAsync(destinationPath, confirmedJsonPreview, ct);
+            return;
+        }
+
+        var dir = Path.GetDirectoryName(destinationPath);
+        if (!string.IsNullOrWhiteSpace(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        await File.WriteAllTextAsync(destinationPath, confirmedJsonPreview, ct);
     }
 }

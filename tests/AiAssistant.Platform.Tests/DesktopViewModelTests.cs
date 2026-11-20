@@ -119,6 +119,31 @@ public sealed class DesktopViewModelTests
         Assert.True(viewModel.AutoStartEnabled);
     });
 
+    [Fact]
+    public Task Diagnostics_DisplaysRetentionLogs_AndGeneratesSanitizedPreview() => RunInHeadlessSession(async () =>
+    {
+        var coordinator = new FakeCaptureCoordinator();
+        var retention = new FakeRetentionService();
+        var logs = new FakeDiagnosticLogReader();
+        var useCase = new DiagnosticsUseCase(
+            new FakeCapabilityProvider(),
+            new FakeMaintenanceService(),
+            coordinator,
+            new FakeReportJobQueue(),
+            retention,
+            logs);
+        var viewModel = new DiagnosticsViewModel(useCase);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        Assert.Contains("安全擦除过期媒体 3 个", viewModel.RetentionText);
+        Assert.Single(viewModel.RecentLogs);
+        Assert.False(viewModel.HasExportPreview);
+
+        await viewModel.GeneratePreviewCommand.ExecuteAsync(null);
+        Assert.True(viewModel.HasExportPreview);
+        Assert.Contains("capturePipeline", viewModel.ExportPreviewJson);
+    });
+
     private static ShellViewModel CreateShell()
     {
         var repository = new InMemoryEventRepository();
@@ -336,5 +361,24 @@ public sealed class DesktopViewModelTests
             _enabled = enabled;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeRetentionService : IRetentionService
+    {
+        public MediaRetentionMetrics GetMetricsSnapshot() => new(2, 3, DateTimeOffset.UtcNow);
+        public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+        public Task<int> RunSweepNowAsync(CancellationToken ct) => Task.FromResult(0);
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class FakeDiagnosticLogReader : IDiagnosticLogReader
+    {
+        public IReadOnlyList<DiagnosticLogEntry> GetRecentEntries(int maxCount = 50) =>
+        [
+            new DiagnosticLogEntry(DateTimeOffset.UtcNow, "Information", "AppRuntime", "Runtime initialized cleanly.")
+        ];
+
+        public Task ExportConfirmedPreviewAsync(string destinationPath, string confirmedJsonPreview, CancellationToken ct) =>
+            Task.CompletedTask;
     }
 }

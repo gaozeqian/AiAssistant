@@ -48,8 +48,10 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
 
     private readonly Channel<ControlCommand> _controlChannel;
     private readonly Channel<CapturedSample> _dataChannel;
-    private readonly CancellationTokenSource _shutdownCts = new();
-    private readonly List<Task> _backgroundTasks = [];
+    private readonly CancellationTokenSource _sourceCts = new();
+    private readonly CancellationTokenSource _consumerCts = new();
+    private readonly List<Task> _sourceTasks = [];
+    private Task? _consumerTask;
 
     private volatile bool _isPaused;
     private DateTimeOffset _resumeCutoffUtc = DateTimeOffset.MinValue;
@@ -134,7 +136,7 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
         }
 
         _started = true;
-        _backgroundTasks.Add(Task.Run(() => RunConsumerLoopAsync(_shutdownCts.Token), CancellationToken.None));
+        _consumerTask = Task.Run(() => RunConsumerLoopAsync(_consumerCts.Token), CancellationToken.None);
 
         var captureCtx = new CaptureContext(
             _options.WhitelistedDirectories,
@@ -151,7 +153,7 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
                 continue;
             }
 
-            _backgroundTasks.Add(Task.Run(() => PumpSourceAsync(source, captureCtx, _shutdownCts.Token), CancellationToken.None));
+            _sourceTasks.Add(Task.Run(() => PumpSourceAsync(source, captureCtx, _sourceCts.Token), CancellationToken.None));
         }
 
         return Task.CompletedTask;
@@ -249,17 +251,32 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
 
     public async ValueTask DisposeAsync()
     {
-        await _shutdownCts.CancelAsync();
-        _controlChannel.Writer.TryComplete();
-        _dataChannel.Writer.TryComplete();
-
+        // 1. Stop capture sources first so no new frames enter the pipeline
+        await _sourceCts.CancelAsync();
         try
         {
-            await Task.WhenAll(_backgroundTasks);
+            await Task.WhenAll(_sourceTasks);
         }
         catch (OperationCanceledException)
         {
-            // Normal shutdown
+            // Normal source shutdown
+        }
+
+        // 2. Complete channels and let consumer gracefully drain any queued high-priority control commands
+        _controlChannel.Writer.TryComplete();
+        _dataChannel.Writer.TryComplete();
+        await _consumerCts.CancelAsync();
+
+        if (_consumerTask is not null)
+        {
+            try
+            {
+                await _consumerTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal consumer shutdown
+            }
         }
 
         foreach (var source in _sources)
@@ -272,7 +289,8 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
             await _screenCapture.DisposeAsync();
         }
 
-        _shutdownCts.Dispose();
+        _sourceCts.Dispose();
+        _consumerCts.Dispose();
     }
 
     private async Task PumpSourceAsync(ICaptureSource source, CaptureContext context, CancellationToken ct)
@@ -300,38 +318,53 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
 
     private async Task RunConsumerLoopAsync(CancellationToken ct)
     {
-        while (!ct.IsCancellationRequested)
+        try
         {
-            // 1. Always drain ALL pending high-priority control commands before touching data frames!
-            while (_controlChannel.Reader.TryRead(out var cmd))
+            while (!ct.IsCancellationRequested)
             {
-                await ExecuteControlCommandAsync(cmd, ct);
-            }
+                // 1. Always drain ALL pending high-priority control commands before touching data frames!
+                while (_controlChannel.Reader.TryRead(out var cmd))
+                {
+                    await ExecuteControlCommandAsync(cmd, CancellationToken.None);
+                }
 
-            // 2. Process one data frame if available and not paused
-            if (!_isPaused && _dataChannel.Reader.TryRead(out var sample))
-            {
-                await ProcessSampleSafeAsync(sample, ct);
-                continue;
-            }
+                // 2. Process one data frame if available and not paused
+                if (!_isPaused && _dataChannel.Reader.TryRead(out var sample))
+                {
+                    await ProcessSampleSafeAsync(sample, ct);
+                    continue;
+                }
 
-            // 3. Wait for whichever channel becomes readable next
-            var controlWait = _controlChannel.Reader.WaitToReadAsync(ct).AsTask();
-            if (_isPaused)
-            {
-                if (!await controlWait)
+                // 3. Wait for whichever channel becomes readable next
+                var controlWait = _controlChannel.Reader.WaitToReadAsync(ct).AsTask();
+                if (_isPaused)
+                {
+                    if (!await controlWait)
+                    {
+                        break;
+                    }
+
+                    continue;
+                }
+
+                var dataWait = _dataChannel.Reader.WaitToReadAsync(ct).AsTask();
+                var completed = await Task.WhenAny(controlWait, dataWait);
+                if (!await completed)
                 {
                     break;
                 }
-
-                continue;
             }
-
-            var dataWait = _dataChannel.Reader.WaitToReadAsync(ct).AsTask();
-            var completed = await Task.WhenAny(controlWait, dataWait);
-            if (!await completed)
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Fall through to drain pending control commands
+        }
+        finally
+        {
+            using var drainCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            while (_controlChannel.Reader.TryRead(out var remainingCmd))
             {
-                break;
+                await ExecuteControlCommandAsync(remainingCmd, drainCts.Token);
             }
         }
     }
@@ -376,23 +409,38 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
 
     private async Task PersistControlAuditEventAsync(string actionName, CancellationToken ct)
     {
-        try
+        var now = _clock.Now();
+        var controlEvent = new ActivityEvent(
+            StableId.NewEventId(now.OccurredAtUtc),
+            now,
+            SourceKind.SystemControl,
+            "AiAssistant",
+            actionName,
+            summary: actionName,
+            privacy: PrivacyLevel.LocalOnly);
+
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            var now = _clock.Now();
-            var controlEvent = new ActivityEvent(
-                StableId.NewEventId(now.OccurredAtUtc),
-                now,
-                SourceKind.SystemControl,
-                "AiAssistant",
-                actionName,
-                summary: actionName,
-                privacy: PrivacyLevel.LocalOnly);
-            await _eventRepository.AppendBatchAsync([controlEvent], ct);
-            Interlocked.Increment(ref _persistedEvents);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Failed to persist control event {Action}: {ExceptionType}.", actionName, ex.GetType().Name);
+            try
+            {
+                await _eventRepository.AppendBatchAsync([controlEvent], ct);
+                Interlocked.Increment(ref _persistedEvents);
+                _logger.LogInformation("Control audit event {ControlAction} persisted.", actionName);
+                return;
+            }
+            catch (Exception ex) when (attempt < 3 && !ct.IsCancellationRequested)
+            {
+                _logger.LogWarning(
+                    "Retrying control event {ControlAction} after {ExceptionType} (attempt {Attempt}).",
+                    actionName,
+                    ex.GetType().Name,
+                    attempt);
+                await Task.Delay(attempt * 15, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to persist control event {ControlAction}: {ExceptionType}.", actionName, ex.GetType().Name);
+            }
         }
     }
 

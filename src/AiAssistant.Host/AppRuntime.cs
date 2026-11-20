@@ -10,6 +10,7 @@ using AiAssistant.Platform.Windows;
 using AiAssistant.Storage;
 using AiAssistant.Storage.KeyStores;
 using AiAssistant.Storage.Media;
+using AiAssistant.Storage.Observability;
 using AiAssistant.Storage.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -55,15 +56,26 @@ public sealed class AppRuntime : IAsyncDisposable
         var eventRepository = new SqliteEventRepository(connectionFactory, mediaStore);
         var maintenance = new SqliteDatabaseMaintenanceService(connectionFactory);
         var jobQueue = new SqliteReportJobQueue(connectionFactory, clock);
+        var structuredLogProvider = new SanitizedStructuredLoggerProvider(options, clock);
         var services = new ServiceCollection();
 
-        services.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Information));
+        services.AddLogging(builder =>
+        {
+            builder.SetMinimumLevel(LogLevel.Information);
+            builder.AddProvider(structuredLogProvider);
+        });
         services.AddSingleton<IClock>(clock);
         services.AddSingleton(options);
+        services.AddSingleton<IDiagnosticLogReader>(structuredLogProvider);
         services.AddSingleton<IKeyStore>(keyStore);
         services.AddSingleton(connectionFactory);
         services.AddSingleton<IMediaStore>(mediaStore);
         services.AddSingleton(mediaStore);
+        services.AddSingleton<IRetentionService>(provider => new MediaRetentionService(
+            provider.GetRequiredService<IMediaStore>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<StorageOptions>(),
+            provider.GetRequiredService<ILogger<MediaRetentionService>>()));
         services.AddSingleton<IEventRepository>(eventRepository);
         services.AddSingleton<IDatabaseMaintenanceService>(maintenance);
         services.AddSingleton<IReportJobQueue>(jobQueue);
@@ -114,7 +126,11 @@ public sealed class AppRuntime : IAsyncDisposable
 
         await _services.GetRequiredService<IDatabaseMaintenanceService>().InitializeAsync(ct);
         RecoveredJobCount = await _services.GetRequiredService<IReportJobQueue>().RecoverInterruptedJobsAsync(ct);
+        await _services.GetRequiredService<IRetentionService>().StartAsync(ct);
         await _services.GetRequiredService<ICaptureCoordinator>().StartAsync(ct);
+        _services.GetRequiredService<ILogger<AppRuntime>>().LogInformation(
+            "Runtime initialized cleanly; recoveredJobs={RecoveredJobs}.",
+            RecoveredJobCount);
         _started = true;
     }
 
