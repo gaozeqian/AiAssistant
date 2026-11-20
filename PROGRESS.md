@@ -108,6 +108,16 @@ AiAssistant.Host --benchmark-model --output artifacts/benchmarks/model.md
 - 模型不可用时仍写出报告并以退出码 `1` 结束，便于 CI 区分「未安装模型」与「崩溃」。
 - 本机 loopback 端点会显式绕过系统代理环境变量，避免公司代理导致 Ollama 请求失败。
 
+运维自检：
+
+```bash
+AiAssistant.Host --help
+AiAssistant.Host --version
+AiAssistant.Host --doctor
+```
+
+- `--doctor` 输出加密库健康/Schema/事件与媒体计数、模型端点能力（10 秒超时）与 MCP 状态，库不健康时退出码 1。
+
 模型端点密钥与能力探测：
 
 ```bash
@@ -251,6 +261,7 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-20 [win-x64] [S8 智能检索与完整对话完成]**：新增 `AiAssistant.LocalApi` 项目并把检索/问答/区间报告提升为 Application 端口（`IEvidenceSearch`、`IEvidenceQuestionAnswerer`、`IRangeReportService`、`ILocalMcpControl`），Desktop 只依赖 Application。实现 `HybridSearchService`（时间过滤 + 关键词 + 向量 RRF 融合、统一 `[E#]` 证据、向量失败仅降级关键词）与 `EvidenceQuestionAnswerUseCase`（强制引用校验，无引用走抽取式降级，无证据返回 `no-evidence` 且不调用模型）。实现 `ActivityRangeReportService` 与 `RangeReportUseCase`：周一为界的周报、任意区间每日事件数/活跃分钟/主要应用、Markdown + stats JSON 双文件导出、模型不可用确定性统计降级。实现只读 loopback MCP：`TcpListener` 仅绑 `127.0.0.1`、AES-GCM 加密令牌（可轮换）、滑动窗口限流、JSON-RPC `initialize/ping/tools/list/tools/call`、四个只读工具、未知或写入工具返回 -32602；Host 生命周期接入且默认关闭。新增“检索与问答”面板（检索/提问/导出、证据卡片一键定位时间线、周报柱状与导出）、“本地诊断”MCP 令牌显示/轮换，语音“问一下…”复用同一证据用例。全仓 Release 0 警告 0 错误、106/106 测试通过（新增 16 项检索/报告/MCP 契约测试与 2 项 UI/语音测试），两平台发布通过。真实 embedding 质量与真实 MCP 客户端联调保留遗留项。
 - **2026-11-20 [win-x64] [S9 发布加固工具链完成]**：新增 `build/package/` 跨平台打包脚本与图标生成器（纯 Python 生成 PNG/ICO/MSIX 资源）：Windows 自包含 zip + 可选 Authenticode/MSIX、macOS `.app` + codesign/notarytool/stapler、Linux tar.gz + `.deb`；新增 `.github/workflows/release.yml` 签名发布流水线与 CI 打包作业。新增 `IDataDeletionService`/`DataDeletionService`（按日期或全量删除事件、媒体、日报、任务、语音日志、向量索引，WAL checkpoint）与“数据与导出”页面（二次确认删除）、Host 维护命令 `--backup` / `--restore --confirm-restore` / `--purge-data --confirm-purge`（实测备份 84KB、恢复、清空、清空后启动均成功）。新增 v1→v2 迁移保留数据、按日期删除、全量删除后可用、密钥丢失不损坏数据库四项门禁测试；修复报告后台任务测试的时段依赖缺陷（固定时钟）。补充键盘快捷键（Ctrl+D1…D7、Ctrl+F、F5）、关键控件无障碍名称、诊断页权限引导与确认导出。新增 `docs/release/` 隐私说明、已知限制、性能报告（启动 0.82s、包体积 83MB/58MB）、升级卸载、回滚手册与发布检查表。全仓 Release 0 警告 0 错误、112/112 测试通过；Windows zip、Linux tar.gz、macOS app 布局实测生成。真实签名公证、多日浸泡与人工无障碍验收保留遗留项。
 - **2026-11-20 [win-x64] [S9 供应链收尾]**：新增离线 CycloneDX 1.5 SBOM 生成器 `build/sbom/generate-sbom.py`（读取 `project.assets.json`，输出 SHA-512 哈希、purl 与依赖图，支持 `--verify` 与 `--check-manifest`），实测 103 个组件、104 条依赖边、校验通过；依赖清单补齐全部 28 个集中管理包。打包脚本自动生成 `SHA256SUMS` 并实测 `sha256sum -c` 通过；CI SBOM 作业改为离线生成（不再安装外部工具），Release 工作流合并产物后统一生成校验和并附 `bom.json`。新增 `docs/release/RELEASE-NOTES-TEMPLATE.md`。`S9-R4` 仅剩 CI 实际运行与 Release 附件待验证。
+- **2026-11-20 [win-x64] [S9 运维自检命令]**：新增 `--help`/`-h`、`--version` 与 `--doctor`；`--doctor` 组合加密库健康检查、模型能力探测（10s 超时）与 MCP 状态，库不健康返回 1。实测输出 `storage healthy schema=v2`、`models: probe timed out`（12B 模型首次探测超时，命令仍正常结束）与 `mcp disabled`。全仓 137/137 测试通过。
 - **2026-11-20 [win-x64] [S9 14 天加速浸泡通过]**：`AIASSISTANT_SOAK_DAYS=14` 实测 73.8 秒完成 336 小时等效：674/674 控制事件零丢失、672 条黑名单拦截、队列峰值 12/12、1342 条事件、336 个媒体、8 小时休眠窗口零事件、完整性 `ok`、保留清理 336/336，日志/导出零泄露。报告 `artifacts/soak/soak-14d.md`。真实时间多日浸泡与设备热插拔仍为 `S9-R2` 遗留项。
 - **2026-11-20 [win-x64] [S9 周报 SVG 图形化导出]**：新增 `RangeReportSvgRenderer`（纯 `StringBuilder`，无图像库依赖），输出 960×420 的每日柱状图、总量/模型副标题与脱敏页脚；`RangeReportUseCase.ExportAsync` 现在同时写出 Markdown、stats JSON 与 SVG 三个文件，检索页导出状态同步提示。新增 SVG 转义与逐日渲染测试，全仓 137/137 通过。
 - **2026-11-20 [win-x64] [S9 模型密钥导入与端点探测]**：新增 `IModelSecretAdmin` 端口与 `ModelSecretAdmin`，`ProtectedModelSecretStore` 支持只列名称、删除返回是否命中；新增 `--import-model-secret`（标准输入读取、终端隐藏输入）、`--list-model-secrets`、`--delete-model-secret --confirm-delete-secret` 与 `--probe-model`；诊断页新增“模型端点密钥”卡片（名称/密码框/保存/刷新/删除）。端到端实测导入、列出、未确认拒绝删除、删除与空列表均正确；`--probe-model` 输出 gemma4:12b 的 chat/stream/embed 能力。新增加密存储与诊断页交互测试，全仓 136/136 通过。

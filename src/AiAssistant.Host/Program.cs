@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text;
 using AiAssistant.Host.Benchmarks;
 using AiAssistant.Platform.Linux.Desktop;
@@ -14,6 +15,23 @@ public static class Program
         if (args.Contains("--smoke-check", StringComparer.OrdinalIgnoreCase))
         {
             Console.WriteLine("AiAssistant.Host smoke-check OK");
+            return 0;
+        }
+
+        if (args.Contains("--help", StringComparer.OrdinalIgnoreCase) ||
+            args.Contains("-h", StringComparer.OrdinalIgnoreCase))
+        {
+            Console.WriteLine(HelpText);
+            return 0;
+        }
+
+        if (args.Contains("--version", StringComparer.OrdinalIgnoreCase))
+        {
+            var version = typeof(Program).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? typeof(Program).Assembly.GetName().Version?.ToString()
+                ?? "unknown";
+            Console.WriteLine($"AiAssistant {version}");
             return 0;
         }
 
@@ -55,6 +73,44 @@ public static class Program
                 }
 
                 return 0;
+            }
+
+            if (args.Contains("--doctor", StringComparer.OrdinalIgnoreCase))
+            {
+                await runtime.DatabaseMaintenance.InitializeAsync(CancellationToken.None);
+                var health = await runtime.DatabaseMaintenance.CheckHealthAsync(CancellationToken.None);
+                Console.WriteLine(
+                    $"storage: healthy={health.IsHealthy} schema=v{health.SchemaVersion.Number} " +
+                    $"events={health.EventCount} media={health.EncryptedBlobCount} integrity={health.IntegrityMessage}");
+
+                try
+                {
+                    using var probeCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    var capabilities = await runtime.ModelCapabilityProber.ProbeAllAsync(
+                        forceRefresh: false,
+                        probeCts.Token);
+                    if (capabilities.Count == 0)
+                    {
+                        Console.WriteLine("models: none configured");
+                    }
+
+                    foreach (var capability in capabilities)
+                    {
+                        Console.WriteLine(
+                            $"model {capability.Tier}: chat={capability.ChatAvailable} " +
+                            $"embed={capability.EmbeddingsAvailable} json={capability.StructuredOutputAvailable} " +
+                            $"tools={capability.ToolCallingAvailable} | {capability.Diagnostic}");
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine("models: probe timed out after 10s");
+                }
+
+                var mcp = runtime.McpControl.GetSnapshot();
+                Console.WriteLine(
+                    $"mcp: enabled={mcp.Enabled} running={mcp.Running} endpoint={mcp.Endpoint ?? "-"}");
+                return health.IsHealthy ? 0 : 1;
             }
 
             if (TryGetOption(args, "--import-model-secret", out var secretName))
@@ -246,6 +302,35 @@ public static class Program
         value = string.Empty;
         return false;
     }
+
+    private const string HelpText = """
+        AiAssistant.Host [options]
+
+        Diagnostics:
+          --help, -h                         Show this help
+          --version                          Print version
+          --smoke-check                      Verify the binary can start
+          --startup-check                    Initialize storage and exit
+          --doctor                           Storage health + model probe + MCP status
+
+        Maintenance:
+          --backup <path>                    Write an encrypted backup
+          --restore <path> --confirm-restore Restore an encrypted backup
+          --purge-data --confirm-purge       Delete all captured local data
+          --rebuild-vectors                  Rebuild the embedding index
+
+        Models:
+          --benchmark-model [--output <p>]   Run the fixed chat benchmark
+          --benchmark-retrieval [--output <p>] Run the retrieval quality benchmark
+          --probe-model                      Print endpoint capabilities
+          --import-model-secret <name>       Read a secret from stdin and store it encrypted
+          --list-model-secrets               List secret names (values are never shown)
+          --delete-model-secret <name> --confirm-delete-secret
+
+        Local MCP:
+          --mcp-serve                        Run the read-only MCP endpoint headlessly
+          --mcp-token                        Print the local bearer token
+        """;
 
     private static string? ReadSecretFromConsole()
     {
