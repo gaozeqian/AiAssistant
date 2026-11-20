@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AiAssistant.Core\AiAssistant.Core.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Application\AiAssistant.Application.csproj" />
+  </ItemGroup>
+</Project>

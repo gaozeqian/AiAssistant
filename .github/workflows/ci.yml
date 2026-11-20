@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  CI: "true"
+
+jobs:
+  build-and-test:
+    name: Build & Test (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: ubuntu-latest
+            rid: linux-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 LTS
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore AiAssistant.sln
+
+      - name: Verify code formatting & build
+        run: dotnet build AiAssistant.sln -c Release --no-restore
+
+      - name: Run Architecture, Unit, Integration & Contract Tests
+        run: dotnet test AiAssistant.sln -c Release --no-build --logger "trx;LogFileName=test-results-${{ matrix.rid }}.trx"
+
+      - name: Verify RID Native Asset Packaging (${{ matrix.rid }})
+        run: dotnet publish src/AiAssistant.Host/AiAssistant.Host.csproj -c Release -r ${{ matrix.rid }} --self-contained false -o artifacts/publish/${{ matrix.rid }}
+
+      - name: Build Swift Helper Stub (macOS arm64)
+        if: matrix.rid == 'osx-arm64'
+        working-directory: native/AiAssistant.MacHelper
+        run: swift build -c release
+
+  sbom-and-licenses:
+    name: SBOM & License Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 LTS
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install CycloneDX & NuGet-License tools
+        run: |
+          dotnet tool install --global CycloneDX
+          dotnet tool install --global dotnet-project-licenses
+
+      - name: Restore & Generate CycloneDX SBOM
+        run: |
+          dotnet restore AiAssistant.sln
+          mkdir -p artifacts/sbom
+          dotnet CycloneDX AiAssistant.sln -o artifacts/sbom -fn bom.json --json
+
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: artifacts/sbom/bom.json

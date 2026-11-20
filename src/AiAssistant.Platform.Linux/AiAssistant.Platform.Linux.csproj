@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Linux platform adapters: Wayland/X11 capability provider, portal, AT-SPI, inotify, libsecret.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AiAssistant.Application\AiAssistant.Application.csproj" />
+    <ProjectReference Include="..\AiAssistant.Core\AiAssistant.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+</Project>

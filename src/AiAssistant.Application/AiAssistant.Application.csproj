@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Application use cases, ports, DTOs, and policies. Depends only on Core.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AiAssistant.Core\AiAssistant.Core.csproj" />
+  </ItemGroup>
+</Project>

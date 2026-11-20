@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Domain entities, value objects, and domain events. Zero third-party dependencies.</Description>
+  </PropertyGroup>
+</Project>
