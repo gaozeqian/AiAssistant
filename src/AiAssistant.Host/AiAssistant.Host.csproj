@@ -3,6 +3,7 @@
     <OutputType>WinExe</OutputType>
     <Description>Composition Root, startup, DI registration, OS platform wiring, and application lifecycle.</Description>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <MacHelperBinaryPath>$(MSBuildProjectDirectory)/../../native/AiAssistant.MacHelper/.build/release/aiassistant-mac-helper</MacHelperBinaryPath>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AiAssistant.Core\AiAssistant.Core.csproj" />
@@ -24,4 +25,7 @@
     <PackageReference Include="Avalonia.Wayland" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
+  <Target Name="BundleMacOsSwiftHelper" AfterTargets="Publish" Condition="$([MSBuild]::IsOsPlatform('OSX')) And Exists('$(MacHelperBinaryPath)')">
+    <Copy SourceFiles="$(MacHelperBinaryPath)" DestinationFolder="$(PublishDir)" />
+  </Target>
 </Project>

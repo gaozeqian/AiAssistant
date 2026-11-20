@@ -6,6 +6,7 @@ using AiAssistant.Core.ValueObjects;
 using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Platform.Linux;
 using AiAssistant.Platform.MacOS;
+using AiAssistant.Platform.MacOS.Ipc;
 using AiAssistant.Platform.Windows;
 using AiAssistant.Storage;
 using AiAssistant.Storage.KeyStores;
@@ -86,19 +87,15 @@ public sealed class AppRuntime : IAsyncDisposable
         {
             RegisterWindows(services, clock, keyStore);
         }
+        else if (OperatingSystem.IsMacOS())
+        {
+            RegisterMacOS(services, clock, keyStore);
+        }
         else
         {
             services.AddSingleton<ITextExtractor>(new UnavailableTextExtractor());
-            if (OperatingSystem.IsMacOS())
-            {
-                services.AddSingleton<IAutoStartService>(new MacOsNoOpAutoStartService());
-                services.AddSingleton<ICapabilityProvider>(new MacOsCapabilityProvider(keyStore));
-            }
-            else
-            {
-                services.AddSingleton<IAutoStartService>(new LinuxNoOpAutoStartService());
-                services.AddSingleton<ICapabilityProvider>(new LinuxCapabilityProvider(keyStore));
-            }
+            services.AddSingleton<IAutoStartService>(new LinuxNoOpAutoStartService());
+            services.AddSingleton<ICapabilityProvider>(new LinuxCapabilityProvider(keyStore));
         }
 
         services.AddSingleton<ICaptureCoordinator>(provider => new BoundedCaptureCoordinator(
@@ -127,6 +124,13 @@ public sealed class AppRuntime : IAsyncDisposable
         await _services.GetRequiredService<IDatabaseMaintenanceService>().InitializeAsync(ct);
         RecoveredJobCount = await _services.GetRequiredService<IReportJobQueue>().RecoverInterruptedJobsAsync(ct);
         await _services.GetRequiredService<IRetentionService>().StartAsync(ct);
+
+        var macSupervisor = _services.GetService<IMacHelperSupervisor>();
+        if (macSupervisor is not null)
+        {
+            await macSupervisor.StartAsync(ct);
+        }
+
         await _services.GetRequiredService<ICaptureCoordinator>().StartAsync(ct);
         _services.GetRequiredService<ILogger<AppRuntime>>().LogInformation(
             "Runtime initialized cleanly; recoveredJobs={RecoveredJobs}.",
@@ -169,6 +173,65 @@ public sealed class AppRuntime : IAsyncDisposable
             textExtractor,
             keyStore,
             autoStart));
+    }
+
+    private static void RegisterMacOS(IServiceCollection services, IClock clock, IKeyStore keyStore)
+    {
+        var helperPath = ResolveMacHelperPath();
+        IMacHelperProcessLauncher? launcher = helperPath is not null ? new SubprocessMacHelperLauncher(helperPath) : null;
+        var helperOptions = new MacHelperOptions { HelperExecutablePath = helperPath };
+        var processPath = Environment.ProcessPath;
+        var executablePath = string.IsNullOrWhiteSpace(processPath) ? "/Applications/AiAssistant.app/Contents/MacOS/AiAssistant.Host" : processPath;
+        var autoStart = new MacOsLaunchAgentAutoStartService(executablePath);
+
+        services.AddSingleton(helperOptions);
+        services.AddSingleton<IMacHelperSupervisor>(provider => new MacHelperSupervisor(
+            launcher,
+            helperOptions,
+            provider.GetRequiredService<ILogger<MacHelperSupervisor>>()));
+        services.AddSingleton<IScreenCapture>(provider =>
+            new MacOsScreenCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
+        services.AddSingleton<IWindowActivitySource>(provider =>
+            new MacOsWindowActivitySource(
+                provider.GetRequiredService<IMacHelperSupervisor>(),
+                clock,
+                provider.GetRequiredService<IScreenCapture>()));
+        services.AddSingleton<IFileActivitySource>(provider =>
+            new MacOsFileActivitySource(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
+        services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IWindowActivitySource>());
+        services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IFileActivitySource>());
+        services.AddSingleton<ITextExtractor>(provider =>
+            new MacOsTextExtractor(provider.GetRequiredService<IMacHelperSupervisor>()));
+        services.AddSingleton<IAudioCapture>(provider =>
+            new MacOsAudioCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
+        services.AddSingleton<IAutoStartService>(autoStart);
+        services.AddSingleton<ICapabilityProvider>(provider => new MacOsCapabilityProvider(
+            provider.GetRequiredService<IScreenCapture>(),
+            provider.GetRequiredService<IWindowActivitySource>(),
+            provider.GetRequiredService<IFileActivitySource>(),
+            provider.GetRequiredService<ITextExtractor>(),
+            provider.GetRequiredService<IAudioCapture>(),
+            keyStore,
+            autoStart,
+            provider.GetRequiredService<IMacHelperSupervisor>()));
+    }
+
+    private static string? ResolveMacHelperPath()
+    {
+        var overridePath = Environment.GetEnvironmentVariable("AIASSISTANT_MAC_HELPER_PATH");
+        if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
+        {
+            return Path.GetFullPath(overridePath);
+        }
+
+        var baseDir = AppContext.BaseDirectory;
+        string[] candidates =
+        [
+            Path.Combine(baseDir, "aiassistant-mac-helper"),
+            Path.GetFullPath(Path.Combine(baseDir, "..", "Helpers", "aiassistant-mac-helper"))
+        ];
+
+        return candidates.FirstOrDefault(File.Exists);
     }
 
     private sealed class UnavailableTextExtractor : ITextExtractor

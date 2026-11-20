@@ -44,13 +44,19 @@ jobs:
       - name: Run Architecture, Unit, Integration & Contract Tests
         run: dotnet test AiAssistant.sln -c Release --no-build --logger "trx;LogFileName=test-results-${{ matrix.rid }}.trx"
 
+      - name: Build & Smoke-Test Swift Helper (macOS arm64)
+        if: matrix.rid == 'osx-arm64'
+        working-directory: native/AiAssistant.MacHelper
+        run: |
+          swift build -c release
+          .build/release/aiassistant-mac-helper --smoke-check
+
       - name: Verify RID Native Asset Packaging (${{ matrix.rid }})
         run: dotnet publish src/AiAssistant.Host/AiAssistant.Host.csproj -c Release -r ${{ matrix.rid }} --self-contained false -o artifacts/publish/${{ matrix.rid }}
 
-      - name: Build Swift Helper Stub (macOS arm64)
+      - name: Verify Swift Helper Is Bundled (macOS arm64)
         if: matrix.rid == 'osx-arm64'
-        working-directory: native/AiAssistant.MacHelper
-        run: swift build -c release
+        run: test -x artifacts/publish/osx-arm64/aiassistant-mac-helper
 
   sbom-and-licenses:
     name: SBOM & License Verification
