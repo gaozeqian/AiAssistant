@@ -341,7 +341,7 @@ public static class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"AiAssistant startup failed ({ex.GetType().Name}). Check storage permissions and available disk space.");
+            Console.Error.WriteLine($"AiAssistant startup failed ({ex.GetType().Name}): {ex.Message}");
             return 2;
         }
     }

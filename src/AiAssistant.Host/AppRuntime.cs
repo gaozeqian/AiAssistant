@@ -460,7 +460,9 @@ public sealed class AppRuntime : IAsyncDisposable
             gateway,
             configuration.Policy.DefaultTier,
             documentStyle));
-        services.AddSingleton<ModelBenchmarkRunner>();
+        services.AddSingleton(provider => new ModelBenchmarkRunner(
+            provider.GetRequiredService<IModelGateway>(),
+            configuration.Policy.DefaultTier));
 
         var scheduleTime = TimeOnly.TryParse(
             Environment.GetEnvironmentVariable("AIASSISTANT_REPORT_TIME"),

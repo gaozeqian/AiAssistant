@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using AiAssistant.Core.Domain;
 using AiAssistant.Models;
 
@@ -25,6 +27,45 @@ public sealed class ModelEndpointProxyTests
     {
         var endpoint = Create(new Uri("http://127.0.0.1:11434")) with { Proxy = new Uri("http://proxy.internal:8080") };
         Assert.True(ModelHttpClientFactory.ShouldUseProxy(endpoint));
+    }
+
+    [Fact]
+    public void EnterpriseCaPemWithoutPrivateKey_Loads()
+    {
+        var directory = Path.Combine(AppContext.BaseDirectory, "test-temp");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, $"aiassistant-ca-{Guid.NewGuid():N}.crt");
+        try
+        {
+            using var rsa = RSA.Create(2048);
+            var request = new CertificateRequest(
+                "CN=AiAssistant Test CA",
+                rsa,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1);
+            request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
+            using var certificate = request.CreateSelfSigned(
+                DateTimeOffset.UtcNow.AddDays(-1),
+                DateTimeOffset.UtcNow.AddDays(1));
+            File.WriteAllText(path, certificate.ExportCertificatePem());
+
+            var endpoint = Create(new Uri("https://127.0.0.1:47901")) with
+            {
+                Tier = ModelEndpointTier.CorporateIntranet,
+                EnterpriseCaPath = path,
+                AllowRemoteEndpoint = true
+            };
+
+            using var client = ModelHttpClientFactory.Create(endpoint);
+            Assert.NotNull(client);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
     }
 
     private static ModelEndpointSettings Create(Uri baseAddress) =>

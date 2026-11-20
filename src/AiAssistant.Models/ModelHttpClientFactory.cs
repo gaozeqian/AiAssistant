@@ -37,7 +37,7 @@ public static class ModelHttpClientFactory
 
         if (!string.IsNullOrWhiteSpace(endpoint.EnterpriseCaPath))
         {
-            var ca = X509Certificate2.CreateFromPemFile(endpoint.EnterpriseCaPath);
+            var ca = X509CertificateLoader.LoadCertificateFromFile(endpoint.EnterpriseCaPath);
             ssl.RemoteCertificateValidationCallback = (_, certificate, _, errors) =>
                 ValidateWithEnterpriseCa(certificate, errors, ca);
         }

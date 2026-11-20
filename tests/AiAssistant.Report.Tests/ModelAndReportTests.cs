@@ -391,6 +391,18 @@ public sealed class EmbeddingAndBenchmarkTests
     }
 
     [Fact]
+    public async Task BenchmarkRunner_UsesConfiguredTier()
+    {
+        var model = new BenchmarkModel();
+        var runner = new ModelBenchmarkRunner(model, ModelEndpointTier.CorporateIntranet);
+
+        var report = await runner.RunAsync(CancellationToken.None);
+
+        Assert.Equal(ModelEndpointTier.CorporateIntranet, model.LastTier);
+        Assert.Equal(model.ChatModelId, report.ChatModel);
+    }
+
+    [Fact]
     public async Task BenchmarkRunner_ScoresJsonComplianceAndExportsMarkdown()
     {
         var report = await new ModelBenchmarkRunner(new BenchmarkModel()).RunAsync(CancellationToken.None);
@@ -492,12 +504,15 @@ public sealed class EmbeddingAndBenchmarkTests
 
     private sealed class BenchmarkModel : IModelGateway
     {
+        public ModelEndpointTier? LastTier { get; private set; }
+
         public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.ModelGateway, "fake");
         public string ChatModelId => "gemma4:12b";
         public string EmbeddingModelId => "embeddinggemma-2:740m";
 
         public Task<ModelCompletionResult> CompleteAsync(ModelCompletionRequest request, CancellationToken ct)
         {
+            LastTier = request.Tier;
             var text = request.UserPrompt.Contains("只输出 JSON", StringComparison.Ordinal)
                 ? """
                   ```json

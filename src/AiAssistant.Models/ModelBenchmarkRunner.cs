@@ -69,7 +69,9 @@ public sealed record ModelBenchmarkReport(
 }
 
 /// <summary>Fixed synthetic Chinese benchmark set; no personal activity data is included.</summary>
-public sealed class ModelBenchmarkRunner(IModelGateway model)
+public sealed class ModelBenchmarkRunner(
+    IModelGateway model,
+    ModelEndpointTier tier = ModelEndpointTier.LocalOffline)
 {
     public static IReadOnlyList<ModelBenchmarkCase> Cases { get; } =
     [
@@ -90,6 +92,7 @@ public sealed class ModelBenchmarkRunner(IModelGateway model)
     public async Task<ModelBenchmarkReport> RunAsync(CancellationToken ct)
     {
         var results = new List<ModelBenchmarkCaseResult>(Cases.Count);
+        var modelId = model.ChatModelId;
         foreach (var testCase in Cases)
         {
             ct.ThrowIfCancellationRequested();
@@ -100,10 +103,12 @@ public sealed class ModelBenchmarkRunner(IModelGateway model)
                     new ModelCompletionRequest(
                         "你是本机离线模型基准测试器。只输出用户要求的内容。",
                         testCase.Prompt,
+                        Tier: tier,
                         Purpose: "model-benchmark",
                         Temperature: 0),
                     ct);
                 watch.Stop();
+                modelId = response.ModelId;
                 var jsonValid = testCase.Expectation != BenchmarkExpectation.ValidJson || IsValidJson(response.Text);
                 var succeeded = !string.IsNullOrWhiteSpace(response.Text) && jsonValid;
                 results.Add(new ModelBenchmarkCaseResult(
@@ -133,7 +138,7 @@ public sealed class ModelBenchmarkRunner(IModelGateway model)
         var jsonRate = jsonCases.Length == 0 ? 1 : jsonCases.Count(item => item.JsonValid) / (double)jsonCases.Length;
         var averageLatency = results.Count == 0 ? 0 : (long)results.Average(item => item.DurationMilliseconds);
         return new ModelBenchmarkReport(
-            model.ChatModelId,
+            modelId,
             DateTimeOffset.UtcNow,
             results,
             successRate,
