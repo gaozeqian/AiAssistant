@@ -11,7 +11,7 @@
 - **最近更新时间**：`2026-11-20`
 - **最近执行环境**：Windows 11 (`win-x64`, OS 10.0.26300), `.NET SDK 11.0.100` (目标框架 `net10.0` LTS)
 - **当前构建状态**：✅ 本地 Release 0 警告 0 错误；三平台自包含打包脚本实测（win zip / linux tar.gz / macOS app 布局）
-- **当前测试状态**：✅ 123/123 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 35、`Processing.Tests` 7、`Report.Tests` 42、`Voice.Tests` 7）
+- **当前测试状态**：✅ 126/126 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 16、`Capture.Tests` 4、`Platform.Tests` 35、`Processing.Tests` 7、`Report.Tests` 45、`Voice.Tests` 7）
 - **下一步待确认事项**：配置签名证书/公证凭据后执行 `release.yml`；在真机完成 24h/多日浸泡、安装升级卸载与无障碍走查；S9 遗留项见第 5 节
 
 ---
@@ -97,6 +97,16 @@ AIASSISTANT_EMBEDDING_MODEL=qwen3-embedding:0.6b
 AIASSISTANT_REPORT_TIME=18:30
 AIASSISTANT_REPORT_DISABLE_SCHEDULE=true
 ```
+
+模型基准评测（不启动 UI 与采集）：
+
+```bash
+AiAssistant.Host --benchmark-model --output artifacts/benchmarks/model.md
+```
+
+- 固定三用例：中文摘要、语义标签、结构化 JSON；报告含成功率、JSON 合规率、平均耗时与失败详情。
+- 模型不可用时仍写出报告并以退出码 `1` 结束，便于 CI 区分「未安装模型」与「崩溃」。
+- 本机 loopback 端点会显式绕过系统代理环境变量，避免公司代理导致 Ollama 请求失败。
 
 ### 3.5 本地语音模型与命令
 
@@ -210,6 +220,7 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-20 [win-x64] [S8 智能检索与完整对话完成]**：新增 `AiAssistant.LocalApi` 项目并把检索/问答/区间报告提升为 Application 端口（`IEvidenceSearch`、`IEvidenceQuestionAnswerer`、`IRangeReportService`、`ILocalMcpControl`），Desktop 只依赖 Application。实现 `HybridSearchService`（时间过滤 + 关键词 + 向量 RRF 融合、统一 `[E#]` 证据、向量失败仅降级关键词）与 `EvidenceQuestionAnswerUseCase`（强制引用校验，无引用走抽取式降级，无证据返回 `no-evidence` 且不调用模型）。实现 `ActivityRangeReportService` 与 `RangeReportUseCase`：周一为界的周报、任意区间每日事件数/活跃分钟/主要应用、Markdown + stats JSON 双文件导出、模型不可用确定性统计降级。实现只读 loopback MCP：`TcpListener` 仅绑 `127.0.0.1`、AES-GCM 加密令牌（可轮换）、滑动窗口限流、JSON-RPC `initialize/ping/tools/list/tools/call`、四个只读工具、未知或写入工具返回 -32602；Host 生命周期接入且默认关闭。新增“检索与问答”面板（检索/提问/导出、证据卡片一键定位时间线、周报柱状与导出）、“本地诊断”MCP 令牌显示/轮换，语音“问一下…”复用同一证据用例。全仓 Release 0 警告 0 错误、106/106 测试通过（新增 16 项检索/报告/MCP 契约测试与 2 项 UI/语音测试），两平台发布通过。真实 embedding 质量与真实 MCP 客户端联调保留遗留项。
 - **2026-11-20 [win-x64] [S9 发布加固工具链完成]**：新增 `build/package/` 跨平台打包脚本与图标生成器（纯 Python 生成 PNG/ICO/MSIX 资源）：Windows 自包含 zip + 可选 Authenticode/MSIX、macOS `.app` + codesign/notarytool/stapler、Linux tar.gz + `.deb`；新增 `.github/workflows/release.yml` 签名发布流水线与 CI 打包作业。新增 `IDataDeletionService`/`DataDeletionService`（按日期或全量删除事件、媒体、日报、任务、语音日志、向量索引，WAL checkpoint）与“数据与导出”页面（二次确认删除）、Host 维护命令 `--backup` / `--restore --confirm-restore` / `--purge-data --confirm-purge`（实测备份 84KB、恢复、清空、清空后启动均成功）。新增 v1→v2 迁移保留数据、按日期删除、全量删除后可用、密钥丢失不损坏数据库四项门禁测试；修复报告后台任务测试的时段依赖缺陷（固定时钟）。补充键盘快捷键（Ctrl+D1…D7、Ctrl+F、F5）、关键控件无障碍名称、诊断页权限引导与确认导出。新增 `docs/release/` 隐私说明、已知限制、性能报告（启动 0.82s、包体积 83MB/58MB）、升级卸载、回滚手册与发布检查表。全仓 Release 0 警告 0 错误、112/112 测试通过；Windows zip、Linux tar.gz、macOS app 布局实测生成。真实签名公证、多日浸泡与人工无障碍验收保留遗留项。
 - **2026-11-20 [win-x64] [S9 供应链收尾]**：新增离线 CycloneDX 1.5 SBOM 生成器 `build/sbom/generate-sbom.py`（读取 `project.assets.json`，输出 SHA-512 哈希、purl 与依赖图，支持 `--verify` 与 `--check-manifest`），实测 103 个组件、104 条依赖边、校验通过；依赖清单补齐全部 28 个集中管理包。打包脚本自动生成 `SHA256SUMS` 并实测 `sha256sum -c` 通过；CI SBOM 作业改为离线生成（不再安装外部工具），Release 工作流合并产物后统一生成校验和并附 `bom.json`。新增 `docs/release/RELEASE-NOTES-TEMPLATE.md`。`S9-R4` 仅剩 CI 实际运行与 Release 附件待验证。
+- **2026-11-20 [win-x64] [S9 模型评测命令]**：新增 `AiAssistant.Host --benchmark-model [--output <path>]`，复用固定中文基准集输出成功率、JSON 合规率、平均耗时与失败详情；模型不可用时仍写报告并以退出码 1 结束。基准结果新增 `ErrorDetail` 便于定位端点问题。修复本地模型端点在存在系统代理环境变量时误走代理的缺陷（`ModelHttpClientFactory` 对 loopback 默认禁用代理，显式代理仍优先），新增 3 项代理判定测试。用本地模拟 Ollama 端点完成端到端验证：成功路径 100% 成功/100% JSON/退出码 0，离线路径 0% 且报告含 `ModelGatewayException`。将两个浸泡测试放入禁用并行的 `Soak` 集合，消除全量并行时的计时抖动。全仓 126/126 测试通过。真实 Qwen 模型评测仍为 `S5-R1` 遗留项。
 - **2026-11-20 [win-x64] [S9 MCP 协议兼容与一致性校验]**：MCP 端点升级为 Streamable HTTP 兼容：支持 `application/json` 与单事件 `text/event-stream` 响应、`Mcp-Session-Id` 会话头、协议版本协商（`2024-11-05` / `2025-03-26` / `2025-06-18`）与 `DELETE /mcp`；新增无头 `--mcp-serve` 与 `--mcp-token` 命令。新增 10 项协议一致性测试（初始化/协商、通知 202、SSE、工具 schema、错误码 -32700/-32601/-32602、会话删除），并新增独立 Python 一致性客户端 `build/mcp/mcp-client.py`。端到端实测：JSON 模式 17/17、SSE 模式 18/18 通过（含未授权 401、写入工具拒绝）。全仓 123/123 测试通过。第三方 MCP 客户端实测仍为遗留项。
 - **2026-11-20 [win-x64] [S9 多日浸泡完成]**：新增可配置 3–14 天的加速浸泡 `S9MultiDaySoakTests`（默认 3 天/72 小时，约 16 秒），覆盖持续工作、过载洪峰、黑名单、暂停/恢复、配额耗尽、**8 小时休眠窗口**、保留清理与日志/导出泄露检查；产出 `artifacts/soak/soak-<days>d.md` 报告并由 CI 上传。实测 146/146 控制事件零丢失、144 条黑名单拦截、队列峰值 12/12、289 条事件、72 个媒体、休眠窗口零事件、完整性 `ok`、保留清理 72/72。全仓 113/113 测试通过。真实时间多日浸泡与显示器/麦克风热插拔仍待真机执行。
 
@@ -227,7 +238,7 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S4-R1` | S4 语音 | sherpa-onnx 模型资产（Paraformer、Silero VAD、说话人嵌入）不进入 Git，真实中文语音黄金集未评测 | 仅验证适配与降级路径，未证明识别质量 | 在本地/CI 外挂模型目录运行黄金集与唤醒词评测 |
 | `S4-R2` | S4 OCR | Linux RapidOCR ONNX 模型接入与中文 OCR 质量评测 | Linux OCR 仍只有 AT-SPI，无图像文字兜底 | 在 S5 前引入 RapidOCR 模型资产并跑中文截图集 |
 | `S4-R3` | S4 语音 | Whisper.net 高质量批处理适配器未启用 | 高质量离线转写缺少备选实现 | 需要长音频/高精度场景时再接入，保持 `IAsrEngine` 可替换 |
-| `S5-R1` | S5 模型 | 真实 Ollama Qwen3/3.5 4B–9B 质量、耗时与内存评测未运行；仅提供固定中文基准集与报告格式 | 无法确定默认轻量/质量档位 | 在目标机器安装模型后运行 `ModelBenchmarkRunner`，记录成功率、JSON 合规率与延迟 |
+| `S5-R1` | S5 模型 | 已提供 `--benchmark-model` 命令与报告（模拟端点验证成功/降级两条路径）；真实 Ollama Qwen3/3.5 质量、耗时与内存仍未评测 | 无法确定默认轻量/质量档位 | 在目标机器安装模型后运行 `AiAssistant.Host --benchmark-model`，归档报告并确定默认档位 |
 | `S5-R2` | S5 调度 | 每日定时、启动补偿与失败退避尚未进行多日浸泡 | 长时间休眠/跨日边界可能暴露时序问题 | S9 浸泡测试覆盖跨午夜、休眠唤醒、模型离线与重复触发 |
 | `S6-R1` | S6 企业端点 | 真实企业 mTLS、企业 CA、代理和公网 API 未联调；公网同意仅代码级门禁 | TLS/代理环境差异可能导致端点不可用 | 在企业网络与公网沙箱分别验证握手、证书轮换、代理认证、断网回退与策略审计 |
 | `S6-R2` | S6 密钥 | 模型端点密钥加密存储未提供管理 UI/CLI 导入流程 | 用户需手工准备密钥文件 | S9 前补充安全导入向导或 CLI，禁止明文命令行参数 |

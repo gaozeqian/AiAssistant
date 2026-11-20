@@ -17,12 +17,12 @@ public static class ModelHttpClientFactory
         var handler = new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-            ConnectTimeout = TimeSpan.FromSeconds(Math.Min(30, endpoint.Timeout.TotalSeconds))
+            ConnectTimeout = TimeSpan.FromSeconds(Math.Min(30, endpoint.Timeout.TotalSeconds)),
+            UseProxy = ShouldUseProxy(endpoint)
         };
 
         if (endpoint.Proxy is not null)
         {
-            handler.UseProxy = true;
             handler.Proxy = new WebProxy(endpoint.Proxy);
         }
 
@@ -54,6 +54,16 @@ public static class ModelHttpClientFactory
         }
 
         return client;
+    }
+
+    /// <summary>
+    /// Loopback model endpoints must never inherit system proxy settings (common with corporate proxy env vars),
+    /// otherwise local Ollama/LM Studio calls fail. An explicitly configured proxy still wins.
+    /// </summary>
+    public static bool ShouldUseProxy(ModelEndpointSettings endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        return endpoint.Proxy is not null || !endpoint.BaseAddress.IsLoopback;
     }
 
     private static X509Certificate2 LoadClientCertificate(ModelEndpointSettings endpoint)

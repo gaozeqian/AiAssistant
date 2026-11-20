@@ -25,7 +25,8 @@ public sealed record ModelBenchmarkCaseResult(
     bool JsonValid,
     int ResponseCharacters,
     long DurationMilliseconds,
-    string? ErrorType);
+    string? ErrorType,
+    string? ErrorDetail = null);
 
 public sealed record ModelBenchmarkReport(
     string ChatModel,
@@ -50,7 +51,17 @@ public sealed record ModelBenchmarkReport(
         builder.AppendLine("|---|---|---|---|---|---|");
         foreach (var item in Cases)
         {
-            builder.AppendLine(CultureInfo.InvariantCulture, $"| {item.Name} | {(item.Succeeded ? "是" : "否")} | {(item.JsonValid ? "是" : "否")} | {item.ResponseCharacters} | {item.DurationMilliseconds} ms | {item.ErrorType ?? "-"} |");
+            var error = item.ErrorType is null
+                ? "-"
+                : string.IsNullOrWhiteSpace(item.ErrorDetail)
+                    ? item.ErrorType
+                    : $"{item.ErrorType}: {item.ErrorDetail}";
+            if (error.Length > 160)
+            {
+                error = error[..160];
+            }
+
+            builder.AppendLine(CultureInfo.InvariantCulture, $"| {item.Name} | {(item.Succeeded ? "是" : "否")} | {(item.JsonValid ? "是" : "否")} | {item.ResponseCharacters} | {item.DurationMilliseconds} ms | {error} |");
         }
 
         return builder.ToString();
@@ -112,7 +123,8 @@ public sealed class ModelBenchmarkRunner(IModelGateway model)
                     false,
                     0,
                     watch.ElapsedMilliseconds,
-                    ex.GetType().Name));
+                    ex.GetType().Name,
+                    ex.Message));
             }
         }
 

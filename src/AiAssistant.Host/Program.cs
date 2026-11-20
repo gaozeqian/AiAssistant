@@ -55,6 +55,18 @@ public static class Program
                 return 0;
             }
 
+            if (args.Contains("--benchmark-model", StringComparer.OrdinalIgnoreCase))
+            {
+                var report = await runtime.ModelBenchmark.RunAsync(CancellationToken.None);
+                var outputPath = ResolveBenchmarkOutput(args);
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+                await File.WriteAllTextAsync(outputPath, report.ToMarkdown(), CancellationToken.None);
+                Console.WriteLine(
+                    $"Model benchmark: model={report.ChatModel} success={report.SuccessRate:P0} json={report.JsonComplianceRate:P0} avg={report.AverageLatencyMilliseconds}ms");
+                Console.WriteLine($"report={outputPath}");
+                return report.SuccessRate > 0 ? 0 : 1;
+            }
+
             var isMaintenanceCommand = args.Any(argument =>
                 string.Equals(argument, "--backup", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(argument, "--restore", StringComparison.OrdinalIgnoreCase) ||
@@ -148,6 +160,19 @@ public static class Program
 
         value = string.Empty;
         return false;
+    }
+
+    private static string ResolveBenchmarkOutput(string[] args)
+    {
+        if (TryGetOption(args, "--output", out var value))
+        {
+            return Path.GetFullPath(value);
+        }
+
+        return Path.GetFullPath(Path.Combine(
+            "artifacts",
+            "benchmarks",
+            $"model-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.md"));
     }
 
     private static int StartLinuxDesktop(LinuxDisplayBackendState backendState, string[] args)

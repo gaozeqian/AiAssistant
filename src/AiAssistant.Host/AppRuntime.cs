@@ -54,6 +54,8 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public IDataDeletionService DataDeletion => _services.GetRequiredService<IDataDeletionService>();
 
+    public ModelBenchmarkRunner ModelBenchmark => _services.GetRequiredService<ModelBenchmarkRunner>();
+
     public static async Task<AppRuntime> CreateAsync(CancellationToken ct = default)
     {
         var dataDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY");

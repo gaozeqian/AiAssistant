@@ -17,11 +17,16 @@ using Microsoft.Extensions.Logging;
 
 namespace AiAssistant.Platform.Tests;
 
+/// <summary>Soak scenarios run alone: they saturate the bounded pipeline and use real-time drain deadlines.</summary>
+[CollectionDefinition("Soak", DisableParallelization = true)]
+public sealed class SoakCollectionDefinition;
+
 /// <summary>
 /// S9 multi-day accelerated soak. Simulates 3 days (configurable up to 14 via AIASSISTANT_SOAK_DAYS) of
 /// steady work, overload bursts, pause/resume, blacklists, quota exhaustion and an 8-hour suspend window,
 /// then verifies zero control-event loss, zero privacy leaks, bounded queue, schema integrity and retention.
 /// </summary>
+[Collection("Soak")]
 public sealed class S9MultiDaySoakTests : IDisposable
 {
     private readonly string _tempRoot;

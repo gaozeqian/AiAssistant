@@ -21,6 +21,7 @@ namespace AiAssistant.Platform.Tests;
 /// Validates a full 24-hour accelerated soak across midnight local-date boundaries with overload bursts,
 /// quota pressure, pause/resume intervals, blacklists, media retention sweeps, and zero-leak diagnostics.
 /// </summary>
+[Collection("Soak")]
 public sealed class S2FullDaySoakAcceptanceTests : IDisposable
 {
     private sealed class SimulatedClock(DateTimeOffset initialUtc, TimeZoneInfo localTz) : IClock

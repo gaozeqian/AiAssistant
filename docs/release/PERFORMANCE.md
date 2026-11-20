@@ -8,8 +8,8 @@
 | 指标 | 数值 | 说明 |
 |---|---|---|
 | Release 全量构建 | 0 警告 / 0 错误 | `dotnet build AiAssistant.sln -c Release` |
-| 测试总数 | 123 | 8 个测试项目（含 3 天加速浸泡与 MCP 协议一致性） |
-| 测试总耗时 | 约 17 秒 | 各项目并行；Platform 17s（其中 3 天浸泡 15.8s）、Storage 5s、Report 0.9s |
+| 测试总数 | 126 | 8 个测试项目（含 3 天加速浸泡与 MCP 协议一致性） |
+| 测试总耗时 | 约 24 秒 | 各项目并行；Platform 24s（浸泡串行执行）、Storage 3s、Report 0.7s |
 | 架构门禁 | 6 项 | 依赖方向与合成违规检测 |
 
 ## 2. 启动
@@ -56,7 +56,7 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests \
 ## 5. 语音与模型（未评测项）
 
 - KWS/TTS、ASR 延迟与内存占用依赖外挂模型资产，未在本机评测（`S7-R1`）。
-- 本机模型（Ollama Qwen3 4B–9B）首 token 与吞吐未评测（`S5-R1`）。
+- 本机模型（Ollama Qwen3 4B–9B）首 token 与吞吐未评测（`S5-R1`）；已提供 `AiAssistant.Host --benchmark-model --output artifacts/benchmarks/model.md`，并用本地模拟端点验证了成功（100% 成功 / 100% JSON）与离线降级（0% 且退出码 1）两条路径。
 - 混合检索召回率与问答正确率未评测（`S8-R1`）。
 
 ## 6. 复现命令
