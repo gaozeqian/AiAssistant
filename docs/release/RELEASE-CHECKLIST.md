@@ -23,6 +23,7 @@
 ## 3. 安装 / 升级 / 卸载实测
 
 - [ ] 全新安装后首次启动成功，`--startup-check` 输出 OK，`--doctor` 显示存储健康。
+- [ ] Windows zip 解压后 `--version`/`--smoke-check`/`--startup-check` 均通过，`SHA256SUMS` 与产物一致。
 - [ ] MSIX：签名校验通过、安装/启动/卸载成功，卸载后 `%LOCALAPPDATA%\AiAssistant` 与密钥保留。
 - [ ] 从上一版本覆盖升级：Schema 迁移成功，抽查事件/日报/语音日志。
 - [ ] 备份 → 恢复 → 启动成功（`--backup` / `--restore --confirm-restore`）。

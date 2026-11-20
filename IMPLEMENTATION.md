@@ -542,6 +542,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.23：自动化键盘/无障碍测试（标签页名称与加速键、关键控件名称、Ctrl+D/Ctrl+F 真实按键）。
 - [x] S9.24：本地企业 mTLS/代理模拟（双向 TLS、企业 CA、CONNECT 代理、无证书拒绝）并修复 CA 加载与基准档位缺陷。
 - [x] S9.25：真实时钟浸泡测试（`AIASSISTANT_REAL_SOAK_MINUTES=1..120`）；60 分钟运行完成，控制/队列/完整性通过，修正黑名单断言后 8 分钟复验通过。
+- [x] S9.26：Windows 打包复验（zip 83.6 MB / MSIX 86.3 MB / SHA256SUMS；解压后 version、smoke-check、startup-check 均通过）。
 - [ ] S9-R：真实证书签名/公证、真实时间多日浸泡与设备热插拔、真机安装升级卸载与无障碍人工验收、CI 实际生成并随 Release 发布 SBOM/校验和。
 - [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
 
