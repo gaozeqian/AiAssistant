@@ -7,7 +7,7 @@
 | 限制 | 影响 | 现状 |
 |---|---|---|
 | Wayland 连续像素流仅在 GNOME 实测 | KDE/KWin 与多显示器组合未验证；遇到非 RGB 像素格式会回退按需截图 | 已实现 `pw_stream` 消费与降级，可用 `AIASSISTANT_WAYLAND_PIPEWIRE=false` 关闭 |
-| macOS TCC 与签名公证 | 屏幕录制/辅助功能授权、Helper 崩溃监督、公证需真机验收 | 已在 Apple Silicon 真机验证 GUI 启动、系统授权弹窗触发与「未授权 → 精确降级、不崩溃」；点允许后的抓屏、权限撤销与公证待签字 |
+| macOS TCC 与签名公证 | 屏幕录制/辅助功能授权、Helper 崩溃监督、公证需真机验收 | 已在 Apple Silicon 真机验证 GUI 启动、授权弹窗、屏幕录制授权后的「抓屏 → 加密落库 → 报告导出」闭环与未授权精确降级；辅助功能授权、权限撤销与公证待签字 |
 | macOS 音频输出 | 已实现 Swift Helper `AVAudioEngine` 播放（`audio.play`，内存 PCM 不落盘）并真机验证；签名 `.app` 内尚未复测 | `S7-R2` 已关闭；发布会话中需在打包应用内复听一次 |
 | Linux OCR 需自备模型 | 默认仅 AT-SPI 文本；安装 RapidOCR 模型后才有图像 OCR 兜底，中文截图集质量未评测 | 设置 `AIASSISTANT_RAPIDOCR_MODEL_DIR`；缺模型时 `Ocr` 能力显示 `PermissionRequired` |
 | Whisper 批处理需自备模型 | 默认 sherpa-onnx；切换后需自备 ggml 模型，未评测识别质量与耗时 | 设置 `AIASSISTANT_ASR_ENGINE=whisper` 与 `AIASSISTANT_WHISPER_MODEL_PATH`；缺模型时能力显示 `PermissionRequired` |

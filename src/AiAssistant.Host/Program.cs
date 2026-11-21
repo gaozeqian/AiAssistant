@@ -365,6 +365,20 @@ public static class Program
             }
 
             await runtime.StartAsync();
+            if (TryGetOption(args, "--capture-smoke", out var captureSecondsText))
+            {
+                // Real-machine acceptance helper (S3-R1): runs the capture pipeline headless for N seconds
+                // and reports what actually reached the encrypted store, without starting the desktop shell.
+                var captureSeconds = int.TryParse(captureSecondsText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSeconds)
+                    ? Math.Clamp(parsedSeconds, 5, 300)
+                    : 20;
+                await Task.Delay(TimeSpan.FromSeconds(captureSeconds), CancellationToken.None);
+                var captureHealth = await runtime.DatabaseMaintenance.CheckHealthAsync(CancellationToken.None);
+                Console.WriteLine(
+                    $"capture-smoke: seconds={captureSeconds} events={captureHealth.EventCount} media={captureHealth.EncryptedBlobCount} healthy={captureHealth.IsHealthy}");
+                return captureHealth.EventCount > 0 ? 0 : 1;
+            }
+
             if (args.Contains("--startup-check", StringComparer.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"AiAssistant.Host startup-check OK; recovered jobs: {runtime.RecoveredJobCount}");
@@ -419,6 +433,7 @@ public static class Program
           --version                          Print version
           --smoke-check                      Verify the binary can start
           --startup-check                    Initialize storage and exit
+          --capture-smoke [seconds]          Run the capture pipeline headless and report persisted events
           --doctor                           Storage health + model probe + MCP status
 
         Reports & Q&A:

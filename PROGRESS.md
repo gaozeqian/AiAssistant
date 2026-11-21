@@ -118,6 +118,15 @@ AiAssistant.Host --doctor
 
 - `--doctor` 输出加密库健康/Schema/事件与媒体计数、模型端点能力（10 秒超时）与 MCP 状态，库不健康时退出码 1。
 
+真机采集自检（用于 macOS 权限验收与无头采集排查）：
+
+```bash
+AIASSISTANT_DATA_DIRECTORY=/tmp/aia-capture-smoke AiAssistant.Host --capture-smoke 20
+```
+
+- 无头运行采集管线 N 秒（5–300，默认 20），输出 `events/media/healthy`，事件为 0 时退出码 1。
+- macOS 首次运行会触发屏幕录制/麦克风授权弹窗；授权后重跑即可看到事件增长。若前台是密码管理器等黑名单应用，`events` 为 0 属正常过滤。
+
 无头报告与证据问答：
 
 ```bash
@@ -356,6 +365,7 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-21 [osx-arm64] [macOS 包布局与启动自检]**：`bash build/package/package-macos.sh --skip-sign --version 0.1.0` 在本机产出 `AiAssistant-0.1.0-osx-arm64.zip`（56 MB，`.app` 155 MB，含 `SHA256SUMS`），Swift Helper 随包进入 `Contents/MacOS/aiassistant-mac-helper` 并被 `ResolveMacHelperPath` 命中。包内 `--smoke-check` 通过、`--doctor` 输出 `storage healthy schema=v2`、`pdfFont=/System/Library/Fonts/Supplemental/Arial Unicode.ttf`、模型端点离线（本机未装 Ollama，预期）。`.pkg`、Developer ID 签名与公证仍需证书，属 `S9-R1`。
 - **2026-11-21 [osx-arm64] [macOS GUI 启动主线程缺陷修复]**：打包 `.app` 真机启动暴露 `IDispatcherImpl belongs to a different thread`——顶层 `async Task<int> Main` 在 `await AppRuntime.CreateAsync()` 之后落到线程池线程，而 AppKit/Avalonia 只能在进程主线程初始化，导致 macOS 桌面壳根本无法启动（`--startup-check` 等无头命令不受影响，故此前未暴露）。重构 `Program.Main` 为同步入口：无头命令仍走原异步链；桌面路径由 `RunAsync` 完成初始化并置位 `DesktopShellHandoff`，再回到主线程启动 Avalonia（Linux 的 Wayland→X11 回退同样在主线程序列内执行），运行时在 UI 退出后统一释放。打包 `.app` 真机复测：Host 与 Helper 进程正常常驻、数据目录与加密库创建成功。
 - **2026-11-21 [osx-arm64] [TCC 授权弹窗补齐]**：真机发现 Helper 只做 `CGPreflightScreenCaptureAccess` / `authorizationStatus` 预检、从不触发系统授权框，全新安装会永久停在「需要权限」且用户无从授权。新增 `PermissionPrompter`：抓屏预检失败时后台触发 `CGRequestScreenCaptureAccess()`，麦克风 `notDetermined` 时触发 `AVCaptureDevice.requestAccess`，辅助功能缺失时以 `AXIsProcessTrustedWithOptions` 打开授权面板；每次进程仅请求一次、全部在后台队列执行，避免阻塞 IPC 与心跳。`permissions.query` 仍返回真实快照。真机验证：未授权时 `screen.capture` 快速返回 `permission_denied`（3 ms），Helper 不崩溃、心跳正常；授权点击仍需人工完成（`S3-R1`）。
+- **2026-11-21 [osx-arm64] [macOS 采集闭环真机打通]**：系统授权弹窗生效后，打包 `.app` 内 Helper 的 `screenRecording` 变为 `granted`，`screen.capture` 返回真实帧。新增运维命令 `--capture-smoke [seconds]`（无头运行采集管线 N 秒并输出落库事件/媒体数，事件为 0 时退出码 1）。真机实测 20 秒：`events=2 media=1 healthy=True`，事件来源 `WorkBuddy`；随后 `--report-range` 在 macOS 生成 Markdown/SVG/PNG/PDF。GUI 首轮 `events=0` 属预期——当时前台为 1Password，命中内置密码管理器黑名单。**「授权 → 抓屏 → 加密落库 → 报告导出」已在 macOS 真机闭环**。
 - **2026-11-21 [docs] [实施清单与进度对齐]**：`IMPLEMENTATION.md` 第 10 节改为与 `PROGRESS.md` 第 5 节同构的 `*-R` 编号：补记 `S6-R2`（密钥导入）、`S8-R`（embedding 95.8% / MCP Inspector / SVG-PNG-PDF）为已完成，拆分 `S5-R1`/`S5-R2`、`S6-R1`、`S7-R1`/`S7-R2`、`S9-R1..R4`、`S3-R1`/`S3-R2`，并新增第 6 节执行顺序表。
 
 ---
@@ -366,7 +376,7 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 
 | ID | 来源 | 遗留内容 | 风险 | 后续处理 |
 |---|---|---|---|---|
-| `S3-R1` | S3 macOS | 🟡 Apple Silicon 真机已完成：GUI 主线程启动修复、Helper 握手/心跳/音频回放、TCC 授权弹窗触发、未授权时精确降级；「点允许后抓屏成功」、权限撤销、Helper 崩溃监督与公证仍未人工签字 | 允许路径与打包签名仍可能有平台差异；ad-hoc 签名下 TCC 归属可能与正式签名不同 | 用 Developer ID 签名打包后在真机点允许并撤销一次，记录 `spctl`、公证与抓屏结果 |
+| `S3-R1` | S3 macOS | 🟡 真机已完成：GUI 主线程启动、授权弹窗触发、**授权后抓屏 → 加密落库 → 报告导出闭环**、Helper 握手/心跳/音频回放、未授权精确降级；辅助功能授权、权限撤销、Helper 崩溃监督与公证仍未人工签字 | 辅助功能路径与正式签名下的 TCC 归属仍需验证 | 用 Developer ID 签名打包后授予辅助功能并撤销一次，记录 `spctl`、公证与抓屏结果 |
 | `S3-R2` | S3 Linux | 🟡 GNOME Wayland 的 ScreenCast 授权与连续抓屏已真机实测（2026-11-21）；KDE/KWin、X11 回退、AT-SPI 与托盘能力矩阵仍待人工验收 | 合成器差异可能影响窗口与抓屏可用性 | 在 KDE Wayland 与 X11 会话逐项签字 |
 | `S3-R3` | S3 Linux | ✅ 已实现连续 PipeWire 帧消费（私有 `pw_stream`、1 秒节流、格式协商与 YUV 降级回退），GNOME Wayland 真机通过（2026-11-21） | KDE/KWin 与多显示器场景未实测 | 在 KDE Wayland 复跑同一真机测试 |
 | `S4-R1` | S4 语音 | sherpa-onnx 模型资产（Paraformer、Silero VAD、说话人嵌入）不进入 Git，真实中文语音黄金集未评测 | 仅验证适配与降级路径，未证明识别质量 | 在本地/CI 外挂模型目录运行黄金集与唤醒词评测 |
