@@ -476,6 +476,25 @@
                 <TextBlock Text="本机模型网关" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding ModelText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
                 <TextBlock Text="{Binding ModelEndpointsText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasModelConfiguration}">
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="本机模型配置" FontWeight="SemiBold" />
+                    <TextBlock Text="修改本机 Ollama / 兼容端点的模型名与地址；保存后重启应用生效。" FontSize="12"
+                               Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+                      <TextBlock Text="对话模型" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                      <TextBox Grid.Column="1" Text="{Binding ChatModel}" PlaceholderText="例如 gemma4:12b" Margin="0,0,0,6" />
+                      <TextBlock Grid.Row="1" Text="Embedding 模型" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EmbeddingModel}" PlaceholderText="例如 embeddinggemma-2:740m" Margin="0,0,0,6" />
+                      <TextBlock Grid.Row="2" Text="Base URL" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                      <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding BaseUrl}" PlaceholderText="http://127.0.0.1:11434" Margin="0,0,0,6" />
+                    </Grid>
+                    <WrapPanel>
+                      <Button Classes="primary" Content="保存模型配置" Command="{Binding SaveModelConfigurationCommand}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding ModelConfigStatus}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
               </StackPanel>
             </Border>
             <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasMcpControl}">

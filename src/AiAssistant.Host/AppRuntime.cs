@@ -145,6 +145,9 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IDiagnosticLogReader>(structuredLogProvider);
         services.AddSingleton<IKeyStore>(keyStore);
         services.AddSingleton<IModelSecretAdmin>(new ModelSecretAdmin(secretStore));
+        services.AddSingleton<IModelConfigurationAdmin>(new ModelConfigurationAdmin(
+            Path.GetFullPath(modelsConfigPath),
+            modelsConfiguration));
         services.AddSingleton(connectionFactory);
         services.AddSingleton<IMediaStore>(mediaStore);
         services.AddSingleton(mediaStore);
@@ -367,7 +370,8 @@ public sealed class AppRuntime : IAsyncDisposable
                 _services.GetRequiredService<DiagnosticsUseCase>(),
                 _services.GetRequiredService<ILocalMcpControl>(),
                 Path.Combine(_dataDirectory, "reports"),
-                _services.GetRequiredService<IModelSecretAdmin>()),
+                _services.GetRequiredService<IModelSecretAdmin>(),
+                _services.GetRequiredService<IModelConfigurationAdmin>()),
             new ReportsViewModel(
                 _services.GetRequiredService<ReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports")),

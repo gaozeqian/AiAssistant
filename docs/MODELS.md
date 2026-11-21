@@ -55,6 +55,16 @@ bash build/install-voice-models.sh /path/to/data-directory
 验证：启动 GUI → 语音页，能力状态应从「Wake-word model assets are not installed」变为
 「Wake word ready」（若 TTS 资产未装会追加 `TTS feedback unavailable`，不影响唤醒与识别）。
 
+## 2.5 从 UI 配置模型
+
+诊断页「本机模型网关」卡片内可直接编辑本机模型的：
+
+- 对话模型名（例如 `gemma4:12b-mlx`）
+- Embedding 模型名（例如 `embeddinggemma-2:740m`）
+- Base URL（默认 `http://127.0.0.1:11434`，仅允许 loopback）
+
+点「保存模型配置」写入数据目录的 `models.json`（只改 LocalOffline 端点，保留企业内网/公网端点与策略）。保存后**重启应用生效**。
+
 ## 3. 完整流程 UI 测试
 
 `tests/ui-e2e/ollama-flow.swift` 在真实 `.app` 上按真人操作跑完整链路：

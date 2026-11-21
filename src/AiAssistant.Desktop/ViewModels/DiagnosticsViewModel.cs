@@ -14,6 +14,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private readonly DiagnosticsUseCase _diagnostics;
     private readonly ILocalMcpControl? _mcp;
     private readonly IModelSecretAdmin? _secrets;
+    private readonly IModelConfigurationAdmin? _modelConfiguration;
     private readonly string? _exportDirectory;
     private string _platformName = "正在检测平台能力…";
     private string _databaseText = "尚未检查";
@@ -33,17 +34,30 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string? _selectedSecret;
     private string _secretStatus = "密钥值写入后不可读取；models.json 通过 apiKeySecret 引用名称。";
     private bool _isLoading;
+    private string _baseUrl = "http://127.0.0.1:11434";
+    private string _chatModel = string.Empty;
+    private string _embeddingModel = string.Empty;
+    private string _modelConfigStatus = "保存后需重启应用生效。";
 
     public DiagnosticsViewModel(
         DiagnosticsUseCase diagnostics,
         ILocalMcpControl? mcp = null,
         string? exportDirectory = null,
-        IModelSecretAdmin? secrets = null)
+        IModelSecretAdmin? secrets = null,
+        IModelConfigurationAdmin? modelConfiguration = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _mcp = mcp;
         _exportDirectory = exportDirectory;
         _secrets = secrets;
+        _modelConfiguration = modelConfiguration;
+        if (modelConfiguration is not null)
+        {
+            var view = modelConfiguration.Current;
+            _baseUrl = view.BaseUrl;
+            _chatModel = view.ChatModel;
+            _embeddingModel = view.EmbeddingModel;
+        }
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
         ExportPreviewCommand = new AsyncRelayCommand(ExportPreviewAsync);
@@ -52,6 +66,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
         SaveSecretCommand = new AsyncRelayCommand(SaveSecretAsync);
         RefreshSecretsCommand = new AsyncRelayCommand(() => RefreshSecretNamesAsync(updateStatus: true));
         DeleteSecretCommand = new AsyncRelayCommand(DeleteSecretAsync);
+        SaveModelConfigurationCommand = new AsyncRelayCommand(SaveModelConfigurationAsync);
     }
 
     public ObservableCollection<CapabilityItem> Capabilities { get; } = [];
@@ -165,6 +180,34 @@ public sealed class DiagnosticsViewModel : ObservableObject
         get => _modelEndpointsText;
         private set => SetProperty(ref _modelEndpointsText, value);
     }
+
+    public bool HasModelConfiguration => _modelConfiguration is not null;
+
+    public string BaseUrl
+    {
+        get => _baseUrl;
+        set => SetProperty(ref _baseUrl, value);
+    }
+
+    public string ChatModel
+    {
+        get => _chatModel;
+        set => SetProperty(ref _chatModel, value);
+    }
+
+    public string EmbeddingModel
+    {
+        get => _embeddingModel;
+        set => SetProperty(ref _embeddingModel, value);
+    }
+
+    public string ModelConfigStatus
+    {
+        get => _modelConfigStatus;
+        private set => SetProperty(ref _modelConfigStatus, value);
+    }
+
+    public IAsyncRelayCommand SaveModelConfigurationCommand { get; }
 
     public string ExportPreviewJson
     {
@@ -308,6 +351,27 @@ public sealed class DiagnosticsViewModel : ObservableObject
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.Cryptography.CryptographicException)
         {
             SecretStatus = "保存失败，请检查系统密钥库权限。";
+        }
+    }
+
+    private async Task SaveModelConfigurationAsync()
+    {
+        if (_modelConfiguration is null)
+        {
+            ModelConfigStatus = "本机未启用模型配置。";
+            return;
+        }
+
+        try
+        {
+            await _modelConfiguration.SaveAsync(
+                new ModelConfigurationView(BaseUrl, ChatModel, EmbeddingModel),
+                CancellationToken.None);
+            ModelConfigStatus = "已保存到 models.json；重启应用后生效。";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            ModelConfigStatus = ex.Message;
         }
     }
 

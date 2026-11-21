@@ -252,8 +252,53 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
         }
     }
 
-    private sealed class FakeSecretResolver(IReadOnlyDictionary<string, string> values) : IModelSecretResolver
+    [Fact]
+    public async Task ModelConfigurationAdmin_UpdatesLocalOfflineEndpoint_AndPreservesOthers()
     {
+        var path = Path.Combine(_tempRoot, "models.json");
+        await File.WriteAllTextAsync(path, """
+            {
+              "schemaVersion": 1,
+              "policy": { "defaultTier": "LocalOffline" },
+              "endpoints": [
+                { "tier": "LocalOffline", "provider": "ollama", "baseUrl": "http://127.0.0.1:11434", "chatModel": "old-chat", "embeddingModel": "old-embed" },
+                { "tier": "CorporateIntranet", "provider": "openai", "baseUrl": "https://llm.corp.example", "chatModel": "corp-chat", "embeddingModel": "corp-embed", "timeoutSeconds": 60, "allowRemoteEndpoint": true }
+              ]
+            }
+            """);
+        var configuration = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+        var admin = new ModelConfigurationAdmin(path, configuration);
+
+        Assert.Equal("old-chat", admin.Current.ChatModel);
+        await admin.SaveAsync(
+            new ModelConfigurationView("http://127.0.0.1:11434", "gemma4:12b-mlx", "embeddinggemma-2:740m"),
+            CancellationToken.None);
+
+        var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+        var local = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.LocalOffline);
+        Assert.Equal("gemma4:12b-mlx", local.ChatModel);
+        Assert.Equal("embeddinggemma-2:740m", local.EmbeddingModel);
+        var corp = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.CorporateIntranet);
+        Assert.Equal("corp-chat", corp.ChatModel);
+    }
+
+    [Fact]
+    public async Task ModelConfigurationAdmin_RejectsNonLoopbackBaseUrl()
+    {
+        var path = Path.Combine(_tempRoot, "models.json");
+        var configuration = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+        var admin = new ModelConfigurationAdmin(path, configuration);
+
+        await Assert.ThrowsAsync<ModelConfigurationException>(() =>
+            admin.SaveAsync(
+                new ModelConfigurationView("https://api.example.com/v1", "c", "e"),
+                CancellationToken.None));
+    }
+
+    private sealed class FakeSecretResolver(IReadOnlyDictionary<string, string> values) : IModelSecretResolver    {
         public Task<string?> ResolveAsync(string reference, CancellationToken ct) =>
             Task.FromResult(values.TryGetValue(reference, out var value) ? value : null);
     }

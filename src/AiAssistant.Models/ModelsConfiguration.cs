@@ -3,14 +3,14 @@ using AiAssistant.Core.Domain;
 
 namespace AiAssistant.Models;
 
-public sealed class ModelsFileDocument
+public sealed record ModelsFileDocument
 {
     public int SchemaVersion { get; init; } = 1;
     public ModelPolicyDocument Policy { get; init; } = new();
     public IReadOnlyList<ModelEndpointDocument> Endpoints { get; init; } = [];
 }
 
-public sealed class ModelPolicyDocument
+public sealed record ModelPolicyDocument
 {
     public bool AllowIntranet { get; init; } = true;
     public bool AllowPublicCloud { get; init; }
@@ -19,7 +19,7 @@ public sealed class ModelPolicyDocument
     public bool RequirePublicCloudConsent { get; init; } = true;
 }
 
-public sealed class ModelEndpointDocument
+public sealed record ModelEndpointDocument
 {
     public string Tier { get; init; } = "LocalOffline";
     public string Provider { get; init; } = "ollama";
@@ -273,4 +273,4 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
     }
 }
 
-public sealed class ModelConfigurationException(string message, Exception? inner = null) : Exception(message, inner);
+public sealed class ModelConfigurationException(string message, Exception? inner = null) : ArgumentException(message, inner);
