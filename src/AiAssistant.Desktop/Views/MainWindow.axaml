@@ -22,8 +22,18 @@
       <Setter Property="Padding" Value="14,8" />
       <Setter Property="CornerRadius" Value="7" />
     </Style>
-    <Style Selector="TextBox, ComboBox">
+    <Style Selector="TextBox, ComboBox, DatePicker">
       <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="DatePicker /template/ TextBox">
+      <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
     </Style>
     <Style Selector="ListBoxItem">
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />

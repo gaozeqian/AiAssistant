@@ -18,6 +18,12 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
 
     public static Func<ShellViewModel>? ViewModelFactory { get; set; }
 
+    public ShellApp()
+    {
+        // Overrides Avalonia's default "Avalonia Application" so the macOS menu bar / Dock label read 「时光」.
+        Name = "时光";
+    }
+
     public override void Initialize()
     {
         Styles.Add(new FluentTheme());
@@ -101,6 +107,10 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             Add("AccentSoftBackgroundBrush", "#D6EBFF");
             Add("ListSelectionBackgroundBrush", "#CCE4FF");
             Add("TextPrimaryBrush", "#1F1F1F");
+            Add("InputBackgroundBrush", "#FFFFFF");
+            Add("InputBorderBrush", "#D4D4D4");
+            Add("DatePickerFlyoutPresenterBackground", "#FFFFFF");
+            Add("DatePickerFlyoutPresenterBorderBrush", "#C8C8C8");
             Add("MutedBrush", "#616161");
             Add("SubtleCardBrush", "#F3F3F3");
             Add("PlaceholderBrush", "#E5E5E5");
@@ -127,6 +137,10 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             Add("AccentSoftBackgroundBrush", "#123B63");
             Add("ListSelectionBackgroundBrush", "#04395E");
             Add("TextPrimaryBrush", "#D4D4D4");
+            Add("InputBackgroundBrush", "#252526");
+            Add("InputBorderBrush", "#3C3C3C");
+            Add("DatePickerFlyoutPresenterBackground", "#252526");
+            Add("DatePickerFlyoutPresenterBorderBrush", "#3F3F3F");
             Add("MutedBrush", "#A8A8A8");
             Add("SubtleCardBrush", "#252526");
             Add("PlaceholderBrush", "#2D2D2D");
