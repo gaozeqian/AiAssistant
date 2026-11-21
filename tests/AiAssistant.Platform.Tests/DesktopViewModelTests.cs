@@ -413,6 +413,186 @@ public sealed class DesktopViewModelTests
         await shell.RefreshCurrentCommand.ExecuteAsync(null);
     });
 
+    [Fact]
+    public Task FullWindow_UserPausesAndResumesCapture_UpdatesStatusBanner() => RunInHeadlessSession(async () =>
+    {
+        using var shell = CreateShell();
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+
+        Assert.Equal("正在本机采集", shell.CaptureStatus);
+
+        shell.SelectedSectionIndex = 2; // 隐私与控制
+        await WaitUntilAsync(() => HasButton(window, "暂停采集"));
+        Click(window, "暂停采集");
+        await WaitUntilAsync(() => shell.Capture.IsPaused);
+        Assert.Equal("已暂停 · 不补采暂停期间内容", shell.CaptureStatus);
+        Assert.True(HasButton(window, "恢复采集"));
+
+        Click(window, "恢复采集");
+        await WaitUntilAsync(() => !shell.Capture.IsPaused);
+        Assert.Equal("正在本机采集", shell.CaptureStatus);
+        window.Close();
+    });
+
+    [Fact]
+    public Task FullWindow_UserSearchesAndJumpsBackToTimeline() => RunInHeadlessSession(async () =>
+    {
+        var repository = new InMemoryEventRepository();
+        var clock = new SystemClock();
+        var timestamp = ((IClock)clock).Now();
+        repository.Events.Add(CreateEvent("cited", timestamp));
+        repository.Events.Add(CreateEvent("other", timestamp));
+        var timeline = new TimelineViewModel(new TimelineUseCase(repository, new FakeMediaStore(), clock));
+        await timeline.InitializeAsync();
+
+        var evidence = new EvidenceReference(
+            "E1",
+            "cited",
+            timestamp.LocalDate,
+            timestamp.OccurredAtUtc,
+            "TestApp",
+            "Synthetic test event",
+            "结构化证据摘录",
+            false,
+            "keyword+vector",
+            0.5);
+        var search = new SearchViewModel(
+            new EvidenceSearchUseCase(new FakeEvidenceSearch(evidence), new FakeAnswerer(), clock),
+            new RangeReportUseCase(new FakeRangeReportService(), clock),
+            Path.Combine(AppContext.BaseDirectory, "test-temp", "search-ui"));
+
+        var diagnostics = new DiagnosticsUseCase(
+            new FakeCapabilityProvider(),
+            new FakeMaintenanceService(),
+            new FakeCaptureCoordinator(),
+            new FakeReportJobQueue());
+        using var shell = new ShellViewModel(
+            timeline,
+            new CaptureControlViewModel(new CaptureControlUseCase(new FakeCaptureCoordinator(), new FakeAutoStartService())),
+            new DiagnosticsViewModel(diagnostics),
+            new ReportsViewModel(
+                new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
+                Path.Combine(AppContext.BaseDirectory, "test-temp", "reports-ui")),
+            voice: null,
+            voiceNavigation: null,
+            search: search);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+
+        // Ctrl+F 聚焦检索页
+        window.Activate();
+        window.KeyPress(Key.F, RawInputModifiers.Control, PhysicalKey.F, "f");
+        await WaitUntilAsync(() => shell.SelectedSectionIndex == 1);
+
+        TextBoxByName(window, "检索关键词或问题").Text = "迁移";
+        Click(window, "检索证据");
+        await WaitUntilAsync(() => search.Evidence.Count == 1);
+
+        Click(window, "定位");
+        await WaitUntilAsync(() => timeline.SelectedEvent?.Event.Id == "cited");
+        Assert.Equal(0, shell.SelectedSectionIndex);
+        Assert.Contains("已定位", timeline.StatusMessage, StringComparison.Ordinal);
+        window.Close();
+    });
+
+    [Fact]
+    public Task FullWindow_UserTogglesVoiceOnAndOff() => RunInHeadlessSession(async () =>
+    {
+        var voice = new VoiceControlViewModel(new FakeVoiceSession());
+        using var shell = CreateShellWithVoice(voice);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+
+        shell.SelectedSectionIndex = 3; // 语音
+        await WaitUntilAsync(() => HasButton(window, "启用语音"));
+        Click(window, "启用语音");
+        await WaitUntilAsync(() => voice.IsEnabled);
+        Assert.Equal("正在聆听", voice.StatusText);
+        Assert.True(HasButton(window, "关闭语音"));
+
+        Click(window, "关闭语音");
+        await WaitUntilAsync(() => !voice.IsEnabled);
+        Assert.Equal("语音休眠", voice.StatusText);
+        window.Close();
+    });
+
+    [Fact]
+    public Task FullWindow_DataDeletionRequiresTwoStepConfirmation() => RunInHeadlessSession(async () =>
+    {
+        using var shell = CreateShell(out var data);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+
+        shell.SelectedSectionIndex = 4; // 数据与导出
+        await WaitUntilAsync(() => HasButton(window, "删除该日数据"));
+        Click(window, "删除该日数据");
+        await WaitUntilAsync(() => data.HasPending);
+        Assert.True(HasButton(window, "确认删除"));
+
+        Click(window, "确认删除");
+        await WaitUntilAsync(() => !data.HasPending);
+        Assert.Contains("已删除", data.StatusMessage, StringComparison.Ordinal);
+        window.Close();
+    });
+
+    private static bool HasButton(Window window, string text) =>
+        window.GetVisualDescendants().OfType<Button>()
+            .Any(button => string.Equals(button.Content?.ToString(), text, StringComparison.Ordinal));
+
+    private static Button ButtonByText(Window window, string text) =>
+        window.GetVisualDescendants().OfType<Button>()
+            .First(button => string.Equals(button.Content?.ToString(), text, StringComparison.Ordinal));
+
+    private static TextBox TextBoxByName(Window window, string name) =>
+        window.GetVisualDescendants().OfType<TextBox>()
+            .First(control => string.Equals(AutomationProperties.GetName(control), name, StringComparison.Ordinal));
+
+    /// <summary>Real pointer click at the control's position, falling back to the bound command.</summary>
+    private static void Click(Window window, string buttonText)
+    {
+        var button = ButtonByText(window, buttonText);
+        var point = button.Bounds.Width > 0
+            ? button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)
+            : null;
+        if (point is not null)
+        {
+            window.MouseDown(point.Value, MouseButton.Left);
+            window.MouseUp(point.Value, MouseButton.Left);
+        }
+        else
+        {
+            button.Command?.Execute(button.CommandParameter);
+        }
+    }
+
+    private static ShellViewModel CreateShellWithVoice(VoiceControlViewModel voice)
+    {
+        var repository = new InMemoryEventRepository();
+        var clock = new SystemClock();
+        var coordinator = new FakeCaptureCoordinator();
+        var diagnostics = new DiagnosticsUseCase(
+            new FakeCapabilityProvider(),
+            new FakeMaintenanceService(),
+            coordinator,
+            new FakeReportJobQueue());
+        return new ShellViewModel(
+            new TimelineViewModel(new TimelineUseCase(repository, new FakeMediaStore(), clock)),
+            new CaptureControlViewModel(new CaptureControlUseCase(coordinator, new FakeAutoStartService())),
+            new DiagnosticsViewModel(diagnostics),
+            new ReportsViewModel(
+                new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
+                Path.Combine(AppContext.BaseDirectory, "test-temp", "reports-ui")),
+            voice: voice,
+            voiceNavigation: null,
+            search: null,
+            data: new DataManagementViewModel(new FakeDataDeletionService()));
+    }
+
     private static ShellViewModel CreateShell() => CreateShell(out _);
 
     private static ShellViewModel CreateShell(out DataManagementViewModel data)
