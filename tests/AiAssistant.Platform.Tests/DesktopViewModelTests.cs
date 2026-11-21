@@ -593,6 +593,26 @@ public sealed class DesktopViewModelTests
             data: new DataManagementViewModel(new FakeDataDeletionService()));
     }
 
+    [Fact]
+    public Task ReportAndDataViewModels_SeedLocalTodayWithoutTimezoneCrash() => RunInHeadlessSession(async () =>
+    {
+        // Regression for a release-blocking bug: both view models used to seed their date with
+        // `new DateTimeOffset(DateTime.Today, TimeSpan.Zero)`, which throws on any non-UTC machine
+        // (DateTime.Today is Kind=Local; offset Zero only matches UTC). The exception aborted the
+        // entire desktop shell, so the app showed no window and no tray on e.g. GMT+8 machines.
+        var clock = new SystemClock();
+        var reports = new ReportsViewModel(
+            new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
+            Path.Combine(AppContext.BaseDirectory, "test-temp", "reports-tz"));
+        var data = new DataManagementViewModel(new FakeDataDeletionService());
+
+        Assert.NotNull(reports.SelectedDate);
+        Assert.NotNull(data.SelectedDate);
+        Assert.Equal(DateTimeOffset.Now.Date, reports.SelectedDate!.Value);
+        Assert.Equal(DateTimeOffset.Now.Date, data.SelectedDate!.Value);
+        await Task.CompletedTask;
+    });
+
     private static ShellViewModel CreateShell() => CreateShell(out _);
 
     private static ShellViewModel CreateShell(out DataManagementViewModel data)

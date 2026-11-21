@@ -37,14 +37,25 @@ swift tests/ui-e2e/ax-e2e.swift run
 
 ## 当前状态（2026-11-21）
 
-**受阻**：在本机（macOS 26.7.3，Apple Silicon）上，无论 `open`、`open --args` 还是直接运行二进制，
-应用的 Avalonia GUI 外壳 `OnFrameworkInitializationCompleted` 均**未执行**——既无窗口、也无托盘图标
-（仅有后台采集进程与 Helper 存活，日志停留在 "Runtime initialized cleanly"）。`LogToTrace()` 无监听器，
-Avalonia 初始化异常被静默吞掉，难以定位。
+已跑通（`swift ax-e2e.swift run` 3/3 通过）：启动真实 `.app` 后，通过 AX 读取到
 
-待办：给 Avalonia 配置一个 Trace 监听器（或改用 `LogToTrace(LogEventLevel.Error)` + 文件），
-复现并定位 macOS GUI 初始化失败原因；或确认是否与 `runtime.StartAsync()` 在 Avalonia 之前、
-于主线程执行有关。修复后，本驱动即可直接复用。
+- 窗口标题 `时光 · AI 个人活动追踪助手`
+- 顶部横幅静态文本「正在本机采集」「语音休眠」
+
+**已知限制**：Avalonia 的 macOS 辅助功能桥只暴露窗口、`TextBlock`（以 `kAXValue`）
+和 `TabGroup`，**不暴露带名字的按钮/标签**（`AutomationProperties.Name` 未桥接到 NSAccessibility）。
+因此无法按名字点击「暂停采集」「日报」等控件。要点击需改为：
+
+1. **坐标点击**：截图 + 定位（本仓库的 macOS Vision OCR + `PngCodec` 可复用）→ `CGEvent` 点击坐标；
+   或
+2. **补 Avalonia macOS 辅助功能桥**（产品级工作，把 `AutomationPeer` 映射到 NSAccessibility）。
+
+## 曾修复的阻塞 bug
+
+窗口不显示的真因是**时区 bug**：`ReportsViewModel` / `DataManagementViewModel` 用
+`new DateTimeOffset(DateTime.Today, TimeSpan.Zero)` 初始化日期，在非 UTC 机器（如 GMT+8）上
+`DateTime.Today` 的 `Kind=Local` 与 `offset=Zero` 不匹配而抛异常，导致整个桌面外壳创建失败——
+无窗口、无托盘，只有后台采集存活。已改为 `DateTimeOffset.Now.Date` 并补回归测试。
 
 ## 进程内替代（已可用）
 

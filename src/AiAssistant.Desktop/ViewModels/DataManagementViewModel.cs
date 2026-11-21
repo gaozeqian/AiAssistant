@@ -16,7 +16,7 @@ public enum PendingDeletion
 public sealed class DataManagementViewModel : ObservableObject
 {
     private readonly IDataDeletionService _deletion;
-    private DateTimeOffset? _selectedDate = new(DateTime.Today, TimeSpan.Zero);
+    private DateTimeOffset? _selectedDate = DateTimeOffset.Now.Date;
     private PendingDeletion _pending;
     private string _statusMessage = "删除不可撤销；加密媒体与结构化事件会同时移除。";
     private string _errorMessage = string.Empty;

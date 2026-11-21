@@ -13,7 +13,7 @@ public sealed class ReportsViewModel : ObservableObject
 {
     private readonly ReportUseCase _reports;
     private readonly string _exportDirectory;
-    private DateTimeOffset? _selectedDate = new(DateTime.Today, TimeSpan.Zero);
+    private DateTimeOffset? _selectedDate = DateTimeOffset.Now.Date;
     private ReportVersionItem? _selectedVersion;
     private string _markdown = string.Empty;
     private string _standupText = "尚无站会数据";
