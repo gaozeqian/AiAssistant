@@ -39,6 +39,17 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
 
             desktop.MainWindow = window;
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            // UI E2E hook: the app normally starts as a tray-only agent; this shows the window
+            // immediately so an external AX driver can exercise the real window without a tray click.
+            if (string.Equals(
+                    Environment.GetEnvironmentVariable("AIASSISTANT_UI_E2E_SHOW"),
+                    "1",
+                    StringComparison.Ordinal))
+            {
+                window.Show();
+            }
+
             ConfigureTray(desktop, window, shell, icon);
             shell.ExitRequested += (_, _) => desktop.Shutdown();
             desktop.ShutdownRequested += (_, _) =>

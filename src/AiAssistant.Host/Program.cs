@@ -69,6 +69,18 @@ public static class Program
                     return exitCode;
                 }
 
+                // UI E2E 钩子：`open -a AiAssistant.app --args --show-window --data-directory <dir>`
+                // 让 tray-only 应用直接显示主窗口并隔离数据目录，供外部 AX 驱动测试。
+                if (args.Contains("--show-window", StringComparer.OrdinalIgnoreCase))
+                {
+                    Environment.SetEnvironmentVariable("AIASSISTANT_UI_E2E_SHOW", "1");
+                }
+
+                if (TryGetOption(args, "--data-directory", out var dataDirectory))
+                {
+                    Environment.SetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY", dataDirectory);
+                }
+
                 Desktop.ShellApp.ViewModelFactory = runtime.CreateShellViewModel;
                 return OperatingSystem.IsLinux() && runtime.LinuxBackendState is { } linuxBackend
                     ? StartLinuxDesktop(linuxBackend, args)
