@@ -391,7 +391,14 @@ public sealed class AppRuntime : IAsyncDisposable
             modelDirectory = Path.Combine(dataDirectory, "models", "sherpa");
         }
 
-        var voiceOptions = new SherpaVoiceOptions { ModelDirectory = Path.GetFullPath(modelDirectory) };
+        // Fall back to the tuned defaults declared on SherpaVoiceOptions so the two cannot drift.
+        var voiceDefaults = new SherpaVoiceOptions();
+        var voiceOptions = new SherpaVoiceOptions
+        {
+            ModelDirectory = Path.GetFullPath(modelDirectory),
+            KeywordsScore = ReadFloatEnvironment("AIASSISTANT_KWS_SCORE", voiceDefaults.KeywordsScore, 0.1f, 10f),
+            KeywordsThreshold = ReadFloatEnvironment("AIASSISTANT_KWS_THRESHOLD", voiceDefaults.KeywordsThreshold, 0.01f, 0.99f)
+        };
         var sessionOptions = new VoiceSessionOptions
         {
             EnableWakeChime = !string.Equals(
@@ -685,6 +692,14 @@ public sealed class AppRuntime : IAsyncDisposable
             keyStore,
             autoStart,
             backendState));
+    }
+
+    private static float ReadFloatEnvironment(string name, float fallback, float min, float max)
+    {
+        var raw = Environment.GetEnvironmentVariable(name);
+        return float.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? Math.Clamp(value, min, max)
+            : fallback;
     }
 
     private static string? ResolveMacHelperPath()

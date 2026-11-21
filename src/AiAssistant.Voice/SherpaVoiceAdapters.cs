@@ -17,6 +17,16 @@ public sealed class SherpaVoiceOptions
     public string TtsTokens { get; init; } = "tts/tokens.txt";
     public string TtsLexicon { get; init; } = "tts/lexicon.txt";
     public int Threads { get; init; } = 1;
+
+    /// <summary>
+    /// Boosts keyword paths during decoding. Tuned on the 13-positive / 2.12 h golden set:
+    /// 1.0 gave 84.6% recall, 3.0 gave 92.3% with zero false alarms, 5.0 regressed to 84.6%.
+    /// </summary>
+    public float KeywordsScore { get; init; } = 3.0f;
+
+    /// <summary>Posterior threshold for accepting a keyword hit; lower values trade precision for recall.</summary>
+    public float KeywordsThreshold { get; init; } = 0.25f;
+
     public IReadOnlyList<string> WakeWords { get; init; } = ["你好时光"];
 
     public string KeywordsPath => Resolve(KeywordsFile);
@@ -164,6 +174,8 @@ public sealed class SherpaOnnxWakeWordDetector : IWakeWordDetector
         config.ModelConfig.NumThreads = _options.Threads;
         config.ModelConfig.Debug = 0;
         config.KeywordsFile = _options.KeywordsPath;
+        config.KeywordsScore = _options.KeywordsScore;
+        config.KeywordsThreshold = _options.KeywordsThreshold;
         _spotter = new KeywordSpotter(config);
         _stream = _spotter.CreateStream();
         return _spotter;

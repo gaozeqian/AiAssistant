@@ -78,9 +78,9 @@ AIASSISTANT_SHERPA_MODEL_DIR=/models/sherpa-kws \
 ## 5. 已有基线
 
 - `docs/testing/baselines/2026-11-21-macos-arm64.md`：合成语料 ASR CER 12.45%（sherpa）/ 27.48%（Whisper small）、
-  OCR CER 0.00%（macOS Vision）、KWS 唤醒率 87.5% 且误唤醒 0 次/小时。
+  OCR CER 0.00%（macOS Vision）、KWS 唤醒率 84.6%（13 正）且 2.12 小时负样本零误唤醒。
 
 ## 6. 待补齐
 
-- KWS 负样本建议 ≥ 2 小时；6 分钟语料下 1 次误唤醒即 10 次/小时量级，统计噪声大。
+- KWS 负样本已达 2.12 小时，后续优先补真人录音与噪声场景，而非继续堆合成时长。
 - 真实脱敏语料扩充后，把 `--benchmark-retrieval` 的查询集也替换为真实分布（`S8-R1`）。
