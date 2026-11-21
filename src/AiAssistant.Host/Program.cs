@@ -11,8 +11,18 @@ namespace AiAssistant.Host;
 
 public static class Program
 {
+    /// <summary>
+    /// Set when the async prologue reached the point where the desktop shell should start.
+    /// AppKit and Avalonia both require the process main thread, but continuations after an
+    /// awaited call resume on pool threads, so the UI is started back in <see cref="Main"/> (S3-R1).
+    /// </summary>
+    private sealed class DesktopShellHandoff
+    {
+        public bool Requested { get; set; }
+    }
+
     [STAThread]
-    public static async Task<int> Main(string[] args)
+    public static int Main(string[] args)
     {
         try
         {
@@ -48,8 +58,43 @@ public static class Program
 
         try
         {
-            await using var runtime = await AppRuntime.CreateAsync();
+            // Blocking is intentional: it keeps the main thread free to own the AppKit/Avalonia loop.
+            var runtime = AppRuntime.CreateAsync().GetAwaiter().GetResult();
+            try
+            {
+                var handoff = new DesktopShellHandoff();
+                var exitCode = RunAsync(runtime, args, handoff).GetAwaiter().GetResult();
+                if (!handoff.Requested)
+                {
+                    return exitCode;
+                }
 
+                Desktop.ShellApp.ViewModelFactory = runtime.CreateShellViewModel;
+                return OperatingSystem.IsLinux() && runtime.LinuxBackendState is { } linuxBackend
+                    ? StartLinuxDesktop(linuxBackend, args)
+                    : BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            }
+            finally
+            {
+                runtime.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine($"AiAssistant usage error: {ex.Message}");
+            return 3;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"AiAssistant startup failed ({ex.GetType().Name}): {ex.Message}");
+            return 2;
+        }
+    }
+
+    private static async Task<int> RunAsync(AppRuntime runtime, string[] args, DesktopShellHandoff handoff)
+    {
+        try
+        {
             if (args.Contains("--mcp-token", StringComparer.OrdinalIgnoreCase))
             {
                 // Explicit local action: prints the bearer token so the user can paste it into an MCP client.
@@ -326,13 +371,9 @@ public static class Program
                 return 0;
             }
 
-            Desktop.ShellApp.ViewModelFactory = runtime.CreateShellViewModel;
-            if (OperatingSystem.IsLinux() && runtime.LinuxBackendState is { } linuxBackend)
-            {
-                return StartLinuxDesktop(linuxBackend, args);
-            }
-
-            return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            // AppKit/Avalonia require the process main thread; Main starts the shell there.
+            handoff.Requested = true;
+            return 0;
         }
         catch (ArgumentException ex)
         {

@@ -55,6 +55,68 @@ private final class PermissionCache: @unchecked Sendable {
 
 // MARK: - TCC Permissions & Native macOS Adapters
 
+/// Fires the macOS TCC prompts the first time a capability is actually used.
+///
+/// Without this the helper only preflights, so a fresh install would show "permission required"
+/// forever and never tell the user that a dialog is waiting (S3-R1). Requests run off the IPC
+/// thread because `CGRequestScreenCaptureAccess` blocks until the user answers the dialog.
+private final class PermissionPrompter: @unchecked Sendable {
+    static let shared = PermissionPrompter()
+
+    private let lock = NSLock()
+    private let queue = DispatchQueue(label: "aiassistant.helper.tcc.prompts", qos: .userInitiated)
+    private var requestedScreenRecording = false
+    private var requestedMicrophone = false
+    private var requestedAccessibility = false
+
+    func requestScreenRecordingIfNeeded() {
+        guard markScreenRecording() else { return }
+        queue.async {
+            _ = CGRequestScreenCaptureAccess()
+        }
+    }
+
+    func requestMicrophoneIfNeeded() {
+        guard markMicrophone() else { return }
+        queue.async {
+            AVCaptureDevice.requestAccess(for: .audio) { _ in }
+        }
+    }
+
+    func requestAccessibilityIfNeeded() {
+        guard markAccessibility() else { return }
+        queue.async {
+            // Literal key avoids Swift 6 concurrency complaints about the kAXTrustedCheckOptionPrompt global.
+            let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(options)
+        }
+    }
+
+    private func markScreenRecording() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if requestedScreenRecording { return false }
+        requestedScreenRecording = true
+        return true
+    }
+
+    private func markMicrophone() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if requestedMicrophone { return false }
+        requestedMicrophone = true
+        return true
+    }
+
+    private func markAccessibility() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if requestedAccessibility { return false }
+        requestedAccessibility = true
+        return true
+    }
+}
+
 enum MacNativeCapabilities {
     private static let permissionRefreshQueue = DispatchQueue(label: "aiassistant.helper.tcc.permissions")
     private static let permissionCache = PermissionCache()
@@ -133,6 +195,10 @@ enum MacNativeCapabilities {
                     windowTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
                 }
             }
+        } else {
+            // Window titles stay degraded (app name only) until the user grants Accessibility;
+            // opening the settings pane once is the only actionable hint we can give.
+            PermissionPrompter.shared.requestAccessibilityIfNeeded()
         }
 
         return MacForegroundWindowDto(
@@ -145,7 +211,8 @@ enum MacNativeCapabilities {
 
     static func captureScreen(maxWidth: Int) -> Result<MacScreenFrameDto, MacAdapterError> {
         guard CGPreflightScreenCaptureAccess() else {
-            return .failure(.permissionDenied("Screen Recording permission has not been granted."))
+            PermissionPrompter.shared.requestScreenRecordingIfNeeded()
+            return .failure(.permissionDenied("Screen Recording permission has not been granted; approve the system prompt or enable it in System Settings."))
         }
 
         let clampedMaxWidth = max(320, min(maxWidth, 2560))
@@ -531,6 +598,7 @@ final class OnDemandAudioTap: @unchecked Sendable {
 
     func pollChunk() -> Result<MacAudioChunkDto?, MacAdapterError> {
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
+            PermissionPrompter.shared.requestMicrophoneIfNeeded()
             stop()
             return .failure(.permissionDenied("Microphone permission has not been granted."))
         }
