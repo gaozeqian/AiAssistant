@@ -218,7 +218,7 @@ public sealed class MacHelperSupervisor : IMacHelperSupervisor
                     MacHelperProtocol.Methods.Handshake,
                     ProtocolVersion: MacHelperProtocol.CurrentVersion,
                     AuthToken: oneTimeToken),
-                _options.RequestTimeout,
+                _options.HandshakeTimeout,
                 ct);
 
             if (!handshake.Ok)

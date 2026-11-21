@@ -31,6 +31,7 @@ public static class MacHelperProtocol
         public const string ExtractText = "text.extract";
         public const string PollFileEvents = "fs.poll";
         public const string PollAudioFrames = "audio.poll";
+        public const string PlayAudio = "audio.play";
         public const string Shutdown = "shutdown";
     }
 
@@ -81,7 +82,9 @@ public sealed record MacIpcRequest(
     int? MaxWidth = null,
     long? WindowId = null,
     string? PngBase64 = null,
-    IReadOnlyList<string>? Directories = null);
+    IReadOnlyList<string>? Directories = null,
+    int? SampleRateHz = null,
+    string? Float32PcmBase64 = null);
 
 public sealed record MacPermissionsDto(
     string? ScreenRecording,

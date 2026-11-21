@@ -13,11 +13,81 @@ private final class AsyncBox<T: Sendable>: @unchecked Sendable {
     var value: Result<T, any Error>?
 }
 
+/// Lock-protected TCC snapshot shared by the IPC loop and its background refresher.
+private final class PermissionCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var snapshot = MacPermissionsDto(
+        screenRecording: "unknown",
+        accessibility: "unknown",
+        microphone: "unknown"
+    )
+    private var refreshing = false
+
+    func current() -> MacPermissionsDto {
+        lock.lock()
+        defer { lock.unlock() }
+        return snapshot
+    }
+
+    func store(_ value: MacPermissionsDto) {
+        lock.lock()
+        snapshot = value
+        lock.unlock()
+    }
+
+    func tryBeginRefresh() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if refreshing {
+            return false
+        }
+        refreshing = true
+        return true
+    }
+
+    func finishRefresh(_ value: MacPermissionsDto) {
+        lock.lock()
+        snapshot = value
+        refreshing = false
+        lock.unlock()
+    }
+}
+
 // MARK: - TCC Permissions & Native macOS Adapters
 
 enum MacNativeCapabilities {
+    private static let permissionRefreshQueue = DispatchQueue(label: "aiassistant.helper.tcc.permissions")
+    private static let permissionCache = PermissionCache()
 
+    /// Non-blocking snapshot for the IPC loop.
+    ///
+    /// `AVCaptureDevice.authorizationStatus` alone costs 1–1.6 s whenever tccd is cold, so a
+    /// synchronous TCC read on every `ping` stalled all other requests (measured on macOS 26,
+    /// S7-R2). The cached value is returned immediately and refreshed on a background queue.
     static func queryPermissions() -> MacPermissionsDto {
+        schedulePermissionRefresh()
+        return permissionCache.current()
+    }
+
+    /// Blocking refresh for the handshake and explicit diagnostics requests.
+    static func queryPermissionsBlocking() -> MacPermissionsDto {
+        let snapshot = readPermissions()
+        permissionCache.store(snapshot)
+        return snapshot
+    }
+
+    private static func schedulePermissionRefresh() {
+        guard permissionCache.tryBeginRefresh() else {
+            return
+        }
+
+        permissionRefreshQueue.async {
+            let snapshot = readPermissions()
+            permissionCache.finishRefresh(snapshot)
+        }
+    }
+
+    private static func readPermissions() -> MacPermissionsDto {
         let screenGranted = CGPreflightScreenCaptureAccess()
         let axGranted = AXIsProcessTrusted()
         let micStatus: String

@@ -408,14 +408,48 @@ public sealed class MacOsAudioCaptureFactory(IMacHelperSupervisor supervisor, IC
 }
 
 /// <summary>macOS feedback playback is deferred to the S9 helper extension; voice text feedback remains available.</summary>
-public sealed class MacOsAudioPlayback : IAudioPlayback
+/// <summary>
+/// macOS TTS feedback playback via the Swift Helper's AVAudioEngine (S7-R2).
+/// Samples stay in memory as float32 PCM; no temporary audio files are written.
+/// </summary>
+public sealed class MacOsAudioPlayback(IMacHelperSupervisor supervisor) : IAudioPlayback
 {
-    public CapabilityState Capability => CapabilityState.Degraded(
-        CapabilityKind.WakeWord,
-        "macOS TTS playback requires the native helper audio output extension");
+    private const int MaxDurationSeconds = 30;
 
-    public Task PlayAsync(ReadOnlyMemory<float> samples, int sampleRateHz, CancellationToken ct) =>
-        Task.CompletedTask;
+    public CapabilityState Capability => supervisor.Status == MacHelperSupervisorStatus.Healthy
+        ? CapabilityState.Supported(
+            CapabilityKind.WakeWord,
+            "AVAudioEngine feedback playback via Swift Helper")
+        : CapabilityState.Degraded(
+            CapabilityKind.WakeWord,
+            $"macOS helper {supervisor.Status}; voice feedback playback unavailable",
+            "Voice commands still work; check the helper status on the diagnostics page.");
+
+    public async Task PlayAsync(ReadOnlyMemory<float> samples, int sampleRateHz, CancellationToken ct)
+    {
+        if (samples.IsEmpty || sampleRateHz <= 0)
+        {
+            return;
+        }
+
+        // Feedback is short by design; clamp pathological payloads instead of blocking the session.
+        var maxSamples = sampleRateHz * MaxDurationSeconds;
+        if (samples.Length > maxSamples)
+        {
+            samples = samples[..maxSamples];
+        }
+
+        var pcmBytes = MemoryMarshal.AsBytes(samples.Span).ToArray();
+
+        // Playback failures must never break a voice command; Capability already reflects helper health.
+        await supervisor.InvokeAsync(
+            new MacIpcRequest(
+                string.Empty,
+                MacHelperProtocol.Methods.PlayAudio,
+                SampleRateHz: sampleRateHz,
+                Float32PcmBase64: Convert.ToBase64String(pcmBytes)),
+            ct);
+    }
 }
 
 public sealed class MacOsAudioCapture(

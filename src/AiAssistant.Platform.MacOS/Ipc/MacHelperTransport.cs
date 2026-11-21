@@ -11,6 +11,11 @@ public sealed class MacHelperOptions
     public string? SocketDirectory { get; init; }
     public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(3);
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(2);
+    /// <summary>
+    /// The handshake performs a blocking TCC lookup (measured 1.5–1.9 s on macOS 26 when tccd is cold),
+    /// so it gets a wider budget than ordinary requests instead of triggering a false restart.
+    /// </summary>
+    public TimeSpan HandshakeTimeout { get; init; } = TimeSpan.FromSeconds(10);
     public TimeSpan HeartbeatInterval { get; init; } = TimeSpan.FromSeconds(10);
     public TimeSpan InitialBackoff { get; init; } = TimeSpan.FromMilliseconds(500);
     public TimeSpan MaxBackoff { get; init; } = TimeSpan.FromSeconds(30);

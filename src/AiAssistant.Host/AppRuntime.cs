@@ -573,7 +573,8 @@ public sealed class AppRuntime : IAsyncDisposable
             new MacOsAudioCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
         services.AddSingleton<IAudioCaptureFactory>(provider =>
             new MacOsAudioCaptureFactory(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
-        services.AddSingleton<IAudioPlayback>(new MacOsAudioPlayback());
+        services.AddSingleton<IAudioPlayback>(provider =>
+            new MacOsAudioPlayback(provider.GetRequiredService<IMacHelperSupervisor>()));
         services.AddSingleton<IAutoStartService>(autoStart);
         services.AddSingleton<ICapabilityProvider>(provider => new MacOsCapabilityProvider(
             provider.GetRequiredService<IScreenCapture>(),

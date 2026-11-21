@@ -193,6 +193,51 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
     }
 
     [Fact]
+    public async Task TtsPlaybackSendsFloat32PcmToHelper_AndCapabilityFollowsHelperHealth()
+    {
+        var behavior = new FakeHelperBehavior();
+        var launcher = new FakeMacHelperLauncher(behavior);
+        await using var supervisor = CreateSupervisor(launcher, out _);
+        await supervisor.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => supervisor.Status == MacHelperSupervisorStatus.Healthy);
+
+        var playback = new MacOsAudioPlayback(supervisor);
+        Assert.Equal(CapabilityStatus.Supported, playback.Capability.Status);
+
+        await playback.PlayAsync(new float[] { 0.25f, -0.5f, 0.75f }, 24_000, CancellationToken.None);
+        Assert.Equal(1, behavior.PlayAudioCalls);
+        Assert.Equal(24_000, behavior.LastPlayedSampleRateHz);
+        Assert.Equal([0.25f, -0.5f, 0.75f], behavior.LastPlayedSamples!);
+
+        // Pathological payloads are clamped to 30 seconds instead of blocking the session.
+        var oversized = new float[24_000 * 40];
+        await playback.PlayAsync(oversized, 24_000, CancellationToken.None);
+        Assert.Equal(24_000 * 30, behavior.LastPlayedSamples!.Length);
+
+        // Empty audio and invalid rates never hit the helper.
+        await playback.PlayAsync(ReadOnlyMemory<float>.Empty, 16_000, CancellationToken.None);
+        await playback.PlayAsync(new float[] { 0.1f }, 0, CancellationToken.None);
+        Assert.Equal(2, behavior.PlayAudioCalls);
+    }
+
+    [Fact]
+    public async Task TtsPlaybackDegradesWithoutBreakingVoiceCommands_WhenHelperIsUnavailable()
+    {
+        var supervisor = new MacHelperSupervisor(
+            launcher: null,
+            new MacHelperOptions { SocketDirectory = _tempRoot },
+            NullLogger<MacHelperSupervisor>.Instance);
+        await using var disposable = supervisor;
+        await supervisor.StartAsync(CancellationToken.None);
+
+        var playback = new MacOsAudioPlayback(supervisor);
+        Assert.Equal(CapabilityStatus.Degraded, playback.Capability.Status);
+
+        // Playback must be a no-throw degradation; the voice session keeps text feedback.
+        await playback.PlayAsync(new float[] { 0.1f, 0.2f }, 16_000, CancellationToken.None);
+    }
+
+    [Fact]
     public async Task RequestTimeoutIsBounded_AndUnexpectedDisconnectIsDiagnosable()
     {
         var behavior = new FakeHelperBehavior { PingDelayMs = 250 };
@@ -325,6 +370,9 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
         public MacPermissionGrant Microphone { get; set; } = MacPermissionGrant.Granted;
         public string? NextFilePath { get; set; }
         public float[]? AudioSamples { get; set; }
+        public int PlayAudioCalls { get; set; }
+        public int? LastPlayedSampleRateHz { get; set; }
+        public float[]? LastPlayedSamples { get; set; }
         public string? LastReceivedToken { get; set; }
         public int? LastHandshakeProtocolVersion { get; set; }
         public int Generation { get; set; }
@@ -493,8 +541,25 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
             MacHelperProtocol.Methods.PollFileEvents =>
                 new(request.RequestId, true, FileChanges: behavior.NextFilePath is null ? [] : [new MacFileChangeDto(behavior.NextFilePath, "Modified")]),
             MacHelperProtocol.Methods.PollAudioFrames => BuildAudioResponse(request, behavior),
+            MacHelperProtocol.Methods.PlayAudio => BuildPlayAudioResponse(request, behavior),
             _ => new(request.RequestId, false, ErrorCode: MacHelperProtocol.ErrorCodes.InternalError)
         };
+
+        private static MacIpcResponse BuildPlayAudioResponse(MacIpcRequest request, FakeHelperBehavior state)
+        {
+            state.PlayAudioCalls++;
+            state.LastPlayedSampleRateHz = request.SampleRateHz;
+
+            if (request.Float32PcmBase64 is null)
+            {
+                state.LastPlayedSamples = null;
+                return new MacIpcResponse(request.RequestId, false, ErrorCode: MacHelperProtocol.ErrorCodes.InternalError);
+            }
+
+            var bytes = Convert.FromBase64String(request.Float32PcmBase64);
+            state.LastPlayedSamples = MemoryMarshal.Cast<byte, float>(bytes).ToArray();
+            return new MacIpcResponse(request.RequestId, true);
+        }
 
         private static MacIpcResponse BuildAudioResponse(MacIpcRequest request, FakeHelperBehavior state)
         {

@@ -94,7 +94,9 @@ enum MacHelperServer {
         let encoder = JSONEncoder()
         let fsTracker = WhitelistedDirectoryTracker()
         let audioTap = OnDemandAudioTap()
+        let audioPlayback = OnDemandAudioPlayback()
         defer {
+            audioPlayback.stop()
             audioTap.stop()
             fsTracker.stop()
         }
@@ -130,7 +132,7 @@ enum MacHelperServer {
             requestId: firstReq.requestId,
             ok: true,
             protocolVersion: ProtocolConstants.currentVersion,
-            permissions: MacNativeCapabilities.queryPermissions()
+            permissions: MacNativeCapabilities.queryPermissionsBlocking()
         )
         guard FrameIO.writeFrame(fd: clientFd, response: hsOk, encoder: encoder) else {
             return 0
@@ -144,7 +146,7 @@ enum MacHelperServer {
                 break
             }
 
-            let resp = dispatchRequest(req, fsTracker: fsTracker, audioTap: audioTap)
+            let resp = dispatchRequest(req, fsTracker: fsTracker, audioTap: audioTap, audioPlayback: audioPlayback)
             if !FrameIO.writeFrame(fd: clientFd, response: resp, encoder: encoder) {
                 break
             }
@@ -156,15 +158,26 @@ enum MacHelperServer {
     private static func dispatchRequest(
         _ req: MacIpcRequest,
         fsTracker: WhitelistedDirectoryTracker,
-        audioTap: OnDemandAudioTap
+        audioTap: OnDemandAudioTap,
+        audioPlayback: OnDemandAudioPlayback
     ) -> MacIpcResponse {
         switch req.method {
-        case "ping", "permissions.query":
+        case "ping":
+            // Heartbeat must stay cheap: serve the cached TCC snapshot and refresh in the background.
             return MacIpcResponse(
                 requestId: req.requestId,
                 ok: true,
                 protocolVersion: ProtocolConstants.currentVersion,
                 permissions: MacNativeCapabilities.queryPermissions()
+            )
+
+        case "permissions.query":
+            // Explicit diagnostics request: pay the TCC round-trip once, on purpose.
+            return MacIpcResponse(
+                requestId: req.requestId,
+                ok: true,
+                protocolVersion: ProtocolConstants.currentVersion,
+                permissions: MacNativeCapabilities.queryPermissionsBlocking()
             )
 
         case "window.foreground":
@@ -253,6 +266,29 @@ enum MacHelperServer {
                     errorCode: "permission_denied",
                     errorMessage: msg,
                     permissions: MacNativeCapabilities.queryPermissions()
+                )
+            case .failure(.internalFailure(let msg)):
+                return MacIpcResponse(
+                    requestId: req.requestId,
+                    ok: false,
+                    errorCode: "internal_error",
+                    errorMessage: msg
+                )
+            }
+
+        case "audio.play":
+            switch audioPlayback.play(
+                sampleRateHz: req.sampleRateHz,
+                float32PcmBase64: req.float32PcmBase64
+            ) {
+            case .success:
+                return MacIpcResponse(requestId: req.requestId, ok: true)
+            case .failure(.permissionDenied(let msg)):
+                return MacIpcResponse(
+                    requestId: req.requestId,
+                    ok: false,
+                    errorCode: "permission_denied",
+                    errorMessage: msg
                 )
             case .failure(.internalFailure(let msg)):
                 return MacIpcResponse(

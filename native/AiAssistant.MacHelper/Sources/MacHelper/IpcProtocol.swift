@@ -18,6 +18,8 @@ struct MacIpcRequest: Codable, Sendable {
     let windowId: Int64?
     let pngBase64: String?
     let directories: [String]?
+    let sampleRateHz: Int?
+    let float32PcmBase64: String?
 }
 
 struct MacPermissionsDto: Codable, Sendable {
