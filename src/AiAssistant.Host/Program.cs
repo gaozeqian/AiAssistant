@@ -284,6 +284,22 @@ public static class Program
                     .RunAsync(outputPath, CancellationToken.None);
             }
 
+            if (args.Contains("--benchmark-asr", StringComparer.OrdinalIgnoreCase))
+            {
+                var samples = ResolveSamplesDirectory(args, "asr");
+                var outputPath = ResolveBenchmarkOutput(args, "asr");
+                return await new AsrBenchmarkCommand(runtime.AsrEngine)
+                    .RunAsync(samples, outputPath, CancellationToken.None);
+            }
+
+            if (args.Contains("--benchmark-ocr", StringComparer.OrdinalIgnoreCase))
+            {
+                var samples = ResolveSamplesDirectory(args, "ocr");
+                var outputPath = ResolveBenchmarkOutput(args, "ocr");
+                return await new OcrBenchmarkCommand(runtime.OcrRecognizer)
+                    .RunAsync(samples, outputPath, CancellationToken.None);
+            }
+
             var isMaintenanceCommand = args.Any(argument =>
                 string.Equals(argument, "--backup", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(argument, "--restore", StringComparison.OrdinalIgnoreCase) ||
@@ -477,6 +493,10 @@ public static class Program
         Models:
           --benchmark-model [--output <p>]   Run the fixed chat benchmark
           --benchmark-retrieval [--output <p>] Run the retrieval quality benchmark
+          --benchmark-asr [--samples <dir>] [--output <p>]
+                                             Run the Chinese ASR golden set (wav + txt) and report CER
+          --benchmark-ocr [--samples <dir>] [--output <p>]
+                                             Run the OCR golden set (png + txt); Linux RapidOCR only
           --probe-model                      Print endpoint capabilities
           --import-model-secret <name>       Read a secret from stdin and store it encrypted
           --list-model-secrets               List secret names (values are never shown)
@@ -553,6 +573,16 @@ public static class Program
         }
 
         return builder.ToString();
+    }
+
+    private static string ResolveSamplesDirectory(string[] args, string prefix)
+    {
+        if (TryGetOption(args, "--samples", out var value))
+        {
+            return Path.GetFullPath(value);
+        }
+
+        return Path.GetFullPath(Path.Combine("artifacts", "golden", prefix));
     }
 
     private static string ResolveBenchmarkOutput(string[] args, string prefix)

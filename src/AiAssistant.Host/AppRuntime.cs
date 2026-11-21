@@ -74,6 +74,11 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public ICapabilityProvider? Capabilities => _services.GetService<ICapabilityProvider>();
 
+    public IAsrEngine AsrEngine => _services.GetRequiredService<IAsrEngine>();
+
+    /// <summary>Only registered where a managed image OCR adapter exists (Linux RapidOCR).</summary>
+    public IImageOcrRecognizer? OcrRecognizer => _services.GetService<IImageOcrRecognizer>();
+
     public IModelCapabilityProber ModelCapabilityProber =>
         _services.GetRequiredService<IModelCapabilityProber>();
 
