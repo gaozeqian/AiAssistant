@@ -98,6 +98,26 @@ public sealed class HybridSearchAndEvidenceTests
     }
 
     [Fact]
+    public async Task Answer_WithMergedCitationBracket_KeepsModelAnswer()
+    {
+        // gemma emits several citations inside one bracket: [E1, E2, E3].
+        var (answerer, _) = CreateAnswerer(
+            "今天使用的应用是 Rider 和 Chrome [E1, E2]。",
+            [new VectorSearchHit("e1", 0.9f), new VectorSearchHit("e2", 0.8f)]);
+
+        var answer = await answerer.AnswerAsync(
+            "今天用过哪些应用",
+            new DateOnly(2026, 11, 20),
+            new DateOnly(2026, 11, 20),
+            CancellationToken.None);
+
+        Assert.False(answer.Degraded);
+        Assert.Equal(2, answer.CitedEvidenceIds.Count);
+        Assert.Contains("Rider", answer.Answer, StringComparison.Ordinal);
+        Assert.DoesNotContain("根据本地证据", answer.Answer, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Answer_WithoutCitations_FallsBackToExtractiveEvidence()
     {
         var (answerer, model) = CreateAnswerer(

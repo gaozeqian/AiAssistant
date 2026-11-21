@@ -294,6 +294,8 @@ public sealed partial class EvidenceQuestionAnswerUseCase(
             DegradedReason: reason);
     }
 
-    [GeneratedRegex(@"\[E(\d+)\]", RegexOptions.CultureInvariant)]
+    // Models emit citations both as [E1][E2] and as a merged [E1, E2, E3] (gemma does the latter
+    // when several evidence items are supplied). Match the bare E# token so both forms are cited.
+    [GeneratedRegex(@"\bE(\d+)\b", RegexOptions.CultureInvariant)]
     private static partial Regex CitationRegex();
 }
