@@ -76,15 +76,26 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public event Action<ThemeVariant>? ThemeVariantChanged;
 
     /// <summary>Current UI theme variant; the shell applies it to the application on change.</summary>
-    public ThemeVariant ThemeVariant { get; set; } = ThemeVariant.Light;
+    private ThemeVariant _themeVariant = ThemeVariant.Light;
+    public ThemeVariant ThemeVariant
+    {
+        get => _themeVariant;
+        set
+        {
+            if (SetProperty(ref _themeVariant, value))
+            {
+                OnPropertyChanged(nameof(ThemeToggleText));
+                ThemeVariantChanged?.Invoke(value);
+            }
+        }
+    }
 
+    /// <summary>The mode this button switches TO (not the current mode).</summary>
     public string ThemeToggleText => ThemeVariant == ThemeVariant.Dark ? "浅色模式" : "深色模式";
 
     private void ToggleTheme()
     {
         ThemeVariant = ThemeVariant == ThemeVariant.Dark ? ThemeVariant.Light : ThemeVariant.Dark;
-        OnPropertyChanged(nameof(ThemeToggleText));
-        ThemeVariantChanged?.Invoke(ThemeVariant);
     }
 
     public int SelectedSectionIndex
