@@ -728,4 +728,6 @@ internal sealed class FakeKeyStore : IKeyStore
     public Task<byte[]> GetOrCreateMasterKeyAsync(string keyId, CancellationToken ct) => Task.FromResult(_key.ToArray());
 
     public Task RotateWrapperKeyAsync(string keyId, CancellationToken ct) => Task.CompletedTask;
+
+    public IKeyStore CreateForDirectory(string dataDirectory) => this;
 }

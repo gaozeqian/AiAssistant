@@ -33,6 +33,7 @@ public sealed class EncryptedSqliteConnectionFactory
     }
 
     public StorageOptions Options => _options;
+    public IKeyStore KeyStore => _keyStore;
     public bool IsNativeSqliteVecLoaded => _isSqliteVecAvailable;
     public string VectorBackendDiagnostic => _vecBackendDiagnostic;
 

@@ -146,14 +146,16 @@ if [[ -f "$ZIP_PATH" ]]; then
 fi
 
 PKG_PATH="$REPO_ROOT/$OUTPUT_ROOT/AiAssistant-$VERSION-$RUNTIME.pkg"
-if [[ "$(uname -s)" == "Darwin" && -n "$CERTIFICATE_PATH" && -f "$CERTIFICATE_PATH" ]]; then
+if [[ "$(uname -s)" == "Darwin" ]]; then
   PKG_ROOT="$STAGE/pkgroot"
   PKG_SCRIPTS="$STAGE/pkgscripts"
   rm -rf "$PKG_ROOT" "$PKG_SCRIPTS"
-  mkdir -p "$PKG_ROOT/Applications" "$PKG_ROOT/usr/local/share/aiassistant" "$PKG_SCRIPTS"
-  cp -R "$APP" "$PKG_ROOT/Applications/"
-  cp "$CERTIFICATE_PATH" "$PKG_ROOT/usr/local/share/aiassistant/AiAssistant.cer"
-  cat > "$PKG_SCRIPTS/postinstall" <<'POSTINSTALL'
+  mkdir -p "$PKG_ROOT/Applications" "$PKG_SCRIPTS"
+
+  if [[ -n "$CERTIFICATE_PATH" && -f "$CERTIFICATE_PATH" ]]; then
+    mkdir -p "$PKG_ROOT/usr/local/share/aiassistant"
+    cp "$CERTIFICATE_PATH" "$PKG_ROOT/usr/local/share/aiassistant/AiAssistant.cer"
+    cat > "$PKG_SCRIPTS/postinstall" <<'POSTINSTALL'
 #!/bin/bash
 set -e
 CERT="/usr/local/share/aiassistant/AiAssistant.cer"
@@ -162,12 +164,17 @@ if [ -f "$CERT" ]; then
 fi
 exit 0
 POSTINSTALL
-  chmod +x "$PKG_SCRIPTS/postinstall"
+    chmod +x "$PKG_SCRIPTS/postinstall"
+  fi
+
+  cp -R "$APP" "$PKG_ROOT/Applications/"
   rm -f "$PKG_PATH"
-  pkgbuild --root "$PKG_ROOT" --scripts "$PKG_SCRIPTS"     --identifier "com.aiassistant.app" --version "$VERSION"     --install-location "/" "$PKG_PATH" >/dev/null
+  pkgbuild --root "$PKG_ROOT" --scripts "$PKG_SCRIPTS" \
+    --identifier "com.aiassistant.app" --version "$VERSION" \
+    --install-location "/" "$PKG_PATH" >/dev/null
   echo "pkg: $PKG_PATH"
 else
-  echo "warning: pkgbuild requires macOS and --certificate; skipping .pkg" >&2
+  echo "warning: pkgbuild is macOS-only; skipping .pkg" >&2
 fi
 
 write_checksums() {

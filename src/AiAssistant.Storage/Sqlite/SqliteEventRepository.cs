@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using AiAssistant.Application.Ports;
@@ -644,10 +645,32 @@ public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFa
             File.Delete(destinationPath);
         }
 
-        await using var sourceConn = await connectionFactory.OpenConnectionAsync(ct);
-        await using var destConn = await connectionFactory.OpenConnectionForPathAsync(destinationPath, ct);
-        sourceConn.BackupDatabase(destConn);
-        await destConn.CloseAsync();
+        // Backups are self-contained: encrypted DB + the wrapped master-key envelope + encrypted media,
+        // so a restore into another data directory on the same machine can decrypt everything.
+        var tempDir = Path.Combine(Path.GetTempPath(), $"aiassistant-backup-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var tempDb = Path.Combine(tempDir, connectionFactory.Options.DatabaseFileName);
+            await using (var sourceConn = await connectionFactory.OpenConnectionAsync(ct))
+            await using (var destConn = await connectionFactory.OpenConnectionForPathAsync(tempDb, ct))
+            {
+                sourceConn.BackupDatabase(destConn);
+                await destConn.CloseAsync();
+            }
+
+            using var zip = ZipFile.Open(destinationPath, ZipArchiveMode.Create);
+            zip.CreateEntryFromFile(tempDb, "database/aiassistant.enc.db", CompressionLevel.Optimal);
+            AddDirectoryToZip(zip, connectionFactory.Options.KeyStoreDirectory, "keystore");
+            AddDirectoryToZip(zip, connectionFactory.Options.MediaDirectory, "media");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
     }
 
     public async Task RestoreEncryptedAsync(string backupSourcePath, CancellationToken ct)
@@ -657,41 +680,158 @@ public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFa
             throw new FileNotFoundException("Encrypted backup file does not exist.", backupSourcePath);
         }
 
-        // Verify the backup can be decrypted with current key and passes integrity_check BEFORE touching active DB!
-        await using (var verifyConn = await connectionFactory.OpenConnectionForPathAsync(backupSourcePath, ct))
+        if (!IsZipArchive(backupSourcePath))
         {
-            await using var cmd = verifyConn.CreateCommand();
+            await RestoreLegacyDatabaseFileAsync(backupSourcePath, ct);
+            return;
+        }
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"aiassistant-restore-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            ZipFile.ExtractToDirectory(backupSourcePath, tempDir);
+            var extractedDb = Path.Combine(tempDir, "database", "aiassistant.enc.db");
+            if (!File.Exists(extractedDb))
+            {
+                throw new StorageIntegrityException("Backup archive does not contain database/aiassistant.enc.db.");
+            }
+
+            // Verify with the backup's own keystore BEFORE touching the live data directory. On this machine
+            // the OS KEK still unwraps the envelope; a backup from another machine fails here cleanly.
+            var tempFactory = new EncryptedSqliteConnectionFactory(
+                new StorageOptions { DataDirectory = tempDir },
+                connectionFactory.KeyStore.CreateForDirectory(tempDir));
+            await VerifyRestorableAsync(tempFactory, Path.Combine(tempDir, "database", "aiassistant.enc.db"), ct);
+
+            var dbPath = connectionFactory.Options.DatabasePath;
+            Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+            DeleteDatabaseSidecars(dbPath);
+            File.Copy(extractedDb, dbPath, overwrite: true);
+
+            ReplaceDirectoryContents(Path.Combine(tempDir, "keystore"), connectionFactory.Options.KeyStoreDirectory);
+            ReplaceDirectoryContents(Path.Combine(tempDir, "media"), connectionFactory.Options.MediaDirectory);
+
+            // Apply forward migrations if the backup was from an older schema version.
+            await InitializeAsync(ct);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+    }
+
+    /// <summary>Legacy path: a raw SQLite3MC database file, restorable only with the live key envelope.</summary>
+    private async Task RestoreLegacyDatabaseFileAsync(string backupSourcePath, CancellationToken ct)
+    {
+        await VerifyRestorableAsync(connectionFactory, backupSourcePath, ct);
+
+        var dbPath = connectionFactory.Options.DatabasePath;
+        Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+        DeleteDatabaseSidecars(dbPath);
+        File.Copy(backupSourcePath, dbPath, overwrite: true);
+        await InitializeAsync(ct);
+    }
+
+    private static async Task VerifyRestorableAsync(
+        EncryptedSqliteConnectionFactory factory,
+        string databasePath,
+        CancellationToken ct)
+    {
+        await using var verifyConn = await factory.OpenConnectionForPathAsync(databasePath, ct);
+        await using (var cmd = verifyConn.CreateCommand())
+        {
             cmd.CommandText = "PRAGMA integrity_check;";
             var status = (await cmd.ExecuteScalarAsync(ct))?.ToString();
             if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
             {
-                throw new StorageIntegrityException($"Refusing to restore corrupted backup '{backupSourcePath}': {status}");
+                throw new StorageIntegrityException($"Refusing to restore corrupted backup '{databasePath}': {status}");
             }
+        }
 
-            var backupVersion = await SchemaMigrator.GetCurrentVersionAsync(verifyConn, ct);
-            if (backupVersion > SchemaVersion.Current)
+        var backupVersion = await SchemaMigrator.GetCurrentVersionAsync(verifyConn, ct);
+        if (backupVersion > SchemaVersion.Current)
+        {
+            throw new SchemaMigrationException(
+                $"Backup schema version ({backupVersion.Number}) is newer than current application ({SchemaVersion.Current.Number}).");
+        }
+    }
+
+    private static bool IsZipArchive(string path)
+    {
+        try
+        {
+            using var file = File.OpenRead(path);
+            Span<byte> magic = stackalloc byte[4];
+            if (file.Read(magic) < 4)
             {
-                throw new SchemaMigrationException(
-                    $"Backup schema version ({backupVersion.Number}) is newer than current application ({SchemaVersion.Current.Number}).");
+                return false;
+            }
+
+            return magic[0] == 0x50 && magic[1] == 0x4B && (magic[2] == 0x03 || magic[2] == 0x05 || magic[2] == 0x07);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    private static void DeleteDatabaseSidecars(string dbPath)
+    {
+        foreach (var sidecar in new[] { $"{dbPath}-wal", $"{dbPath}-shm" })
+        {
+            if (File.Exists(sidecar))
+            {
+                File.Delete(sidecar);
             }
         }
+    }
 
-        var dbPath = connectionFactory.Options.DatabasePath;
-        var walPath = $"{dbPath}-wal";
-        var shmPath = $"{dbPath}-shm";
-        if (File.Exists(walPath))
+    private static void AddDirectoryToZip(ZipArchive zip, string directory, string prefix)
+    {
+        if (!Directory.Exists(directory))
         {
-            File.Delete(walPath);
+            return;
         }
 
-        if (File.Exists(shmPath))
+        foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
         {
-            File.Delete(shmPath);
+            var relative = Path.GetRelativePath(directory, file).Replace(Path.DirectorySeparatorChar, '/');
+            zip.CreateEntryFromFile(file, $"{prefix}/{relative}", CompressionLevel.Optimal);
+        }
+    }
+
+    private static void ReplaceDirectoryContents(string sourceDir, string destinationDir)
+    {
+        if (Directory.Exists(destinationDir))
+        {
+            Directory.Delete(destinationDir, recursive: true);
         }
 
-        File.Copy(backupSourcePath, dbPath, overwrite: true);
+        if (!Directory.Exists(sourceDir))
+        {
+            Directory.CreateDirectory(destinationDir);
+            return;
+        }
 
-        // Apply forward migrations if the backup was from an older schema version
-        await InitializeAsync(ct);
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationDir)!);
+        CopyDirectory(sourceDir, destinationDir);
+    }
+
+    private static void CopyDirectory(string sourceDir, string destinationDir)
+    {
+        Directory.CreateDirectory(destinationDir);
+        foreach (var file in Directory.EnumerateFiles(sourceDir))
+        {
+            File.Copy(file, Path.Combine(destinationDir, Path.GetFileName(file)), overwrite: true);
+        }
+
+        foreach (var directory in Directory.EnumerateDirectories(sourceDir))
+        {
+            CopyDirectory(directory, Path.Combine(destinationDir, Path.GetFileName(directory)));
+        }
     }
 }

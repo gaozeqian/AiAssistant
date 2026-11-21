@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.IO.Compression;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.Exceptions;
@@ -235,6 +236,55 @@ public sealed class EncryptedStorageAndPocTests : IDisposable
         }
 
         await Assert.ThrowsAsync<SchemaMigrationException>(() => maintenance.InitializeAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task BackupIsSelfContained_AndRestoresIntoColdDirectory()
+    {
+        var key = RandomNumberGenerator.GetBytes(32);
+        var dirA = Path.Combine(_tempRoot, "full-src");
+        var keyStoreA = new StaticKeyStore(key);
+        var factoryA = new EncryptedSqliteConnectionFactory(new StorageOptions { DataDirectory = dirA }, keyStoreA);
+        var mediaA = new AesGcmMediaStore(factoryA, keyStoreA);
+        var repoA = new SqliteEventRepository(factoryA, mediaA);
+        var maintA = new SqliteDatabaseMaintenanceService(factoryA);
+        await maintA.InitializeAsync(CancellationToken.None);
+
+        var ts = OccurredTimestamp.FromInstant(DateTimeOffset.UtcNow, TimeZoneInfo.Utc);
+        var evId = StableId.NewEventId(ts.OccurredAtUtc);
+        await repoA.AppendBatchAsync(
+            [new ActivityEvent(evId, ts, SourceKind.WindowActivity, "Terminal", "cross-dir backup")],
+            CancellationToken.None);
+        await mediaA.PutAsync(
+            new ContentWriteRequest("content-1", ContentKind.ScreenshotPng, new byte[] { 0x89, 0x50, 0x4E, 0x47 }.AsMemory(), DateTimeOffset.UtcNow),
+            CancellationToken.None);
+
+        var backupPath = Path.Combine(_tempRoot, "full.aia-backup.zip");
+        await maintA.BackupEncryptedAsync(backupPath, CancellationToken.None);
+
+        // The archive must be self-contained: database + encrypted media. The keystore envelope only
+        // exists for OS-backed key stores (StaticKeyStore keeps the key in memory, so no files to carry).
+        using (var zip = ZipFile.OpenRead(backupPath))
+        {
+            var names = zip.Entries.Select(e => e.FullName).ToArray();
+            Assert.Contains("database/aiassistant.enc.db", names);
+            Assert.Contains(names, n => n.StartsWith("media/", StringComparison.Ordinal));
+        }
+
+        // Restore into a cold directory with a fresh key store instance (same OS user).
+        var dirB = Path.Combine(_tempRoot, "full-dst");
+        var factoryB = new EncryptedSqliteConnectionFactory(new StorageOptions { DataDirectory = dirB }, new StaticKeyStore(key));
+        var mediaB = new AesGcmMediaStore(factoryB, new StaticKeyStore(key));
+        var repoB = new SqliteEventRepository(factoryB, mediaB);
+        var maintB = new SqliteDatabaseMaintenanceService(factoryB);
+        await maintB.RestoreEncryptedAsync(backupPath, CancellationToken.None);
+
+        var restored = await repoB.GetByIdAsync(evId, CancellationToken.None);
+        Assert.NotNull(restored);
+        Assert.Equal("cross-dir backup", restored!.WindowTitle);
+
+        var health = await maintB.CheckHealthAsync(CancellationToken.None);
+        Assert.Equal(1, health.EncryptedBlobCount);
     }
 
     [Fact]

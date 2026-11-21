@@ -41,6 +41,9 @@ public sealed class OsProtectedKeyStore : IKeyStore, IDisposable
             : DetectCapability();
     }
 
+    public IKeyStore CreateForDirectory(string dataDirectory) =>
+        new OsProtectedKeyStore(new StorageOptions { DataDirectory = dataDirectory });
+
     public async Task<byte[]> GetOrCreateMasterKeyAsync(string keyId, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
@@ -380,6 +383,8 @@ public sealed class StaticKeyStore(byte[] masterKey) : IKeyStore
 
     public Task RotateWrapperKeyAsync(string keyId, CancellationToken ct) =>
         Task.CompletedTask;
+
+    public IKeyStore CreateForDirectory(string dataDirectory) => this;
 
     public void OverrideKeyForTesting(byte[] newKey) => _key = newKey.ToArray();
 }

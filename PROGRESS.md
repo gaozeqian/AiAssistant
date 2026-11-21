@@ -11,7 +11,7 @@
 - **最近更新时间**：`2026-11-21`
 - **最近执行环境**：`osx-arm64` macOS 26.7.3（Apple Silicon）+ `.NET SDK 10.0.404` + Swift 6.4；上一轮 `linux-x64` Ubuntu 26.04 + GNOME Wayland；再上一轮 Windows 11 `win-x64` / SDK 11.0.100
 - **当前构建状态**：✅ `osx-arm64` 本地 Release 0 警告 0 错误；Swift Helper `swift build -c release` 通过；`linux-x64` / `win-x64` 历史结论见第 4 节日志
-- **当前测试状态**：✅ 211/211 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 58、`Processing.Tests` 48、`Report.Tests` 61、`Voice.Tests` 11），本机 `osx-arm64` 全量实跑；另含 3 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放、TCC 降级、崩溃重启，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
+- **当前测试状态**：✅ 212/212 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 18、`Capture.Tests` 4、`Platform.Tests` 58、`Processing.Tests` 48、`Report.Tests` 61、`Voice.Tests` 11），本机 `osx-arm64` 全量实跑；另含 3 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放、TCC 降级、崩溃重启，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
 - **下一步待确认事项**：macOS 侧的 TCC 允许流程（屏幕录制/辅助功能）与签名公证仍需人工授权与签字；S9-R4 待 Actions 配额恢复；黄金集（S4-R/S7-R1）需外挂模型资产。详见第 6 节
 
 ---
@@ -390,6 +390,8 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-21 [osx-arm64] [Linux RapidOCR 基线受阻]**：本机无 Linux 主机、无 Docker/Podman，RapidOCR 的 PP-OCRv4 ONNX 资产在当前代理下也未取到（GitHub release 资产 404、ModelScope 根目录无对应文件）。`--benchmark-ocr` 已支持该适配器，需在 Linux 机器外挂模型后运行；macOS Vision 侧基线仍为 12/12、CER 0.00%。
 - **2026-11-21 [osx-arm64] [真人语料基线]**：经 HF 镜像取 `AudioLLMs/aishell_1_zh_test` 一个 parquet 分片（2307 条 AISHELL-1 测试集，16 kHz WAV + 转写），随机抽 100 条做 ASR、693 条拼成 6×10 分钟做 KWS 负样本。结果：sherpa **CER 6.34%**（真人优于合成 12.45%）、Whisper **17.13%**（繁简归一化后；未归一化 26.56%）、KWS 真人负样本 60 分钟 **0 误唤醒**。同时把 OpenCC `TSCharacters.txt`（Apache-2.0，104 KB）内置进 `CharacterErrorRate.Normalize` 做繁简归一，新增 2 项测试；数字书写差异（`2012` vs `二零一二`）仍如实计入 CER。
 - **2026-11-21 [osx-arm64] [开发证书签名验证]**：用本机 Apple Development 身份（`zeqian_gao@icloud.com (4XH8AUR7JN)`，Team ID `Y6ANU9Z954`）走完整 `package-macos.sh --identity` 签名：`codesign --verify --deep --strict` 通过、自包含 .NET 的 `.dylib` 加载正常（新增 `disable-library-validation` 权限）、签名后 `--smoke-check`/`--doctor`/`--capture-smoke`（15 秒 2 事件 2 媒体）全通过；`spctl` 仍 rejected（Apple Development ≠ Developer ID 且未公证，属预期）。脚本新增 `--keychain <path>`。`tccutil reset` 在本沙箱内被拒，权限撤销演练需在系统设置或真终端手动完成。
+- **2026-11-21 [osx-arm64] [备份/恢复缺陷修复]**：E2E 发现 `--restore` 只能恢复到原数据目录——备份仅含加密 DB，不含密钥库，恢复到冷目录时因密钥不匹配报 `SQLITE_NOTADB`。改为**自包含 zip 备份**（`database/aiassistant.enc.db` + `keystore/` 密钥信封 + `media/` 加密媒体），恢复时先用备份自带密钥信封校验再落地，同机跨目录恢复真机复验通过（2 事件 2 媒体完整性 ok）；旧版裸 DB 备份仍兼容。新增 `BackupIsSelfContained_AndRestoresIntoColdDirectory` 测试；跨机恢复仍受 OS Keychain 包裹限制（设计如此）。
+- **2026-11-21 [osx-arm64] [macOS 全功能 E2E 与 pkg/安装]**：`package-macos.sh` 改为 macOS 上**无条件生成 `.pkg`**（证书信任 postinstall 仅在提供 `--certificate` 时附加）。全链路实测：版本/启动自检/诊断/抓屏（打包应用 15 秒 2 事件 2 媒体）/日报四件套/问答（无证据拒绝）/备份恢复（同机跨目录）/重建向量/清除/密钥管理/模型探测/对话基准（100% 成功率、100% JSON、avg 7.3s）/检索基准（hybrid recall 89.6%、MRR 1.0）/MCP（initialize + tools/list，含 Bearer 与 session id）/GUI 常驻。`.app` 以 Apple Development 身份 `codesign --verify --deep --strict` 通过；`.pkg` 56 MB 载荷核对（`/Applications/AiAssistant.app`，156 MB，bundle id com.aiassistant.desktop）。**安装需管理员权限**：`sudo installer -pkg artifacts/packages/AiAssistant-0.1.0-osx-arm64.pkg -target /`（沙箱禁止 sudo，需用户手动执行后按卸载清单核验）。
 - **2026-11-21 [docs] [实施清单与进度对齐]**：`IMPLEMENTATION.md` 第 10 节改为与 `PROGRESS.md` 第 5 节同构的 `*-R` 编号：补记 `S6-R2`（密钥导入）、`S8-R`（embedding 95.8% / MCP Inspector / SVG-PNG-PDF）为已完成，拆分 `S5-R1`/`S5-R2`、`S6-R1`、`S7-R1`/`S7-R2`、`S9-R1..R4`、`S3-R1`/`S3-R2`，并新增第 6 节执行顺序表。
 
 ---
@@ -418,7 +420,7 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S8-R3` | S8 周报 | 已提供 SVG/PNG/PDF；PDF 自动发现系统 TrueType 中文字体并嵌入子集、文本可检索，无字体时回退矢量轮廓 | 极简 Linux 可能无任何 CJK TTF | 安装 CJK 字体或通过 `AIASSISTANT_PDF_FONT_PATH` 指定 |
 | `S9-R1` | S9 签名 | Windows Authenticode/MSIX 与 macOS Developer ID/公证未用真实证书执行；脚本与工作流已就绪 | 未验证的签名链可能导致安装被拦截 | 配置证书与公证凭据后运行 `release.yml`，并保存 `signtool verify` / `spctl` 输出 |
 | `S9-R2` | S9 浸泡 | 已跑通 14 天加速浸泡与 60 分钟真实时钟浸泡（3191 事件、1585 媒体、控制 22/22、队列 2/12、完整性 ok）；黑名单断言修正后 8 分钟复验 7/7 通过；真机热插拔未执行 | 真实设备热插拔与长稳内存曲线未量化 | 按 `RELEASE-CHECKLIST.md` 第 5 节执行 `AIASSISTANT_REAL_SOAK_MINUTES=90` 并记录 |
-| `S9-R3` | S9 人工验收 | 自动化已覆盖 7 个标签页无障碍名称/加速键、Ctrl+D1…D7 与 Ctrl+F 真实按键、关键控件名称；安装/升级/卸载与人工走查未做 | 平台交互差异可能影响可用性 | 三平台各执行一次发布检查表第 3、6 节 |
+| `S9-R3` | S9 人工验收 | 自动化已覆盖 7 个标签页无障碍名称/加速键、Ctrl+D1…D7 与 Ctrl+F 真实按键、关键控件名称；macOS `.pkg` 已生成并核对载荷，实际安装/升级/卸载需管理员权限（沙箱禁 sudo） | 安装器实装与卸载清理未在真机执行 | 用户 `sudo installer -pkg ... -target /` 后按 `UPGRADE-AND-UNINSTALL.md` 核验 |
 | `S9-R4` | S9 供应链 | 离线 SBOM 与 `SHA256SUMS` 已实现并本地验证；CI 因账单未运行，Release 附件未实际生成 | 供应链证据尚未随发布物提供 | 恢复 Actions 后运行 SBOM 作业与 `release.yml`，确认 `bom.json` 与 `SHA256SUMS` 出现在 Release |
 
 ---
