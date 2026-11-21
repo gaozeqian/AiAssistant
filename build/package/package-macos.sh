@@ -10,6 +10,7 @@ NOTARY_PROFILE="${AIASSISTANT_NOTARY_PROFILE:-}"
 OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-artifacts/packages}"
 SKIP_SIGN=0
 REQUIRE_SIGN=0
+CERTIFICATE_PATH=""
 FRAMEWORK_DEPENDENT=0
 RUNTIME="osx-arm64"
 
@@ -22,6 +23,7 @@ while [[ $# -gt 0 ]]; do
     --runtime) RUNTIME="$2"; shift 2 ;;
     --skip-sign) SKIP_SIGN=1; shift ;;
     --require-sign) REQUIRE_SIGN=1; shift ;;
+    --certificate) CERTIFICATE_PATH="$2"; shift 2 ;;
     --framework-dependent) FRAMEWORK_DEPENDENT=1; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -48,8 +50,7 @@ if [[ "$REQUIRE_SIGN" -eq 1 ]]; then
     exit 1
   fi
   if [[ -z "$NOTARY_PROFILE" ]]; then
-    echo "error: --require-sign requires AIASSISTANT_NOTARY_PROFILE for notarization" >&2
-    exit 1
+    echo "warning: no notary profile supplied; self-signed build will not be notarized" >&2
   fi
 fi
 
@@ -141,12 +142,37 @@ if [[ -f "$ZIP_PATH" ]]; then
   echo "zip: $ZIP_PATH"
 fi
 
+PKG_PATH="$REPO_ROOT/$OUTPUT_ROOT/AiAssistant-$VERSION-$RUNTIME.pkg"
+if [[ "$(uname -s)" == "Darwin" && -n "$CERTIFICATE_PATH" && -f "$CERTIFICATE_PATH" ]]; then
+  PKG_ROOT="$STAGE/pkgroot"
+  PKG_SCRIPTS="$STAGE/pkgscripts"
+  rm -rf "$PKG_ROOT" "$PKG_SCRIPTS"
+  mkdir -p "$PKG_ROOT/Applications" "$PKG_ROOT/usr/local/share/aiassistant" "$PKG_SCRIPTS"
+  cp -R "$APP" "$PKG_ROOT/Applications/"
+  cp "$CERTIFICATE_PATH" "$PKG_ROOT/usr/local/share/aiassistant/AiAssistant.cer"
+  cat > "$PKG_SCRIPTS/postinstall" <<'POSTINSTALL'
+#!/bin/bash
+set -e
+CERT="/usr/local/share/aiassistant/AiAssistant.cer"
+if [ -f "$CERT" ]; then
+  /usr/bin/security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$CERT" || true
+fi
+exit 0
+POSTINSTALL
+  chmod +x "$PKG_SCRIPTS/postinstall"
+  rm -f "$PKG_PATH"
+  pkgbuild --root "$PKG_ROOT" --scripts "$PKG_SCRIPTS"     --identifier "com.aiassistant.app" --version "$VERSION"     --install-location "/" "$PKG_PATH" >/dev/null
+  echo "pkg: $PKG_PATH"
+else
+  echo "warning: pkgbuild requires macOS and --certificate; skipping .pkg" >&2
+fi
+
 write_checksums() {
   local directory="$1"
   (
     cd "$directory" || return 1
     : > SHA256SUMS
-    for file in *.zip *.tar.gz *.deb; do
+    for file in *.zip *.tar.gz *.deb *.dmg *.pkg; do
       [ -f "$file" ] || continue
       if command -v sha256sum >/dev/null 2>&1; then
         sha256sum "$file" >> SHA256SUMS

@@ -25,8 +25,9 @@
 | 平台 | 产物 | 体积 |
 |---|---|---|
 | Windows | 自包含目录（staging） | 239 MB |
-| Windows | `AiAssistant-<ver>-win-x64.zip` | **83.6 MB**（311 文件，含 PDB） |
-| Windows | `AiAssistant-<ver>-win-x64.msix` | **86.3 MB**（未签名，待真实证书） |
+| Windows | `AiAssistant-<ver>-win-x64.msi` | **68.1 MB**（自签名，安装时导入证书） |
+| Linux | `AiAssistant-<ver>-linux-x64.deb` | **57.6 MB** |
+| macOS | `AiAssistant-<ver>-osx-arm64.pkg` | 待 macOS runner 生成 |
 | Linux | 自包含目录（`usr/lib/aiassistant`） | 144 MB |
 | Linux | `.tar.gz` | **58 MB** |
 | macOS | `AiAssistant.app`（含 .NET 运行时） | 155 MB |

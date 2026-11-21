@@ -70,13 +70,17 @@ rm -f "$TARBALL"
 tar -czf "$TARBALL" --exclude=DEBIAN -C "$STAGE" .
 echo "tar.gz: $TARBALL"
 
+DEB="$REPO_ROOT/$OUTPUT_ROOT/AiAssistant-$VERSION-$RUNTIME.deb"
+rm -f "$DEB"
 if command -v dpkg-deb >/dev/null 2>&1; then
-  DEB="$REPO_ROOT/$OUTPUT_ROOT/AiAssistant-$VERSION-$RUNTIME.deb"
-  rm -f "$DEB"
   dpkg-deb --build --root-owner-group "$STAGE" "$DEB" >/dev/null
   echo "deb: $DEB"
+elif command -v python3 >/dev/null 2>&1; then
+  python3 "$SCRIPT_DIR/deb/build_deb.py" "$STAGE" "$DEB"
+elif command -v python >/dev/null 2>&1; then
+  python "$SCRIPT_DIR/deb/build_deb.py" "$STAGE" "$DEB"
 else
-  echo "warning: dpkg-deb not found; skipping .deb (tar.gz is still usable)" >&2
+  echo "warning: neither dpkg-deb nor python found; skipping .deb" >&2
 fi
 
 write_checksums() {
