@@ -1,3 +1,4 @@
+using AiAssistant.Application.Imaging;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
@@ -168,8 +169,8 @@ public sealed class LinuxPlatformContractTests : IDisposable
             255, 0, 0, 255,   0, 255, 0, 255,
             0, 0, 255, 255,   255, 255, 255, 255
         };
-        var png = LinuxPngCodec.EncodeBgra32(bgra, 2, 2);
-        Assert.True(LinuxPngCodec.TryDecodeToBgra32(png, out var decoded, out var width, out var height, out var hash));
+        var png = PngCodec.EncodeBgra32(bgra, 2, 2);
+        Assert.True(PngCodec.TryDecodeToBgra32(png, out var decoded, out var width, out var height, out var hash));
         Assert.Equal(2, width);
         Assert.Equal(2, height);
         Assert.Equal(bgra, decoded);
@@ -190,7 +191,7 @@ public sealed class LinuxPlatformContractTests : IDisposable
             targetHeight: 2);
         Assert.Equal(bgra, x11Bgra);
 
-        Assert.False(LinuxPngCodec.TryDecodeToBgra32([1, 2, 3], out _, out _, out _, out _));
+        Assert.False(PngCodec.TryDecodeToBgra32([1, 2, 3], out _, out _, out _, out _));
     }
 
     [Fact]
@@ -291,7 +292,7 @@ public sealed class LinuxPlatformContractTests : IDisposable
     private sealed class FakePortalClient(int initialSequence = 0) : IXdgPortalClient
     {
         private int _sequence = initialSequence;
-        private static readonly byte[] Png = LinuxPngCodec.EncodeBgra32(
+        private static readonly byte[] Png = PngCodec.EncodeBgra32(
         [
             40, 80, 160, 255, 40, 80, 160, 255,
             40, 80, 160, 255, 40, 80, 160, 255

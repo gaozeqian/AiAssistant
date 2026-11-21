@@ -2,13 +2,13 @@ using System.Buffers.Binary;
 using System.IO.Compression;
 using AiAssistant.Core.ValueObjects;
 
-namespace AiAssistant.Platform.Linux;
+namespace AiAssistant.Application.Imaging;
 
 /// <summary>
-/// Dependency-free PNG codec for portal screenshots and X11 XImage frames.
+/// Dependency-free PNG codec for platform screenshots, X11 XImage frames and OCR benchmarks.
 /// Supports 8-bit non-interlaced RGB/RGBA PNG input and emits RGBA PNG with no filter.
 /// </summary>
-public static class LinuxPngCodec
+public static class PngCodec
 {
     private static readonly byte[] Signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
@@ -125,6 +125,9 @@ public static class LinuxPngCodec
             }
 
             var rgba = new byte[checked(width * height * 4)];
+            // PNG filters reference reconstructed neighbours, never the filtered stream bytes.
+            var previousRow = new byte[sourceStride];
+            var currentRow = new byte[sourceStride];
             for (var y = 0; y < height; y++)
             {
                 var filter = filtered[y * (sourceStride + 1)];
@@ -137,11 +140,10 @@ public static class LinuxPngCodec
                 for (var x = 0; x < sourceStride; x++)
                 {
                     var raw = filtered[sourceRow + x];
-                    var left = x >= channels ? filtered[sourceRow + x - channels] : 0;
-                    var upIndex = sourceRow + x - sourceStride - 1;
-                    var up = y > 0 ? filtered[upIndex] : 0;
-                    var upLeft = y > 0 && x >= channels ? filtered[upIndex - channels] : 0;
-                    var reconstructed = filter switch
+                    var left = x >= channels ? currentRow[x - channels] : 0;
+                    var up = y > 0 ? previousRow[x] : 0;
+                    var upLeft = y > 0 && x >= channels ? previousRow[x - channels] : 0;
+                    currentRow[x] = filter switch
                     {
                         0 => raw,
                         1 => unchecked((byte)(raw + left)),
@@ -150,27 +152,20 @@ public static class LinuxPngCodec
                         4 => unchecked((byte)(raw + Paeth(left, up, upLeft))),
                         _ => raw
                     };
-
-                    var pixelBase = y * width * 4 + (x / channels) * 4;
-                    var channel = x % channels;
-                    if (channel == 0)
-                    {
-                        rgba[pixelBase + 2] = reconstructed;
-                    }
-                    else if (channel == 1)
-                    {
-                        rgba[pixelBase + 1] = reconstructed;
-                    }
-                    else if (channel == 2)
-                    {
-                        rgba[pixelBase] = reconstructed;
-                        rgba[pixelBase + 3] = 255;
-                    }
-                    else
-                    {
-                        rgba[pixelBase + 3] = reconstructed;
-                    }
                 }
+
+                var rowBase = y * width * 4;
+                for (var px = 0; px < width; px++)
+                {
+                    var source = px * channels;
+                    var target = rowBase + px * 4;
+                    rgba[target] = currentRow[source + 2];
+                    rgba[target + 1] = currentRow[source + 1];
+                    rgba[target + 2] = currentRow[source];
+                    rgba[target + 3] = channels == 4 ? currentRow[source + 3] : (byte)255;
+                }
+
+                (previousRow, currentRow) = (currentRow, previousRow);
             }
 
             bgra = rgba;

@@ -238,6 +238,58 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
     }
 
     [Fact]
+    public async Task ImageOcrSendsPngThroughIpcAndReturnsVisionText()
+    {
+        var behavior = new FakeHelperBehavior();
+        var launcher = new FakeMacHelperLauncher(behavior);
+        await using var supervisor = CreateSupervisor(launcher, out _);
+        await supervisor.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => supervisor.Status == MacHelperSupervisorStatus.Healthy);
+
+        var ocr = new MacOsImageOcrRecognizer(supervisor);
+        Assert.Equal(CapabilityStatus.Supported, ocr.Capability.Status);
+
+        var pixels = new byte[2 * 2 * 4];
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            pixels[i] = 0x20;       // B
+            pixels[i + 1] = 0x90;   // G
+            pixels[i + 2] = 0xE0;   // R
+            pixels[i + 3] = 0xFF;   // A
+        }
+
+        var text = await ocr.RecognizeAsync(new ImageFrameBuffer(pixels, 2, 2), CancellationToken.None);
+        Assert.Equal("SAFE_AX_TEXT", text);
+        Assert.False(string.IsNullOrWhiteSpace(behavior.LastTextPngBase64));
+
+        // The adapter must send a real PNG, not raw pixels: check the signature bytes.
+        var png = Convert.FromBase64String(behavior.LastTextPngBase64!);
+        Assert.Equal([0x89, 0x50, 0x4E, 0x47], png.Take(4));
+
+        // Invalid buffers are rejected before any IPC traffic.
+        var callsBefore = behavior.ExtractTextCalls;
+        Assert.Null(await ocr.RecognizeAsync(new ImageFrameBuffer(new byte[4], 4, 4), CancellationToken.None));
+        Assert.Equal(callsBefore, behavior.ExtractTextCalls);
+    }
+
+    [Fact]
+    public async Task ImageOcrDegradesWhenHelperIsUnavailable()
+    {
+        var supervisor = new MacHelperSupervisor(
+            launcher: null,
+            new MacHelperOptions { SocketDirectory = _tempRoot },
+            NullLogger<MacHelperSupervisor>.Instance);
+        await using var disposable = supervisor;
+        await supervisor.StartAsync(CancellationToken.None);
+
+        var ocr = new MacOsImageOcrRecognizer(supervisor);
+        Assert.Equal(CapabilityStatus.Degraded, ocr.Capability.Status);
+        Assert.Null(await ocr.RecognizeAsync(
+            new ImageFrameBuffer(new byte[2 * 2 * 4], 2, 2),
+            CancellationToken.None));
+    }
+
+    [Fact]
     public async Task RequestTimeoutIsBounded_AndUnexpectedDisconnectIsDiagnosable()
     {
         var behavior = new FakeHelperBehavior { PingDelayMs = 250 };
@@ -373,6 +425,8 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
         public int PlayAudioCalls { get; set; }
         public int? LastPlayedSampleRateHz { get; set; }
         public float[]? LastPlayedSamples { get; set; }
+        public int ExtractTextCalls { get; set; }
+        public string? LastTextPngBase64 { get; set; }
         public string? LastReceivedToken { get; set; }
         public int? LastHandshakeProtocolVersion { get; set; }
         public int Generation { get; set; }
@@ -538,13 +592,23 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
             MacHelperProtocol.Methods.ScreenCapture =>
                 new(request.RequestId, true, ScreenFrame: new MacScreenFrameDto(1280, 720, 123, Convert.ToBase64String([0x89, 0x50, 0x4E, 0x47]))),
             MacHelperProtocol.Methods.ExtractText =>
-                new(request.RequestId, true, ExtractedText: new MacExtractedTextDto("SAFE_AX_TEXT", "accessibility", 0.95)),
+                BuildExtractTextResponse(request, behavior),
             MacHelperProtocol.Methods.PollFileEvents =>
                 new(request.RequestId, true, FileChanges: behavior.NextFilePath is null ? [] : [new MacFileChangeDto(behavior.NextFilePath, "Modified")]),
             MacHelperProtocol.Methods.PollAudioFrames => BuildAudioResponse(request, behavior),
             MacHelperProtocol.Methods.PlayAudio => BuildPlayAudioResponse(request, behavior),
             _ => new(request.RequestId, false, ErrorCode: MacHelperProtocol.ErrorCodes.InternalError)
         };
+
+        private static MacIpcResponse BuildExtractTextResponse(MacIpcRequest request, FakeHelperBehavior state)
+        {
+            state.ExtractTextCalls++;
+            state.LastTextPngBase64 = request.PngBase64;
+            return new MacIpcResponse(
+                request.RequestId,
+                true,
+                ExtractedText: new MacExtractedTextDto("SAFE_AX_TEXT", request.PngBase64 is null ? "accessibility" : "vision", 0.95));
+        }
 
         private static MacIpcResponse BuildPlayAudioResponse(MacIpcRequest request, FakeHelperBehavior state)
         {

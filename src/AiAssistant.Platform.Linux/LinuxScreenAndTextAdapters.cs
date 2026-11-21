@@ -1,3 +1,4 @@
+using AiAssistant.Application.Imaging;
 using System.Runtime.CompilerServices;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
@@ -85,14 +86,14 @@ public sealed class WaylandScreenCapture(
                         frame.Width,
                         frame.Height,
                         frame.Width * 4);
-                    var framePng = LinuxPngCodec.EncodeBgra32(frame.Bgra32, frame.Width, frame.Height);
+                    var framePng = PngCodec.EncodeBgra32(frame.Bgra32, frame.Width, frame.Height);
                     return new ScreenCaptureFrame(clock.Now(), frame.Width, frame.Height, frameHash, framePng);
                 }
             }
 
             // Fallback: portal Screenshot returns a bounded PNG when the continuous stream is unavailable.
             var png = await portalClient.CaptureScreenshotAsync(ct);
-            if (!LinuxPngCodec.TryDecodeToBgra32(png, out var bgra, out var width, out var height, out var hash) || bgra is null)
+            if (!PngCodec.TryDecodeToBgra32(png, out var bgra, out var width, out var height, out var hash) || bgra is null)
             {
                 return null;
             }
@@ -298,7 +299,7 @@ public sealed class LinuxTextExtractor(
 
         if (ocr is not null &&
             request.ScreenshotPngBytes is { Length: > 0 } png &&
-            LinuxPngCodec.TryDecodeToBgra32(png, out var bgra, out var width, out var height, out _) &&
+            PngCodec.TryDecodeToBgra32(png, out var bgra, out var width, out var height, out _) &&
             bgra is not null)
         {
             var ocrText = await ocr.RecognizeAsync(new ImageFrameBuffer(bgra, width, height), ct);

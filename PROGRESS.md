@@ -11,7 +11,7 @@
 - **最近更新时间**：`2026-11-21`
 - **最近执行环境**：`osx-arm64` macOS 26.7.3（Apple Silicon）+ `.NET SDK 10.0.404` + Swift 6.4；上一轮 `linux-x64` Ubuntu 26.04 + GNOME Wayland；再上一轮 Windows 11 `win-x64` / SDK 11.0.100
 - **当前构建状态**：✅ `osx-arm64` 本地 Release 0 警告 0 错误；Swift Helper `swift build -c release` 通过；`linux-x64` / `win-x64` 历史结论见第 4 节日志
-- **当前测试状态**：✅ 196/196 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 56、`Processing.Tests` 37、`Report.Tests` 61、`Voice.Tests` 9），本机 `osx-arm64` 全量实跑；另含 3 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放、TCC 降级、崩溃重启，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
+- **当前测试状态**：✅ 204/204 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 58、`Processing.Tests` 43、`Report.Tests` 61、`Voice.Tests` 9），本机 `osx-arm64` 全量实跑；另含 3 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放、TCC 降级、崩溃重启，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
 - **下一步待确认事项**：macOS 侧的 TCC 允许流程（屏幕录制/辅助功能）与签名公证仍需人工授权与签字；S9-R4 待 Actions 配额恢复；黄金集（S4-R/S7-R1）需外挂模型资产。详见第 6 节
 
 ---
@@ -180,8 +180,8 @@ AiAssistant.Host --benchmark-ocr --samples artifacts/golden/ocr --output artifac
 
 - 样本格式：ASR 为 `<name>.wav` + 同名 `.txt`（参考答案），任意采样率/声道会自动转 16 kHz 单声道；OCR 为 `<name>.png` + `.txt`。
 - 报告含逐样本 CER、编辑数/字数、耗时、识别结果、参考答案与错误；模型缺失时标记 `engine unavailable`（不计为 100% 错误）并退出码 1。
-- OCR 命令仅在注册了 `IImageOcrRecognizer` 的平台可用（Linux RapidOCR）；macOS 走 Vision/辅助功能树，不支持该命令。
-- 语料覆盖与目录约定见 `docs/testing/golden-sets.md`。
+- OCR 命令在注册了 `IImageOcrRecognizer` 的平台可用（macOS Vision、Linux RapidOCR）。
+- 语料覆盖与目录约定见 `docs/testing/golden-sets.md`；首轮合成语料基线见 `docs/testing/baselines/2026-11-21-macos-arm64.md`。
 
 ### 3.5 本地语音模型与命令
 `AIASSISTANT_SHERPA_MODEL_DIR` 指向同一语音模型根目录，建议结构：
@@ -380,6 +380,8 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-21 [osx-arm64] [Helper 崩溃监督真机验收]**：`IMacHelperProcessInstance` 新增 `ProcessId`（诊断与故障注入用），新增真机测试 `LiveHelperRecoversFromCrashWithFreshSession`：强杀 Helper 进程后，监督器在指数退避内重新拉起（`RestartCount` 递增、PID 变化、新会话 Token），状态回到 `Healthy`，音频回放能力恢复并再次播放成功。三项真机 Helper 测试（回放 / TCC 降级 / 崩溃重启）全部通过，`osx-arm64` 全量 181/181。同时修正 Helper 缺失时的修复提示路径（`Contents/Helpers` → 实际打包位置 `Contents/MacOS`）。
 - **2026-11-21 [osx-arm64] [doctor 增加 Helper 与能力观测]**：`--doctor` 新增 `macosHelper` 行（status / restarts / screen / accessibility / microphone）与全平台能力清单（Kind: Status | Summary），macOS 上会按需拉起 Helper 再释放。真机包内实测：`status=Healthy restarts=0 screen=Granted accessibility=Granted microphone=NotDetermined`，ScreenCapture / WindowActivity / FileActivity / AccessibilityText / Ocr 均为 `Supported`，AudioCapture 为 `PermissionRequired`、WakeWord 为 `Degraded`（语音需显式开启）。顺带修正 Windows/macOS 能力清单里过时的 “Pending S7” 唤醒描述。
 - **2026-11-21 [osx-arm64] [S4-R 识别黄金集命令落地]**：新增 `--benchmark-asr` / `--benchmark-ocr`，共享 `AiAssistant.Processing/Benchmarks`：`CharacterErrorRate`（归一化后 Levenshtein，忽略空白/标点/大小写）、`RecognitionSampleSet`（媒体 + 同名 `.txt` 配对，缺参考答案给出警告）、`WavPcm16Reader`（PCM16 任意采样率/声道 → 16 kHz 单声道线性重采样）、`RecognitionBenchmarkEvaluator`（逐样本评分与失败隔离）、`RecognitionBenchmarkReport`（逐样本 CER/编辑数/耗时/文本与警告的 Markdown）。模型缺失时整批标记 `engine unavailable` 而不是记 100% 错误，退出码 1；OCR 仅在注册 `IImageOcrRecognizer` 的平台（Linux RapidOCR）可用。新增 15 项测试（CER、配对、WAV 解码与重采样、评分/不可用路径、报告转义），`Processing.Tests` 37/37；真机跑通空模型场景并正确写出报告。
+- **2026-11-21 [osx-arm64] [识别基线首次跑通]**：下载 sherpa-onnx Paraformer 中文 small（`model.int8.onnx`，77.9 MB）到 `artifacts/models`，用 `say` 合成 10 条中文语音（两种普通话音色）与 12 张渲染截图（浅/深色、18px 小字、低对比度、中英混排）构成合成黄金集。**ASR 10/10、平均 CER 12.45%、完全匹配 3/10、热态 17–21 ms（首次 2185 ms 含模型加载）**；**OCR 12/12、平均 CER 0.00%、75–91 ms**。基线详情与典型错误见 `docs/testing/baselines/2026-11-21-macos-arm64.md`。
+- **2026-11-21 [osx-arm64] [PNG 滤波缺陷修复 + macOS Vision OCR 适配器]**：基线暴露出 `TryDecodeToBgra32` 在 Sub/Up/Average/Paeth 滤波下用未重建邻居字节，真实截图解码为空白图、OCR 全空——影响 Linux portal/X11 截图路径。改为逐行重建并补 6 项滤波回归测试；同时把 `LinuxPngCodec` 上移为 `AiAssistant.Application.Imaging.PngCodec` 供各平台复用，新增 `MacOsImageOcrRecognizer`（经 Swift Helper 的 `text.extract` 走 Vision），使 `--benchmark-ocr` 在 macOS 可直接运行。全量 204/204。
 - **2026-11-21 [docs] [实施清单与进度对齐]**：`IMPLEMENTATION.md` 第 10 节改为与 `PROGRESS.md` 第 5 节同构的 `*-R` 编号：补记 `S6-R2`（密钥导入）、`S8-R`（embedding 95.8% / MCP Inspector / SVG-PNG-PDF）为已完成，拆分 `S5-R1`/`S5-R2`、`S6-R1`、`S7-R1`/`S7-R2`、`S9-R1..R4`、`S3-R1`/`S3-R2`，并新增第 6 节执行顺序表。
 
 ---
@@ -393,8 +395,8 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S3-R1` | S3 macOS | 🟡 真机已完成：GUI 主线程启动、系统授权弹窗、屏幕录制与辅助功能均已授权、抓屏 → 加密落库 → 报告导出闭环、Helper 崩溃重启与能力恢复、未授权精确降级；剩余权限撤销与公证签字 | 正式签名下的 TCC 归属与公证流程仍需验证 | 用 Developer ID 签名打包后撤销一次屏幕录制并记录恢复过程，保存 `spctl` 与公证输出 |
 | `S3-R2` | S3 Linux | 🟡 GNOME Wayland 的 ScreenCast 授权与连续抓屏已真机实测（2026-11-21）；KDE/KWin、X11 回退、AT-SPI 与托盘能力矩阵仍待人工验收 | 合成器差异可能影响窗口与抓屏可用性 | 在 KDE Wayland 与 X11 会话逐项签字 |
 | `S3-R3` | S3 Linux | ✅ 已实现连续 PipeWire 帧消费（私有 `pw_stream`、1 秒节流、格式协商与 YUV 降级回退），GNOME Wayland 真机通过（2026-11-21） | KDE/KWin 与多显示器场景未实测 | 在 KDE Wayland 复跑同一真机测试 |
-| `S4-R1` | S4 语音 | sherpa-onnx 模型资产（Paraformer、Silero VAD、说话人嵌入）不进入 Git，真实中文语音黄金集未跑；`--benchmark-asr`（CER、逐样本明细）已就绪 | 仅验证适配与降级路径，未证明识别质量 | 外挂模型目录后运行 `--benchmark-asr --samples artifacts/golden/asr`，与 Whisper 基线对比 |
-| `S4-R2` | S4 OCR | 🟡 RapidOCR PP-OCRv4 适配器已接入（2026-11-21）：AT-SPI 为空时按需 OCR、缺模型降级、托管 ORT 复用 sherpa 原生库；`--benchmark-ocr`（PNG + 参考答案的 CER）已就绪，真实中文截图集质量未跑 | 无模型资产时仍只有 AT-SPI 文本 | 在 Linux 外挂 RapidOCR 模型后跑 `--benchmark-ocr`，按结果调阈值/裁剪策略 |
+| `S4-R1` | S4 语音 | 🟡 合成语料基线已跑（2026-11-21）：sherpa Paraformer 中文 small，10 条 TTS 语料 **CER 12.45%**、完全匹配 3/10、热态 17–21 ms；真实麦克风/噪声/口音语料未覆盖 | 合成 TTS 与人声分布不同，不能当作发布质量门禁 | 按 `docs/testing/golden-sets.md` 补真实授权语料后复跑 `--benchmark-asr` |
+| `S4-R2` | S4 OCR | 🟡 macOS Vision 基线已跑（2026-11-21）：12 张合成截图 **CER 0.00%**、75–91 ms，并修复 PNG 滤波解码缺陷；Linux RapidOCR 真实模型质量未跑 | 合成截图 ≠ 真实 UI（多显示器、缩放、复杂背景） | 在 Linux 外挂 RapidOCR 模型后跑 `--benchmark-ocr`，再补真实截图集 |
 | `S4-R3` | S4 语音 | ✅ 已实现 Whisper.net 批处理适配器（2026-11-21）：`AIASSISTANT_ASR_ENGINE=whisper` 显式启用、缺模型降级、发布按 RID 裁剪原生库；`--benchmark-asr` 可直接用同一黄金集对比两引擎 | 真实 Whisper 模型质量/耗时未评测（无模型资产） | 外挂 ggml 模型后运行 `--benchmark-asr` 对比 sherpa 基线 |
 | `S5-R1` | S5 模型 | 已用本机 `gemma4:12b` 实测：成功率 100%、JSON 合规率 100%、热态平均 4.6s（首次含加载 7.4s）；其它候选模型与内存曲线仍未评测 | 不同模型质量/延迟差异较大，默认档位未定 | 对目标候选模型分别运行 `AiAssistant.Host --benchmark-model`，按质量/延迟选默认档 |
 | `S5-R2` | S5 调度 | 每日定时、启动补偿与失败退避尚未进行多日浸泡 | 长时间休眠/跨日边界可能暴露时序问题 | S9 浸泡测试覆盖跨午夜、休眠唤醒、模型离线与重复触发 |

@@ -1,3 +1,4 @@
+using AiAssistant.Application.Imaging;
 using AiAssistant.Application.Ports;
 using AiAssistant.Platform.Linux;
 using AiAssistant.Processing.Benchmarks;
@@ -18,8 +19,8 @@ public sealed class OcrBenchmarkCommand(IImageOcrRecognizer? ocr)
         if (ocr is null)
         {
             Console.Error.WriteLine(
-                "OCR benchmark requires a platform image OCR adapter (Linux RapidOCR). " +
-                "Set AIASSISTANT_RAPIDOCR_MODEL_DIR and run on Linux, or use the accessibility tree on macOS.");
+                "OCR benchmark requires a platform image OCR adapter (macOS Vision or Linux RapidOCR). " +
+                "On Linux set AIASSISTANT_RAPIDOCR_MODEL_DIR; on macOS the Swift helper must be available.");
             return 1;
         }
 
@@ -42,7 +43,7 @@ public sealed class OcrBenchmarkCommand(IImageOcrRecognizer? ocr)
             async (sample, token) =>
             {
                 var bytes = await File.ReadAllBytesAsync(sample.MediaPath, token);
-                if (!LinuxPngCodec.TryDecodeToBgra32(bytes, out var bgra, out var width, out var height, out _) ||
+                if (!PngCodec.TryDecodeToBgra32(bytes, out var bgra, out var width, out var height, out _) ||
                     bgra is null)
                 {
                     throw new InvalidDataException(

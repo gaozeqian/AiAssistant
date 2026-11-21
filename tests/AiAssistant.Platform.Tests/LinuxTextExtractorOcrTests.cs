@@ -1,3 +1,4 @@
+using AiAssistant.Application.Imaging;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Platform.Linux;
@@ -62,7 +63,7 @@ public sealed class LinuxTextExtractorOcrTests
     {
         var bgra = new byte[width * height * 4];
         Array.Fill(bgra, (byte)255);
-        return LinuxPngCodec.EncodeBgra32(bgra, width, height);
+        return PngCodec.EncodeBgra32(bgra, width, height);
     }
 
     private sealed class FakeAtSpiClient(string? text) : IAtSpiAccessibilityClient

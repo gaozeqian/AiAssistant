@@ -79,6 +79,15 @@ public sealed class AppRuntime : IAsyncDisposable
     /// <summary>Only registered where a managed image OCR adapter exists (Linux RapidOCR).</summary>
     public IImageOcrRecognizer? OcrRecognizer => _services.GetService<IImageOcrRecognizer>();
 
+    /// <summary>Starts the macOS Swift helper for commands that need it without starting capture.</summary>
+    public async Task StartMacHelperAsync(CancellationToken ct)
+    {
+        if (MacHelperSupervisor is { } supervisor)
+        {
+            await supervisor.StartAsync(ct);
+        }
+    }
+
     public IModelCapabilityProber ModelCapabilityProber =>
         _services.GetRequiredService<IModelCapabilityProber>();
 
@@ -579,6 +588,8 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IFileActivitySource>());
         services.AddSingleton<ITextExtractor>(provider =>
             new MacOsTextExtractor(provider.GetRequiredService<IMacHelperSupervisor>()));
+        services.AddSingleton<IImageOcrRecognizer>(provider =>
+            new MacOsImageOcrRecognizer(provider.GetRequiredService<IMacHelperSupervisor>()));
         services.AddSingleton<IAudioCapture>(provider =>
             new MacOsAudioCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
         services.AddSingleton<IAudioCaptureFactory>(provider =>

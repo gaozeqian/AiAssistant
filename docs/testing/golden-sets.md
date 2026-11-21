@@ -45,7 +45,7 @@ AiAssistant.Host --benchmark-asr
 # 指定语料与输出
 AiAssistant.Host --benchmark-asr --samples /data/golden/asr --output artifacts/benchmarks/asr.md
 
-# OCR（仅 Linux RapidOCR；macOS 走 Vision / 辅助功能树）
+# OCR（macOS 走 Vision；Linux 走 RapidOCR）
 AIASSISTANT_RAPIDOCR_MODEL_DIR=/models/rapidocr \
   AiAssistant.Host --benchmark-ocr --samples /data/golden/ocr
 ```
@@ -53,7 +53,8 @@ AIASSISTANT_RAPIDOCR_MODEL_DIR=/models/rapidocr \
 模型位置：
 
 - ASR：`AIASSISTANT_SHERPA_MODEL_DIR`（默认 sherpa）；`AIASSISTANT_ASR_ENGINE=whisper` + `AIASSISTANT_WHISPER_MODEL_PATH` 可切 Whisper 做基线对比。
-- OCR：`AIASSISTANT_RAPIDOCR_MODEL_DIR`（含 `ch_PP-OCRv4_det_infer.onnx`、`ch_PP-OCRv4_rec_infer.onnx`、`ppocr_keys_v1.txt`）。
+- macOS 无需模型资产（使用系统 Vision，经 Swift Helper 调用），但需要 Helper 可用（`AIASSISTANT_MAC_HELPER_PATH` 或打包产物）。
+- Linux OCR：`AIASSISTANT_RAPIDOCR_MODEL_DIR`（含 `ch_PP-OCRv4_det_infer.onnx`、`ch_PP-OCRv4_rec_infer.onnx`、`ppocr_keys_v1.txt`）。
 
 ## 4. 报告口径
 
@@ -62,7 +63,11 @@ AIASSISTANT_RAPIDOCR_MODEL_DIR=/models/rapidocr \
 - 模型缺失时整批标记 `engine unavailable`，**不**计为 100% 错误；命令退出码 `1`。
 - 退出码：`0` 至少一条成功；`1` 无成功样本（缺模型 / 缺语料 / 全部失败）；`2` 启动失败。
 
-## 5. 待补齐
+## 5. 已有基线
+
+- `docs/testing/baselines/2026-11-21-macos-arm64.md`：合成语料 ASR CER 12.45%、OCR CER 0.00%（macOS Vision）。
+
+## 6. 待补齐
 
 - `S7-R1`：KWS 唤醒率 / 误唤醒率需要流式回放语料（正样本 + 负样本连续音频），当前尚未提供 `--benchmark-kws`。
 - 真实脱敏语料扩充后，把 `--benchmark-retrieval` 的查询集也替换为真实分布（`S8-R1`）。

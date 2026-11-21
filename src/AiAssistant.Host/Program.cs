@@ -294,6 +294,9 @@ public static class Program
 
             if (args.Contains("--benchmark-ocr", StringComparer.OrdinalIgnoreCase))
             {
+                using var helperCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                await runtime.StartMacHelperAsync(helperCts.Token);
+
                 var samples = ResolveSamplesDirectory(args, "ocr");
                 var outputPath = ResolveBenchmarkOutput(args, "ocr");
                 return await new OcrBenchmarkCommand(runtime.OcrRecognizer)

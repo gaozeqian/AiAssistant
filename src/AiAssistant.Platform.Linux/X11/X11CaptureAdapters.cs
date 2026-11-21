@@ -1,3 +1,4 @@
+using AiAssistant.Application.Imaging;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using AiAssistant.Application.Ports;
@@ -231,7 +232,7 @@ public sealed class X11ScreenCapture(IClock clock) : IScreenCapture
                 targetWidth,
                 targetHeight);
             var hash = PerceptualHash.ComputeFromBgra32(bgra, targetWidth, targetHeight, targetWidth * 4);
-            var png = LinuxPngCodec.EncodeBgra32(bgra, targetWidth, targetHeight);
+            var png = PngCodec.EncodeBgra32(bgra, targetWidth, targetHeight);
             return Task.FromResult<ScreenCaptureFrame?>(new ScreenCaptureFrame(clock.Now(), targetWidth, targetHeight, hash, png));
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException or OverflowException)

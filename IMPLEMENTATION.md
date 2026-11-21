@@ -505,7 +505,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S4.3：sherpa-onnx 中文 Paraformer ASR、Silero VAD、pyannote 说话人分离适配器与模型缺失降级测试。
 - [x] S4-R3：Whisper.net 批处理 ASR 适配器（`AIASSISTANT_ASR_ENGINE=whisper`、缺模型明确降级、发布按 RID 裁剪原生库），默认仍为 sherpa-onnx。
 - [x] S4-R2：Linux RapidOCR PP-OCRv4 图像 OCR 兜底（`IImageOcrRecognizer`、缺模型降级、复用 sherpa 原生 ORT 1.28.2）。
-- [ ] S4-R：外挂中文语音（Paraformer/VAD/说话人）、RapidOCR 与 Whisper 模型资产，完成识别质量黄金集评测（`--benchmark-asr` / `--benchmark-ocr` 与 CER 报告已就绪，缺模型资产与基线数据）。
+- [ ] S4-R：外挂中文语音（Paraformer/VAD/说话人）、RapidOCR 与 Whisper 模型资产，完成识别质量黄金集评测（`--benchmark-asr` / `--benchmark-ocr` 与 CER 报告已就绪；macOS 合成语料基线 ASR CER 12.45%、OCR 0.00%，真实语料与 Linux RapidOCR/Whisper 基线待补）。
 - [x] S5.1：Microsoft.Extensions.AI 本机网关、Ollama/LM Studio 适配、loopback 策略、超时/脱敏/审计装饰器与能力探测。
 - [x] S5.2：事件向量索引、活动分段、map-reduce、结构化 JSON 校验重试、版本化加密日报与站会 Markdown。
 - [x] S5.3：单消费者三通道调度、启动补偿、幂等/失败保留、日报/站会面板、强制重生成与 Markdown 导出。
