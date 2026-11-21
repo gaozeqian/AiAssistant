@@ -210,9 +210,15 @@
                 <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
                          PlaceholderText="输入关键词或问题，例如：迁移进展如何"
                          automation:AutomationProperties.Name="检索关键词或问题" />
-                <Grid ColumnDefinitions="*,*">
-                  <DatePicker Grid.Column="0" SelectedDate="{Binding FromDate}" Margin="0,0,6,0" />
-                  <DatePicker Grid.Column="1" SelectedDate="{Binding ToDate}" Margin="6,0,0,0" />
+                <Grid RowDefinitions="Auto,Auto" Margin="0,4,0,0">
+                  <Grid Grid.Row="0" ColumnDefinitions="40,*" VerticalAlignment="Center">
+                    <TextBlock Text="从" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+                    <DatePicker Grid.Column="1" SelectedDate="{Binding FromDate}" Initialized="OnDatePickerInitialized" />
+                  </Grid>
+                  <Grid Grid.Row="1" ColumnDefinitions="40,*" VerticalAlignment="Center" Margin="0,6,0,0">
+                    <TextBlock Text="到" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+                    <DatePicker Grid.Column="1" SelectedDate="{Binding ToDate}" Initialized="OnDatePickerInitialized" />
+                  </Grid>
                 </Grid>
               </StackPanel>
               <WrapPanel Grid.Row="2" Margin="0,12,0,0">
@@ -393,7 +399,7 @@
             <StackPanel Spacing="14">
               <TextBlock Text="删除本地数据" FontSize="18" FontWeight="SemiBold" />
               <TextBlock Text="{Binding RetentionNotice}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
-              <DatePicker SelectedDate="{Binding SelectedDate}" />
+              <DatePicker SelectedDate="{Binding SelectedDate}" Initialized="OnDatePickerInitialized" />
               <WrapPanel>
                 <Button Classes="secondary" Content="{Binding DeleteDateButtonText}"
                         Command="{Binding DeleteDateCommand}" Margin="0,0,8,8"
@@ -580,7 +586,7 @@
           <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,12,0">
             <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
               <TextBlock Text="日报与站会" FontSize="18" FontWeight="SemiBold" />
-              <DatePicker Grid.Row="1" SelectedDate="{Binding SelectedDate}" Margin="0,14,0,10" />
+              <DatePicker Grid.Row="1" SelectedDate="{Binding SelectedDate}" Margin="0,14,0,10" Initialized="OnDatePickerInitialized" />
               <WrapPanel Grid.Row="2" Margin="0,0,0,12">
                 <Button Classes="primary" Content="生成日报" Command="{Binding GenerateCommand}" Margin="0,0,8,8" />
                 <Button Classes="secondary" Content="强制重生成" Command="{Binding RegenerateCommand}" Margin="0,0,8,8" />
