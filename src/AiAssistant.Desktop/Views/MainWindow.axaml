@@ -38,6 +38,10 @@
       <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource ListSelectionBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
   </Window.Styles>
 
   <Window.KeyBindings>
@@ -98,7 +102,7 @@
               <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
                 <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="搜索应用、标题或正文"
                          automation:AutomationProperties.Name="搜索应用、标题或正文" />
-                <Button Grid.Column="1" Classes="primary" Command="{Binding RefreshCommand}" Content="刷新" Margin="8,0,0,0"
+                <Button Grid.Column="1" Classes="secondary" Command="{Binding RefreshCommand}" Content="刷新" Margin="8,0,0,0"
                         automation:AutomationProperties.Name="刷新时间线" />
               </Grid>
 

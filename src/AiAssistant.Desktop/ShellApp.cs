@@ -101,6 +101,8 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             Add("HeaderBadgeForegroundBrush", "#242424");
             Add("AccentBrush", "#0078D4");
             Add("AccentSoftBackgroundBrush", "#D6EBFF");
+            Add("ListSelectionBackgroundBrush", "#CCE4FF");
+            Add("TextPrimaryBrush", "#1F1F1F");
             Add("MutedBrush", "#616161");
             Add("SubtleCardBrush", "#F3F3F3");
             Add("PlaceholderBrush", "#E5E5E5");
@@ -125,6 +127,8 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             Add("HeaderBadgeForegroundBrush", "#E0E0E0");
             Add("AccentBrush", "#0078D4");
             Add("AccentSoftBackgroundBrush", "#123B63");
+            Add("ListSelectionBackgroundBrush", "#04395E");
+            Add("TextPrimaryBrush", "#D4D4D4");
             Add("MutedBrush", "#A8A8A8");
             Add("SubtleCardBrush", "#252526");
             Add("PlaceholderBrush", "#2D2D2D");
