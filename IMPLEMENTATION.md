@@ -511,7 +511,8 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S7.1：sherpa-onnx KWS/TTS 适配、语音端口、模型缺失降级与唤醒提示音。
 - [x] S7.2：四态语音状态机、8 秒命令窗口、误唤醒冷却、固定命令、敏感二次确认与加密文本日志。
 - [x] S7.3：语音面板与状态栏、Host 单路 AudioHub 装配、Windows/Linux 反馈播放与 macOS 明确降级。
-- [ ] S7-R：真实中文 KWS/TTS 黄金集、macOS 音频输出与命令音频 opt-in 落盘。
+- [x] S7-R3：命令音频显式开关（语音面板 + `AIASSISTANT_VOICE_RECORD_COMMAND_AUDIO`）、AES-GCM 加密媒体引用、可配置保留期与到期自动擦除；默认不落盘。
+- [ ] S7-R：真实中文 KWS/TTS 黄金集、macOS 音频输出。
 - [x] S8.1：时间过滤 + 关键词 + 向量 RRF 混合检索、统一 `[E#]` 证据引用，无证据不生成推测性回答。
 - [x] S8.2：任意区间/周报统计、每日柱状数据、Markdown + stats JSON 导出，模型不可用时确定性统计降级。
 - [x] S8.3：只读 loopback MCP（默认关闭、加密本地令牌、loopback 校验、限流、四个只读工具、无写工具）。
@@ -544,6 +545,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.25：真实时钟浸泡测试（`AIASSISTANT_REAL_SOAK_MINUTES=1..120`）；60 分钟运行完成，控制/队列/完整性通过，修正黑名单断言后 8 分钟复验通过。
 - [x] S9.26：Windows 打包复验（zip 83.6 MB / MSIX 86.3 MB / SHA256SUMS；解压后 version、smoke-check、startup-check 均通过）。
 - [x] S9.27：三平台自签名安装包（MSI + PKG + deb）与 GitHub Actions 发布工作流；MSI/PKG 安装时自动导入并信任证书。
+- [x] S9.28：`linux-x64` 全量测试暴露 Skia 原生资产缺失，`AiAssistant.Export` 增加 `SkiaSharp.NativeAssets.Linux`，`Report.Tests` 在 Linux 61/61 通过。
 - [ ] S9-R：真实证书签名/公证、真实时间多日浸泡与设备热插拔、真机安装升级卸载与无障碍人工验收、CI 实际生成并随 Release 发布 SBOM/校验和。
 - [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
 

@@ -122,6 +122,7 @@ public sealed class VoiceCommandAndSessionTests
         Assert.True(harness.Coordinator.IsPaused);
         Assert.Equal(VoiceCommandKind.PauseCapture.ToString(), harness.Log.Records[0].Intent);
         Assert.Null(harness.Log.Records[0].AudioContentId);
+        Assert.Empty(harness.Media.Writes);
         Assert.True(harness.Playback.PlayCount >= 1);
         Assert.Contains(VoiceSessionState.Listening, harness.States);
         Assert.Contains(VoiceSessionState.Processing, harness.States);
@@ -129,6 +130,47 @@ public sealed class VoiceCommandAndSessionTests
 
         await harness.Session.StopAsync(CancellationToken.None);
         await WaitUntilAsync(() => harness.Hub.SubscriberCount == 0);
+    }
+
+    [Fact]
+    public async Task Session_CommandAudioOptIn_PersistsEncryptedWavAndLinksLog()
+    {
+        var harness = new Harness(recordCommandAudio: true);
+        harness.Asr.Responses.Enqueue("暂停采集");
+        await harness.Session.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => harness.Hub.SubscriberCount == 1);
+
+        harness.Hub.Publish(DetectionFrame(harness.Clock));
+        await WaitUntilAsync(() => harness.Session.State == VoiceSessionState.Listening);
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+        harness.Clock.Advance(TimeSpan.FromSeconds(9));
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+
+        await WaitUntilAsync(
+            () => harness.Log.Records.Count == 1 && harness.Session.State == VoiceSessionState.Sleeping,
+            message: () => $"state={harness.Session.State}, logs={harness.Log.Records.Count}, writes={harness.Media.Writes.Count}");
+
+        var write = Assert.Single(harness.Media.Writes);
+        Assert.Equal(ContentKind.AudioPcm16Wav, write.Kind);
+        Assert.Equal(write.CreatedAtUtc.Add(TimeSpan.FromDays(7)), write.ExpiresAtUtc);
+        Assert.Equal(harness.Log.Records[0].AudioContentId, write.ContentId);
+
+        var wav = write.Plaintext.Span;
+        Assert.True(wav.Length > 44);
+        Assert.Equal("RIFF"u8.ToArray(), wav[..4].ToArray());
+        Assert.Equal("WAVE"u8.ToArray(), wav[8..12].ToArray());
+        Assert.Equal(16_000, System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(wav[24..28]));
+
+        await harness.Session.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Session_CommandAudioOptIn_WithoutMediaStore_IsRejected()
+    {
+        var harness = new Harness(withMediaStore: false);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Session.SetCommandAudioRecordingAsync(true, CancellationToken.None));
+        Assert.False(harness.Session.RecordsCommandAudio);
     }
 
     [Fact]
@@ -194,12 +236,19 @@ public sealed class VoiceCommandAndSessionTests
         public FakePlayback Playback { get; } = new();
         public FakeCoordinator Coordinator { get; } = new();
         public FakeCommandLog Log { get; } = new();
+        public FakeMediaStore Media { get; } = new();
         public CountingNavigator Navigator { get; } = new();
         public List<VoiceSessionState> States { get; } = [];
+        public VoiceSessionOptions Options { get; }
         public VoiceSessionController Session { get; }
 
-        public Harness()
+        public Harness(bool recordCommandAudio = false, bool withMediaStore = true)
         {
+            Options = new VoiceSessionOptions
+            {
+                CommandWindow = TimeSpan.FromSeconds(8),
+                RecordCommandAudio = recordCommandAudio
+            };
             var router = new VoiceCommandRouter(
                 new ReportUseCase(new FakeReportQueue(), new FakeReportRepository(), Clock),
                 new CaptureControlUseCase(Coordinator, new FakeAutoStart()),
@@ -214,8 +263,9 @@ public sealed class VoiceCommandAndSessionTests
                 router,
                 Log,
                 Clock,
-                new VoiceSessionOptions { CommandWindow = TimeSpan.FromSeconds(8) },
-                NullLogger<VoiceSessionController>.Instance);
+                Options,
+                NullLogger<VoiceSessionController>.Instance,
+                withMediaStore ? Media : null);
             Session.StateChanged += (_, state) => States.Add(state);
         }
     }
@@ -392,6 +442,32 @@ public sealed class VoiceCommandAndSessionTests
             Records.Add(record);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeMediaStore : IMediaStore
+    {
+        public List<ContentWriteRequest> Writes { get; } = [];
+
+        public Task<ContentRef> PutAsync(ContentWriteRequest request, CancellationToken ct)
+        {
+            Writes.Add(request);
+            return Task.FromResult(new ContentRef(
+                request.ContentId,
+                request.Kind,
+                "sha256-test",
+                request.Plaintext.Length,
+                request.CreatedAtUtc,
+                request.ExpiresAtUtc));
+        }
+
+        public Task<byte[]?> ReadDecryptedAsync(string contentId, CancellationToken ct) =>
+            Task.FromResult<byte[]?>(null);
+
+        public Task<int> IncrementRefAsync(string contentId, CancellationToken ct) => Task.FromResult(1);
+
+        public Task<int> DecrementRefAsync(string contentId, CancellationToken ct) => Task.FromResult(0);
+
+        public Task<int> PurgeExpiredAsync(DateTimeOffset nowUtc, CancellationToken ct) => Task.FromResult(0);
     }
 
     private sealed class CountingNavigator : IVoiceViewNavigator

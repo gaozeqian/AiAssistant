@@ -23,7 +23,7 @@
 | `Microsoft.Extensions.Logging.Abstractions` | `10.0.15` | 各业务模块 | MIT | 结构化日志抽象 |
 | `Microsoft.Extensions.Options` | `10.0.15` | `Models` / `Scheduler` | MIT | 配置选项模式 |
 | `org.k2fsa.sherpa.onnx` | `2.0.2` | `Processing` | Apache-2.0 | 离线中文 ASR、Silero VAD、pyannote 说话人分离；按 RID 携带原生 `sherpa-onnx` 运行库，模型资产不入库 |
-| `SkiaSharp` | `3.119.4` | `Export` | MIT | PNG/PDF 栅格化（随 Avalonia 已携带，不额外增加原生库） |
+| `SkiaSharp` / `SkiaSharp.NativeAssets.Linux` | `3.119.4` | `Export` | MIT | PNG/PDF 栅格化；Linux 原生资产随导出库分发，保证 Linux 端渲染与测试可用 |
 | `PDFsharp` | `6.1.1` | `Export` | MIT | 可检索 PDF、TrueType 字体子集嵌入 |
 | `NAudio` | `3.3.0` | `Platform.Windows` | MIT | WASAPI 共享模式单路麦克风采集（仅 Windows 生效） |
 | `NetArchTest.Rules` | `1.3.2` | `Architecture.Tests` | MIT | 编译产物与依赖方向自动化门禁 |

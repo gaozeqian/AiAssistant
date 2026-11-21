@@ -329,11 +329,17 @@
             <StackPanel Spacing="14">
               <TextBlock Text="本地语音命令" FontSize="20" FontWeight="SemiBold" />
               <TextBlock Text="{Binding StatusText}" FontSize="16" Foreground="{StaticResource AccentBrush}" />
-              <TextBlock Text="唤醒词：你好时光。唤醒后 8 秒内说出固定命令，命令音频仅驻留内存。"
+              <TextBlock Text="唤醒词：你好时光。唤醒后 8 秒内说出固定命令，命令音频默认仅驻留内存。"
                          TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
               <WrapPanel>
                 <Button Classes="primary" Content="{Binding ToggleButtonText}" Command="{Binding ToggleCommand}" Margin="0,0,8,8" />
               </WrapPanel>
+              <CheckBox Content="记录命令音频（加密留存，可自动清理）"
+                        IsChecked="{Binding RecordsCommandAudio, Mode=OneWay}"
+                        Command="{Binding ToggleCommandAudioCommand}"
+                        automation:AutomationProperties.Name="记录命令音频" />
+              <TextBlock Text="{Binding CommandAudioStatus}" TextWrapping="Wrap" FontSize="12"
+                         Foreground="{StaticResource MutedBrush}" />
               <TextBlock Text="{Binding CapabilityText}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
               <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Foreground="#B42318" IsVisible="{Binding HasError}" />
             </StackPanel>

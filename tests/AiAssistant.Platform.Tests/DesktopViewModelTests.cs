@@ -75,6 +75,10 @@ public sealed class DesktopViewModelTests
         Assert.Contains("检索证据", Names(window));
         Assert.Contains("基于证据提问", Names(window));
 
+        shell.SelectedSectionIndex = 3;
+        await WaitUntilAsync(() => Names(window).Contains("记录命令音频"));
+        Assert.Contains("记录命令音频", Names(window));
+
         shell.SelectedSectionIndex = 5;
         await WaitUntilAsync(() => Names(window).Contains("重新检查平台能力"));
         Assert.Contains("重新检查平台能力", Names(window));
@@ -275,6 +279,25 @@ public sealed class DesktopViewModelTests
         await viewModel.ToggleCommand.ExecuteAsync(null);
         Assert.False(viewModel.IsEnabled);
         Assert.Equal("语音休眠", viewModel.StatusText);
+    });
+
+    [Fact]
+    public Task VoicePanel_CommandAudioOptIn_IsOffUntilExplicitlyEnabled() => RunInHeadlessSession(async () =>
+    {
+        var session = new FakeVoiceSession();
+        using var viewModel = new VoiceControlViewModel(session);
+        Assert.False(viewModel.RecordsCommandAudio);
+        Assert.Contains("不落盘", viewModel.CommandAudioStatus, StringComparison.Ordinal);
+
+        await viewModel.ToggleCommandAudioCommand.ExecuteAsync(null);
+        Assert.True(viewModel.RecordsCommandAudio);
+        Assert.True(session.RecordsCommandAudio);
+        Assert.Contains("加密", viewModel.CommandAudioStatus, StringComparison.Ordinal);
+
+        await viewModel.ToggleCommandAudioCommand.ExecuteAsync(null);
+        Assert.False(viewModel.RecordsCommandAudio);
+        Assert.False(session.RecordsCommandAudio);
+        Assert.Contains("不落盘", viewModel.CommandAudioStatus, StringComparison.Ordinal);
     });
 
     [Fact]
@@ -664,8 +687,15 @@ public sealed class DesktopViewModelTests
     {
         public VoiceSessionState State { get; private set; } = VoiceSessionState.Sleeping;
         public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.WakeWord, "fake KWS");
+        public bool RecordsCommandAudio { get; private set; }
         public event EventHandler<VoiceSessionState>? StateChanged;
         public event EventHandler<VoiceInteraction>? Interaction;
+
+        public Task SetCommandAudioRecordingAsync(bool enabled, CancellationToken ct)
+        {
+            RecordsCommandAudio = enabled;
+            return Task.CompletedTask;
+        }
 
         public Task StartAsync(CancellationToken ct)
         {

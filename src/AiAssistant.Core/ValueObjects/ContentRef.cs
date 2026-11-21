@@ -6,7 +6,8 @@ public enum ContentKind
     ScreenshotWebp = 1,
     ThumbnailPng = 2,
     AudioOpus = 3,
-    TextSnapshot = 4
+    TextSnapshot = 4,
+    AudioPcm16Wav = 5
 }
 
 /// <summary>

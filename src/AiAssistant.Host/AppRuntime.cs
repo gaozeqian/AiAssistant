@@ -352,7 +352,16 @@ public sealed class AppRuntime : IAsyncDisposable
             EnableWakeChime = !string.Equals(
                 Environment.GetEnvironmentVariable("AIASSISTANT_VOICE_DISABLE_CHIME"),
                 "true",
-                StringComparison.OrdinalIgnoreCase)
+                StringComparison.OrdinalIgnoreCase),
+            RecordCommandAudio = string.Equals(
+                Environment.GetEnvironmentVariable("AIASSISTANT_VOICE_RECORD_COMMAND_AUDIO"),
+                "true",
+                StringComparison.OrdinalIgnoreCase),
+            CommandAudioRetention = TimeSpan.FromDays(ParseBoundedInt(
+                Environment.GetEnvironmentVariable("AIASSISTANT_VOICE_AUDIO_RETENTION_DAYS"),
+                7,
+                1,
+                365))
         };
         var navigation = new VoiceNavigationHub();
         services.AddSingleton(voiceOptions);
@@ -373,7 +382,8 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<IVoiceCommandLog>(),
             clock,
             sessionOptions,
-            provider.GetRequiredService<ILogger<VoiceSessionController>>()));
+            provider.GetRequiredService<ILogger<VoiceSessionController>>(),
+            provider.GetRequiredService<IMediaStore>()));
     }
 
     private static void RegisterReports(

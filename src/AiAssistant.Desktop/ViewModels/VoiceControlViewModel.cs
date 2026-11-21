@@ -16,19 +16,45 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     private string _lastTranscript = "尚无语音命令";
     private string _lastFeedback = "启用后说“你好时光”唤醒";
     private string _errorMessage = string.Empty;
+    private bool _recordsCommandAudio;
+    private string _commandAudioStatus = "命令音频仅驻留内存，不落盘。";
     private bool _disposed;
 
     public VoiceControlViewModel(IVoiceSession session)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         ToggleCommand = new AsyncRelayCommand(ToggleAsync);
+        ToggleCommandAudioCommand = new AsyncRelayCommand(ToggleCommandAudioAsync);
         _session.StateChanged += OnStateChanged;
         _session.Interaction += OnInteraction;
         UpdateStatus(_session.State);
         CapabilityText = _session.Capability.Summary;
+        RecordsCommandAudio = _session.RecordsCommandAudio;
+        CommandAudioStatus = DescribeCommandAudio(RecordsCommandAudio);
     }
 
     public IAsyncRelayCommand ToggleCommand { get; }
+
+    public IAsyncRelayCommand ToggleCommandAudioCommand { get; }
+
+    /// <summary>Explicit opt-in reflected from the session; command audio is never persisted by default.</summary>
+    public bool RecordsCommandAudio
+    {
+        get => _recordsCommandAudio;
+        private set
+        {
+            if (SetProperty(ref _recordsCommandAudio, value))
+            {
+                OnPropertyChanged(nameof(CommandAudioStatus));
+            }
+        }
+    }
+
+    public string CommandAudioStatus
+    {
+        get => _commandAudioStatus;
+        private set => SetProperty(ref _commandAudioStatus, value);
+    }
 
     public bool IsEnabled
     {
@@ -136,6 +162,39 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
             IsBusy = false;
         }
     }
+
+    private async Task ToggleCommandAudioAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ErrorMessage = string.Empty;
+        try
+        {
+            await _session.SetCommandAudioRecordingAsync(!RecordsCommandAudio, CancellationToken.None);
+            RecordsCommandAudio = _session.RecordsCommandAudio;
+            CommandAudioStatus = DescribeCommandAudio(RecordsCommandAudio);
+        }
+        catch (InvalidOperationException)
+        {
+            ErrorMessage = "当前会话未接入加密媒体库，无法记录命令音频。";
+        }
+        catch (AiAssistant.Core.Exceptions.AiAssistantDomainException)
+        {
+            ErrorMessage = "命令音频设置失败，请检查存储健康状态。";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private static string DescribeCommandAudio(bool enabled) => enabled
+        ? "命令音频已开启：唤醒后的命令音频会以 AES-GCM 加密保存，并在保留期结束后自动擦除。"
+        : "命令音频仅驻留内存，不落盘。";
 
     private void OnStateChanged(object? sender, VoiceSessionState state)
     {

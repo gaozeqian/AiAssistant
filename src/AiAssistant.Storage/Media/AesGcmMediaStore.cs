@@ -171,6 +171,15 @@ public sealed class AesGcmMediaStore : IMediaStore
                 await unlinkCmd.ExecuteNonQueryAsync(ct);
             }
 
+            await using (var unlinkVoiceAudioCmd = conn.CreateCommand())
+            {
+                unlinkVoiceAudioCmd.Transaction = tx;
+                unlinkVoiceAudioCmd.CommandText =
+                    "UPDATE voice_commands SET audio_content_id = NULL WHERE audio_content_id = $id;";
+                unlinkVoiceAudioCmd.Parameters.AddWithValue("$id", item.ContentId);
+                await unlinkVoiceAudioCmd.ExecuteNonQueryAsync(ct);
+            }
+
             await using (var delCmd = conn.CreateCommand())
             {
                 delCmd.Transaction = tx;
