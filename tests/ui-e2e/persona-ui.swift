@@ -12,7 +12,7 @@ import Vision
 let appBundle = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
     : "/Users/gaozeqian/Repos/AiAssistant/artifacts/packages/staging/osx-arm64/AiAssistant.app"
-let dataDir = "/tmp/aia-persona-ui"
+let dataDir = ProcessInfo.processInfo.environment["PERSONA_DATA_DIR"] ?? "/tmp/aia-persona-ui"
 
 func attr(_ e: AXUIElement, _ n: String) -> AnyObject? {
     var v: AnyObject?
@@ -145,10 +145,14 @@ guard AXIsProcessTrusted() else {
     print("FAIL  辅助功能未授权"); exit(2)
 }
 
-let proc = Process()
-proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-proc.arguments = ["-n", appBundle, "--args", "--show-window", "--data-directory", dataDir]
-try? proc.run()
+// 复用已运行的实例（若存在），否则新启动。这样可用外部环境变量（模型/语音）预配置进程。
+let existing = NSRunningApplication.runningApplications(withBundleIdentifier: "com.aiassistant.desktop").first
+if existing == nil {
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    proc.arguments = ["-n", appBundle, "--args", "--show-window", "--data-directory", dataDir]
+    try? proc.run()
+}
 
 var win: AXUIElement?
 let deadline = Date().addingTimeInterval(25)
@@ -189,6 +193,12 @@ check("恢复后横幅显示「正在本机采集」", waitText(win, "正在本�
 _ = tapExact("语音", in: r)
 Thread.sleep(forTimeInterval: 0.8)
 check("语音页显示「本地语音命令」", waitText(win, "本地语音命令"))
+let voiceOcr = ocrAll(r)
+check("唤醒词模型已安装（无缺失提示）",
+      !voiceOcr.contains { $0.contains("model assets are not installed") })
+if ProcessInfo.processInfo.environment["PERSONA_DEBUG"] == "1" {
+    print("  [语音页 OCR] " + voiceOcr.joined(separator: " | "))
+}
 _ = tapExact("启用语音", in: r) || tap("启用", in: r)
 // 真人断言：点击后按钮文案应切换（启用语音→关闭语音）；模型资产缺失时状态会停在休眠，
 // 所以断言按钮切换而非状态文字。
