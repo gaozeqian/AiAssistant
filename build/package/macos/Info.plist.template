@@ -10,6 +10,8 @@
   <string>com.aiassistant.desktop</string>
   <key>CFBundleExecutable</key>
   <string>AiAssistant.Host</string>
+  <key>CFBundleIconFile</key>
+  <string>AiAssistant</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>

@@ -12,8 +12,8 @@ import zlib
 from pathlib import Path
 
 SIZE = 256
-ACCENT = (49, 87, 213)
-DARK = (17, 28, 54)
+ACCENT = (0, 120, 212)  # #0078D4 (VS Code accent)
+DARK = (0, 90, 158)     # #005A9E (gradient bottom)
 WHITE = (255, 255, 255)
 
 
@@ -138,7 +138,8 @@ def main() -> None:
 
     # MSIX tile assets (generated only when the Windows package layout is requested).
     msix_dir = out_dir / "msix"
-    msix_dir.mkdir(exist_ok=True)
+    if not msix_dir.exists():
+        msix_dir.mkdir(parents=True)
     for name, size in [
         ("StoreLogo.png", 50),
         ("Square44x44Logo.png", 44),

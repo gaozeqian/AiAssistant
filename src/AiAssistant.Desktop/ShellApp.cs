@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Desktop.Views;
 using Avalonia;
@@ -7,7 +6,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
-using Avalonia.Platform;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using CommunityToolkit.Mvvm.Input;
@@ -231,29 +229,9 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
 
     private static WindowIcon CreateApplicationIcon()
     {
-        const int size = 32;
-        using var bitmap = new WriteableBitmap(
-            new PixelSize(size, size),
-            new Vector(96, 96),
-            PixelFormat.Bgra8888,
-            AlphaFormat.Premul);
-        using (var frame = bitmap.Lock())
-        {
-            for (var y = 0; y < size; y++)
-            {
-                for (var x = 0; x < size; x++)
-                {
-                    var inside = x is >= 3 and < 29 && y is >= 3 and < 29;
-                    var marker = x is >= 13 and < 19 || y is >= 13 and < 19;
-                    var color = !inside ? 0u : marker ? 0xFFFFFFFFu : 0xFFD55731u;
-                    Marshal.WriteInt32(frame.Address, y * frame.RowBytes + x * 4, unchecked((int)color));
-                }
-            }
-        }
-
-        using var stream = new MemoryStream();
-        bitmap.Save(stream, PngBitmapEncoderOptions.Default);
-        stream.Position = 0;
-        return new WindowIcon(stream);
+        using var stream = typeof(ShellApp).Assembly.GetManifestResourceStream(
+            "AiAssistant.Desktop.Assets.aiassistant.png")
+            ?? throw new InvalidOperationException("Embedded app icon 'AiAssistant.Desktop.Assets.aiassistant.png' is missing.");
+        return new WindowIcon(new Bitmap(stream));
     }
 }

@@ -13,4 +13,7 @@
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/aiassistant.png" LogicalName="AiAssistant.Desktop.Assets.aiassistant.png" />
+  </ItemGroup>
 </Project>
