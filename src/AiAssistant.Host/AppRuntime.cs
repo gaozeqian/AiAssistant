@@ -76,6 +76,9 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public IAsrEngine AsrEngine => _services.GetRequiredService<IAsrEngine>();
 
+    /// <summary>Streaming wake-word detector used by the KWS golden-set command.</summary>
+    public IWakeWordDetector WakeWordDetector => _services.GetRequiredService<IWakeWordDetector>();
+
     /// <summary>Only registered where a managed image OCR adapter exists (Linux RapidOCR).</summary>
     public IImageOcrRecognizer? OcrRecognizer => _services.GetService<IImageOcrRecognizer>();
 

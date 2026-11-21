@@ -11,7 +11,7 @@
 - **最近更新时间**：`2026-11-21`
 - **最近执行环境**：`osx-arm64` macOS 26.7.3（Apple Silicon）+ `.NET SDK 10.0.404` + Swift 6.4；上一轮 `linux-x64` Ubuntu 26.04 + GNOME Wayland；再上一轮 Windows 11 `win-x64` / SDK 11.0.100
 - **当前构建状态**：✅ `osx-arm64` 本地 Release 0 警告 0 错误；Swift Helper `swift build -c release` 通过；`linux-x64` / `win-x64` 历史结论见第 4 节日志
-- **当前测试状态**：✅ 204/204 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 58、`Processing.Tests` 43、`Report.Tests` 61、`Voice.Tests` 9），本机 `osx-arm64` 全量实跑；另含 3 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放、TCC 降级、崩溃重启，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
+- **当前测试状态**：✅ 207/207 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 58、`Processing.Tests` 46、`Report.Tests` 61、`Voice.Tests` 9），本机 `osx-arm64` 全量实跑；另含 3 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放、TCC 降级、崩溃重启，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
 - **下一步待确认事项**：macOS 侧的 TCC 允许流程（屏幕录制/辅助功能）与签名公证仍需人工授权与签字；S9-R4 待 Actions 配额恢复；黄金集（S4-R/S7-R1）需外挂模型资产。详见第 6 节
 
 ---
@@ -176,9 +176,12 @@ AiAssistant.Host --benchmark-retrieval --output artifacts/benchmarks/retrieval-r
 ```bash
 AiAssistant.Host --benchmark-asr --samples artifacts/golden/asr --output artifacts/benchmarks/asr.md
 AiAssistant.Host --benchmark-ocr --samples artifacts/golden/ocr --output artifacts/benchmarks/ocr.md
+AIASSISTANT_SHERPA_MODEL_DIR=artifacts/models/sherpa-kws \
+  AiAssistant.Host --benchmark-kws --samples artifacts/golden/kws --output artifacts/benchmarks/kws.md
 ```
 
 - 样本格式：ASR 为 `<name>.wav` + 同名 `.txt`（参考答案），任意采样率/声道会自动转 16 kHz 单声道；OCR 为 `<name>.png` + `.txt`。
+- KWS 语料为 `positive/` 与 `negative/` 两个子目录；报告含唤醒率、误唤醒率（次/小时）与唤醒延迟中位数。
 - 报告含逐样本 CER、编辑数/字数、耗时、识别结果、参考答案与错误；模型缺失时标记 `engine unavailable`（不计为 100% 错误）并退出码 1。
 - OCR 命令在注册了 `IImageOcrRecognizer` 的平台可用（macOS Vision、Linux RapidOCR）。
 - 语料覆盖与目录约定见 `docs/testing/golden-sets.md`；首轮合成语料基线见 `docs/testing/baselines/2026-11-21-macos-arm64.md`。
@@ -382,6 +385,7 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-21 [osx-arm64] [S4-R 识别黄金集命令落地]**：新增 `--benchmark-asr` / `--benchmark-ocr`，共享 `AiAssistant.Processing/Benchmarks`：`CharacterErrorRate`（归一化后 Levenshtein，忽略空白/标点/大小写）、`RecognitionSampleSet`（媒体 + 同名 `.txt` 配对，缺参考答案给出警告）、`WavPcm16Reader`（PCM16 任意采样率/声道 → 16 kHz 单声道线性重采样）、`RecognitionBenchmarkEvaluator`（逐样本评分与失败隔离）、`RecognitionBenchmarkReport`（逐样本 CER/编辑数/耗时/文本与警告的 Markdown）。模型缺失时整批标记 `engine unavailable` 而不是记 100% 错误，退出码 1；OCR 仅在注册 `IImageOcrRecognizer` 的平台（Linux RapidOCR）可用。新增 15 项测试（CER、配对、WAV 解码与重采样、评分/不可用路径、报告转义），`Processing.Tests` 37/37；真机跑通空模型场景并正确写出报告。
 - **2026-11-21 [osx-arm64] [识别基线首次跑通]**：下载 sherpa-onnx Paraformer 中文 small（`model.int8.onnx`，77.9 MB）到 `artifacts/models`，用 `say` 合成 10 条中文语音（两种普通话音色）与 12 张渲染截图（浅/深色、18px 小字、低对比度、中英混排）构成合成黄金集。**ASR 10/10、平均 CER 12.45%、完全匹配 3/10、热态 17–21 ms（首次 2185 ms 含模型加载）**；**OCR 12/12、平均 CER 0.00%、75–91 ms**。基线详情与典型错误见 `docs/testing/baselines/2026-11-21-macos-arm64.md`。
 - **2026-11-21 [osx-arm64] [PNG 滤波缺陷修复 + macOS Vision OCR 适配器]**：基线暴露出 `TryDecodeToBgra32` 在 Sub/Up/Average/Paeth 滤波下用未重建邻居字节，真实截图解码为空白图、OCR 全空——影响 Linux portal/X11 截图路径。改为逐行重建并补 6 项滤波回归测试；同时把 `LinuxPngCodec` 上移为 `AiAssistant.Application.Imaging.PngCodec` 供各平台复用，新增 `MacOsImageOcrRecognizer`（经 Swift Helper 的 `text.extract` 走 Vision），使 `--benchmark-ocr` 在 macOS 可直接运行。全量 204/204。
+- **2026-11-21 [osx-arm64] [Whisper 对比基线与 KWS 评测落地]**：下载 `ggml-small.bin`（466 MB）跑同语料对比：Whisper **CER 27.48%**、完全匹配 0/10、热态 214–251 ms，sherpa 为 12.45% / 3/10 / 17–21 ms；Whisper 有 2/10 输出繁体，按简体逐字比较会抬高 CER（折算后仍更差、更慢）。新增 `--benchmark-kws`：`KwsBenchmarkEvaluator` 按 100 ms 帧流式喂入检测器，统计唤醒率、首次偏移（延迟）与误唤醒/小时，`KwsBenchmarkCommand` 负责语料与 Markdown；配套 3 项测试。KWS 模型（zipformer wenetspeech 3.3M int8）+ 拼音 tokens 组出 `kws/` 资产后真机实测：**唤醒率 87.5%（7/8）、误唤醒 0.00 次/小时（负样本 6.0 分钟）、延迟中位数 1100 ms**（唤醒词约 1.1 s，等价词尾触发），唯一未命中为低语速 Grandma 音色。基线详情见 `docs/testing/baselines/2026-11-21-macos-arm64.md`。
 - **2026-11-21 [docs] [实施清单与进度对齐]**：`IMPLEMENTATION.md` 第 10 节改为与 `PROGRESS.md` 第 5 节同构的 `*-R` 编号：补记 `S6-R2`（密钥导入）、`S8-R`（embedding 95.8% / MCP Inspector / SVG-PNG-PDF）为已完成，拆分 `S5-R1`/`S5-R2`、`S6-R1`、`S7-R1`/`S7-R2`、`S9-R1..R4`、`S3-R1`/`S3-R2`，并新增第 6 节执行顺序表。
 
 ---
@@ -402,7 +406,7 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S5-R2` | S5 调度 | 每日定时、启动补偿与失败退避尚未进行多日浸泡 | 长时间休眠/跨日边界可能暴露时序问题 | S9 浸泡测试覆盖跨午夜、休眠唤醒、模型离线与重复触发 |
 | `S6-R1` | S6 企业端点 | 真实企业 mTLS、企业 CA、代理和公网 API 未联调；公网同意仅代码级门禁 | TLS/代理环境差异可能导致端点不可用 | 在企业网络与公网沙箱分别验证握手、证书轮换、代理认证、断网回退与策略审计 |
 | `S6-R2` | S6 密钥 | 已提供 `--import-model-secret`（stdin、终端隐藏输入）、列表/删除命令与诊断页密钥卡片；值只写不读 | 仍需用户自行准备密钥值并确保不进入 shell 历史 | 发布说明中提示使用 stdin 管道，避免命令行明文 |
-| `S7-R1` | S7 语音 | 真实中文 KWS 唤醒率/误唤醒率、TTS 音质与端到端延迟未评测 | 阈值和体验未达发布基线 | 外挂 KWS/TTS 模型后运行安静/嘈杂/多人场景黄金集，按实测调整阈值 |
+| `S7-R1` | S7 语音 | 🟡 合成 KWS 基线已跑（2026-11-21）：唤醒率 **87.5%**、误唤醒 **0.00 次/小时**（负样本 6.0 分钟）、延迟中位数 **1100 ms**；TTS 音质无客观指标，真实环境唤醒未覆盖 | 负样本时长偏短、合成音色少于真人分布，统计噪声大 | 扩到 ≥ 2 小时负样本与真人录音后复跑 `--benchmark-kws`，按结果调阈值 |
 | `S7-R2` | S7 macOS | ✅ 已实现 Swift Helper `audio.play`（AVAudioEngine 内存 PCM、不落盘、每次播放后释放设备）并真机验证：回放往返 0.7–1.7 ms、心跳 0.2–0.3 ms、空载荷短路、30 秒截断；能力随 Helper 健康度切换 | 签名 `.app` 内尚未复听 | 随 `S9-R1` 在打包应用内复听一次并记录 |
 | `S7-R3` | S7 隐私 | ✅ 已实现显式开关、AES-GCM 加密音频引用与到期自动清理（2026-11-21）；仅缺内置回听界面 | 默认仍不落盘，风险已消除 | 需要回听时从加密媒体库导出；内置播放器另立需求 |
 | `S8-R1` | S8 检索 | 已完成真实评测：embeddinggemma-2:740m **95.8%**（MRR 1.0，768 维，热态约 19ms）；已把官方查询指令与 `title/text` 文档格式接入生产并支持向量重建 | 合成语料仍与真实分布不同；个别同义词会漂移 | 用真实脱敏语料扩充查询集，按失败样本调参 |

@@ -292,6 +292,14 @@ public static class Program
                     .RunAsync(samples, outputPath, CancellationToken.None);
             }
 
+            if (args.Contains("--benchmark-kws", StringComparer.OrdinalIgnoreCase))
+            {
+                var samples = ResolveSamplesDirectory(args, "kws");
+                var outputPath = ResolveBenchmarkOutput(args, "kws");
+                return await new KwsBenchmarkCommand(runtime.WakeWordDetector)
+                    .RunAsync(samples, outputPath, CancellationToken.None);
+            }
+
             if (args.Contains("--benchmark-ocr", StringComparer.OrdinalIgnoreCase))
             {
                 using var helperCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
@@ -500,6 +508,8 @@ public static class Program
                                              Run the Chinese ASR golden set (wav + txt) and report CER
           --benchmark-ocr [--samples <dir>] [--output <p>]
                                              Run the OCR golden set (png + txt); Linux RapidOCR only
+          --benchmark-kws [--samples <dir>] [--output <p>]
+                                             Run the wake-word golden set (positive/negative wav)
           --probe-model                      Print endpoint capabilities
           --import-model-secret <name>       Read a secret from stdin and store it encrypted
           --list-model-secrets               List secret names (values are never shown)

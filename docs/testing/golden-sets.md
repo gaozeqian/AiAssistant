@@ -13,10 +13,17 @@ artifacts/golden/
 │   ├── noisy-01.wav
 │   ├── noisy-01.txt
 │   └── ...
-└── ocr/
-    ├── settings-zh-01.png
-    ├── settings-zh-01.txt
-    └── ...
+├── ocr/
+│   ├── settings-zh-01.png
+│   ├── settings-zh-01.txt
+│   └── ...
+└── kws/
+    ├── positive/            # 每条含唤醒词一次，建议唤醒词位于片段起始处
+    │   ├── p01-bare.wav
+    │   └── ...
+    └── negative/            # 不含唤醒词的连续语音，建议单条 ≥ 60 s
+        ├── n01-product.wav
+        └── ...
 ```
 
 - 媒体与参考答案同名，仅扩展名不同；缺 `.txt` 的样本会被跳过并在报告 `警告` 段落列出。
@@ -33,6 +40,7 @@ artifacts/golden/
 | 近音词 | 「时光 / 石光」「会议 / 回忆」 | — |
 | 多人 | 他人插话、旁白 | — |
 | 界面 | — | 浅色/深色、100%/150% 缩放、中文为主 + 少量英文 |
+| 唤醒 | 不同音色/语速、带命令与裸唤醒 | 含「时光」「你好」等近音负样本 |
 
 单集建议 20–50 条，且**不要**使用真实个人录音或含敏感信息的截图；用合成文本朗读或明确授权的素材。
 
@@ -48,6 +56,10 @@ AiAssistant.Host --benchmark-asr --samples /data/golden/asr --output artifacts/b
 # OCR（macOS 走 Vision；Linux 走 RapidOCR）
 AIASSISTANT_RAPIDOCR_MODEL_DIR=/models/rapidocr \
   AiAssistant.Host --benchmark-ocr --samples /data/golden/ocr
+
+# KWS（正/负样本目录）
+AIASSISTANT_SHERPA_MODEL_DIR=/models/sherpa-kws \
+  AiAssistant.Host --benchmark-kws --samples /data/golden/kws
 ```
 
 模型位置：
@@ -65,9 +77,10 @@ AIASSISTANT_RAPIDOCR_MODEL_DIR=/models/rapidocr \
 
 ## 5. 已有基线
 
-- `docs/testing/baselines/2026-11-21-macos-arm64.md`：合成语料 ASR CER 12.45%、OCR CER 0.00%（macOS Vision）。
+- `docs/testing/baselines/2026-11-21-macos-arm64.md`：合成语料 ASR CER 12.45%（sherpa）/ 27.48%（Whisper small）、
+  OCR CER 0.00%（macOS Vision）、KWS 唤醒率 87.5% 且误唤醒 0 次/小时。
 
 ## 6. 待补齐
 
-- `S7-R1`：KWS 唤醒率 / 误唤醒率需要流式回放语料（正样本 + 负样本连续音频），当前尚未提供 `--benchmark-kws`。
+- KWS 负样本建议 ≥ 2 小时；6 分钟语料下 1 次误唤醒即 10 次/小时量级，统计噪声大。
 - 真实脱敏语料扩充后，把 `--benchmark-retrieval` 的查询集也替换为真实分布（`S8-R1`）。
