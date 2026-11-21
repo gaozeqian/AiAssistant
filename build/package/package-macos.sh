@@ -13,6 +13,7 @@ REQUIRE_SIGN=0
 CERTIFICATE_PATH=""
 FRAMEWORK_DEPENDENT=0
 RUNTIME="osx-arm64"
+KEYCHAIN=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -24,6 +25,7 @@ while [[ $# -gt 0 ]]; do
     --skip-sign) SKIP_SIGN=1; shift ;;
     --require-sign) REQUIRE_SIGN=1; shift ;;
     --certificate) CERTIFICATE_PATH="$2"; shift 2 ;;
+    --keychain) KEYCHAIN="$2"; shift 2 ;;
     --framework-dependent) FRAMEWORK_DEPENDENT=1; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -107,9 +109,10 @@ if [[ "$SKIP_SIGN" -eq 0 ]]; then
   fi
 
   SIGN_IDENTITY="${IDENTITY:--}"
-  echo "signing with identity: $SIGN_IDENTITY"
+  echo "signing with identity: $SIGN_IDENTITY keychain=${KEYCHAIN:-default}"
   codesign --force --deep --options runtime \
     --entitlements "$SCRIPT_DIR/macos/AiAssistant.entitlements" \
+    ${KEYCHAIN:+--keychain "$KEYCHAIN"} \
     --sign "$SIGN_IDENTITY" "$APP"
   codesign --verify --deep --strict --verbose=2 "$APP"
 

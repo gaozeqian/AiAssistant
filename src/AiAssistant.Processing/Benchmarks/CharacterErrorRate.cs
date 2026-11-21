@@ -5,11 +5,16 @@ namespace AiAssistant.Processing.Benchmarks;
 
 /// <summary>
 /// Character error rate for Chinese/English transcripts (S4-R golden set).
-/// Normalization drops whitespace, punctuation and symbols so that ASR/OCR formatting
-/// differences do not dominate the score; casing is folded for Latin text.
+/// Normalization drops whitespace, punctuation and symbols, folds Latin casing, and converts
+/// Traditional to Simplified Chinese (OpenCC TSCharacters, Apache-2.0) so that Whisper's
+/// Traditional output is not mis-scored as recognition errors. Arabic numerals are kept as-is:
+/// "2012" vs "二零一二" is a formatting difference that still counts, and is called out in reports.
 /// </summary>
 public static class CharacterErrorRate
 {
+    private static readonly Lazy<IReadOnlyDictionary<char, char>> TraditionalToSimplified =
+        new(LoadTraditionalToSimplified, LazyThreadSafetyMode.ExecutionAndPublication);
+
     public static string Normalize(string? text)
     {
         if (string.IsNullOrEmpty(text))
@@ -17,6 +22,7 @@ public static class CharacterErrorRate
             return string.Empty;
         }
 
+        var map = TraditionalToSimplified.Value;
         var builder = new StringBuilder(text.Length);
         foreach (var ch in text)
         {
@@ -25,10 +31,55 @@ public static class CharacterErrorRate
                 continue;
             }
 
-            builder.Append(char.ToLowerInvariant(ch));
+            var normalized = map.TryGetValue(ch, out var simplified) ? simplified : ch;
+            builder.Append(char.ToLowerInvariant(normalized));
         }
 
         return builder.ToString();
+    }
+
+    private static Dictionary<char, char> LoadTraditionalToSimplified()
+    {
+        try
+        {
+            using var stream = typeof(CharacterErrorRate).Assembly.GetManifestResourceStream(
+                "AiAssistant.Processing.Benchmarks.TSCharacters.txt");
+            if (stream is null)
+            {
+                return new Dictionary<char, char>(0);
+            }
+
+            var map = new Dictionary<char, char>(4096);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            while (reader.ReadLine() is { } line)
+            {
+                if (line.Length < 3 || line[0] == '#')
+                {
+                    continue;
+                }
+
+                var parts = line.Split('\t', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2 || parts[0].Length != 1)
+                {
+                    continue;
+                }
+
+                var target = parts[1].Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                if (string.IsNullOrEmpty(target) || target.Length != 1)
+                {
+                    continue;
+                }
+
+                map[parts[0][0]] = target[0];
+            }
+
+            return map;
+        }
+        catch (Exception)
+        {
+            // The mapping is an optional normalization resource; never break metric computation.
+            return new Dictionary<char, char>(0);
+        }
     }
 
     /// <summary>Levenshtein distance over normalized characters.</summary>

@@ -11,7 +11,7 @@
 - **最近更新时间**：`2026-11-21`
 - **最近执行环境**：`osx-arm64` macOS 26.7.3（Apple Silicon）+ `.NET SDK 10.0.404` + Swift 6.4；上一轮 `linux-x64` Ubuntu 26.04 + GNOME Wayland；再上一轮 Windows 11 `win-x64` / SDK 11.0.100
 - **当前构建状态**：✅ `osx-arm64` 本地 Release 0 警告 0 错误；Swift Helper `swift build -c release` 通过；`linux-x64` / `win-x64` 历史结论见第 4 节日志
-- **当前测试状态**：✅ 209/209 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 58、`Processing.Tests` 46、`Report.Tests` 61、`Voice.Tests` 11），本机 `osx-arm64` 全量实跑；另含 3 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放、TCC 降级、崩溃重启，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
+- **当前测试状态**：✅ 211/211 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 58、`Processing.Tests` 48、`Report.Tests` 61、`Voice.Tests` 11），本机 `osx-arm64` 全量实跑；另含 3 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放、TCC 降级、崩溃重启，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
 - **下一步待确认事项**：macOS 侧的 TCC 允许流程（屏幕录制/辅助功能）与签名公证仍需人工授权与签字；S9-R4 待 Actions 配额恢复；黄金集（S4-R/S7-R1）需外挂模型资产。详见第 6 节
 
 ---
@@ -388,6 +388,8 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-21 [osx-arm64] [Whisper 对比基线与 KWS 评测落地]**：下载 `ggml-small.bin`（466 MB）跑同语料对比：Whisper **CER 27.48%**、完全匹配 0/10、热态 214–251 ms，sherpa 为 12.45% / 3/10 / 17–21 ms；Whisper 有 2/10 输出繁体，按简体逐字比较会抬高 CER（折算后仍更差、更慢）。新增 `--benchmark-kws`：`KwsBenchmarkEvaluator` 按 100 ms 帧流式喂入检测器，统计唤醒率、首次偏移（延迟）与误唤醒/小时，`KwsBenchmarkCommand` 负责语料与 Markdown；配套 3 项测试。KWS 模型（zipformer wenetspeech 3.3M int8）+ 拼音 tokens 组出 `kws/` 资产后真机实测：**唤醒率 87.5%（7/8）、误唤醒 0.00 次/小时（负样本 6.0 分钟）、延迟中位数 1100 ms**（唤醒词约 1.1 s，等价词尾触发），唯一未命中为低语速 Grandma 音色。基线详情见 `docs/testing/baselines/2026-11-21-macos-arm64.md`。
 - **2026-11-21 [osx-arm64] [KWS 扩样到 2 小时负样本]**：正样本扩到 13 条（9 种中文音色），负样本扩到 **2.12 小时**（12 条 10 分钟乱序拼接长样本 + 10 条单元样本）。结果：**唤醒率 84.6%（11/13）、误唤醒 0.00 次/小时、延迟中位数 1100 ms**；零误唤醒在 2 小时量级仍成立，但新增 Reed 音色与原有低语速 Grandma 各漏检一次，说明阈值对音色/语速鲁棒性不足。评测吞吐约 **100× 实时**（2.12 小时音频耗时 74 秒），可作为发布前常规门禁。随后把 `KeywordsScore`/`KeywordsThreshold` 做成可配置（`AIASSISTANT_KWS_SCORE` / `AIASSISTANT_KWS_THRESHOLD`）：threshold 0.15–0.35 无变化，score 1.0→3.0 把唤醒率提升到 **92.3%** 且误唤醒仍为 0，5.0 回落到 84.6%，故默认值定为 **3.0**。
 - **2026-11-21 [osx-arm64] [Linux RapidOCR 基线受阻]**：本机无 Linux 主机、无 Docker/Podman，RapidOCR 的 PP-OCRv4 ONNX 资产在当前代理下也未取到（GitHub release 资产 404、ModelScope 根目录无对应文件）。`--benchmark-ocr` 已支持该适配器，需在 Linux 机器外挂模型后运行；macOS Vision 侧基线仍为 12/12、CER 0.00%。
+- **2026-11-21 [osx-arm64] [真人语料基线]**：经 HF 镜像取 `AudioLLMs/aishell_1_zh_test` 一个 parquet 分片（2307 条 AISHELL-1 测试集，16 kHz WAV + 转写），随机抽 100 条做 ASR、693 条拼成 6×10 分钟做 KWS 负样本。结果：sherpa **CER 6.34%**（真人优于合成 12.45%）、Whisper **17.13%**（繁简归一化后；未归一化 26.56%）、KWS 真人负样本 60 分钟 **0 误唤醒**。同时把 OpenCC `TSCharacters.txt`（Apache-2.0，104 KB）内置进 `CharacterErrorRate.Normalize` 做繁简归一，新增 2 项测试；数字书写差异（`2012` vs `二零一二`）仍如实计入 CER。
+- **2026-11-21 [osx-arm64] [开发证书签名验证]**：用本机 Apple Development 身份（`zeqian_gao@icloud.com (4XH8AUR7JN)`，Team ID `Y6ANU9Z954`）走完整 `package-macos.sh --identity` 签名：`codesign --verify --deep --strict` 通过、自包含 .NET 的 `.dylib` 加载正常（新增 `disable-library-validation` 权限）、签名后 `--smoke-check`/`--doctor`/`--capture-smoke`（15 秒 2 事件 2 媒体）全通过；`spctl` 仍 rejected（Apple Development ≠ Developer ID 且未公证，属预期）。脚本新增 `--keychain <path>`。`tccutil reset` 在本沙箱内被拒，权限撤销演练需在系统设置或真终端手动完成。
 - **2026-11-21 [docs] [实施清单与进度对齐]**：`IMPLEMENTATION.md` 第 10 节改为与 `PROGRESS.md` 第 5 节同构的 `*-R` 编号：补记 `S6-R2`（密钥导入）、`S8-R`（embedding 95.8% / MCP Inspector / SVG-PNG-PDF）为已完成，拆分 `S5-R1`/`S5-R2`、`S6-R1`、`S7-R1`/`S7-R2`、`S9-R1..R4`、`S3-R1`/`S3-R2`，并新增第 6 节执行顺序表。
 
 ---
@@ -398,17 +400,17 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 
 | ID | 来源 | 遗留内容 | 风险 | 后续处理 |
 |---|---|---|---|---|
-| `S3-R1` | S3 macOS | 🟡 真机已完成：GUI 主线程启动、系统授权弹窗、屏幕录制与辅助功能均已授权、抓屏 → 加密落库 → 报告导出闭环、Helper 崩溃重启与能力恢复、未授权精确降级；剩余权限撤销与公证签字 | 正式签名下的 TCC 归属与公证流程仍需验证 | 用 Developer ID 签名打包后撤销一次屏幕录制并记录恢复过程，保存 `spctl` 与公证输出 |
+| `S3-R1` | S3 macOS | 🟡 真机已完成：GUI 主线程启动、系统授权弹窗、屏幕录制与辅助功能授权、抓屏→加密落库→报告导出闭环、Helper 崩溃重启、未授权降级、**本机 Apple Development 身份完整签名且签名后采集正常**；剩余权限撤销演练与公证（Developer ID） | 正式公证仍是唯一未验证环节；撤销演练受沙箱限制只能手动 | 手动在系统设置撤销一次屏幕录制并复测；取得 Developer ID 后走公证 |
 | `S3-R2` | S3 Linux | 🟡 GNOME Wayland 的 ScreenCast 授权与连续抓屏已真机实测（2026-11-21）；KDE/KWin、X11 回退、AT-SPI 与托盘能力矩阵仍待人工验收 | 合成器差异可能影响窗口与抓屏可用性 | 在 KDE Wayland 与 X11 会话逐项签字 |
 | `S3-R3` | S3 Linux | ✅ 已实现连续 PipeWire 帧消费（私有 `pw_stream`、1 秒节流、格式协商与 YUV 降级回退），GNOME Wayland 真机通过（2026-11-21） | KDE/KWin 与多显示器场景未实测 | 在 KDE Wayland 复跑同一真机测试 |
-| `S4-R1` | S4 语音 | 🟡 合成语料基线已跑（2026-11-21）：sherpa Paraformer 中文 small，10 条 TTS 语料 **CER 12.45%**、完全匹配 3/10、热态 17–21 ms；真实麦克风/噪声/口音语料未覆盖 | 合成 TTS 与人声分布不同，不能当作发布质量门禁 | 按 `docs/testing/golden-sets.md` 补真实授权语料后复跑 `--benchmark-asr` |
+| `S4-R1` | S4 语音 | 🟡 真人语料基线已跑（AISHELL-1 测试集 100 条）：sherpa Paraformer 中文 small **CER 6.34%**、热态 17–21 ms；合成语料为 12.45%。噪声/口音/多人场景仍未覆盖 | 干净朗读语料不等于真实使用（噪声、口音） | 补 AISHELL 噪声测试集或真实会议录音后复跑 `--benchmark-asr` |
 | `S4-R2` | S4 OCR | 🟡 macOS Vision 基线已跑（2026-11-21）：12 张合成截图 **CER 0.00%**、75–91 ms，并修复 PNG 滤波解码缺陷；Linux RapidOCR 基线受阻（无 Linux 主机/容器，模型资产未取到） | 合成截图 ≠ 真实 UI；Linux 侧质量仍未知 | 在 Linux 外挂 RapidOCR 模型后跑 `--benchmark-ocr`，再补真实截图集 |
-| `S4-R3` | S4 语音 | ✅ 已实现 Whisper.net 批处理适配器（2026-11-21）：`AIASSISTANT_ASR_ENGINE=whisper` 显式启用、缺模型降级、发布按 RID 裁剪原生库；`--benchmark-asr` 可直接用同一黄金集对比两引擎 | 真实 Whisper 模型质量/耗时未评测（无模型资产） | 外挂 ggml 模型后运行 `--benchmark-asr` 对比 sherpa 基线 |
+| `S4-R3` | S4 语音 | 🟡 Whisper.net 已跑真人对比（`ggml-small`）：AISHELL-1 100 条 **CER 17.13%**（未归一化 26.56%）、热态 214–251 ms，明显落后 sherpa（6.34%）；数字书写差异仍计入 | 中文口语/新闻域明显弱于专用模型；更大模型未测 | 可对比 `ggml-medium/large` 或换 prompt 优化后复测 |
 | `S5-R1` | S5 模型 | 已用本机 `gemma4:12b` 实测：成功率 100%、JSON 合规率 100%、热态平均 4.6s（首次含加载 7.4s）；其它候选模型与内存曲线仍未评测 | 不同模型质量/延迟差异较大，默认档位未定 | 对目标候选模型分别运行 `AiAssistant.Host --benchmark-model`，按质量/延迟选默认档 |
 | `S5-R2` | S5 调度 | 每日定时、启动补偿与失败退避尚未进行多日浸泡 | 长时间休眠/跨日边界可能暴露时序问题 | S9 浸泡测试覆盖跨午夜、休眠唤醒、模型离线与重复触发 |
 | `S6-R1` | S6 企业端点 | 真实企业 mTLS、企业 CA、代理和公网 API 未联调；公网同意仅代码级门禁 | TLS/代理环境差异可能导致端点不可用 | 在企业网络与公网沙箱分别验证握手、证书轮换、代理认证、断网回退与策略审计 |
 | `S6-R2` | S6 密钥 | 已提供 `--import-model-secret`（stdin、终端隐藏输入）、列表/删除命令与诊断页密钥卡片；值只写不读 | 仍需用户自行准备密钥值并确保不进入 shell 历史 | 发布说明中提示使用 stdin 管道，避免命令行明文 |
-| `S7-R1` | S7 语音 | 🟡 合成 KWS 基线已跑（13 正 / **2.12 小时**负）：调 `KeywordsScore=3.0` 后唤醒率 **92.3%**、误唤醒 **0.00 次/小时**、延迟中位数 **1100 ms**；`p09-reed` 稳定漏检；TTS 音质无客观指标，真人录音未覆盖 | 音色覆盖不足；threshold 与 score 的联合调优只在合成语料上验证 | 用真人录音复跑并做 score×threshold 网格，补 TTS 客观音质指标 |
+| `S7-R1` | S7 语音 | 🟡 KWS 基线已跑：合成 13 正（9 音色）/ 2.12 小时负 + **AISHELL 真人负样本 60 分钟**，`KeywordsScore=3.0` 唤醒率 **92.3%**、误唤醒 **0.00 次/小时**、延迟中位数 1100 ms；`p09-reed` 漏检、真人正样本（唤醒词实拍）仍缺 | 真人负样本已覆盖；真人「你好时光」正样本无法公开获取，仍需自制 | 用户自录唤醒词正样本复测召回；补 TTS 客观音质指标 |
 | `S7-R2` | S7 macOS | ✅ 已实现 Swift Helper `audio.play`（AVAudioEngine 内存 PCM、不落盘、每次播放后释放设备）并真机验证：回放往返 0.7–1.7 ms、心跳 0.2–0.3 ms、空载荷短路、30 秒截断；能力随 Helper 健康度切换 | 签名 `.app` 内尚未复听 | 随 `S9-R1` 在打包应用内复听一次并记录 |
 | `S7-R3` | S7 隐私 | ✅ 已实现显式开关、AES-GCM 加密音频引用与到期自动清理（2026-11-21）；仅缺内置回听界面 | 默认仍不落盘，风险已消除 | 需要回听时从加密媒体库导出；内置播放器另立需求 |
 | `S8-R1` | S8 检索 | 已完成真实评测：embeddinggemma-2:740m **95.8%**（MRR 1.0，768 维，热态约 19ms）；已把官方查询指令与 `title/text` 文档格式接入生产并支持向量重建 | 合成语料仍与真实分布不同；个别同义词会漂移 | 用真实脱敏语料扩充查询集，按失败样本调参 |

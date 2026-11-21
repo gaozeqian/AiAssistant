@@ -70,7 +70,10 @@ AIASSISTANT_SHERPA_MODEL_DIR=/models/sherpa-kws \
 
 ## 4. 报告口径
 
-- `CER = 编辑距离 / 参考字数`，比较前会去掉空白、标点、符号并统一小写；插入过多时 CER 可超过 100%。
+- `CER = 编辑距离 / 参考字数`，比较前会去掉空白、标点、符号、统一小写，并把繁体转简体
+  （OpenCC `TSCharacters.txt`，Apache-2.0，已内置）。阿拉伯数字不做转写归一：`2012` 与 `二零一二` 仍计错。
+- 公开真人语料可用 AISHELL-1 测试集（HF 镜像 `AudioLLMs/aishell_1_zh_test`，parquet 含 WAV+转写）；
+  本仓库基线用了其中 100 条。
 - `完全匹配` 只统计 CER = 0 的样本。
 - 模型缺失时整批标记 `engine unavailable`，**不**计为 100% 错误；命令退出码 `1`。
 - 退出码：`0` 至少一条成功；`1` 无成功样本（缺模型 / 缺语料 / 全部失败）；`2` 启动失败。

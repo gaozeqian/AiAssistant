@@ -196,6 +196,22 @@ public sealed class RecognitionBenchmarkTests : IDisposable
         Assert.Equal("n/a", RecognitionBenchmarkEvaluator.AverageCer(rows));
     }
 
+    [Fact]
+    public void Normalize_FoldsTraditionalChineseToSimplified()
+    {
+        Assert.Equal("第三会议进行方案评审", CharacterErrorRate.Normalize("第三會議進行方案評審"));
+        Assert.Equal("形成了系统完整的规划体系", CharacterErrorRate.Normalize("形成了系統完整的規劃體系"));
+        Assert.Equal(0d, CharacterErrorRate.Compute("形成了系统完整的规划体系", "形成了系統完整的規劃體系"));
+    }
+
+    [Fact]
+    public void DigitVerbalizationDifferenceStillCountsAsError()
+    {
+        // Documented residual: Whisper writes "2012", AISHELL transcripts spell "二零一二".
+        // We deliberately do not invent an ITN model, so this still shows up in CER.
+        Assert.True(CharacterErrorRate.Compute("二零一二年", "2012年") > 0);
+    }
+
     private static void WritePcm16Wav(string path, int sampleRateHz, int channels, int frames, float left, float right)
     {
         var dataBytes = frames * channels * sizeof(short);
