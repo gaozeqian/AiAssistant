@@ -10,6 +10,7 @@ using AiAssistant.LocalApi;
 using AiAssistant.Platform.Linux;
 using AiAssistant.Platform.Linux.Accessibility;
 using AiAssistant.Platform.Linux.Desktop;
+using AiAssistant.Platform.Linux.PipeWire;
 using AiAssistant.Platform.Linux.Portal;
 using AiAssistant.Platform.Linux.X11;
 using AiAssistant.Platform.MacOS;
@@ -606,11 +607,24 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<ILogger<XdgPortalSessionManager>>()));
         services.AddSingleton<IAtSpiAccessibilityClient, TmdsAtSpiClient>();
         services.AddSingleton(new X11ScreenCapture(clock));
+        var pipeWireOptions = new WaylandPipeWireOptions
+        {
+            EnablePipeWire = !string.Equals(
+                Environment.GetEnvironmentVariable("AIASSISTANT_WAYLAND_PIPEWIRE"),
+                "false",
+                StringComparison.OrdinalIgnoreCase)
+        };
+        services.AddSingleton(pipeWireOptions);
+        services.AddSingleton(provider => new PipeWireScreenCastStream(
+            provider.GetRequiredService<ILogger<PipeWireScreenCastStream>>(),
+            pipeWireOptions.MinFrameInterval));
         services.AddSingleton(provider => new WaylandScreenCapture(
             provider.GetRequiredService<IXdgPortalClient>(),
             provider.GetRequiredService<XdgPortalSessionManager>(),
             clock,
-            provider.GetRequiredService<ILogger<WaylandScreenCapture>>()));
+            provider.GetRequiredService<ILogger<WaylandScreenCapture>>(),
+            provider.GetRequiredService<PipeWireScreenCastStream>(),
+            pipeWireOptions));
         services.AddSingleton<LinuxScreenCapture>();
         services.AddSingleton<IScreenCapture>(provider => provider.GetRequiredService<LinuxScreenCapture>());
         services.AddSingleton<IWindowActivitySource>(provider => new LinuxWindowActivitySource(

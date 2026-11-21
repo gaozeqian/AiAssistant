@@ -262,7 +262,7 @@ public sealed class TmdsAtSpiClient : IAtSpiAccessibilityClient
             MessageBuffer request;
             using (var writer = session.GetMessageWriter())
             {
-                writer.WriteMethodCallHeader("org.a11y.Bus", "/org/a11y/bus", "org.a11y.Bus", string.Empty, "GetAddress");
+                writer.WriteMethodCallHeader("org.a11y.Bus", "/org/a11y/bus", "org.a11y.Bus", "GetAddress", string.Empty);
                 request = writer.CreateMessage();
             }
 
@@ -332,7 +332,7 @@ public sealed class TmdsAtSpiClient : IAtSpiAccessibilityClient
         MessageBuffer request;
         using (var writer = connection.GetMessageWriter())
         {
-            writer.WriteMethodCallHeader(target.BusName, target.ObjectPath, interfaceName, signature, member);
+            writer.WriteMethodCallHeader(target.BusName, target.ObjectPath, interfaceName, member, signature);
             writeBody?.Invoke(writer);
             request = writer.CreateMessage();
         }

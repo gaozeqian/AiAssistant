@@ -7,6 +7,8 @@ namespace AiAssistant.Platform.Linux.Portal;
 /// <summary>
 /// Native xdg-desktop-portal client over the D-Bus session bus using Tmds.DBus.Protocol 0.95.
 /// Request signal subscriptions are installed before method calls to avoid the portal response race.
+/// Message bodies are written inline because <see cref="MessageWriter"/> is a mutable struct:
+/// passing it to delegates or helpers by value silently drops the body and makes the bus drop the connection.
 /// </summary>
 public sealed class TmdsXdgPortalClient : IXdgPortalClient
 {
@@ -15,6 +17,7 @@ public sealed class TmdsXdgPortalClient : IXdgPortalClient
     private const string ScreenCastInterface = "org.freedesktop.portal.ScreenCast";
     private const string ScreenshotInterface = "org.freedesktop.portal.Screenshot";
     private const string RequestInterface = "org.freedesktop.portal.Request";
+    private const string SessionInterface = "org.freedesktop.portal.Session";
 
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private readonly TimeSpan _requestTimeout;
@@ -29,75 +32,110 @@ public sealed class TmdsXdgPortalClient : IXdgPortalClient
 
     public async Task<string> CreateSessionAsync(CancellationToken ct)
     {
-        var response = await InvokeRequestAsync(
-            ScreenCastInterface,
-            "CreateSession",
-            "a{sv}",
-            (writer, token) =>
-            {
-                var options = WriteOptionsStart(writer, token);
-                WriteStringOption(writer, "session_handle_token", $"aia{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6))}");
-                writer.WriteDictionaryEnd(options);
-                return null;
-            },
-            ct);
+        var token = NewToken(8);
+        MessageBuffer message;
+        await using var lease = await BeginAsync("CreateSession", "a{sv}", token, ct);
+        using (var writer = lease.Connection.GetMessageWriter())
+        {
+            writer.WriteMethodCallHeader(Destination, PortalPath, ScreenCastInterface, "CreateSession", "a{sv}");
+            var options = writer.WriteDictionaryStart();
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("handle_token");
+            writer.WriteVariant(VariantValue.String(token));
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("session_handle_token");
+            writer.WriteVariant(VariantValue.String(NewToken(6)));
+            writer.WriteDictionaryEnd(options);
+            message = writer.CreateMessage();
+        }
+
+        var response = await lease.SendAsync(message, ct);
         return GetRequiredString(response.Results, "session_handle");
     }
 
-    public Task SelectSourcesAsync(string sessionPath, string? restoreToken, CancellationToken ct) =>
-        InvokeRequestAsync(
-            ScreenCastInterface,
-            "SelectSources",
-            "oa{sv}",
-            (writer, token) =>
+    public async Task SelectSourcesAsync(string sessionPath, string? restoreToken, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionPath);
+        var token = NewToken(8);
+        MessageBuffer message;
+        await using var lease = await BeginAsync("SelectSources", "oa{sv}", token, ct);
+        using (var writer = lease.Connection.GetMessageWriter())
+        {
+            writer.WriteMethodCallHeader(Destination, PortalPath, ScreenCastInterface, "SelectSources", "oa{sv}");
+            writer.WriteObjectPath(sessionPath);
+            var options = writer.WriteDictionaryStart();
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("handle_token");
+            writer.WriteVariant(VariantValue.String(token));
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("types");
+            writer.WriteVariant(VariantValue.UInt32(1)); // MONITOR
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("multiple");
+            writer.WriteVariant(VariantValue.Bool(false));
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("cursor_mode");
+            writer.WriteVariant(VariantValue.UInt32(2)); // Embedded
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("persist_mode");
+            writer.WriteVariant(VariantValue.UInt32(2)); // Until explicitly revoked
+            if (!string.IsNullOrWhiteSpace(restoreToken))
             {
-                writer.WriteObjectPath(sessionPath);
-                var options = WriteOptionsStart(writer, token);
-                WriteUInt32Option(writer, "types", 1); // MONITOR
-                WriteBoolOption(writer, "multiple", false);
-                WriteUInt32Option(writer, "cursor_mode", 2); // Embedded
-                WriteUInt32Option(writer, "persist_mode", 2); // Until explicitly revoked
-                if (!string.IsNullOrWhiteSpace(restoreToken))
-                {
-                    WriteStringOption(writer, "restore_token", restoreToken);
-                }
+                writer.WriteDictionaryEntryStart();
+                writer.WriteString("restore_token");
+                writer.WriteVariant(VariantValue.String(restoreToken));
+            }
 
-                writer.WriteDictionaryEnd(options);
-                return null;
-            },
-            ct);
+            writer.WriteDictionaryEnd(options);
+            message = writer.CreateMessage();
+        }
+
+        _ = await lease.SendAsync(message, ct);
+    }
 
     public async Task<PortalStartResult> StartAsync(string sessionPath, CancellationToken ct)
     {
-        var response = await InvokeRequestAsync(
-            ScreenCastInterface,
-            "Start",
-            "osa{sv}",
-            (writer, token) =>
-            {
-                writer.WriteObjectPath(sessionPath);
-                writer.WriteString(string.Empty); // parent_window
-                var options = WriteOptionsStart(writer, token);
-                writer.WriteDictionaryEnd(options);
-                return null;
-            },
-            ct);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionPath);
+        var token = NewToken(8);
+        MessageBuffer message;
+        await using var lease = await BeginAsync("Start", "osa{sv}", token, ct);
+        using (var writer = lease.Connection.GetMessageWriter())
+        {
+            writer.WriteMethodCallHeader(Destination, PortalPath, ScreenCastInterface, "Start", "osa{sv}");
+            writer.WriteObjectPath(sessionPath);
+            writer.WriteString(string.Empty); // parent_window
+            var options = writer.WriteDictionaryStart();
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("handle_token");
+            writer.WriteVariant(VariantValue.String(token));
+            writer.WriteDictionaryEnd(options);
+            message = writer.CreateMessage();
+        }
 
+        var response = await lease.SendAsync(message, ct);
         var streams = ReadStreams(response.Results);
-        var nextToken = response.Results.TryGetValue("restore_token", out var token) && token.Type == VariantValueType.String
-            ? token.GetString()
+        var nextToken = response.Results.TryGetValue("restore_token", out var tokenValue) &&
+                        tokenValue.Type == VariantValueType.String
+            ? tokenValue.GetString()
             : null;
         return new PortalStartResult(streams, nextToken);
     }
 
     public async Task<SafeFileHandle> OpenPipeWireRemoteAsync(string sessionPath, CancellationToken ct)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionPath);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await EnsureConnectedAsync(ct);
         var connection = _connection!;
         MessageBuffer message;
         using (var writer = connection.GetMessageWriter())
         {
-            writer.WriteMethodCallHeader(Destination, PortalPath, ScreenCastInterface, "oa{sv}", "OpenPipeWireRemote");
+            writer.WriteMethodCallHeader(
+                Destination,
+                PortalPath,
+                ScreenCastInterface,
+                "OpenPipeWireRemote",
+                "oa{sv}");
             writer.WriteObjectPath(sessionPath);
             var options = writer.WriteDictionaryStart();
             writer.WriteDictionaryEnd(options);
@@ -106,28 +144,37 @@ public sealed class TmdsXdgPortalClient : IXdgPortalClient
 
         return await connection.CallMethodAsync(
             message,
-            static (Message message, object? _) => message.GetBodyReader().ReadHandle<SafeFileHandle>(),
+            static (Message reply, object? _) => reply.GetBodyReader().ReadHandle<SafeFileHandle>(),
             null).WaitAsync(ct);
     }
 
     public async Task<byte[]> CaptureScreenshotAsync(CancellationToken ct)
     {
-        var response = await InvokeRequestAsync(
-            ScreenshotInterface,
-            "Screenshot",
-            "sa{sv}",
-            (writer, token) =>
-            {
-                writer.WriteString(string.Empty);
-                var options = WriteOptionsStart(writer, token);
-                WriteBoolOption(writer, "modal", false);
-                WriteBoolOption(writer, "interactive", false);
-                WriteUInt32Option(writer, "target", 1); // Entire screen
-                writer.WriteDictionaryEnd(options);
-                return null;
-            },
-            ct);
+        var token = NewToken(8);
+        MessageBuffer message;
+        await using var lease = await BeginAsync("Screenshot", "sa{sv}", token, ct);
+        using (var writer = lease.Connection.GetMessageWriter())
+        {
+            writer.WriteMethodCallHeader(Destination, PortalPath, ScreenshotInterface, "Screenshot", "sa{sv}");
+            writer.WriteString(string.Empty);
+            var options = writer.WriteDictionaryStart();
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("handle_token");
+            writer.WriteVariant(VariantValue.String(token));
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("modal");
+            writer.WriteVariant(VariantValue.Bool(false));
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("interactive");
+            writer.WriteVariant(VariantValue.Bool(false));
+            writer.WriteDictionaryEntryStart();
+            writer.WriteString("target");
+            writer.WriteVariant(VariantValue.UInt32(1)); // Entire screen
+            writer.WriteDictionaryEnd(options);
+            message = writer.CreateMessage();
+        }
 
+        var response = await lease.SendAsync(message, ct);
         var uriText = GetRequiredString(response.Results, "uri");
         if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri) || !uri.IsFile)
         {
@@ -147,12 +194,14 @@ public sealed class TmdsXdgPortalClient : IXdgPortalClient
 
     public async Task CloseSessionAsync(string sessionPath, CancellationToken ct)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionPath);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await EnsureConnectedAsync(ct);
         var connection = _connection!;
         MessageBuffer message;
         using (var writer = connection.GetMessageWriter())
         {
-            writer.WriteMethodCallHeader(Destination, sessionPath, "org.freedesktop.portal.Session", string.Empty, "Close");
+            writer.WriteMethodCallHeader(Destination, sessionPath, SessionInterface, "Close", string.Empty);
             message = writer.CreateMessage();
         }
 
@@ -172,59 +221,52 @@ public sealed class TmdsXdgPortalClient : IXdgPortalClient
         return ValueTask.CompletedTask;
     }
 
-    private async Task<PortalResponse> InvokeRequestAsync(
-        string interfaceName,
+    private static string NewToken(int byteCount) =>
+        $"aia{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(byteCount))}";
+
+
+
+
+    private async Task<RequestLease> BeginAsync(
         string member,
         string signature,
-        Func<MessageWriter, string, object?> writeBody,
+        string token,
         CancellationToken ct)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         await EnsureConnectedAsync(ct);
         var connection = _connection!;
-        var token = $"aia{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8))}";
         var expectedPath = $"/org/freedesktop/portal/desktop/request/{_senderPath}/{token}";
         var completion = new TaskCompletionSource<PortalResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var subscriptions = new List<IDisposable>(2);
+        var subscription = await SubscribeToResponseAsync(connection, expectedPath, completion);
+        return new RequestLease(this, connection, expectedPath, member, completion, subscription);
+    }
 
-        try
+    private async Task<PortalResponse> AwaitResponseAsync(
+        RequestLease lease,
+        MessageBuffer message,
+        CancellationToken ct)
+    {
+        var actualPath = await lease.Connection.CallMethodAsync(
+            message,
+            static (Message reply, object? _) => reply.GetBodyReader().ReadObjectPathAsString(),
+            null).WaitAsync(ct);
+
+        if (!string.Equals(actualPath, lease.ExpectedPath, StringComparison.Ordinal))
         {
-            subscriptions.Add(await SubscribeToResponseAsync(connection, expectedPath, completion));
-            MessageBuffer methodCall;
-            using (var writer = connection.GetMessageWriter())
-            {
-                writer.WriteMethodCallHeader(Destination, PortalPath, interfaceName, signature, member);
-                _ = writeBody(writer, token);
-                methodCall = writer.CreateMessage();
-            }
-
-            var actualPath = await connection.CallMethodAsync(
-                methodCall,
-                static (Message message, object? _) => message.GetBodyReader().ReadObjectPathAsString(),
-                null).WaitAsync(ct);
-
-            if (!string.Equals(actualPath, expectedPath, StringComparison.Ordinal))
-            {
-                subscriptions.Add(await SubscribeToResponseAsync(connection, actualPath, completion));
-            }
-
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(_requestTimeout);
-            var response = await completion.Task.WaitAsync(timeout.Token);
-            if (response.ResponseCode != 0)
-            {
-                throw new XdgPortalRequestException(response.ResponseCode, member);
-            }
-
-            return response;
+            var extra = await SubscribeToResponseAsync(lease.Connection, actualPath, lease.Completion);
+            lease.AddSubscription(extra);
         }
-        finally
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(_requestTimeout);
+        var response = await lease.Completion.Task.WaitAsync(timeout.Token);
+        if (response.ResponseCode != 0)
         {
-            foreach (var subscription in subscriptions)
-            {
-                subscription.Dispose();
-            }
+            throw new XdgPortalRequestException(response.ResponseCode, lease.Member);
         }
+
+        return response;
     }
 
     private static async Task<IDisposable> SubscribeToResponseAsync(
@@ -268,6 +310,57 @@ public sealed class TmdsXdgPortalClient : IXdgPortalClient
         return new PortalResponse(code, results);
     }
 
+    private static string GetRequiredString(IReadOnlyDictionary<string, VariantValue> values, string key)
+    {
+        if (!values.TryGetValue(key, out var value) || value.Type != VariantValueType.String)
+        {
+            throw new InvalidDataException($"Portal response is missing string result '{key}'.");
+        }
+
+        return value.GetString();
+    }
+
+    private static List<PortalStreamDescriptor> ReadStreams(IReadOnlyDictionary<string, VariantValue> values)
+    {
+        if (!values.TryGetValue("streams", out var streamsValue) || streamsValue.Type != VariantValueType.Array)
+        {
+            return [];
+        }
+
+        var streams = new List<PortalStreamDescriptor>(Math.Max(0, streamsValue.Count));
+        for (var i = 0; i < streamsValue.Count; i++)
+        {
+            var stream = streamsValue.GetItem(i);
+            if (stream.Type != VariantValueType.Struct || stream.Count < 2)
+            {
+                continue;
+            }
+
+            var nodeId = stream.GetItem(0).GetUInt32();
+            var properties = stream.GetItem(1).GetDictionary<string, VariantValue>();
+            var width = 0;
+            var height = 0;
+            if (properties.TryGetValue("size", out var size) &&
+                size.Type == VariantValueType.Struct &&
+                size.Count >= 2)
+            {
+                width = size.GetItem(0).GetInt32();
+                height = size.GetItem(1).GetInt32();
+            }
+
+            ulong? serial = properties.TryGetValue("pipewire-serial", out var serialValue) &&
+                             serialValue.Type == VariantValueType.UInt64
+                ? serialValue.GetUInt64()
+                : null;
+            string? id = properties.TryGetValue("id", out var idValue) && idValue.Type == VariantValueType.String
+                ? idValue.GetString()
+                : null;
+            streams.Add(new PortalStreamDescriptor(nodeId, serial, width, height, id));
+        }
+
+        return streams;
+    }
+
     private async Task EnsureConnectedAsync(CancellationToken ct)
     {
         if (_connection is not null)
@@ -306,81 +399,55 @@ public sealed class TmdsXdgPortalClient : IXdgPortalClient
         }
     }
 
-    private static ArrayStart WriteOptionsStart(MessageWriter writer, string handleToken)
-    {
-        var options = writer.WriteDictionaryStart();
-        WriteStringOption(writer, "handle_token", handleToken);
-        return options;
-    }
-
-    private static void WriteStringOption(MessageWriter writer, string key, string value)
-    {
-        writer.WriteDictionaryEntryStart();
-        writer.WriteString(key);
-        writer.WriteVariant(VariantValue.String(value));
-    }
-
-    private static void WriteUInt32Option(MessageWriter writer, string key, uint value)
-    {
-        writer.WriteDictionaryEntryStart();
-        writer.WriteString(key);
-        writer.WriteVariant(VariantValue.UInt32(value));
-    }
-
-    private static void WriteBoolOption(MessageWriter writer, string key, bool value)
-    {
-        writer.WriteDictionaryEntryStart();
-        writer.WriteString(key);
-        writer.WriteVariant(VariantValue.Bool(value));
-    }
-
-    private static string GetRequiredString(IReadOnlyDictionary<string, VariantValue> values, string key)
-    {
-        if (!values.TryGetValue(key, out var value) || value.Type != VariantValueType.String)
-        {
-            throw new InvalidDataException($"Portal response is missing string result '{key}'.");
-        }
-
-        return value.GetString();
-    }
-
-    private static List<PortalStreamDescriptor> ReadStreams(IReadOnlyDictionary<string, VariantValue> values)
-    {
-        if (!values.TryGetValue("streams", out var streamsValue) || streamsValue.Type != VariantValueType.Array)
-        {
-            return [];
-        }
-
-        var streams = new List<PortalStreamDescriptor>(Math.Max(0, streamsValue.Count));
-        for (var i = 0; i < streamsValue.Count; i++)
-        {
-            var stream = streamsValue.GetItem(i);
-            if (stream.Type != VariantValueType.Struct || stream.Count < 2)
-            {
-                continue;
-            }
-
-            var nodeId = stream.GetItem(0).GetUInt32();
-            var properties = stream.GetItem(1).GetDictionary<string, VariantValue>();
-            var width = 0;
-            var height = 0;
-            if (properties.TryGetValue("size", out var size) && size.Type == VariantValueType.Struct && size.Count >= 2)
-            {
-                width = size.GetItem(0).GetInt32();
-                height = size.GetItem(1).GetInt32();
-            }
-
-            ulong? serial = properties.TryGetValue("pipewire-serial", out var serialValue) && serialValue.Type == VariantValueType.UInt64
-                ? serialValue.GetUInt64()
-                : null;
-            string? id = properties.TryGetValue("id", out var idValue) && idValue.Type == VariantValueType.String
-                ? idValue.GetString()
-                : null;
-            streams.Add(new PortalStreamDescriptor(nodeId, serial, width, height, id));
-        }
-
-        return streams;
-    }
-
     private sealed record PortalResponse(uint ResponseCode, IReadOnlyDictionary<string, VariantValue> Results);
+
+    /// <summary>
+    /// Holds the pending Response subscription. Exposed as a class so message bodies are written by
+    /// callers against the real <see cref="MessageWriter"/> instead of a struct copy.
+    /// </summary>
+    private sealed class RequestLease : IAsyncDisposable
+    {
+        private readonly TmdsXdgPortalClient _owner;
+        private readonly List<IDisposable> _subscriptions;
+
+        public RequestLease(
+            TmdsXdgPortalClient owner,
+            DBusConnection connection,
+            string expectedPath,
+            string member,
+            TaskCompletionSource<PortalResponse> completion,
+            IDisposable subscription)
+        {
+            _owner = owner;
+            Connection = connection;
+            ExpectedPath = expectedPath;
+            Member = member;
+            Completion = completion;
+            _subscriptions = [subscription];
+        }
+
+        public DBusConnection Connection { get; }
+
+        public string ExpectedPath { get; }
+
+        public string Member { get; }
+
+        public TaskCompletionSource<PortalResponse> Completion { get; }
+
+        public void AddSubscription(IDisposable subscription) => _subscriptions.Add(subscription);
+
+        public Task<PortalResponse> SendAsync(MessageBuffer message, CancellationToken ct) =>
+            _owner.AwaitResponseAsync(this, message, ct);
+
+        public ValueTask DisposeAsync()
+        {
+            foreach (var subscription in _subscriptions)
+            {
+                subscription.Dispose();
+            }
+
+            _subscriptions.Clear();
+            return ValueTask.CompletedTask;
+        }
+    }
 }

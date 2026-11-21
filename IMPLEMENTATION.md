@@ -495,6 +495,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] 通过 S1/S2 验收后，再启动 macOS helper 与 Linux Wayland 工作。
 - [x] S3.1：完成 macOS 版本化 AF_UNIX IPC、一次性 Token 鉴权、心跳超时、崩溃退避监督器、Swift Helper 原生适配器、LaunchAgent 与 Windows 契约/故障测试。
 - [x] S3.2：完成 Linux 原生 Wayland 默认、X11 回退、portal 授权恢复、AT-SPI / EWMH、inotify 与 XDG 自启适配器及 Windows 契约测试。
+- [x] S3.3：Wayland 连续 PipeWire ScreenCast 帧流（SPA pod 协商、1 秒节流、非 RGB 格式降级回退）与 portal/AT-SPI D-Bus 报文缺陷修复；GNOME Wayland 真机通过。
 - [x] 三平台 CI 完成构建、53 项测试、Swift 6 Helper 编译/冒烟/打包及 Linux Portal 打包验证（运行 `44703620747`）。
 - [x] S4.1：可组合 `IProcessingStage`、阶段超时/故障隔离、文本提取、pHash 去重与本地脱敏流水线，原始事件永不因预处理失败丢失。
 - [x] S4.2：单路 `AudioHub`、内存预滚、多订阅广播与最后订阅释放；Windows WASAPI、macOS AVAudioEngine、Linux PulseAudio 工厂接入。
@@ -549,7 +550,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.27：三平台自签名安装包（MSI + PKG + deb）与 GitHub Actions 发布工作流；MSI/PKG 安装时自动导入并信任证书。
 - [x] S9.28：`linux-x64` 全量测试暴露 Skia 原生资产缺失，`AiAssistant.Export` 增加 `SkiaSharp.NativeAssets.Linux`，`Report.Tests` 在 Linux 61/61 通过。
 - [ ] S9-R：真实证书签名/公证、真实时间多日浸泡与设备热插拔、真机安装升级卸载与无障碍人工验收、CI 实际生成并随 Release 发布 SBOM/校验和。
-- [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在真实 Linux 桌面完成 Wayland / X11 能力矩阵验收。
+- [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在 KDE Wayland / X11 / 多显示器下完成 Linux 能力矩阵验收（GNOME Wayland 抓屏与连续帧流已实测）。
 
 ---
 

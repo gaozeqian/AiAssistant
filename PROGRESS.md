@@ -7,11 +7,11 @@
 
 ## 1. 当前总体状态快照
 
-- **当前活跃阶段**：`S9 发布加固：S7-R3 命令音频 opt-in 已完成；真机签名公证、浸泡与人工验收待执行`
+- **当前活跃阶段**：`S9 发布加固：S3-R3 Wayland 连续抓屏已在 GNOME Wayland 实测；真机签名公证、浸泡与人工验收待执行`
 - **最近更新时间**：`2026-11-21`
-- **最近执行环境**：Linux (`linux-x64`), `.NET SDK 10.0.115`（目标框架 `net10.0` LTS）；上一轮 Windows 11 `win-x64` / SDK 11.0.100
+- **最近执行环境**：`linux-x64` Ubuntu 26.04 + GNOME Wayland, `.NET SDK 10.0.115`（目标框架 `net10.0` LTS）；上一轮 Windows 11 `win-x64` / SDK 11.0.100
 - **当前构建状态**：✅ `linux-x64` 本地 Release 0 警告 0 错误；三平台自包含打包脚本实测（win zip / linux tar.gz / macOS app 布局）
-- **当前测试状态**：✅ 169/169 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 44、`Processing.Tests` 22、`Report.Tests` 61、`Voice.Tests` 9）
+- **当前测试状态**：✅ 176/176 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 51、`Processing.Tests` 22、`Report.Tests` 61、`Voice.Tests` 9）；另含 1 项需 `AIASSISTANT_PORTAL_E2E=1` 的真机 ScreenCast 测试（GNOME Wayland 实测通过）
 - **下一步待确认事项**：配置签名证书/公证凭据后执行 `release.yml`；在真机完成 24h/多日浸泡、安装升级卸载与无障碍走查；S9 遗留项见第 5 节
 
 ---
@@ -23,7 +23,7 @@
 | **S0 工程奠基** | P0 前置 | ✅ 已完成 | `win-x64` 实测；`osx-arm64` / `linux-x64` 交叉打包验证 | 19 个项目解决方案、CPM、10 份 ADR、CI 矩阵、6 条架构依赖测试通过 |
 | **S1 核心与存储** | P0 | ✅ 已完成 | `win-x64` 实测通过；`osx-arm64` / `linux-x64` 待真机复跑 `Storage.Tests` | SQLite3MC 页级加密、DPAPI/Keychain/libsecret 密钥封装与轮换、AES-GCM 媒体库与引用计数、原子事件+媒体事务、加密备份恢复、`sqlite-vec` + SIMD 向量索引与重建 POC 全部通过 |
 | **S2 Windows 最小闭环** | P0 | ✅ 已完成 | `win-x64` 采集、Headless UI、真实桌面强杀重启、24h 全天加速浸泡均通过 | 完成采集与有界管道、Avalonia MVVM 时间线、选中后解密预览、暂停/黑名单、托盘、自启开关、基础保留清理 `MediaRetentionService`、零敏感泄露结构化日志 `SanitizedStructuredLoggerProvider` 与导出预览；24h 浸泡验证控制事件 100% 零丢失 |
-| **S3 三平台扩展** | P1 | 🔄 三平台 CI 全绿；待真实桌面权限/交互验收 | GitHub Actions `win-x64` / `osx-arm64` / `linux-x64` 各 53/53 测试通过，发布/Helper/Portal 打包通过 | macOS Helper、Linux Wayland 默认与初始化失败 X11 回退、portal 加密令牌轮换、AT-SPI/EWMH、inotify/PulseAudio/XDG 均已接入；macOS TCC 与 Linux 真实桌面能力矩阵待人工验收 |
+| **S3 三平台扩展** | P1 | 🔄 Linux GNOME Wayland 实测通过；macOS TCC 与 KDE/X11 矩阵待验收 | GitHub Actions 三平台构建/测试/打包通过；`linux-x64` Ubuntu 26.04 + GNOME Wayland 真机抓屏实测 | macOS Helper、Linux Wayland 默认与初始化失败 X11 回退、portal 加密令牌轮换、AT-SPI/EWMH、inotify/PulseAudio/XDG 均已接入；连续 PipeWire ScreenCast 帧流（§3.10）与 portal D-Bus 报文缺陷修复 |
 | **S4 预处理与音频** | P1 | 🔄 代码与契约完成；模型资产评测遗留 | `win-x64` 流水线/AudioHub/WASAPI 实测；`linux-x64` 全量测试与发布（含 sherpa-onnx / Whisper 原生库）通过 | 可组合阶段、超时/失败隔离、脱敏、pHash 去重、单路 AudioHub、三平台音频工厂、sherpa-onnx ASR/VAD/说话人分离与缺失模型降级；Whisper.net 批处理 ASR 可选引擎；RapidOCR PP-OCRv4 Linux 图像 OCR 兜底（§3.5）；真实中文语音与 OCR 质量待遗留项验收 |
 | **S5 本机模型与日报** | P2 | 🔄 代码与契约完成；真实模型评测遗留 | `win-x64` 网关/分段/调度/UI 实测；`linux-x64` / `osx-arm64` 发布通过 | Microsoft.Extensions.AI 网关、Ollama/LM Studio 兼容适配、脱敏/审计/超时装饰器、事件向量索引、分段+map-reduce+JSON 校验重试、版本化加密日报、单消费者三通道与日报/站会 UI；真实模型质量待遗留项评测 |
 | **S6 内网与公网档** | P2.5 | 🔄 代码与契约完成；真实企业端点遗留 | `win-x64` 配置/策略/三闸/探测测试通过；两平台发布通过 | 版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理、Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、三闸脱敏、五能力探测缓存与诊断展示 |
@@ -279,6 +279,23 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 
 报告写入 `artifacts/soak/soak-<days>d.md`，包含控制事件、黑名单拦截、队列峰值、活跃日期、完整性、保留清理与泄露检查结论。CI 会随测试上传该报告。
 
+### 3.10 Wayland 连续抓屏（PipeWire）
+
+授权 xdg-desktop-portal 后，抓屏优先消费 `OpenPipeWireRemote` 返回的连续帧流；失败时自动回退到 portal 按需截图。
+
+```bash
+# 关闭连续帧流，强制按需截图
+AIASSISTANT_WAYLAND_PIPEWIRE=false
+
+# 真机端到端验证（会弹出 GNOME 共享屏幕授权；需真实 Wayland 会话）
+AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release \
+  --filter "FullyQualifiedName~LiveWaylandScreenCast"
+```
+
+- 帧流为私有 `pw_stream`（方向 INPUT），按最小采样间隔 1 秒节流，只保留最新一帧；4K 屏幕不会持续拷贝内存。
+- 协商格式支持 BGRx/BGRA/RGBA/RGBx，其它格式（如 YUV）会降级为截图回退而不是保存错误像素。
+- 已在 Ubuntu 26.04 + GNOME Wayland（2560×1440）实测通过；KDE/KWin 与 X11 会话仍需人工验收。
+
 ---
 
 ## 4. 实施日志（按时间顺序追加）
@@ -327,6 +344,8 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-20 [win-x64] [S9 MCP 协议兼容与一致性校验]**：MCP 端点升级为 Streamable HTTP 兼容：支持 `application/json` 与单事件 `text/event-stream` 响应、`Mcp-Session-Id` 会话头、协议版本协商（`2024-11-05` / `2025-03-26` / `2025-06-18`）与 `DELETE /mcp`；新增无头 `--mcp-serve` 与 `--mcp-token` 命令。新增 10 项协议一致性测试（初始化/协商、通知 202、SSE、工具 schema、错误码 -32700/-32601/-32602、会话删除），并新增独立 Python 一致性客户端 `build/mcp/mcp-client.py`。端到端实测：JSON 模式 17/17、SSE 模式 18/18 通过（含未授权 401、写入工具拒绝）。全仓 123/123 测试通过。第三方 MCP 客户端实测仍为遗留项。
 - **2026-11-20 [win-x64] [S9 多日浸泡完成]**：新增可配置 3–14 天的加速浸泡 `S9MultiDaySoakTests`（默认 3 天/72 小时，约 16 秒），覆盖持续工作、过载洪峰、黑名单、暂停/恢复、配额耗尽、**8 小时休眠窗口**、保留清理与日志/导出泄露检查；产出 `artifacts/soak/soak-<days>d.md` 报告并由 CI 上传。实测 146/146 控制事件零丢失、144 条黑名单拦截、队列峰值 12/12、289 条事件、72 个媒体、休眠窗口零事件、完整性 `ok`、保留清理 72/72。全仓 113/113 测试通过。真实时间多日浸泡与显示器/麦克风热插拔仍待真机执行。
 - **2026-11-21 [linux-x64] [S7-R3 命令音频 opt-in 完成]**：新增 `VoiceSessionOptions.RecordCommandAudio`/`CommandAudioRetention`、`CommandAudioWavEncoder`（16 kHz 单声道 16-bit WAV，无额外编解码依赖）与 `IVoiceSession.SetCommandAudioRecordingAsync`；仅当显式开启且会话接入了 `IMediaStore` 时，唤醒窗口内的命令音频才经 AES-GCM 写入媒体库，`voice_commands.audio_content_id` 记录引用，写入失败只告警不影响命令执行。`AesGcmMediaStore.PurgeExpiredAsync` 在擦除到期媒体时同步把 `voice_commands.audio_content_id` 置空；`MediaRetentionService` 沿用既有周期清理。新增“语音”页“记录命令音频”开关与状态说明，Host 支持 `AIASSISTANT_VOICE_RECORD_COMMAND_AUDIO` 与 `AIASSISTANT_VOICE_AUDIO_RETENTION_DAYS`（1–365，默认 7）。新增 4 项测试（默认不落盘、opt-in 写入 WAV/保留期/引用、无媒体库拒绝、到期置空），`linux-x64` 全量 151/151。
+- **2026-11-21 [linux-x64] [S3-R3 Wayland 连续 PipeWire 抓屏完成]**：新增 `AiAssistant.Platform.Linux/PipeWire`（`PipeWireNative` P/Invoke、`SpaPodCodec` 手写 SPA pod 编解码、`PipeWireFrameConverter`、`PipeWireScreenCastStream`），`WaylandScreenCapture` 优先消费 `OpenPipeWireRemote` 的连续帧流，失败自动回退 portal 按需截图；新增 `AIASSISTANT_WAYLAND_PIPEWIRE=false` 关闭开关。常量与结构布局对照 PipeWire 1.6.2 头文件（`SPA_TYPE_Object=15`、`SPA_TYPE_OBJECT_Format=0x40003`、`VIDEO_format=0x20001`、`PW_VERSION_STREAM_EVENTS=2`），并用官方 `spa_pod_builder` 生成的参考字节逐位比对通过。真机验证中发现并修复三处缺陷：① `spa_buffer.datas` 指向首个 `spa_data` 结构而非指针数组，按指针读取导致原生回调段错误；② 格式尺寸上限按 portal 报告的 1920×1080 协商，而 mutter 节点实际只提供 2560×1440 固定尺寸，导致 `no more input formats`，改为 8192 上限宽范围；③ 托管异常穿出 pipewire 回调会终止进程，已全部包裹并降级。GNOME Wayland（2560×1440）真机测试 `LiveWaylandScreenCast_ProducesFrame` 通过，全仓 176/176。
+- **2026-11-21 [linux-x64] [S3 portal D-Bus 报文缺陷修复]**：真机联调暴露 `TmdsXdgPortalClient` 两处会直接导致 portal 不可用的缺陷：① `MessageWriter.WriteMethodCallHeader` 参数顺序为 `(destination, path, interface, member, signature)`，原代码把 member 与 signature 传反，总线以协议错误断开连接；② `MessageWriter` 是可变结构体，原实现通过 `Func<MessageWriter, ...>` 委托按值传入，报文体写入落在副本上，`a{sv}` 报文缺失同样导致断连。已重构为每个调用内联写报文、订阅与发送分离（`RequestLease`），并同步修正 `TmdsAtSpiClient` 的两处同样问题。修复后 `CreateSession` 正常返回 `session_handle`，为后续 ScreenCast 打通前提。
 - **2026-11-21 [linux-x64] [S4-R2 Linux RapidOCR 接入]**：新增 `AiAssistant.Processing/Ocr`（`RapidOcrOptions`、`RapidOcrImage`、`RapidOcrDetPostProcessor`、`RapidOcrCtcDecoder`、`RapidOcrTextRecognizer`）与 Application 端口 `IImageOcrRecognizer`/`ImageFrameBuffer`；`LinuxTextExtractor` 在 AT-SPI 无文本时用 `LinuxPngCodec` 解码截图并调用按需 OCR。模型目录 `AIASSISTANT_RAPIDOCR_MODEL_DIR`（默认 `<data>/models/rapidocr`，需 det/rec onnx 与 `ppocr_keys_v1.txt`），缺模型时 `Ocr` 能力为 `PermissionRequired` 并回退应用名/窗口标题。过程中发现并修复真实缺陷：先引入 `Microsoft.ML.OnnxRuntime` 1.32 会覆盖发布根目录的 `libonnxruntime.so`，`ldd -r` 报 `VERS_1.28.2 not found`，sherpa ASR/VAD/TTS 会整体失效；改为 `Microsoft.ML.OnnxRuntime.Managed` 1.28.0 复用 sherpa 自带原生库，发布体积保持 149 MB，`ldd -r` 无未解析符号，约束写入 ADR-0007。新增 10 项测试（缺模型降级、真实原生 ORT 加载、DB 后处理、CTC 解码、帧校验、AT-SPI 优先/OCR 兜底/无截图跳过），全仓 169/169，`--startup-check` 通过。真实模型中文截图集质量仍为遗留项。
 - **2026-11-21 [linux-x64] [S4-R3 Whisper.net 批处理 ASR 完成]**：新增 `WhisperAsrEngine`（懒加载 `WhisperFactory`、16 kHz 校验、段落概率均值置信度、异常降级）与 `AsrEngineSelection`；Host 通过 `AIASSISTANT_ASR_ENGINE=whisper` 显式切换（默认 sherpa-onnx），模型路径 `AIASSISTANT_WHISPER_MODEL_PATH` 或 `<data>/models/whisper/ggml-small.bin`，缺模型时能力为 `PermissionRequired` 且启动自检照常通过。新增发布裁剪目标，只保留目标 RID 的 Whisper 原生库（`linux-x64` 发布体积 163 MB → 149 MB）。新增 8 项测试（缺模型降级、非 16 kHz 短路、原生运行时加载、引擎选择解析），`Processing.Tests` 15/15；`--startup-check` 与 `dotnet publish -r linux-x64` 实测通过。真实模型识别质量仍属黄金集遗留项。
 - **2026-11-21 [linux-x64] [Linux 端 Skia 原生资产补齐]**：`linux-x64` 全量测试暴露 `Report.Tests` 的 4 项 PNG/PDF 栅格化测试因缺少 `libSkiaSharp.so` 失败（`AiAssistant.Export` 只引用了托管 `SkiaSharp`，Linux 原生资产仅由 Host 经 Avalonia 传递引入）。在 `AiAssistant.Export` 增加 `SkiaSharp.NativeAssets.Linux`（3.119.4）并同步 CPM 与依赖清单，修复后 `Report.Tests` 61/61 在 Linux 通过；`generate-sbom.py --check-manifest --verify` 通过（110 组件 / 111 依赖边）。
@@ -340,8 +359,8 @@ AIASSISTANT_SOAK_DAYS=14 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | ID | 来源 | 遗留内容 | 风险 | 后续处理 |
 |---|---|---|---|---|
 | `S3-R1` | S3 macOS | 真实 macOS 桌面的 TCC 屏幕录制/辅助功能授权、Helper 崩溃监督与签名公证未人工验收 | 原生权限路径与打包签名仍可能有平台差异 | 在 macOS Apple Silicon 真机执行 Helper 冒烟、权限拒绝/撤销与重启测试 |
-| `S3-R2` | S3 Linux | 真实 Wayland 合成器的 portal 授权/撤销、X11 回退、AT-SPI 与托盘能力矩阵未人工验收 | 合成器差异可能影响窗口与抓屏可用性 | 在 GNOME/KDE Wayland 与 X11 会话逐项签字 |
-| `S3-R3` | S3 Linux | Wayland 连续 PipeWire 像素流未消费；当前按 `Degraded` 使用按需 portal Screenshot 回退 | 无法提供高频 Wayland 截屏 | S4/S8 前评估 PipeWire 消费库，或保持按需截图并明确能力降级 |
+| `S3-R2` | S3 Linux | 🟡 GNOME Wayland 的 ScreenCast 授权与连续抓屏已真机实测（2026-11-21）；KDE/KWin、X11 回退、AT-SPI 与托盘能力矩阵仍待人工验收 | 合成器差异可能影响窗口与抓屏可用性 | 在 KDE Wayland 与 X11 会话逐项签字 |
+| `S3-R3` | S3 Linux | ✅ 已实现连续 PipeWire 帧消费（私有 `pw_stream`、1 秒节流、格式协商与 YUV 降级回退），GNOME Wayland 真机通过（2026-11-21） | KDE/KWin 与多显示器场景未实测 | 在 KDE Wayland 复跑同一真机测试 |
 | `S4-R1` | S4 语音 | sherpa-onnx 模型资产（Paraformer、Silero VAD、说话人嵌入）不进入 Git，真实中文语音黄金集未评测 | 仅验证适配与降级路径，未证明识别质量 | 在本地/CI 外挂模型目录运行黄金集与唤醒词评测 |
 | `S4-R2` | S4 OCR | 🟡 RapidOCR PP-OCRv4 适配器已接入（2026-11-21）：AT-SPI 为空时按需 OCR、缺模型降级、托管 ORT 复用 sherpa 原生库；真实模型中文截图集质量未评测 | 无模型资产时仍只有 AT-SPI 文本 | 外挂 RapidOCR 模型后跑中文截图集，按结果调阈值/裁剪策略 |
 | `S4-R3` | S4 语音 | ✅ 已实现 Whisper.net 批处理适配器（2026-11-21）：`AIASSISTANT_ASR_ENGINE=whisper` 显式启用、缺模型降级、发布按 RID 裁剪原生库 | 真实 Whisper 模型质量/耗时未评测（无模型资产） | 外挂 ggml 模型后运行中文语音黄金集对比 sherpa 基线 |

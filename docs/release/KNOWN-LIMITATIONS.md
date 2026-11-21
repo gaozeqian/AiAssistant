@@ -6,7 +6,7 @@
 
 | 限制 | 影响 | 现状 |
 |---|---|---|
-| Wayland 连续像素流未消费 | 无法高频截屏，手动截图走 portal Screenshot 回退并标记 `Degraded` | 窗口/文本采集仍可用；GNOME/KDE 实测待补 |
+| Wayland 连续像素流仅在 GNOME 实测 | KDE/KWin 与多显示器组合未验证；遇到非 RGB 像素格式会回退按需截图 | 已实现 `pw_stream` 消费与降级，可用 `AIASSISTANT_WAYLAND_PIPEWIRE=false` 关闭 |
 | macOS TCC 与签名公证 | 屏幕录制/辅助功能授权、Helper 崩溃监督、公证需真机验收 | 代码与契约测试完成，未在真机签字 |
 | macOS TTS 输出 | 语音反馈仅有文字与提示音 | `S7-R2`，扩展 Swift Helper 音频输出后修复 |
 | Linux OCR 需自备模型 | 默认仅 AT-SPI 文本；安装 RapidOCR 模型后才有图像 OCR 兜底，中文截图集质量未评测 | 设置 `AIASSISTANT_RAPIDOCR_MODEL_DIR`；缺模型时 `Ocr` 能力显示 `PermissionRequired` |

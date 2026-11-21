@@ -4,27 +4,61 @@ using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Platform.Linux.Accessibility;
 using AiAssistant.Platform.Linux.Desktop;
+using AiAssistant.Platform.Linux.PipeWire;
 using AiAssistant.Platform.Linux.Portal;
 using AiAssistant.Platform.Linux.X11;
 using Microsoft.Extensions.Logging;
 
 namespace AiAssistant.Platform.Linux;
 
+public sealed class WaylandPipeWireOptions
+{
+    /// <summary>Continuous PipeWire streaming is the default on Wayland; screenshots stay the fallback.</summary>
+    public bool EnablePipeWire { get; init; } = true;
+
+    /// <summary>How long a capture waits for the next PipeWire frame before falling back.</summary>
+    public TimeSpan FrameTimeout { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>Reuse a cached frame when it is at most this old.</summary>
+    public TimeSpan MaxFrameAge { get; init; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>Minimum spacing between copied frames; protects CPU and memory at monitor refresh rates.</summary>
+    public TimeSpan MinFrameInterval { get; init; } = TimeSpan.FromSeconds(1);
+}
+
 public sealed class WaylandScreenCapture(
     IXdgPortalClient portalClient,
     XdgPortalSessionManager sessionManager,
     IClock clock,
-    ILogger<WaylandScreenCapture> logger) : IScreenCapture
+    ILogger<WaylandScreenCapture> logger,
+    PipeWireScreenCastStream? pipeWireStream = null,
+    WaylandPipeWireOptions? pipeWireOptions = null) : IScreenCapture
 {
-    public CapabilityState Capability => sessionManager.Snapshot.Status switch
+    private readonly SemaphoreSlim _streamGate = new(1, 1);
+    private bool _streamStarted;
+
+    public CapabilityState Capability
     {
-        XdgPortalSessionStatus.Unavailable => CapabilityState.Unavailable(CapabilityKind.ScreenCapture, sessionManager.Snapshot.Summary),
-        XdgPortalSessionStatus.Degraded => CapabilityState.Degraded(CapabilityKind.ScreenCapture, sessionManager.Snapshot.Summary, "Check xdg-desktop-portal and its desktop backend."),
-        _ => CapabilityState.Degraded(
-            CapabilityKind.ScreenCapture,
-            $"Wayland portal on-demand capture; {sessionManager.Snapshot.Summary}",
-            "Authorize the xdg-desktop-portal screen dialog. Continuous PipeWire frame consumption is validated on a Linux desktop.")
-    };
+        get
+        {
+            if (pipeWireStream is not null &&
+                (pipeWireOptions?.EnablePipeWire ?? true) &&
+                pipeWireStream.Capability.IsOperational)
+            {
+                return pipeWireStream.Capability;
+            }
+
+            return sessionManager.Snapshot.Status switch
+            {
+                XdgPortalSessionStatus.Unavailable => CapabilityState.Unavailable(CapabilityKind.ScreenCapture, sessionManager.Snapshot.Summary),
+                XdgPortalSessionStatus.Degraded => CapabilityState.Degraded(CapabilityKind.ScreenCapture, sessionManager.Snapshot.Summary, "Check xdg-desktop-portal and its desktop backend."),
+                _ => CapabilityState.Degraded(
+                    CapabilityKind.ScreenCapture,
+                    $"Wayland portal on-demand capture; {sessionManager.Snapshot.Summary}",
+                    "Authorize the xdg-desktop-portal screen dialog. Screenshots remain available when the PipeWire stream cannot start.")
+            };
+        }
+    }
 
     public async Task<ScreenCaptureFrame?> CaptureFrameAsync(CancellationToken ct)
     {
@@ -37,7 +71,26 @@ public sealed class WaylandScreenCapture(
                 return null;
             }
 
-            // Safe fallback: portal Screenshot returns a bounded PNG while native PipeWire pixel streaming remains a real-desktop validation item.
+            if (pipeWireStream is not null && (pipeWireOptions?.EnablePipeWire ?? true))
+            {
+                await EnsurePipeWireStartedAsync(session, ct);
+                var frame = await pipeWireStream.CaptureAsync(
+                    pipeWireOptions?.MaxFrameAge ?? TimeSpan.FromSeconds(2),
+                    pipeWireOptions?.FrameTimeout ?? TimeSpan.FromSeconds(5),
+                    ct);
+                if (frame is not null)
+                {
+                    var frameHash = PerceptualHash.ComputeFromBgra32(
+                        frame.Bgra32,
+                        frame.Width,
+                        frame.Height,
+                        frame.Width * 4);
+                    var framePng = LinuxPngCodec.EncodeBgra32(frame.Bgra32, frame.Width, frame.Height);
+                    return new ScreenCaptureFrame(clock.Now(), frame.Width, frame.Height, frameHash, framePng);
+                }
+            }
+
+            // Fallback: portal Screenshot returns a bounded PNG when the continuous stream is unavailable.
             var png = await portalClient.CaptureScreenshotAsync(ct);
             if (!LinuxPngCodec.TryDecodeToBgra32(png, out var bgra, out var width, out var height, out var hash) || bgra is null)
             {
@@ -48,6 +101,7 @@ public sealed class WaylandScreenCapture(
         }
         catch (XdgPortalRequestException)
         {
+            await ResetStreamAsync();
             await sessionManager.InvalidateAsync(clearRestoreToken: true, ct);
             return null;
         }
@@ -58,7 +112,65 @@ public sealed class WaylandScreenCapture(
         }
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        pipeWireStream?.Stop();
+        _streamGate.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    private async Task EnsurePipeWireStartedAsync(PortalScreenCastSession session, CancellationToken ct)
+    {
+        if (_streamStarted)
+        {
+            return;
+        }
+
+        await _streamGate.WaitAsync(ct);
+        try
+        {
+            if (_streamStarted)
+            {
+                return;
+            }
+
+            var descriptor = session.Streams[0];
+            using var remote = await portalClient.OpenPipeWireRemoteAsync(session.SessionPath, ct);
+            var serial = descriptor.PipeWireSerial is > 0 ? (uint)descriptor.PipeWireSerial.Value : (uint?)null;
+            if (pipeWireStream!.TryStart(
+                    remote,
+                    serial,
+                    descriptor.NodeId,
+                    Math.Max(descriptor.Width, 1),
+                    Math.Max(descriptor.Height, 1),
+                    out var error))
+            {
+                _streamStarted = true;
+            }
+            else
+            {
+                logger.LogInformation("PipeWire stream unavailable; using portal screenshots ({Reason}).", error);
+            }
+        }
+        finally
+        {
+            _streamGate.Release();
+        }
+    }
+
+    private async Task ResetStreamAsync()
+    {
+        pipeWireStream?.Stop();
+        await _streamGate.WaitAsync();
+        try
+        {
+            _streamStarted = false;
+        }
+        finally
+        {
+            _streamGate.Release();
+        }
+    }
 }
 
 /// <summary>Dynamic screen adapter that follows Wayland to X11 runtime fallback without restarting the capture pipeline.</summary>
