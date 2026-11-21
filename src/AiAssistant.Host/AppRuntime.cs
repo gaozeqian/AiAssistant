@@ -252,7 +252,29 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<IVectorIndex>(),
             provider.GetRequiredService<IModelGateway>(),
             provider.GetRequiredService<HybridSearchOptions>(),
-            provider.GetRequiredService<ILogger<HybridSearchService>>()));
+            provider.GetRequiredService<ILogger<HybridSearchService>>(),
+            ensureIndexed: async ct =>
+            {
+                var vectors = provider.GetRequiredService<IVectorIndex>();
+                var metadata = await vectors.GetMetadataAsync(ct);
+                if (metadata.IndexedCount > 0)
+                {
+                    return;
+                }
+
+                bool hasEvents = false;
+                await foreach (var _ in provider.GetRequiredService<IEventRepository>()
+                                   .QueryAsync(new EventQuery(Limit: 1), ct))
+                {
+                    hasEvents = true;
+                    break;
+                }
+
+                if (hasEvents)
+                {
+                    await provider.GetRequiredService<EventEmbeddingIndexer>().RebuildAllAsync(ct);
+                }
+            }));
         services.AddSingleton<IEvidenceQuestionAnswerer>(provider => new EvidenceQuestionAnswerUseCase(
             provider.GetRequiredService<IEvidenceSearch>(),
             provider.GetRequiredService<IModelGateway>(),

@@ -31,8 +31,33 @@ public sealed class HybridSearchService(
     IVectorIndex vectors,
     IModelGateway model,
     HybridSearchOptions options,
-    ILogger<HybridSearchService> logger) : IEvidenceSearch
+    ILogger<HybridSearchService> logger,
+    Func<CancellationToken, Task>? ensureIndexed = null) : IEvidenceSearch
 {
+    private int _indexEnsured;
+
+    /// <summary>
+    /// Indexing is explicit by design (no model calls at startup). When a user asks before any index
+    /// exists, build it once so natural-language questions (which keyword search cannot match) still
+    /// return evidence. Fails soft so keyword-only retrieval keeps working offline.
+    /// </summary>
+    private async Task EnsureIndexOnceAsync(CancellationToken ct)
+    {
+        if (ensureIndexed is null || Interlocked.Exchange(ref _indexEnsured, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await ensureIndexed(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogInformation("Automatic vector index refresh skipped with {ExceptionType}; keyword results remain.", ex.GetType().Name);
+        }
+    }
+
     public async Task<SearchQueryResult> SearchAsync(
         string query,
         DateOnly fromDate,
@@ -67,6 +92,7 @@ public sealed class HybridSearchService(
         var vectorEvents = new List<ActivityEvent>();
         if (options.EnableVectorRecall)
         {
+            await EnsureIndexOnceAsync(ct);
             try
             {
                 var embeddingText = string.IsNullOrEmpty(options.EmbeddingQueryPrefix)

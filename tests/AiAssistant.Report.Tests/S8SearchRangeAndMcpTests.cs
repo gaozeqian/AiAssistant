@@ -54,6 +54,31 @@ public sealed class HybridSearchAndEvidenceTests
     }
 
     [Fact]
+    public async Task Search_EnsuresIndexOnceBeforeVectorRecall()
+    {
+        var events = new QueryableEventRepository([Event("e1", BaseUtc, "Rider", "迁移方案", "整理迁移步骤")]);
+        var vectors = new FixedVectorIndex([new VectorSearchHit("e1", 0.9f)]);
+        var calls = 0;
+        var search = new HybridSearchService(
+            events,
+            vectors,
+            new ScriptedModelGateway("ignored"),
+            new HybridSearchOptions(),
+            NullLogger<HybridSearchService>.Instance,
+            ensureIndexed: _ =>
+            {
+                Interlocked.Increment(ref calls);
+                return Task.CompletedTask;
+            });
+
+        var query = new DateOnly(2026, 11, 20);
+        await search.SearchAsync("迁移", query, query, CancellationToken.None);
+        await search.SearchAsync("迁移", query, query, CancellationToken.None);
+
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
     public async Task Answer_WithCitedEvidence_KeepsModelAnswerAndCitations()
     {
         var (answerer, _) = CreateAnswerer(
