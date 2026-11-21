@@ -7,12 +7,12 @@
 
 ## 1. 当前总体状态快照
 
-- **当前活跃阶段**：`S9 发布加固：S3-R3 Wayland 连续抓屏已在 GNOME Wayland 实测；真机签名公证、浸泡与人工验收待执行`
+- **当前活跃阶段**：`S9 发布加固 + macOS 真机验收`：代码与自动化验收已收口，剩余为真机/真实资产/真实凭据/人工签字类门禁
 - **最近更新时间**：`2026-11-21`
-- **最近执行环境**：`linux-x64` Ubuntu 26.04 + GNOME Wayland, `.NET SDK 10.0.115`（目标框架 `net10.0` LTS）；上一轮 Windows 11 `win-x64` / SDK 11.0.100
-- **当前构建状态**：✅ `linux-x64` 本地 Release 0 警告 0 错误；三平台自包含打包脚本实测（win zip / linux tar.gz / macOS app 布局）
-- **当前测试状态**：✅ 176/176 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 51、`Processing.Tests` 22、`Report.Tests` 61、`Voice.Tests` 9）；另含 1 项需 `AIASSISTANT_PORTAL_E2E=1` 的真机 ScreenCast 测试（GNOME Wayland 实测通过）
-- **下一步待确认事项**：配置签名证书/公证凭据后执行 `release.yml`；在真机完成 24h/多日浸泡、安装升级卸载与无障碍走查；S9 遗留项见第 5 节
+- **最近执行环境**：`osx-arm64` macOS 26.7.3（Apple Silicon）+ `.NET SDK 10.0.404` + Swift 6.4；上一轮 `linux-x64` Ubuntu 26.04 + GNOME Wayland；再上一轮 Windows 11 `win-x64` / SDK 11.0.100
+- **当前构建状态**：✅ `osx-arm64` 本地 Release 0 警告 0 错误；Swift Helper `swift build -c release` 通过；`linux-x64` / `win-x64` 历史结论见第 4 节日志
+- **当前测试状态**：✅ 180/180 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 55、`Processing.Tests` 22、`Report.Tests` 61、`Voice.Tests` 9），本机 `osx-arm64` 全量实跑；另含 2 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放 + TCC 降级，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
+- **下一步待确认事项**：macOS 侧的 TCC 允许流程（屏幕录制/辅助功能）与签名公证仍需人工授权与签字；S9-R4 待 Actions 配额恢复；黄金集（S4-R/S7-R1）需外挂模型资产。详见第 6 节
 
 ---
 
@@ -21,13 +21,13 @@
 | 阶段 | 设计基线 | 状态 | 已验证平台 | 核心产出与门禁结论 |
 |---|---|---|---|---|
 | **S0 工程奠基** | P0 前置 | ✅ 已完成 | `win-x64` 实测；`osx-arm64` / `linux-x64` 交叉打包验证 | 19 个项目解决方案、CPM、10 份 ADR、CI 矩阵、6 条架构依赖测试通过 |
-| **S1 核心与存储** | P0 | ✅ 已完成 | `win-x64` 实测通过；`osx-arm64` / `linux-x64` 待真机复跑 `Storage.Tests` | SQLite3MC 页级加密、DPAPI/Keychain/libsecret 密钥封装与轮换、AES-GCM 媒体库与引用计数、原子事件+媒体事务、加密备份恢复、`sqlite-vec` + SIMD 向量索引与重建 POC 全部通过 |
+| **S1 核心与存储** | P0 | ✅ 已完成 | `win-x64` / `osx-arm64` 实测通过（`Storage.Tests` 17/17）；`linux-x64` 通过 | SQLite3MC 页级加密、DPAPI/Keychain/libsecret 密钥封装与轮换、AES-GCM 媒体库与引用计数、原子事件+媒体事务、加密备份恢复、`sqlite-vec` + SIMD 向量索引与重建 POC 全部通过 |
 | **S2 Windows 最小闭环** | P0 | ✅ 已完成 | `win-x64` 采集、Headless UI、真实桌面强杀重启、24h 全天加速浸泡均通过 | 完成采集与有界管道、Avalonia MVVM 时间线、选中后解密预览、暂停/黑名单、托盘、自启开关、基础保留清理 `MediaRetentionService`、零敏感泄露结构化日志 `SanitizedStructuredLoggerProvider` 与导出预览；24h 浸泡验证控制事件 100% 零丢失 |
-| **S3 三平台扩展** | P1 | 🔄 Linux GNOME Wayland 实测通过；macOS TCC 与 KDE/X11 矩阵待验收 | GitHub Actions 三平台构建/测试/打包通过；`linux-x64` Ubuntu 26.04 + GNOME Wayland 真机抓屏实测 | macOS Helper、Linux Wayland 默认与初始化失败 X11 回退、portal 加密令牌轮换、AT-SPI/EWMH、inotify/PulseAudio/XDG 均已接入；连续 PipeWire ScreenCast 帧流（§3.10）与 portal D-Bus 报文缺陷修复 |
+| **S3 三平台扩展** | P1 | 🔄 macOS 真机已验证 TCC 拒绝降级；TCC 允许流程、公证与 KDE/X11 矩阵待验收 | GitHub Actions 三平台构建/测试/打包通过；`osx-arm64` 真机 Helper 握手/心跳/降级实测；`linux-x64` GNOME Wayland 真机抓屏实测 | macOS Helper、Linux Wayland 默认与初始化失败 X11 回退、portal 加密令牌轮换、AT-SPI/EWMH、inotify/PulseAudio/XDG 均已接入；连续 PipeWire ScreenCast 帧流（§3.10）与 portal D-Bus 报文缺陷修复 |
 | **S4 预处理与音频** | P1 | 🔄 代码与契约完成；模型资产评测遗留 | `win-x64` 流水线/AudioHub/WASAPI 实测；`linux-x64` 全量测试与发布（含 sherpa-onnx / Whisper 原生库）通过 | 可组合阶段、超时/失败隔离、脱敏、pHash 去重、单路 AudioHub、三平台音频工厂、sherpa-onnx ASR/VAD/说话人分离与缺失模型降级；Whisper.net 批处理 ASR 可选引擎；RapidOCR PP-OCRv4 Linux 图像 OCR 兜底（§3.5）；真实中文语音与 OCR 质量待遗留项验收 |
 | **S5 本机模型与日报** | P2 | 🔄 代码与契约完成；真实模型评测遗留 | `win-x64` 网关/分段/调度/UI 实测；`linux-x64` / `osx-arm64` 发布通过 | Microsoft.Extensions.AI 网关、Ollama/LM Studio 兼容适配、脱敏/审计/超时装饰器、事件向量索引、分段+map-reduce+JSON 校验重试、版本化加密日报、单消费者三通道与日报/站会 UI；真实模型质量待遗留项评测 |
 | **S6 内网与公网档** | P2.5 | 🔄 代码与契约完成；真实企业端点遗留 | `win-x64` 配置/策略/三闸/探测测试通过；两平台发布通过 | 版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理、Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、三闸脱敏、五能力探测缓存与诊断展示 |
-| **S7 唤醒与基础命令** | P2.6 | 🔄 代码与契约完成；真实 KWS/TTS 评测与 macOS 音频输出遗留 | `win-x64` 状态机/命令/日志/UI 测试；`linux-x64` 全量 151/151；两平台发布通过 | sherpa-onnx “你好时光” KWS、四态语音会话、8 秒命令窗口、误唤醒冷却、固定命令、敏感命令二次确认、TTS 反馈、加密 voice_commands 文本日志与状态栏/语音面板；命令音频 opt-in（§3.5） |
+| **S7 唤醒与基础命令** | P2.6 | 🔄 代码与契约完成；macOS 音频输出已真机验证；真实 KWS/TTS 黄金集遗留 | `osx-arm64` 真机 Helper 音频回放与 TCC 降级通过；`win-x64` 状态机/命令/日志/UI 测试；`linux-x64` 全量 151/151；三平台发布通过 | sherpa-onnx “你好时光” KWS、四态语音会话、8 秒命令窗口、误唤醒冷却、固定命令、敏感命令二次确认、TTS 反馈、加密 voice_commands 文本日志与状态栏/语音面板；命令音频 opt-in（§3.5）；macOS `audio.play`（AVAudioEngine 内存 PCM） |
 | **S8 智能检索与对话** | P3 | 🔄 代码与契约完成；真实检索质量与 MCP 客户端联调遗留 | `win-x64` 混合检索/证据问答/区间报告/MCP 契约与 Headless UI 测试；两平台发布通过 | 时间过滤+关键词+向量 RRF 混合检索与 `[E#]` 证据引用、无证据/无引用/媒体清理三类降级、周报与任意区间 Markdown+stats 导出、只读 loopback MCP（加密令牌/限流/四个只读工具）、检索问答面板与证据回跳、语音问答复用同一用例 |
 | **S9 发布加固** | 全阶段 | 🔄 代码与工具链完成；真机签名/浸泡/人工验收遗留 | `win-x64` 打包与维护命令实测；`linux-x64` / `osx-arm64` 包布局验证 | 跨平台打包脚本（Windows zip+MSIX 模板+签名、macOS app+codesign/notarize、Linux tar.gz+deb）、应用图标、发布工作流、数据删除服务与 CLI（backup/restore/purge）、v1→v2 迁移与密钥丢失故障注入、数据与导出页面、键盘快捷键/无障碍名称/权限引导、隐私/限制/性能/升级卸载/回滚/发布检查表文档 |
 
@@ -173,6 +173,8 @@ sherpa/
 ```
 
 `keywords.txt` 使用 sherpa-onnx KWS 关键词格式，至少包含“你好时光”及备选词；阈值在真实环境实测后调整。语音默认关闭，由“语音”页显式启用；`AIASSISTANT_VOICE_DISABLE_CHIME=true` 可关闭唤醒提示音。语音问答只在“问一下 / 请问 / 查询 / 搜索”触发词后进入，回答与“检索与问答”面板共用同一证据用例。
+
+语音反馈输出：Windows（WinMM/WASAPI）与 Linux（PulseAudio）直接在进程内播放；macOS 经 Swift Helper 的 `audio.play` 方法用 AVAudioEngine 渲染内存 PCM（不写临时文件、每次播放后释放设备，音频输出不需要 TCC 授权）。Helper 未就绪时能力降级为 `Degraded`，文字反馈不受影响。
 
 命令音频默认不落盘：唤醒窗口内的音频只驻留内存，命令处理完即释放。需要回听时在“语音”页勾选“记录命令音频”，或用环境变量在启动时开启：
 
@@ -349,6 +351,9 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-21 [linux-x64] [S4-R2 Linux RapidOCR 接入]**：新增 `AiAssistant.Processing/Ocr`（`RapidOcrOptions`、`RapidOcrImage`、`RapidOcrDetPostProcessor`、`RapidOcrCtcDecoder`、`RapidOcrTextRecognizer`）与 Application 端口 `IImageOcrRecognizer`/`ImageFrameBuffer`；`LinuxTextExtractor` 在 AT-SPI 无文本时用 `LinuxPngCodec` 解码截图并调用按需 OCR。模型目录 `AIASSISTANT_RAPIDOCR_MODEL_DIR`（默认 `<data>/models/rapidocr`，需 det/rec onnx 与 `ppocr_keys_v1.txt`），缺模型时 `Ocr` 能力为 `PermissionRequired` 并回退应用名/窗口标题。过程中发现并修复真实缺陷：先引入 `Microsoft.ML.OnnxRuntime` 1.32 会覆盖发布根目录的 `libonnxruntime.so`，`ldd -r` 报 `VERS_1.28.2 not found`，sherpa ASR/VAD/TTS 会整体失效；改为 `Microsoft.ML.OnnxRuntime.Managed` 1.28.0 复用 sherpa 自带原生库，发布体积保持 149 MB，`ldd -r` 无未解析符号，约束写入 ADR-0007。新增 10 项测试（缺模型降级、真实原生 ORT 加载、DB 后处理、CTC 解码、帧校验、AT-SPI 优先/OCR 兜底/无截图跳过），全仓 169/169，`--startup-check` 通过。真实模型中文截图集质量仍为遗留项。
 - **2026-11-21 [linux-x64] [S4-R3 Whisper.net 批处理 ASR 完成]**：新增 `WhisperAsrEngine`（懒加载 `WhisperFactory`、16 kHz 校验、段落概率均值置信度、异常降级）与 `AsrEngineSelection`；Host 通过 `AIASSISTANT_ASR_ENGINE=whisper` 显式切换（默认 sherpa-onnx），模型路径 `AIASSISTANT_WHISPER_MODEL_PATH` 或 `<data>/models/whisper/ggml-small.bin`，缺模型时能力为 `PermissionRequired` 且启动自检照常通过。新增发布裁剪目标，只保留目标 RID 的 Whisper 原生库（`linux-x64` 发布体积 163 MB → 149 MB）。新增 8 项测试（缺模型降级、非 16 kHz 短路、原生运行时加载、引擎选择解析），`Processing.Tests` 15/15；`--startup-check` 与 `dotnet publish -r linux-x64` 实测通过。真实模型识别质量仍属黄金集遗留项。
 - **2026-11-21 [linux-x64] [Linux 端 Skia 原生资产补齐]**：`linux-x64` 全量测试暴露 `Report.Tests` 的 4 项 PNG/PDF 栅格化测试因缺少 `libSkiaSharp.so` 失败（`AiAssistant.Export` 只引用了托管 `SkiaSharp`，Linux 原生资产仅由 Host 经 Avalonia 传递引入）。在 `AiAssistant.Export` 增加 `SkiaSharp.NativeAssets.Linux`（3.119.4）并同步 CPM 与依赖清单，修复后 `Report.Tests` 61/61 在 Linux 通过；`generate-sbom.py --check-manifest --verify` 通过（110 组件 / 111 依赖边）。
+- **2026-11-21 [osx-arm64] [S7-R2 macOS 音频输出完成]**：Swift Helper 新增 `audio.play` 方法（`AudioPlayback.swift`，AVAudioEngine + AVAudioPlayerNode，float32 单声道 PCM 直接内存渲染，不写临时文件；每次播放独立 engine 并在结束后停止，空闲时不占用音频设备）；`MacOsAudioPlayback` 改为经 `IMacHelperSupervisor` 调用，能力状态随 Helper 健康度切换（Healthy → `Supported`，其余 → `Degraded`），空载荷与超 30 秒载荷分别短路与截断。真机静音回放验证通过：`audio.play` 往返 0.7–1.7 ms，Heartbeat 不受影响。新增 2 项平台契约测试与 2 项 `AIASSISTANT_MAC_HELPER_E2E=1` 真机测试（回放 + TCC 降级），`osx-arm64` 全量 180/180。
+- **2026-11-21 [osx-arm64] [Helper 心跳 TCC 阻塞缺陷修复]**：真机探针发现每次 `ping` 都同步调用 TCC，`AVCaptureDevice.authorizationStatus(for: .audio)` 单次耗时 819–1648 ms（冷启动首次握手 1.5–1.9 s，首次运行二进制因系统扫描曾达 21 s），导致所有 IPC 请求被串行阻塞，极端情况下会超时并触发无意义重启。Helper 改为 `PermissionCache`（NSLock 保护的快照 + 后台串行队列刷新，`ping` 永不阻塞在 TCC 上，`permissions.query` 才同步刷新，握手使用阻塞快照保证首帧准确）；`MacHelperOptions` 新增 `HandshakeTimeout`（默认 10 s）与普通请求超时解耦。修复后 `ping` 从约 1000 ms 降至 **0.2–0.3 ms**，并新增 `< 300 ms` 的真机回归断言。
+- **2026-11-21 [docs] [实施清单与进度对齐]**：`IMPLEMENTATION.md` 第 10 节改为与 `PROGRESS.md` 第 5 节同构的 `*-R` 编号：补记 `S6-R2`（密钥导入）、`S8-R`（embedding 95.8% / MCP Inspector / SVG-PNG-PDF）为已完成，拆分 `S5-R1`/`S5-R2`、`S6-R1`、`S7-R1`/`S7-R2`、`S9-R1..R4`、`S3-R1`/`S3-R2`，并新增第 6 节执行顺序表。
 
 ---
 
@@ -358,7 +363,7 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 
 | ID | 来源 | 遗留内容 | 风险 | 后续处理 |
 |---|---|---|---|---|
-| `S3-R1` | S3 macOS | 真实 macOS 桌面的 TCC 屏幕录制/辅助功能授权、Helper 崩溃监督与签名公证未人工验收 | 原生权限路径与打包签名仍可能有平台差异 | 在 macOS Apple Silicon 真机执行 Helper 冒烟、权限拒绝/撤销与重启测试 |
+| `S3-R1` | S3 macOS | 🟡 Apple Silicon 真机已完成 Helper 握手/心跳/音频回放，并验证「未授权 → 精确降级、采集返回 null、不崩溃」；TCC 允许流程、权限撤销、Helper 崩溃监督与公证仍未人工签字 | 允许路径与打包签名仍可能有平台差异 | 在签名 `.app` 内授予屏幕录制/辅助功能并撤销一次，记录 `spctl` 与公证输出 |
 | `S3-R2` | S3 Linux | 🟡 GNOME Wayland 的 ScreenCast 授权与连续抓屏已真机实测（2026-11-21）；KDE/KWin、X11 回退、AT-SPI 与托盘能力矩阵仍待人工验收 | 合成器差异可能影响窗口与抓屏可用性 | 在 KDE Wayland 与 X11 会话逐项签字 |
 | `S3-R3` | S3 Linux | ✅ 已实现连续 PipeWire 帧消费（私有 `pw_stream`、1 秒节流、格式协商与 YUV 降级回退），GNOME Wayland 真机通过（2026-11-21） | KDE/KWin 与多显示器场景未实测 | 在 KDE Wayland 复跑同一真机测试 |
 | `S4-R1` | S4 语音 | sherpa-onnx 模型资产（Paraformer、Silero VAD、说话人嵌入）不进入 Git，真实中文语音黄金集未评测 | 仅验证适配与降级路径，未证明识别质量 | 在本地/CI 外挂模型目录运行黄金集与唤醒词评测 |
@@ -369,7 +374,7 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S6-R1` | S6 企业端点 | 真实企业 mTLS、企业 CA、代理和公网 API 未联调；公网同意仅代码级门禁 | TLS/代理环境差异可能导致端点不可用 | 在企业网络与公网沙箱分别验证握手、证书轮换、代理认证、断网回退与策略审计 |
 | `S6-R2` | S6 密钥 | 已提供 `--import-model-secret`（stdin、终端隐藏输入）、列表/删除命令与诊断页密钥卡片；值只写不读 | 仍需用户自行准备密钥值并确保不进入 shell 历史 | 发布说明中提示使用 stdin 管道，避免命令行明文 |
 | `S7-R1` | S7 语音 | 真实中文 KWS 唤醒率/误唤醒率、TTS 音质与端到端延迟未评测 | 阈值和体验未达发布基线 | 外挂 KWS/TTS 模型后运行安静/嘈杂/多人场景黄金集，按实测调整阈值 |
-| `S7-R2` | S7 macOS | macOS TTS 音频输出仍为 Degraded；命令文字反馈可用 | macOS 无语音播报 | 扩展 Swift Helper 的音频输出能力并做 TCC 麦克风/输出验收 |
+| `S7-R2` | S7 macOS | ✅ 已实现 Swift Helper `audio.play`（AVAudioEngine 内存 PCM、不落盘、每次播放后释放设备）并真机验证：回放往返 0.7–1.7 ms、心跳 0.2–0.3 ms、空载荷短路、30 秒截断；能力随 Helper 健康度切换 | 签名 `.app` 内尚未复听 | 随 `S9-R1` 在打包应用内复听一次并记录 |
 | `S7-R3` | S7 隐私 | ✅ 已实现显式开关、AES-GCM 加密音频引用与到期自动清理（2026-11-21）；仅缺内置回听界面 | 默认仍不落盘，风险已消除 | 需要回听时从加密媒体库导出；内置播放器另立需求 |
 | `S8-R1` | S8 检索 | 已完成真实评测：embeddinggemma-2:740m **95.8%**（MRR 1.0，768 维，热态约 19ms）；已把官方查询指令与 `title/text` 文档格式接入生产并支持向量重建 | 合成语料仍与真实分布不同；个别同义词会漂移 | 用真实脱敏语料扩充查询集，按失败样本调参 |
 | `S8-R2` | S8 MCP | 已完成 MCP Inspector 2.16.0 真实客户端联调：initialize、tools/list、activity_stats/search_events、未授权退出码 3、写工具退出码 5；其他客户端（Claude Desktop 等）未测 | 其他客户端的会话/SSE 细节可能仍有差异 | 需要时用其他客户端复跑同一流程 |
@@ -378,3 +383,21 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S9-R2` | S9 浸泡 | 已跑通 14 天加速浸泡与 60 分钟真实时钟浸泡（3191 事件、1585 媒体、控制 22/22、队列 2/12、完整性 ok）；黑名单断言修正后 8 分钟复验 7/7 通过；真机热插拔未执行 | 真实设备热插拔与长稳内存曲线未量化 | 按 `RELEASE-CHECKLIST.md` 第 5 节执行 `AIASSISTANT_REAL_SOAK_MINUTES=90` 并记录 |
 | `S9-R3` | S9 人工验收 | 自动化已覆盖 7 个标签页无障碍名称/加速键、Ctrl+D1…D7 与 Ctrl+F 真实按键、关键控件名称；安装/升级/卸载与人工走查未做 | 平台交互差异可能影响可用性 | 三平台各执行一次发布检查表第 3、6 节 |
 | `S9-R4` | S9 供应链 | 离线 SBOM 与 `SHA256SUMS` 已实现并本地验证；CI 因账单未运行，Release 附件未实际生成 | 供应链证据尚未随发布物提供 | 恢复 Actions 后运行 SBOM 作业与 `release.yml`，确认 `bom.json` 与 `SHA256SUMS` 出现在 Release |
+
+---
+
+## 6. 未完成项执行顺序（2026-11-21 排定）
+
+代码与自动化测试已全部收口，剩余项都依赖特定环境。按“可在当前机器立即产出成果”优先排序：
+
+| 顺序 | 项 | 依赖 | 产出判定 |
+|---|---|---|---|
+| 1 | `S3-R1` macOS TCC 允许流程与公证 | 签名 `.app` + 人工授权 | 授予屏幕录制/辅助功能并撤销一次，记录 Helper 崩溃监督、`spctl` 与公证输出 |
+| 2 | `S9-R4` Release 与 SBOM 附件 | GitHub Actions 配额恢复（当前仍 5 秒失败） | `bom.json` + `SHA256SUMS` + 三平台安装包出现在 Release |
+| 3 | `S4-R` / `S7-R1` 黄金集 | 外挂 Paraformer/RapidOCR/Whisper/KWS/TTS 模型资产 | 中文语音、OCR、唤醒率与误唤醒率基线报告 |
+| 4 | `S5-R1` 候选模型档位 | 第 3 项完成后同机跑 `--benchmark-model` | 轻量档/质量档选型结论与内存曲线 |
+| 5 | `S9-R2` / `S9-R3` / `S3-R2` | 三平台真机 + 物理热插拔 | 90 分钟浸泡、安装升级卸载、无障碍与 KDE/X11 矩阵签字 |
+| 6 | `S6-R1` 企业端点联调 | 企业网络与公网沙箱 | mTLS/CA/代理/断网回退联调记录 |
+
+> 2026-11-21 已关闭 `S7-R2`（第 1 项原计划），并顺带修复 Helper 心跳被 TCC 阻塞的性能缺陷。
+> `S5-R2` 跟随 `S9-R2` 一并执行；`S6-R2`、`S7-R3`、`S8-R*` 已关闭，仅在需要时做调优复跑。

@@ -1,9 +1,12 @@
 # AI 个人活动追踪助手 · 分步骤实现方案
 
-> 版本：v1.0 ｜ 日期：2026-11-19 ｜ 基线：`DESIGN.md` v2.5
+> 版本：v1.1 ｜ 日期：2026-11-21 ｜ 基线：`DESIGN.md` v2.5
 >
 > 本文是工程实施计划，不重复产品设计；重点定义架构边界、实现顺序、阶段交付物、
 > 验证方法与回退策略。实施中若发现底层技术组合不成立，先回到对应 POC，不用业务代码掩盖问题。
+>
+> 第 10 节清单与 `PROGRESS.md` 第 5 节遗留项实时同步：`[x]` 表示代码与自动化验收均完成，
+> `[ ]` 表示仍欠缺真机环境、真实模型资产、真实凭据或人工签字。`*-R` 编号与 PROGRESS 一一对应。
 
 ---
 
@@ -502,25 +505,28 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S4.3：sherpa-onnx 中文 Paraformer ASR、Silero VAD、pyannote 说话人分离适配器与模型缺失降级测试。
 - [x] S4-R3：Whisper.net 批处理 ASR 适配器（`AIASSISTANT_ASR_ENGINE=whisper`、缺模型明确降级、发布按 RID 裁剪原生库），默认仍为 sherpa-onnx。
 - [x] S4-R2：Linux RapidOCR PP-OCRv4 图像 OCR 兜底（`IImageOcrRecognizer`、缺模型降级、复用 sherpa 原生 ORT 1.28.2）。
-- [ ] S4-R：外挂中文语音与 RapidOCR 模型资产完成识别质量黄金集评测。
+- [ ] S4-R：外挂中文语音（Paraformer/VAD/说话人）、RapidOCR 与 Whisper 模型资产，完成识别质量黄金集评测（适配器与降级路径已完成，缺质量基线）。
 - [x] S5.1：Microsoft.Extensions.AI 本机网关、Ollama/LM Studio 适配、loopback 策略、超时/脱敏/审计装饰器与能力探测。
 - [x] S5.2：事件向量索引、活动分段、map-reduce、结构化 JSON 校验重试、版本化加密日报与站会 Markdown。
 - [x] S5.3：单消费者三通道调度、启动补偿、幂等/失败保留、日报/站会面板、强制重生成与 Markdown 导出。
-- [ ] S5-R：安装真实候选模型运行固定中文基准集并确定默认轻量/质量档位；多日调度浸泡并入 S9。
+- [ ] S5-R1：对目标候选对话模型分别运行 `--benchmark-model`，按质量/延迟/内存确定默认轻量档与质量档（`gemma4:12b` 已实测成功率 100%、JSON 100%、热态 4.6s）。
+- [ ] S5-R2：日报三通道多日调度浸泡（跨午夜、休眠唤醒、模型离线、重复触发），并入 S9-R2 一起执行。
 - [x] S6.1：版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理与三档端点装配。
 - [x] S6.2：Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、最小化/脱敏/残留检测三闸。
 - [x] S6.3：chat/streaming/embeddings/structured output/tool calling 探测缓存与诊断展示。
-- [ ] S6-R：真实企业 mTLS/CA/代理、公网端点和密钥导入流程联调。
+- [ ] S6-R1：真实企业 mTLS / 企业 CA / 代理认证与公网端点联调（含证书轮换、断网回退、策略审计）；本地双向 TLS + CONNECT 代理模拟已通过（S9.24）。
+- [x] S6-R2：模型端点密钥导入（`--import-model-secret` 标准输入隐藏输入）、列表/删除命令与 `--probe-model` 能力探测，诊断页密钥卡片同步提供。
 - [x] S7.1：sherpa-onnx KWS/TTS 适配、语音端口、模型缺失降级与唤醒提示音。
 - [x] S7.2：四态语音状态机、8 秒命令窗口、误唤醒冷却、固定命令、敏感二次确认与加密文本日志。
 - [x] S7.3：语音面板与状态栏、Host 单路 AudioHub 装配、Windows/Linux 反馈播放与 macOS 明确降级。
 - [x] S7-R3：命令音频显式开关（语音面板 + `AIASSISTANT_VOICE_RECORD_COMMAND_AUDIO`）、AES-GCM 加密媒体引用、可配置保留期与到期自动擦除；默认不落盘。
-- [ ] S7-R：真实中文 KWS/TTS 黄金集、macOS 音频输出。
+- [ ] S7-R1：真实中文 KWS 唤醒率/误唤醒率、TTS 音质与端到端延迟黄金集（模型资产外挂后调整逐词阈值）。
+- [x] S7-R2：macOS TTS 音频输出（Swift Helper `audio.play` + AVAudioEngine 内存播放、能力随 Helper 健康状态切换、真机静音回放与 IPC 不阻塞回归测试通过；签名 `.app` 内复听随 S9-R1 执行）。
 - [x] S8.1：时间过滤 + 关键词 + 向量 RRF 混合检索、统一 `[E#]` 证据引用，无证据不生成推测性回答。
 - [x] S8.2：任意区间/周报统计、每日柱状数据、Markdown + stats JSON 导出，模型不可用时确定性统计降级。
 - [x] S8.3：只读 loopback MCP（默认关闭、加密本地令牌、loopback 校验、限流、四个只读工具、无写工具）。
 - [x] S8.4：检索/问答面板、证据点击跳转时间线、语音问答复用同一用例、诊断页 MCP 令牌显示与轮换。
-- [ ] S8-R：真实 embedding 检索质量评测、真实 MCP 客户端联调与图形化周报导出。
+- [x] S8-R：真实 embedding 评测（embeddinggemma-2:740m，Recall@8 95.8% / MRR 1.000）、MCP Inspector 2.16.0 真实客户端联调、周报 SVG/PNG/PDF 图形化导出均已完成；真实脱敏语料扩充与其它 MCP 客户端复跑降级为后续调优项。
 - [x] S9.1：跨平台打包脚本（Windows 自包含 zip + 可选 Authenticode/MSIX、macOS `.app` + codesign/notarize、Linux tar.gz + deb）、应用图标与签名发布工作流。
 - [x] S9.2：数据删除服务与 Host 维护命令（backup/restore/purge）、v1→v2 迁移保留数据、密钥丢失与删除后可用性故障注入测试。
 - [x] S9.3：数据与导出页面（二次确认删除）、键盘快捷键、关键控件无障碍名称、诊断页权限引导与确认导出。
@@ -549,8 +555,12 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.26：Windows 打包复验（zip 83.6 MB / MSIX 86.3 MB / SHA256SUMS；解压后 version、smoke-check、startup-check 均通过）。
 - [x] S9.27：三平台自签名安装包（MSI + PKG + deb）与 GitHub Actions 发布工作流；MSI/PKG 安装时自动导入并信任证书。
 - [x] S9.28：`linux-x64` 全量测试暴露 Skia 原生资产缺失，`AiAssistant.Export` 增加 `SkiaSharp.NativeAssets.Linux`，`Report.Tests` 在 Linux 61/61 通过。
-- [ ] S9-R：真实证书签名/公证、真实时间多日浸泡与设备热插拔、真机安装升级卸载与无障碍人工验收、CI 实际生成并随 Release 发布 SBOM/校验和。
-- [ ] 在真实 macOS 桌面完成 TCC 权限与签名公证验收；在 KDE Wayland / X11 / 多显示器下完成 Linux 能力矩阵验收（GNOME Wayland 抓屏与连续帧流已实测）。
+- [ ] S9-R1：用真实证书执行 Windows Authenticode/MSIX 签名与 macOS Developer ID 签名/公证（脚本与 `release.yml` 就绪，仅自签名演练过）。
+- [ ] S9-R2：真实时钟 90 分钟以上浸泡 + 显示器/麦克风热插拔（已跑 14 天加速浸泡与 60 分钟真实浸泡：3191 事件、控制 22/22、队列 2/12、完整性 ok）。
+- [ ] S9-R3：三平台安装/升级/卸载与无障碍人工走查签字（自动化无障碍测试已覆盖标签页名称/加速键/真实按键）。
+- [ ] S9-R4：GitHub Actions 恢复后实际运行 SBOM 作业与 `release.yml`，确认 `bom.json` 与 `SHA256SUMS` 随 Release 发布（本地生成器已验证 110 组件 / 111 依赖边）。
+- [ ] S3-R1：真实 macOS 桌面 TCC 屏幕录制/辅助功能授权、Helper 崩溃监督与签名公证人工验收。
+- [ ] S3-R2：KDE Wayland、X11 回退与多显示器能力矩阵验收（GNOME Wayland 抓屏与连续帧流已实测通过）。
 
 ---
 
