@@ -79,9 +79,9 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
     }
 
     /// <summary>
-    /// Semantic brushes keyed by theme variant. Controls reference them with {DynamicResource} so the
-    /// whole window restyles when the theme toggles. Hardcoded colors were the source of the mixed-theme
-    /// contrast bug (Fluent controls followed the system dark variant while the layout stayed light).
+    /// Semantic brushes keyed by theme variant, referencing the VS Code Dark Modern / Light Modern
+    /// palettes (neutral grays + #0078D4 accent). Controls reference them with {DynamicResource} so
+    /// the whole window restyles when the theme toggles.
     /// </summary>
     private static ResourceDictionary BuildThemeDictionary(bool isDark)
     {
@@ -90,45 +90,51 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
 
         if (!isDark)
         {
-            Add("PageBackgroundBrush", "#F4F6FA");
+            // Light Modern
+            Add("PageBackgroundBrush", "#F3F3F3");
             Add("CardBackgroundBrush", "#FFFFFF");
-            Add("HeaderBackgroundBrush", "#111C36");
-            Add("HeaderTextSecondaryBrush", "#B7C3D9");
-            Add("HeaderBadgeBackgroundBrush", "#22304D");
-            Add("HeaderBadgeForegroundBrush", "#DCE5F5");
-            Add("AccentBrush", "#3157D5");
-            Add("AccentSoftBackgroundBrush", "#EEF2FF");
-            Add("MutedBrush", "#475569");
-            Add("SubtleCardBrush", "#F8FAFC");
-            Add("PlaceholderBrush", "#E8EDF5");
-            Add("DividerBrush", "#E7EBF1");
-            Add("SuccessForegroundBrush", "#256044");
-            Add("SuccessBackgroundBrush", "#EFF6F1");
-            Add("DangerForegroundBrush", "#B42318");
-            Add("DangerBackgroundBrush", "#FFF1F0");
-            Add("WarningForegroundBrush", "#8A4B0F");
-            Add("WarningBackgroundBrush", "#FFF4E5");
+            Add("HeaderBackgroundBrush", "#EEEEEE");
+            Add("HeaderBorderBrush", "#D4D4D4");
+            Add("HeaderTextBrush", "#1F1F1F");
+            Add("HeaderTextSecondaryBrush", "#616161");
+            Add("HeaderBadgeBackgroundBrush", "#E5E5E5");
+            Add("HeaderBadgeForegroundBrush", "#242424");
+            Add("AccentBrush", "#0078D4");
+            Add("AccentSoftBackgroundBrush", "#D6EBFF");
+            Add("MutedBrush", "#616161");
+            Add("SubtleCardBrush", "#F3F3F3");
+            Add("PlaceholderBrush", "#E5E5E5");
+            Add("DividerBrush", "#D4D4D4");
+            Add("SuccessForegroundBrush", "#22863A");
+            Add("SuccessBackgroundBrush", "#E6F4EA");
+            Add("DangerForegroundBrush", "#A1260D");
+            Add("DangerBackgroundBrush", "#FBE9E7");
+            Add("WarningForegroundBrush", "#895503");
+            Add("WarningBackgroundBrush", "#FFF4CE");
         }
         else
         {
-            Add("PageBackgroundBrush", "#0F172A");
-            Add("CardBackgroundBrush", "#1E293B");
-            Add("HeaderBackgroundBrush", "#0B1220");
-            Add("HeaderTextSecondaryBrush", "#94A3B8");
-            Add("HeaderBadgeBackgroundBrush", "#1E293B");
-            Add("HeaderBadgeForegroundBrush", "#CBD5E1");
-            Add("AccentBrush", "#4F6BEF");
-            Add("AccentSoftBackgroundBrush", "#1E2A4A");
-            Add("MutedBrush", "#94A3B8");
-            Add("SubtleCardBrush", "#1E293B");
-            Add("PlaceholderBrush", "#334155");
-            Add("DividerBrush", "#334155");
-            Add("SuccessForegroundBrush", "#4ADE80");
-            Add("SuccessBackgroundBrush", "#0B2A1A");
-            Add("DangerForegroundBrush", "#F87171");
-            Add("DangerBackgroundBrush", "#2A1210");
-            Add("WarningForegroundBrush", "#FBBF24");
-            Add("WarningBackgroundBrush", "#2A1F08");
+            // Dark Modern
+            Add("PageBackgroundBrush", "#181818");
+            Add("CardBackgroundBrush", "#1F1F1F");
+            Add("HeaderBackgroundBrush", "#181818");
+            Add("HeaderBorderBrush", "#2D2D2D");
+            Add("HeaderTextBrush", "#D4D4D4");
+            Add("HeaderTextSecondaryBrush", "#9D9D9D");
+            Add("HeaderBadgeBackgroundBrush", "#2D2D2D");
+            Add("HeaderBadgeForegroundBrush", "#E0E0E0");
+            Add("AccentBrush", "#0078D4");
+            Add("AccentSoftBackgroundBrush", "#123B63");
+            Add("MutedBrush", "#A8A8A8");
+            Add("SubtleCardBrush", "#252526");
+            Add("PlaceholderBrush", "#2D2D2D");
+            Add("DividerBrush", "#3C3C3C");
+            Add("SuccessForegroundBrush", "#89D185");
+            Add("SuccessBackgroundBrush", "#1E3B2A");
+            Add("DangerForegroundBrush", "#F48771");
+            Add("DangerBackgroundBrush", "#3B1E1E");
+            Add("WarningForegroundBrush", "#CCA700");
+            Add("WarningBackgroundBrush", "#3B3410");
         }
 
         return d;

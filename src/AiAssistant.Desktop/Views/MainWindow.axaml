@@ -28,6 +28,16 @@
     <Style Selector="ListBoxItem">
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     </Style>
+    <Style Selector="TabControl TabItem">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Normal" />
+      <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+      <Setter Property="Padding" Value="12,7" />
+    </Style>
+    <Style Selector="TabControl TabItem:selected">
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
   </Window.Styles>
 
   <Window.KeyBindings>
@@ -43,14 +53,15 @@
   </Window.KeyBindings>
 
   <Grid RowDefinitions="Auto,*">
-    <Border Grid.Row="0" Background="{DynamicResource HeaderBackgroundBrush}" Padding="24,16">
+    <Border Grid.Row="0" Background="{DynamicResource HeaderBackgroundBrush}" BorderBrush="{DynamicResource HeaderBorderBrush}"
+            BorderThickness="0,0,0,1" Padding="24,14">
       <Grid ColumnDefinitions="Auto,*,Auto">
         <Border Width="38" Height="38" CornerRadius="11" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center">
-          <TextBlock Text="时" Foreground="White" FontSize="20" FontWeight="SemiBold"
+          <TextBlock Text="时" Foreground="White" FontSize="18" FontWeight="SemiBold"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
         <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-          <TextBlock Text="时光" Foreground="White" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="时光" Foreground="{DynamicResource HeaderTextBrush}" FontSize="18" FontWeight="SemiBold" />
           <TextBlock Text="个人活动追踪 · 默认仅在本机处理" Foreground="{DynamicResource HeaderTextSecondaryBrush}" FontSize="12" />
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -75,7 +86,7 @@
               ColumnDefinitions="360,*" Margin="0,12,0,0">
           <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="16" Margin="0,0,12,0">
             <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
-              <TextBlock Grid.Row="0" Text="活动记录" FontSize="18" FontWeight="SemiBold" />
+              <TextBlock Grid.Row="0" Text="活动记录" FontSize="15" FontWeight="SemiBold" />
               <ComboBox Grid.Row="1" ItemsSource="{Binding ActiveDates}" SelectedItem="{Binding SelectedDate}"
                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Margin="0,14,0,10">
                 <ComboBox.ItemTemplate>
@@ -129,7 +140,7 @@
               <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                 <StackPanel DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem" IsVisible="{Binding $parent[Grid].DataContext.HasSelectedEvent}">
                   <TextBlock Text="{Binding AppName}" FontSize="13" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding Title}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,4" />
+                  <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,4" />
                   <TextBlock Text="{Binding CapturedTimeText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                 </StackPanel>
                 <Border Grid.Column="1" Background="{DynamicResource AccentSoftBackgroundBrush}" CornerRadius="6" Padding="9,5" VerticalAlignment="Top">
@@ -151,8 +162,9 @@
                   <StackPanel IsVisible="{Binding HasSelectedEvent}" Spacing="8">
                     <TextBlock Text="媒体预览" FontWeight="SemiBold" />
                     <TextBlock DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem"
-                               Text="{Binding MediaSizeText}" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
-                    <Border Background="{DynamicResource PlaceholderBrush}" CornerRadius="8" MinHeight="180" ClipToBounds="True"
+                               Text="{Binding MediaSizeText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                    <Border Background="{DynamicResource PlaceholderBrush}" BorderBrush="{DynamicResource DividerBrush}"
+                            BorderThickness="1" CornerRadius="8" MinHeight="180" ClipToBounds="True"
                             IsVisible="{Binding HasPreview}">
                       <Image Source="{Binding PreviewImage}" Stretch="Uniform" MaxHeight="500" />
                     </Border>
@@ -164,7 +176,7 @@
                   </StackPanel>
 
                   <StackPanel IsVisible="{Binding !HasSelectedEvent}" HorizontalAlignment="Center" Margin="0,100,0,0" Spacing="8">
-                    <TextBlock Text="选择左侧事件开始回看" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Text="选择左侧事件开始回看" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
                     <TextBlock Text="媒体只在选中时解密，明文不会写入临时文件" Foreground="{DynamicResource MutedBrush}" />
                   </StackPanel>
                 </StackPanel>
@@ -179,7 +191,7 @@
               ColumnDefinitions="400,*" Margin="0,12,0,0">
           <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,12,0">
             <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
-              <TextBlock Text="证据检索与问答" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="证据检索与问答" FontSize="18" FontWeight="SemiBold" />
               <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
                 <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
                          PlaceholderText="输入关键词或问题，例如：迁移进展如何"
@@ -207,10 +219,10 @@
                 <StackPanel Spacing="6">
                   <TextBlock Text="回答（仅基于证据）" FontWeight="SemiBold" />
                   <TextBlock Text="{Binding Answer}" TextWrapping="Wrap" />
-                  <TextBlock Text="{Binding AnswerMeta}" FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding AnswerMeta}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
                   <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="6" Padding="10">
                     <TextBlock Text="无证据时不会生成推测性回答；原始媒体清理后只保留结构化证据。"
-                               FontSize="11" Foreground="{DynamicResource SuccessForegroundBrush}" TextWrapping="Wrap" />
+                               FontSize="12" Foreground="{DynamicResource SuccessForegroundBrush}" TextWrapping="Wrap" />
                   </Border>
                 </StackPanel>
               </Border>
@@ -220,9 +232,9 @@
           <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
             <Grid RowDefinitions="Auto,*,Auto">
               <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Text="证据列表" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="证据列表" FontSize="15" FontWeight="SemiBold" />
                 <TextBlock Grid.Column="1" Text="点击“定位”跳转到时间线对应记录"
-                           FontSize="11" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+                           FontSize="12" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
               </Grid>
               <ScrollViewer Grid.Row="1" Margin="0,10,0,0">
                 <ItemsControl ItemsSource="{Binding Evidence}">
@@ -235,8 +247,8 @@
                                        Foreground="{DynamicResource AccentBrush}" />
                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding Excerpt}" FontSize="12" TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding MatchedByText}" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
-                            <TextBlock Text="{Binding MediaText}" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
+                            <TextBlock Text="{Binding MatchedByText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                            <TextBlock Text="{Binding MediaText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                           </StackPanel>
                           <Button Grid.Column="1" Classes="secondary" Content="定位"
                                   Command="{Binding NavigateCommand}" VerticalAlignment="Top"
@@ -261,17 +273,17 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:DailyBarItem">
                         <Grid ColumnDefinitions="56,*,90" Margin="0,2">
-                          <TextBlock Text="{Binding DateText}" FontSize="11" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding DateText}" FontSize="12" VerticalAlignment="Center" />
                           <Border Grid.Column="1" Height="14" Background="{DynamicResource AccentBrush}"
                                   CornerRadius="3" HorizontalAlignment="Left" Width="{Binding BarWidthPixels}" />
-                          <TextBlock Grid.Column="2" Text="{Binding CountText}" FontSize="11"
+                          <TextBlock Grid.Column="2" Text="{Binding CountText}" FontSize="12"
                                      Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Right" />
                         </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
                   <TextBox Text="{Binding WeeklyMarkdown}" IsReadOnly="True" AcceptsReturn="True"
-                           MaxHeight="190" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" />
+                           MaxHeight="190" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
                 </StackPanel>
               </Border>
             </Grid>
@@ -284,7 +296,7 @@
           <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
             <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,12">
               <StackPanel Spacing="14">
-                <TextBlock Text="采集状态" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="采集状态" FontSize="18" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding CaptureStateText}" FontSize="15" Foreground="{DynamicResource AccentBrush}" />
                 <TextBlock Text="暂停会立即阻断入口并清空待处理队列。恢复后不会补写暂停期间的活动。"
                            TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
@@ -298,7 +310,7 @@
 
             <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,12">
               <StackPanel Spacing="14">
-                <TextBlock Text="开机与隐私" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="开机与隐私" FontSize="18" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding AutoStartText}" />
                 <Button Classes="secondary" Content="切换开机自启" Command="{Binding ToggleAutoStartCommand}" HorizontalAlignment="Left" />
                 <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
@@ -310,7 +322,7 @@
 
             <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24">
               <StackPanel Spacing="12">
-                <TextBlock Text="应用与窗口黑名单" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="应用与窗口黑名单" FontSize="18" FontWeight="SemiBold" />
                 <TextBlock Text="每行一个关键字，匹配应用名或窗口标题，不区分大小写。密码管理器与隐私浏览的内置规则也会显示在下方。"
                            TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
                 <TextBox Text="{Binding BlacklistText}" AcceptsReturn="True" MinHeight="170" TextWrapping="NoWrap" />
@@ -327,8 +339,8 @@
               ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" Margin="0,12,0,0">
           <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,12">
             <StackPanel Spacing="14">
-              <TextBlock Text="本地语音命令" FontSize="20" FontWeight="SemiBold" />
-              <TextBlock Text="{Binding StatusText}" FontSize="16" Foreground="{DynamicResource AccentBrush}" />
+              <TextBlock Text="本地语音命令" FontSize="18" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding StatusText}" FontSize="15" Foreground="{DynamicResource AccentBrush}" />
               <TextBlock Text="唤醒词：你好时光。唤醒后 8 秒内说出固定命令，命令音频默认仅驻留内存。"
                          TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
               <WrapPanel>
@@ -346,7 +358,7 @@
           </Border>
           <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,12">
             <StackPanel Spacing="14">
-              <TextBlock Text="最近一次交互" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="最近一次交互" FontSize="18" FontWeight="SemiBold" />
               <TextBlock Text="识别文本" FontWeight="SemiBold" />
               <TextBlock Text="{Binding LastTranscript}" TextWrapping="Wrap" />
               <TextBlock Text="反馈" FontWeight="SemiBold" />
@@ -365,7 +377,7 @@
               ColumnDefinitions="*,*" Margin="0,12,0,0">
           <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,0">
             <StackPanel Spacing="14">
-              <TextBlock Text="删除本地数据" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="删除本地数据" FontSize="18" FontWeight="SemiBold" />
               <TextBlock Text="{Binding RetentionNotice}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
               <DatePicker SelectedDate="{Binding SelectedDate}" />
               <WrapPanel>
@@ -389,7 +401,7 @@
           </Border>
           <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,0">
             <StackPanel Spacing="14">
-              <TextBlock Text="导出与保留" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="导出与保留" FontSize="18" FontWeight="SemiBold" />
               <TextBlock Text="{Binding ExportNotice}" TextWrapping="Wrap" />
               <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
                 <TextBlock Text="所有导出均在本机生成，不经过云端。删除数据前请先导出需要保留的日报与问答。"
@@ -407,7 +419,7 @@
           <StackPanel Spacing="12">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
               <StackPanel>
-                <TextBlock Text="系统健康与能力矩阵" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="系统健康与能力矩阵" FontSize="18" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding PlatformName}" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
               </StackPanel>
               <Button Grid.Column="1" Classes="secondary" Content="生成脱敏导出预览" Command="{Binding GeneratePreviewCommand}" Margin="0,0,8,0" />
@@ -452,7 +464,7 @@
                 <TextBlock Text="{Binding McpStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
                 <TextBlock Text="仅暴露 search_events、activity_stats、list_reports、get_report 四个只读工具；无写工具，强制 loopback 与本地令牌。"
                            TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-                <TextBox Text="{Binding McpTokenText}" IsReadOnly="True" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" />
+                <TextBox Text="{Binding McpTokenText}" IsReadOnly="True" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
                 <WrapPanel>
                   <Button Classes="secondary" Content="显示令牌" Command="{Binding RevealMcpTokenCommand}" Margin="0,0,8,8" />
                   <Button Classes="secondary" Content="轮换令牌" Command="{Binding RotateMcpTokenCommand}" Margin="0,0,8,8" />
@@ -481,7 +493,7 @@
             <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasExportPreview}">
               <StackPanel Spacing="8">
                 <TextBlock Text="诊断导出预览（仅元数据，用户确认前不写外部文件）" FontWeight="SemiBold" />
-                <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180" FontFamily="Consolas" FontSize="11" />
+                <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180" FontFamily="Consolas" FontSize="12" />
                 <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
@@ -534,9 +546,9 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:DiagnosticLogItem">
                       <Grid ColumnDefinitions="80,90,150,*" Margin="0,4">
-                        <TextBlock Text="{Binding TimeText}" FontFamily="Consolas" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
-                        <TextBlock Grid.Column="1" Text="{Binding LevelText}" FontSize="11" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="2" Text="{Binding CategoryText}" FontSize="11" Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding TimeText}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                        <TextBlock Grid.Column="1" Text="{Binding LevelText}" FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="2" Text="{Binding CategoryText}" FontSize="12" Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Column="3" Text="{Binding MessageText}" FontSize="12" TextWrapping="Wrap" />
                       </Grid>
                     </DataTemplate>
@@ -553,7 +565,7 @@
               ColumnDefinitions="360,*" Margin="0,12,0,0">
           <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,12,0">
             <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
-              <TextBlock Text="日报与站会" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="日报与站会" FontSize="18" FontWeight="SemiBold" />
               <DatePicker Grid.Row="1" SelectedDate="{Binding SelectedDate}" Margin="0,14,0,10" />
               <WrapPanel Grid.Row="2" Margin="0,0,0,12">
                 <Button Classes="primary" Content="生成日报" Command="{Binding GenerateCommand}" Margin="0,0,8,8" />
@@ -582,7 +594,7 @@
             <Grid RowDefinitions="Auto,Auto,*">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel>
-                  <TextBlock Text="日报正文" FontSize="22" FontWeight="SemiBold" />
+                  <TextBlock Text="日报正文" FontSize="20" FontWeight="SemiBold" />
                   <TextBlock Text="{Binding VersionText}" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
                 </StackPanel>
                 <Button Grid.Column="1" Classes="secondary" Content="导出 Markdown"
