@@ -686,6 +686,9 @@ public sealed class WindowsCapabilityProvider(
         autoStartService.Capability,
         CapabilityState.Supported(CapabilityKind.SystemTray, "Avalonia TrayIcon active"),
         CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI shared-mode capture through AudioHub"),
-        CapabilityState.Degraded(CapabilityKind.WakeWord, "Pending S7 sherpa-onnx '你好时光' KWS")
+        CapabilityState.Degraded(
+            CapabilityKind.WakeWord,
+            "Voice is opt-in; enable it on the Voice page",
+            "Requires sherpa-onnx KWS/TTS models under AIASSISTANT_SHERPA_MODEL_DIR.")
     ];
 }

@@ -69,6 +69,11 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public EvidenceSearchUseCase EvidenceSearch => _services.GetRequiredService<EvidenceSearchUseCase>();
 
+    /// <summary>Present only on macOS; used by --doctor to report helper health and TCC state.</summary>
+    public IMacHelperSupervisor? MacHelperSupervisor => _services.GetService<IMacHelperSupervisor>();
+
+    public ICapabilityProvider? Capabilities => _services.GetService<ICapabilityProvider>();
+
     public IModelCapabilityProber ModelCapabilityProber =>
         _services.GetRequiredService<IModelCapabilityProber>();
 

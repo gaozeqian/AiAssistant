@@ -163,6 +163,32 @@ public static class Program
                     Console.WriteLine("models: probe timed out after 10s");
                 }
 
+                if (runtime.MacHelperSupervisor is { } macHelper)
+                {
+                    try
+                    {
+                        using var helperCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                        await macHelper.StartAsync(helperCts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Helper start timed out; the status line below still reports the supervisor state.
+                    }
+
+                    Console.WriteLine(
+                        $"macosHelper: status={macHelper.Status} restarts={macHelper.RestartCount} " +
+                        $"screen={macHelper.Permissions.ScreenRecording} accessibility={macHelper.Permissions.Accessibility} " +
+                        $"microphone={macHelper.Permissions.Microphone}");
+                }
+
+                if (runtime.Capabilities is { } capabilityProvider)
+                {
+                    foreach (var capability in capabilityProvider.GetCapabilities())
+                    {
+                        Console.WriteLine($"capability {capability.Kind}: {capability.Status} | {capability.Summary}");
+                    }
+                }
+
                 var mcp = runtime.McpControl.GetSnapshot();
                 Console.WriteLine(
                     $"mcp: enabled={mcp.Enabled} running={mcp.Running} endpoint={mcp.Endpoint ?? "-"}");
