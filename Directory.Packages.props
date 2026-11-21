@@ -44,6 +44,12 @@
     <PackageVersion Include="NAudio" Version="3.3.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Local Inference">
+    <!-- Managed bindings only: the native ONNX Runtime is already shipped by sherpa-onnx (1.28.2).
+         Adding Microsoft.ML.OnnxRuntime would overwrite it with a newer SONAME and break sherpa. -->
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.28.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />

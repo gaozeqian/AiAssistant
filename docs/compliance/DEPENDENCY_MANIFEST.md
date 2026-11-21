@@ -24,6 +24,7 @@
 | `Microsoft.Extensions.Options` | `10.0.15` | `Models` / `Scheduler` | MIT | 配置选项模式 |
 | `org.k2fsa.sherpa.onnx` | `2.0.2` | `Processing` | Apache-2.0 | 离线中文 ASR、Silero VAD、pyannote 说话人分离；按 RID 携带原生 `sherpa-onnx` 运行库，模型资产不入库 |
 | `Whisper.net` / `Whisper.net.Runtime` | `1.9.1` | `Processing` | MIT | 可选高质量批处理 ASR（`AIASSISTANT_ASR_ENGINE=whisper`）；运行时包携带各平台 ggml 原生库，发布时按 RID 裁剪，模型资产不入库 |
+| `Microsoft.ML.OnnxRuntime.Managed` | `1.28.0` | `Processing` | MIT | RapidOCR 托管绑定；原生 ONNX Runtime 复用 `org.k2fsa.sherpa.onnx` 自带的 1.28.2，不额外增加原生库（ADR-0007） |
 | `SkiaSharp` / `SkiaSharp.NativeAssets.Linux` | `3.119.4` | `Export` | MIT | PNG/PDF 栅格化；Linux 原生资产随导出库分发，保证 Linux 端渲染与测试可用 |
 | `PDFsharp` | `6.1.1` | `Export` | MIT | 可检索 PDF、TrueType 字体子集嵌入 |
 | `NAudio` | `3.3.0` | `Platform.Windows` | MIT | WASAPI 共享模式单路麦克风采集（仅 Windows 生效） |

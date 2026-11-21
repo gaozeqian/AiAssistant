@@ -5,7 +5,7 @@
 ## 1. 代码与自动化门禁
 
 - [ ] `dotnet build AiAssistant.sln -c Release`：0 警告 0 错误。
-- [ ] `dotnet test AiAssistant.sln -c Release`：全部通过（当前基线 159 项）。
+- [ ] `dotnet test AiAssistant.sln -c Release`：全部通过（当前基线 169 项）。
 - [ ] 架构依赖测试 6 项通过（`Architecture.Tests`）。
 - [ ] 三平台 CI 全绿（Windows / macOS / Linux）；若 Actions 配额或账单异常，记录本地替代证据。
 - [ ] SBOM 生成成功（CycloneDX）并附在发布产物中。

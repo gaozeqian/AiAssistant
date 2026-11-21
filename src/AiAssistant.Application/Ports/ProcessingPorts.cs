@@ -31,6 +31,20 @@ public interface ITextExtractor
     Task<ExtractedTextResult> ExtractAsync(TextExtractionRequest request, CancellationToken ct);
 }
 
+/// <summary>Decoded BGRA32 frame handed to the OCR pipeline; decoding stays in the platform adapter.</summary>
+public sealed record ImageFrameBuffer(byte[] Bgra32Pixels, int Width, int Height);
+
+/// <summary>
+/// Image-to-text OCR fallback used when the accessibility tree yields nothing.
+/// Implementations stay replaceable; missing model assets only degrade OCR, never text capture.
+/// </summary>
+public interface IImageOcrRecognizer
+{
+    CapabilityState Capability { get; }
+
+    Task<string?> RecognizeAsync(ImageFrameBuffer frame, CancellationToken ct);
+}
+
 /// <summary>
 /// Composable preprocessing stage contract with explicit timeout &amp; cancellation (IMPLEMENTATION.md S4.1).
 /// </summary>

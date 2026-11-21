@@ -12,6 +12,7 @@
 
 1. 语音相关能力优先统一至 `sherpa-onnx`（开放词表中文 KWS 免训练、VAD、流式/离线 ASR、说话人分离、TTS），保留 `Whisper.net` 作为可选高质量后台批处理适配器。
 2. 通过 `IAudioHub` 单一入口采集麦克风音频，向多个订阅者广播只读帧；唤醒前仅在内存维护约 2 秒环形缓冲区，**绝不落盘、绝不外发**；关闭语音与录音开关后立即释放底层音频句柄与内存缓冲。
+3. 原生 ONNX Runtime 由 `org.k2fsa.sherpa.onnx` 统一提供（当前 1.28.2，带版本化 SONAME）。其它推理能力（如 RapidOCR）只允许引用 `Microsoft.ML.OnnxRuntime.Managed` 托管绑定并复用该原生库；**禁止**再引入 `Microsoft.ML.OnnxRuntime`，否则会覆盖根目录 `libonnxruntime.so` 导致 sherpa 的 `VERS_1.28.2` 符号解析失败。
 
 ## 后果
 

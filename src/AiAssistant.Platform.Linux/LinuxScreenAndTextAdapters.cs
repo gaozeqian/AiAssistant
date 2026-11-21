@@ -162,13 +162,18 @@ public sealed class LinuxWindowActivitySource(
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
-public sealed class LinuxTextExtractor(IAtSpiAccessibilityClient atSpi) : ITextExtractor
+public sealed class LinuxTextExtractor(
+    IAtSpiAccessibilityClient atSpi,
+    IImageOcrRecognizer? ocr = null) : ITextExtractor
 {
     public CapabilityState AccessibilityCapability => atSpi.Capability;
 
-    public CapabilityState OcrCapability => CapabilityState.Degraded(
-        CapabilityKind.Ocr,
-        "RapidOCR ONNX fallback is scheduled for S4; AT-SPI accessibility remains available");
+    public CapabilityState OcrCapability => ocr is not null
+        ? ocr.Capability
+        : CapabilityState.Degraded(
+            CapabilityKind.Ocr,
+            "RapidOCR models are not configured; AT-SPI accessibility remains available",
+            "Set AIASSISTANT_RAPIDOCR_MODEL_DIR to enable the ONNX image OCR fallback.");
 
     public async Task<ExtractedTextResult> ExtractAsync(TextExtractionRequest request, CancellationToken ct)
     {
@@ -177,6 +182,18 @@ public sealed class LinuxTextExtractor(IAtSpiAccessibilityClient atSpi) : ITextE
         if (!string.IsNullOrWhiteSpace(text))
         {
             return new ExtractedTextResult(text, TextExtractionMethod.AccessibilityTree, 0.90);
+        }
+
+        if (ocr is not null &&
+            request.ScreenshotPngBytes is { Length: > 0 } png &&
+            LinuxPngCodec.TryDecodeToBgra32(png, out var bgra, out var width, out var height, out _) &&
+            bgra is not null)
+        {
+            var ocrText = await ocr.RecognizeAsync(new ImageFrameBuffer(bgra, width, height), ct);
+            if (!string.IsNullOrWhiteSpace(ocrText))
+            {
+                return new ExtractedTextResult(ocrText.Trim(), TextExtractionMethod.SystemOcr, 0.75);
+            }
         }
 
         var fallback = string.IsNullOrWhiteSpace(request.WindowTitle)

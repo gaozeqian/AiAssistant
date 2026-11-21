@@ -16,6 +16,7 @@ using AiAssistant.Platform.MacOS;
 using AiAssistant.Platform.MacOS.Ipc;
 using AiAssistant.Platform.Windows;
 using AiAssistant.Processing;
+using AiAssistant.Processing.Ocr;
 using AiAssistant.Scheduler;
 using AiAssistant.Storage;
 using AiAssistant.Storage.KeyStores;
@@ -620,7 +621,18 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IFileActivitySource>(new LinuxInotifyFileActivitySource(clock));
         services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IWindowActivitySource>());
         services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IFileActivitySource>());
-        services.AddSingleton<ITextExtractor>(provider => new LinuxTextExtractor(provider.GetRequiredService<IAtSpiAccessibilityClient>()));
+        var rapidOcrDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_RAPIDOCR_MODEL_DIR");
+        if (string.IsNullOrWhiteSpace(rapidOcrDirectory))
+        {
+            rapidOcrDirectory = Path.Combine(options.DataDirectory, "models", "rapidocr");
+        }
+
+        services.AddSingleton(new RapidOcrOptions { ModelDirectory = Path.GetFullPath(rapidOcrDirectory) });
+        services.AddSingleton<RapidOcrTextRecognizer>();
+        services.AddSingleton<IImageOcrRecognizer>(provider => provider.GetRequiredService<RapidOcrTextRecognizer>());
+        services.AddSingleton<ITextExtractor>(provider => new LinuxTextExtractor(
+            provider.GetRequiredService<IAtSpiAccessibilityClient>(),
+            provider.GetRequiredService<IImageOcrRecognizer>()));
         services.AddSingleton<IAudioCapture>(new LinuxPulseAudioCapture(clock));
         services.AddSingleton<IAudioCaptureFactory>(new LinuxAudioCaptureFactory(clock));
         services.AddSingleton<IAudioPlayback>(new LinuxAudioPlayback());
