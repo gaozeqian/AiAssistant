@@ -28,7 +28,7 @@ internal static class MacHelperCapabilityEvaluator
                 CapabilityState.Unavailable(
                     kind,
                     supervisor.StatusSummary,
-                    "Ensure aiassistant-mac-helper is bundled inside Contents/Helpers and signed."),
+                    "Ensure aiassistant-mac-helper is bundled inside Contents/MacOS and signed."),
             MacHelperSupervisorStatus.Starting or MacHelperSupervisorStatus.BackoffRestarting =>
                 CapabilityState.Degraded(
                     kind,

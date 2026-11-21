@@ -140,13 +140,80 @@ public sealed class MacOsLiveHelperTests : IDisposable
             _ => CapabilityStatus.PermissionRequired
         };
 
-    private async Task<MacHelperSupervisor> StartSupervisorAsync()
+    /// <summary>
+    /// Crash supervision on a real helper: a killed helper must be relaunched with a fresh session,
+    /// converge back to Healthy, and keep TTS playback working (S3-R1).
+    /// </summary>
+    [Fact]
+    public async Task LiveHelperRecoversFromCrashWithFreshSession()
+    {
+        if (!LiveHelperEnabled)
+        {
+            return;
+        }
+
+        var helperPath = ResolveHelperPath();
+        Assert.True(File.Exists(helperPath), $"Swift helper not built: {helperPath}");
+        var launcher = new RecordingLauncher(new SubprocessMacHelperLauncher(helperPath));
+
+        await using var supervisor = await StartSupervisorAsync(launcher);
+        var playback = new MacOsAudioPlayback(supervisor);
+        await playback.PlayAsync(new float[2_400], 24_000, CancellationToken.None);
+
+        Assert.Single(launcher.Instances);
+        var firstPid = launcher.Instances[0].ProcessId;
+        Assert.NotNull(firstPid);
+
+        using (var victim = System.Diagnostics.Process.GetProcessById(firstPid!.Value))
+        {
+            victim.Kill();
+            victim.WaitForExit(5_000);
+        }
+
+        await WaitUntilAsync(
+            () => supervisor.RestartCount >= 1 && supervisor.Status == MacHelperSupervisorStatus.Healthy,
+            TimeSpan.FromSeconds(20));
+
+        Assert.Equal(2, launcher.Instances.Count);
+        Assert.NotEqual(firstPid, launcher.Instances[1].ProcessId);
+        Assert.Equal(CapabilityStatus.Supported, playback.Capability.Status);
+        await playback.PlayAsync(new float[2_400], 24_000, CancellationToken.None);
+        Assert.Equal(MacHelperSupervisorStatus.Healthy, supervisor.Status);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> predicate, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (!predicate() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.True(predicate(), "Expected supervisor state was not reached before timeout.");
+    }
+
+    private sealed class RecordingLauncher(IMacHelperProcessLauncher inner) : IMacHelperProcessLauncher
+    {
+        public List<IMacHelperProcessInstance> Instances { get; } = [];
+
+        public async Task<IMacHelperProcessInstance> LaunchAsync(
+            string socketPath,
+            string oneTimeAuthToken,
+            CancellationToken ct)
+        {
+            var instance = await inner.LaunchAsync(socketPath, oneTimeAuthToken, ct);
+            Instances.Add(instance);
+            return instance;
+        }
+    }
+
+    private async Task<MacHelperSupervisor> StartSupervisorAsync(IMacHelperProcessLauncher? launcher = null)
     {
         var helperPath = ResolveHelperPath();
         Assert.True(File.Exists(helperPath), $"Swift helper not built: {helperPath}");
 
         var supervisor = new MacHelperSupervisor(
-            new SubprocessMacHelperLauncher(helperPath),
+            launcher ?? new SubprocessMacHelperLauncher(helperPath),
             new MacHelperOptions
             {
                 HelperExecutablePath = helperPath,

@@ -11,7 +11,7 @@
 - **最近更新时间**：`2026-11-21`
 - **最近执行环境**：`osx-arm64` macOS 26.7.3（Apple Silicon）+ `.NET SDK 10.0.404` + Swift 6.4；上一轮 `linux-x64` Ubuntu 26.04 + GNOME Wayland；再上一轮 Windows 11 `win-x64` / SDK 11.0.100
 - **当前构建状态**：✅ `osx-arm64` 本地 Release 0 警告 0 错误；Swift Helper `swift build -c release` 通过；`linux-x64` / `win-x64` 历史结论见第 4 节日志
-- **当前测试状态**：✅ 180/180 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 55、`Processing.Tests` 22、`Report.Tests` 61、`Voice.Tests` 9），本机 `osx-arm64` 全量实跑；另含 2 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放 + TCC 降级，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
+- **当前测试状态**：✅ 181/181 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 17、`Capture.Tests` 4、`Platform.Tests` 56、`Processing.Tests` 22、`Report.Tests` 61、`Voice.Tests` 9），本机 `osx-arm64` 全量实跑；另含 3 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放、TCC 降级、崩溃重启，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
 - **下一步待确认事项**：macOS 侧的 TCC 允许流程（屏幕录制/辅助功能）与签名公证仍需人工授权与签字；S9-R4 待 Actions 配额恢复；黄金集（S4-R/S7-R1）需外挂模型资产。详见第 6 节
 
 ---
@@ -366,6 +366,7 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-21 [osx-arm64] [macOS GUI 启动主线程缺陷修复]**：打包 `.app` 真机启动暴露 `IDispatcherImpl belongs to a different thread`——顶层 `async Task<int> Main` 在 `await AppRuntime.CreateAsync()` 之后落到线程池线程，而 AppKit/Avalonia 只能在进程主线程初始化，导致 macOS 桌面壳根本无法启动（`--startup-check` 等无头命令不受影响，故此前未暴露）。重构 `Program.Main` 为同步入口：无头命令仍走原异步链；桌面路径由 `RunAsync` 完成初始化并置位 `DesktopShellHandoff`，再回到主线程启动 Avalonia（Linux 的 Wayland→X11 回退同样在主线程序列内执行），运行时在 UI 退出后统一释放。打包 `.app` 真机复测：Host 与 Helper 进程正常常驻、数据目录与加密库创建成功。
 - **2026-11-21 [osx-arm64] [TCC 授权弹窗补齐]**：真机发现 Helper 只做 `CGPreflightScreenCaptureAccess` / `authorizationStatus` 预检、从不触发系统授权框，全新安装会永久停在「需要权限」且用户无从授权。新增 `PermissionPrompter`：抓屏预检失败时后台触发 `CGRequestScreenCaptureAccess()`，麦克风 `notDetermined` 时触发 `AVCaptureDevice.requestAccess`，辅助功能缺失时以 `AXIsProcessTrustedWithOptions` 打开授权面板；每次进程仅请求一次、全部在后台队列执行，避免阻塞 IPC 与心跳。`permissions.query` 仍返回真实快照。真机验证：未授权时 `screen.capture` 快速返回 `permission_denied`（3 ms），Helper 不崩溃、心跳正常；授权点击仍需人工完成（`S3-R1`）。
 - **2026-11-21 [osx-arm64] [macOS 采集闭环真机打通]**：系统授权弹窗生效后，打包 `.app` 内 Helper 的 `screenRecording` 变为 `granted`，`screen.capture` 返回真实帧。新增运维命令 `--capture-smoke [seconds]`（无头运行采集管线 N 秒并输出落库事件/媒体数，事件为 0 时退出码 1）。真机实测 20 秒：`events=2 media=1 healthy=True`，事件来源 `WorkBuddy`；随后 `--report-range` 在 macOS 生成 Markdown/SVG/PNG/PDF。GUI 首轮 `events=0` 属预期——当时前台为 1Password，命中内置密码管理器黑名单。**「授权 → 抓屏 → 加密落库 → 报告导出」已在 macOS 真机闭环**。
+- **2026-11-21 [osx-arm64] [Helper 崩溃监督真机验收]**：`IMacHelperProcessInstance` 新增 `ProcessId`（诊断与故障注入用），新增真机测试 `LiveHelperRecoversFromCrashWithFreshSession`：强杀 Helper 进程后，监督器在指数退避内重新拉起（`RestartCount` 递增、PID 变化、新会话 Token），状态回到 `Healthy`，音频回放能力恢复并再次播放成功。三项真机 Helper 测试（回放 / TCC 降级 / 崩溃重启）全部通过，`osx-arm64` 全量 181/181。同时修正 Helper 缺失时的修复提示路径（`Contents/Helpers` → 实际打包位置 `Contents/MacOS`）。
 - **2026-11-21 [docs] [实施清单与进度对齐]**：`IMPLEMENTATION.md` 第 10 节改为与 `PROGRESS.md` 第 5 节同构的 `*-R` 编号：补记 `S6-R2`（密钥导入）、`S8-R`（embedding 95.8% / MCP Inspector / SVG-PNG-PDF）为已完成，拆分 `S5-R1`/`S5-R2`、`S6-R1`、`S7-R1`/`S7-R2`、`S9-R1..R4`、`S3-R1`/`S3-R2`，并新增第 6 节执行顺序表。
 
 ---
@@ -376,7 +377,7 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 
 | ID | 来源 | 遗留内容 | 风险 | 后续处理 |
 |---|---|---|---|---|
-| `S3-R1` | S3 macOS | 🟡 真机已完成：GUI 主线程启动、授权弹窗触发、**授权后抓屏 → 加密落库 → 报告导出闭环**、Helper 握手/心跳/音频回放、未授权精确降级；辅助功能授权、权限撤销、Helper 崩溃监督与公证仍未人工签字 | 辅助功能路径与正式签名下的 TCC 归属仍需验证 | 用 Developer ID 签名打包后授予辅助功能并撤销一次，记录 `spctl`、公证与抓屏结果 |
+| `S3-R1` | S3 macOS | 🟡 真机已完成：GUI 主线程启动、授权弹窗触发、**授权后抓屏 → 加密落库 → 报告导出闭环**、Helper 握手/心跳/音频回放、**强杀后崩溃重启与能力恢复**、未授权精确降级；辅助功能授权、权限撤销与公证仍未人工签字 | 辅助功能路径与正式签名下的 TCC 归属仍需验证 | 用 Developer ID 签名打包后授予辅助功能并撤销一次，记录 `spctl`、公证与抓屏结果 |
 | `S3-R2` | S3 Linux | 🟡 GNOME Wayland 的 ScreenCast 授权与连续抓屏已真机实测（2026-11-21）；KDE/KWin、X11 回退、AT-SPI 与托盘能力矩阵仍待人工验收 | 合成器差异可能影响窗口与抓屏可用性 | 在 KDE Wayland 与 X11 会话逐项签字 |
 | `S3-R3` | S3 Linux | ✅ 已实现连续 PipeWire 帧消费（私有 `pw_stream`、1 秒节流、格式协商与 YUV 降级回退），GNOME Wayland 真机通过（2026-11-21） | KDE/KWin 与多显示器场景未实测 | 在 KDE Wayland 复跑同一真机测试 |
 | `S4-R1` | S4 语音 | sherpa-onnx 模型资产（Paraformer、Silero VAD、说话人嵌入）不进入 Git，真实中文语音黄金集未评测 | 仅验证适配与降级路径，未证明识别质量 | 在本地/CI 外挂模型目录运行黄金集与唤醒词评测 |

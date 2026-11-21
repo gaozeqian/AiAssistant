@@ -24,6 +24,9 @@ public sealed class MacHelperOptions
 public interface IMacHelperProcessInstance : IAsyncDisposable
 {
     bool HasExited { get; }
+
+    /// <summary>OS process id, when the launcher runs a real process (diagnostics and crash tests).</summary>
+    int? ProcessId { get; }
 }
 
 public interface IMacHelperProcessLauncher
@@ -68,6 +71,21 @@ public sealed class SubprocessMacHelperLauncher(string executablePath) : IMacHel
     private sealed class OsProcessInstance(Process process) : IMacHelperProcessInstance
     {
         public bool HasExited => process.HasExited;
+
+        public int? ProcessId
+        {
+            get
+            {
+                try
+                {
+                    return process.HasExited ? null : process.Id;
+                }
+                catch (InvalidOperationException)
+                {
+                    return null;
+                }
+            }
+        }
 
         public async ValueTask DisposeAsync()
         {

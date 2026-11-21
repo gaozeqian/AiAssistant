@@ -415,6 +415,7 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
 
         public string SocketPath { get; } = socketPath;
         public bool HasExited => _hasExited;
+        public int? ProcessId => null;
 
         public Task StartAsync(CancellationToken ct)
         {
