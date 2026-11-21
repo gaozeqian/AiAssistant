@@ -499,7 +499,8 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S4.1：可组合 `IProcessingStage`、阶段超时/故障隔离、文本提取、pHash 去重与本地脱敏流水线，原始事件永不因预处理失败丢失。
 - [x] S4.2：单路 `AudioHub`、内存预滚、多订阅广播与最后订阅释放；Windows WASAPI、macOS AVAudioEngine、Linux PulseAudio 工厂接入。
 - [x] S4.3：sherpa-onnx 中文 Paraformer ASR、Silero VAD、pyannote 说话人分离适配器与模型缺失降级测试。
-- [ ] S4-R：外挂中文语音模型资产完成识别质量黄金集评测；Linux RapidOCR 与 Whisper.net 高质量批处理保留为遗留项。
+- [x] S4-R3：Whisper.net 批处理 ASR 适配器（`AIASSISTANT_ASR_ENGINE=whisper`、缺模型明确降级、发布按 RID 裁剪原生库），默认仍为 sherpa-onnx。
+- [ ] S4-R：外挂中文语音模型资产完成识别质量黄金集评测；Linux RapidOCR 保留为遗留项。
 - [x] S5.1：Microsoft.Extensions.AI 本机网关、Ollama/LM Studio 适配、loopback 策略、超时/脱敏/审计装饰器与能力探测。
 - [x] S5.2：事件向量索引、活动分段、map-reduce、结构化 JSON 校验重试、版本化加密日报与站会 Markdown。
 - [x] S5.3：单消费者三通道调度、启动补偿、幂等/失败保留、日报/站会面板、强制重生成与 Markdown 导出。

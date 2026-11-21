@@ -10,7 +10,7 @@
 | macOS TCC 与签名公证 | 屏幕录制/辅助功能授权、Helper 崩溃监督、公证需真机验收 | 代码与契约测试完成，未在真机签字 |
 | macOS TTS 输出 | 语音反馈仅有文字与提示音 | `S7-R2`，扩展 Swift Helper 音频输出后修复 |
 | Linux OCR | 仅 AT-SPI 文本，无图像 OCR 兜底 | `S4-R2` |
-| Whisper 批处理 | 未启用高质量离线转写 | `S4-R3`，`IAsrEngine` 可替换 |
+| Whisper 批处理需自备模型 | 默认 sherpa-onnx；切换后需自备 ggml 模型，未评测识别质量与耗时 | 设置 `AIASSISTANT_ASR_ENGINE=whisper` 与 `AIASSISTANT_WHISPER_MODEL_PATH`；缺模型时能力显示 `PermissionRequired` |
 
 ## 模型与检索
 

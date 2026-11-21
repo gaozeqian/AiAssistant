@@ -31,4 +31,19 @@
   <Target Name="BundleMacOsSwiftHelper" AfterTargets="Publish" Condition="$([MSBuild]::IsOsPlatform('OSX')) And Exists('$(MacHelperBinaryPath)')">
     <Copy SourceFiles="$(MacHelperBinaryPath)" DestinationFolder="$(PublishDir)" />
   </Target>
+
+  <!-- Whisper.net.Runtime ships every desktop RID; keep only the published platform to avoid ~16 MB of dead weight. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <WhisperRuntimeFolder Condition="$(RuntimeIdentifier.StartsWith('win'))">$(RuntimeIdentifier)</WhisperRuntimeFolder>
+    <WhisperRuntimeFolder Condition="$(RuntimeIdentifier.StartsWith('linux'))">$(RuntimeIdentifier)</WhisperRuntimeFolder>
+    <WhisperRuntimeFolder Condition="$(RuntimeIdentifier.StartsWith('osx-arm64'))">macos-arm64</WhisperRuntimeFolder>
+    <WhisperRuntimeFolder Condition="$(RuntimeIdentifier.StartsWith('osx-x64'))">macos-x64</WhisperRuntimeFolder>
+  </PropertyGroup>
+  <Target Name="TrimForeignWhisperRuntimes" AfterTargets="Publish" Condition="'$(WhisperRuntimeFolder)' != ''">
+    <ItemGroup>
+      <ForeignWhisperFile Include="$(PublishDir)runtimes/*/**/*whisper*;$(PublishDir)runtimes/*/**/ggml*"
+                          Exclude="$(PublishDir)runtimes/$(WhisperRuntimeFolder)/**/*" />
+    </ItemGroup>
+    <Delete Files="@(ForeignWhisperFile)" ContinueOnError="true" />
+  </Target>
 </Project>

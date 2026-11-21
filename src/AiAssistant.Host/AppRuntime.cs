@@ -166,7 +166,7 @@ public sealed class AppRuntime : IAsyncDisposable
         }
 
         services.AddSingleton(new SherpaOnnxOptions { ModelDirectory = Path.GetFullPath(sherpaModelDirectory) });
-        services.AddSingleton<IAsrEngine, SherpaOnnxAsrEngine>();
+        RegisterAsrEngine(services, dataDirectory);
         services.AddSingleton<IVadSegmenter, SherpaOnnxVadSegmenter>();
         services.AddSingleton<ISpeakerDiarizationEngine, SherpaOnnxDiarizationEngine>();
         services.AddSingleton<IEventEnrichmentPipeline>(provider => new ProcessingPipeline(
@@ -336,6 +336,27 @@ public sealed class AppRuntime : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _services.DisposeAsync();
+    }
+
+    /// <summary>Whisper is opt-in for high-quality batch recognition; sherpa-onnx stays the default.</summary>
+    private static void RegisterAsrEngine(IServiceCollection services, string dataDirectory)
+    {
+        var kind = AsrEngineSelection.Parse(
+            Environment.GetEnvironmentVariable(AsrEngineSelection.EnvironmentVariableName));
+        if (kind != AsrEngineKind.Whisper)
+        {
+            services.AddSingleton<IAsrEngine, SherpaOnnxAsrEngine>();
+            return;
+        }
+
+        var modelPath = Environment.GetEnvironmentVariable("AIASSISTANT_WHISPER_MODEL_PATH");
+        if (string.IsNullOrWhiteSpace(modelPath))
+        {
+            modelPath = Path.Combine(dataDirectory, "models", "whisper", "ggml-small.bin");
+        }
+
+        services.AddSingleton(new WhisperAsrOptions { ModelPath = Path.GetFullPath(modelPath) });
+        services.AddSingleton<IAsrEngine, WhisperAsrEngine>();
     }
 
     private static void RegisterVoice(IServiceCollection services, string dataDirectory, IClock clock)

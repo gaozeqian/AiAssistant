@@ -39,6 +39,8 @@
 
   <ItemGroup Label="Audio and Local Speech">
     <PackageVersion Include="org.k2fsa.sherpa.onnx" Version="2.0.2" />
+    <PackageVersion Include="Whisper.net" Version="1.9.1" />
+    <PackageVersion Include="Whisper.net.Runtime" Version="1.9.1" />
     <PackageVersion Include="NAudio" Version="3.3.0" />
   </ItemGroup>
 

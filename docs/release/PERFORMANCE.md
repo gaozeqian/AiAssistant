@@ -34,6 +34,8 @@
 
 体积主要来自 .NET 自包含运行时与 sherpa-onnx 原生库；如需更小安装包可改用框架依赖发布（`-FrameworkDependent` / `--framework-dependent`），代价是要求目标机安装 .NET 10 运行时。
 
+> 2026-11-21 起新增可选 Whisper.net 批处理引擎原生库（约 2.5 MB/平台）。`Whisper.net.Runtime` 默认携带全部桌面 RID，发布目标 `TrimForeignWhisperRuntimes` 会删除非目标平台文件（`linux-x64` 自包含目录实测 163 MB → 149 MB）。上表体积为新增依赖前的实测值，下一次发布需复测并更新。
+
 ## 4. 存储与检索
 
 | 场景 | 观测 |
