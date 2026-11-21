@@ -1,5 +1,6 @@
 using System.Globalization;
 using AiAssistant.Application.Ports;
+using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -32,6 +33,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         SelectSectionCommand = new RelayCommand<string>(SelectSection);
         ShowSearchCommand = new RelayCommand(ShowSearch);
         RefreshCurrentCommand = new AsyncRelayCommand(RefreshCurrentAsync);
+        ToggleThemeCommand = new RelayCommand(ToggleTheme);
         Capture.StateChanged += OnCaptureStateChanged;
         CaptureStatus = Capture.CaptureStateText;
         if (_voiceNavigation is not null)
@@ -67,7 +69,23 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     public IAsyncRelayCommand RefreshCurrentCommand { get; }
 
+    public IRelayCommand ToggleThemeCommand { get; }
+
     public event EventHandler? ExitRequested;
+
+    public event Action<ThemeVariant>? ThemeVariantChanged;
+
+    /// <summary>Current UI theme variant; the shell applies it to the application on change.</summary>
+    public ThemeVariant ThemeVariant { get; set; } = ThemeVariant.Light;
+
+    public string ThemeToggleText => ThemeVariant == ThemeVariant.Dark ? "浅色模式" : "深色模式";
+
+    private void ToggleTheme()
+    {
+        ThemeVariant = ThemeVariant == ThemeVariant.Dark ? ThemeVariant.Light : ThemeVariant.Dark;
+        OnPropertyChanged(nameof(ThemeToggleText));
+        ThemeVariantChanged?.Invoke(ThemeVariant);
+    }
 
     public int SelectedSectionIndex
     {

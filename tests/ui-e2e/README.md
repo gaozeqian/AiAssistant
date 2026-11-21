@@ -37,18 +37,25 @@ swift tests/ui-e2e/ax-e2e.swift run
 
 ## 当前状态（2026-11-21）
 
-已跑通（`swift ax-e2e.swift run` 3/3 通过）：启动真实 `.app` 后，通过 AX 读取到
+已跑通（`swift ax-e2e.swift run` 5/5 通过）：
 
-- 窗口标题 `时光 · AI 个人活动追踪助手`
-- 顶部横幅静态文本「正在本机采集」「语音休眠」
+- 通过 AX 读取窗口标题、顶部横幅「正在本机采集」「语音休眠」；
+- 通过 **Vision OCR 定位窗口截图中的文字 → 真实 CGEvent 坐标点击**，完成
+  「切到隐私与控制 → 点击暂停采集 → 横幅变已暂停 → 点击恢复采集」的完整点击流程。
 
-**已知限制**：Avalonia 的 macOS 辅助功能桥只暴露窗口、`TextBlock`（以 `kAXValue`）
-和 `TabGroup`，**不暴露带名字的按钮/标签**（`AutomationProperties.Name` 未桥接到 NSAccessibility）。
-因此无法按名字点击「暂停采集」「日报」等控件。要点击需改为：
+## 已知限制
 
-1. **坐标点击**：截图 + 定位（本仓库的 macOS Vision OCR + `PngCodec` 可复用）→ `CGEvent` 点击坐标；
-   或
-2. **补 Avalonia macOS 辅助功能桥**（产品级工作，把 `AutomationPeer` 映射到 NSAccessibility）。
+Avalonia 的 macOS 辅助功能桥只暴露窗口、`TextBlock`（`kAXValue`）和 `TabGroup`，
+**不暴露带名字的按钮/标签**（`AutomationProperties.Name` 未桥接到 NSAccessibility）。
+因此点击走的是「截图 + OCR 定位 + 坐标点击」，而非按名点击。坐标点击依赖：
+
+- 运行本脚本的宿主进程已授予 **屏幕与系统音频录制**（截图）与 **辅助功能**（CGEvent 点击）。
+
+## 应用侧钩子
+
+- `--show-window`：tray-only 应用默认不显示主窗口，该参数让 `ShellApp` 启动时立即显示主窗口。
+- `--data-directory <dir>`：隔离数据目录，避免污染真实数据。
+- `AIASSISTANT_THEME=light|dark`：固定主题（默认跟随系统）。
 
 ## 曾修复的阻塞 bug
 

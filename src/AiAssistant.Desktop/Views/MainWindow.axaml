@@ -10,14 +10,10 @@
         MinWidth="980"
         MinHeight="660"
         WindowStartupLocation="CenterScreen"
-        Background="#F4F6FA">
-  <Window.Resources>
-    <SolidColorBrush x:Key="AccentBrush" Color="#3157D5" />
-    <SolidColorBrush x:Key="MutedBrush" Color="#64748B" />
-  </Window.Resources>
+        Background="{DynamicResource PageBackgroundBrush}">
   <Window.Styles>
     <Style Selector="Button.primary">
-      <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
       <Setter Property="Foreground" Value="White" />
       <Setter Property="Padding" Value="16,9" />
       <Setter Property="CornerRadius" Value="7" />
@@ -47,22 +43,26 @@
   </Window.KeyBindings>
 
   <Grid RowDefinitions="Auto,*">
-    <Border Grid.Row="0" Background="#111C36" Padding="24,16">
+    <Border Grid.Row="0" Background="{DynamicResource HeaderBackgroundBrush}" Padding="24,16">
       <Grid ColumnDefinitions="Auto,*,Auto">
-        <Border Width="38" Height="38" CornerRadius="11" Background="#3157D5" VerticalAlignment="Center">
+        <Border Width="38" Height="38" CornerRadius="11" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center">
           <TextBlock Text="时" Foreground="White" FontSize="20" FontWeight="SemiBold"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
         <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
           <TextBlock Text="时光" Foreground="White" FontSize="20" FontWeight="SemiBold" />
-          <TextBlock Text="个人活动追踪 · 默认仅在本机处理" Foreground="#B7C3D9" FontSize="12" />
+          <TextBlock Text="个人活动追踪 · 默认仅在本机处理" Foreground="{DynamicResource HeaderTextSecondaryBrush}" FontSize="12" />
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Border Background="#22304D" CornerRadius="14" Padding="12,6">
-            <TextBlock Text="{Binding CaptureStatus}" Foreground="#DCE5F5" FontSize="12" />
+          <Button Content="{Binding ThemeToggleText}" Command="{Binding ToggleThemeCommand}"
+                  Background="{DynamicResource HeaderBadgeBackgroundBrush}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}"
+                  CornerRadius="14" Padding="12,6" FontSize="12"
+                  automation:AutomationProperties.Name="切换深色/浅色" />
+          <Border Background="{DynamicResource HeaderBadgeBackgroundBrush}" CornerRadius="14" Padding="12,6">
+            <TextBlock Text="{Binding CaptureStatus}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}" FontSize="12" />
           </Border>
-          <Border Background="#22304D" CornerRadius="14" Padding="12,6">
-            <TextBlock Text="{Binding Voice.StatusText}" Foreground="#DCE5F5" FontSize="12" />
+          <Border Background="{DynamicResource HeaderBadgeBackgroundBrush}" CornerRadius="14" Padding="12,6">
+            <TextBlock Text="{Binding Voice.StatusText}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}" FontSize="12" />
           </Border>
         </StackPanel>
       </Grid>
@@ -73,7 +73,7 @@
       <TabItem Header="时间线" automation:AutomationProperties.Name="时间线" automation:AutomationProperties.AcceleratorKey="Ctrl+1">
         <Grid DataContext="{Binding Timeline}" x:DataType="vm:TimelineViewModel"
               ColumnDefinitions="360,*" Margin="0,12,0,0">
-          <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="16" Margin="0,0,12,0">
+          <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="16" Margin="0,0,12,0">
             <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
               <TextBlock Grid.Row="0" Text="活动记录" FontSize="18" FontWeight="SemiBold" />
               <ComboBox Grid.Row="1" ItemsSource="{Binding ActiveDates}" SelectedItem="{Binding SelectedDate}"
@@ -99,51 +99,51 @@
                       <Border Padding="10,9" CornerRadius="7" Margin="0,2">
                         <Grid ColumnDefinitions="62,*" RowDefinitions="Auto,Auto,Auto">
                           <TextBlock Grid.RowSpan="3" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="12"
-                                     Foreground="{StaticResource MutedBrush}" VerticalAlignment="Top" Margin="0,2,8,0" />
+                                     Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Top" Margin="0,2,8,0" />
                           <TextBlock Grid.Column="1" Text="{Binding AppName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                           <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Title}" TextWrapping="Wrap"
                                      MaxHeight="40" FontSize="12" Margin="0,3,0,0" />
-                          <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding SourceText}" FontSize="11"
-                                     Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0" />
+                          <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding SourceText}" FontSize="12"
+                                     Foreground="{DynamicResource MutedBrush}" Margin="0,5,0,0" />
                         </Grid>
                       </Border>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
                 </ListBox>
-                <TextBlock Text="暂无可显示的活动" Foreground="{StaticResource MutedBrush}"
+                <TextBlock Text="暂无可显示的活动" Foreground="{DynamicResource MutedBrush}"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            IsVisible="{Binding !HasSelectedEvent}" />
                 <ProgressBar IsIndeterminate="True" VerticalAlignment="Top" IsVisible="{Binding IsLoading}" />
               </Grid>
 
               <StackPanel Grid.Row="4" Margin="0,12,0,0" Spacing="5">
-                <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
-                <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="#B42318" TextWrapping="Wrap"
+                <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
                            IsVisible="{Binding HasError}" />
               </StackPanel>
             </Grid>
           </Border>
 
-          <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="24">
+          <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24">
             <Grid RowDefinitions="Auto,*">
               <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                 <StackPanel DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem" IsVisible="{Binding $parent[Grid].DataContext.HasSelectedEvent}">
-                  <TextBlock Text="{Binding AppName}" FontSize="13" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding AppName}" FontSize="13" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" />
                   <TextBlock Text="{Binding Title}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,4" />
-                  <TextBlock Text="{Binding CapturedTimeText}" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                  <TextBlock Text="{Binding CapturedTimeText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                 </StackPanel>
-                <Border Grid.Column="1" Background="#EEF2FF" CornerRadius="6" Padding="9,5" VerticalAlignment="Top">
-                  <TextBlock Text="LOCAL ONLY" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                <Border Grid.Column="1" Background="{DynamicResource AccentSoftBackgroundBrush}" CornerRadius="6" Padding="9,5" VerticalAlignment="Top">
+                  <TextBlock Text="LOCAL ONLY" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
                 </Border>
               </Grid>
 
               <ScrollViewer Grid.Row="1" Margin="0,20,0,0">
                 <StackPanel Spacing="16">
-                  <Border Background="#F8FAFC" CornerRadius="8" Padding="14" IsVisible="{Binding HasSelectedEvent}">
+                  <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="14" IsVisible="{Binding HasSelectedEvent}">
                     <StackPanel DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem" Spacing="8">
                       <TextBlock Text="活动内容" FontWeight="SemiBold" />
                       <TextBlock Text="{Binding DetailText}" TextWrapping="Wrap" IsVisible="{Binding HasDetailText}" />
-                      <TextBlock Text="该事件没有提取文本或摘要。" Foreground="{StaticResource MutedBrush}"
+                      <TextBlock Text="该事件没有提取文本或摘要。" Foreground="{DynamicResource MutedBrush}"
                                  IsVisible="{Binding !HasDetailText}" />
                     </StackPanel>
                   </Border>
@@ -151,21 +151,21 @@
                   <StackPanel IsVisible="{Binding HasSelectedEvent}" Spacing="8">
                     <TextBlock Text="媒体预览" FontWeight="SemiBold" />
                     <TextBlock DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem"
-                               Text="{Binding MediaSizeText}" FontSize="11" Foreground="{StaticResource MutedBrush}" />
-                    <Border Background="#E8EDF5" CornerRadius="8" MinHeight="180" ClipToBounds="True"
+                               Text="{Binding MediaSizeText}" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
+                    <Border Background="{DynamicResource PlaceholderBrush}" CornerRadius="8" MinHeight="180" ClipToBounds="True"
                             IsVisible="{Binding HasPreview}">
                       <Image Source="{Binding PreviewImage}" Stretch="Uniform" MaxHeight="500" />
                     </Border>
                     <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsPreviewLoading}" />
-                    <Border Background="#FFF4E5" CornerRadius="7" Padding="12" IsVisible="{Binding HasPreviewError}">
-                      <TextBlock Text="{Binding PreviewError}" Foreground="#8A4B0F" TextWrapping="Wrap" />
+                    <Border Background="{DynamicResource WarningBackgroundBrush}" CornerRadius="7" Padding="12" IsVisible="{Binding HasPreviewError}">
+                      <TextBlock Text="{Binding PreviewError}" Foreground="{DynamicResource WarningForegroundBrush}" TextWrapping="Wrap" />
                     </Border>
-                    <TextBlock Text="此事件没有关联媒体。" Foreground="{StaticResource MutedBrush}" IsVisible="{Binding HasNoMedia}" />
+                    <TextBlock Text="此事件没有关联媒体。" Foreground="{DynamicResource MutedBrush}" IsVisible="{Binding HasNoMedia}" />
                   </StackPanel>
 
                   <StackPanel IsVisible="{Binding !HasSelectedEvent}" HorizontalAlignment="Center" Margin="0,100,0,0" Spacing="8">
                     <TextBlock Text="选择左侧事件开始回看" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                    <TextBlock Text="媒体只在选中时解密，明文不会写入临时文件" Foreground="{StaticResource MutedBrush}" />
+                    <TextBlock Text="媒体只在选中时解密，明文不会写入临时文件" Foreground="{DynamicResource MutedBrush}" />
                   </StackPanel>
                 </StackPanel>
               </ScrollViewer>
@@ -177,7 +177,7 @@
       <TabItem Header="检索与问答" automation:AutomationProperties.Name="检索与问答" automation:AutomationProperties.AcceleratorKey="Ctrl+2">
         <Grid DataContext="{Binding Search}" x:DataType="vm:SearchViewModel"
               ColumnDefinitions="400,*" Margin="0,12,0,0">
-          <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="18" Margin="0,0,12,0">
+          <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,12,0">
             <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
               <TextBlock Text="证据检索与问答" FontSize="20" FontWeight="SemiBold" />
               <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
@@ -199,44 +199,44 @@
               </WrapPanel>
               <ProgressBar Grid.Row="3" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
               <StackPanel Grid.Row="4" Spacing="5" Margin="0,8,0,0">
-                <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
-                <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="#B42318" TextWrapping="Wrap"
+                <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
                            IsVisible="{Binding HasError}" />
               </StackPanel>
-              <Border Grid.Row="5" Background="#F8FAFC" CornerRadius="8" Padding="12" Margin="0,14,0,0">
+              <Border Grid.Row="5" Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" Margin="0,14,0,0">
                 <StackPanel Spacing="6">
                   <TextBlock Text="回答（仅基于证据）" FontWeight="SemiBold" />
                   <TextBlock Text="{Binding Answer}" TextWrapping="Wrap" />
-                  <TextBlock Text="{Binding AnswerMeta}" FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
-                  <Border Background="#EFF6F1" CornerRadius="6" Padding="10">
+                  <TextBlock Text="{Binding AnswerMeta}" FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                  <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="6" Padding="10">
                     <TextBlock Text="无证据时不会生成推测性回答；原始媒体清理后只保留结构化证据。"
-                               FontSize="11" Foreground="#256044" TextWrapping="Wrap" />
+                               FontSize="11" Foreground="{DynamicResource SuccessForegroundBrush}" TextWrapping="Wrap" />
                   </Border>
                 </StackPanel>
               </Border>
             </Grid>
           </Border>
 
-          <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="18">
+          <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
             <Grid RowDefinitions="Auto,*,Auto">
               <Grid ColumnDefinitions="*,Auto">
                 <TextBlock Text="证据列表" FontSize="18" FontWeight="SemiBold" />
                 <TextBlock Grid.Column="1" Text="点击“定位”跳转到时间线对应记录"
-                           FontSize="11" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                           FontSize="11" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
               </Grid>
               <ScrollViewer Grid.Row="1" Margin="0,10,0,0">
                 <ItemsControl ItemsSource="{Binding Evidence}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:EvidenceCardItem">
-                      <Border Background="#F8FAFC" CornerRadius="8" Padding="12" Margin="0,0,0,8">
+                      <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" Margin="0,0,0,8">
                         <Grid ColumnDefinitions="*,Auto">
                           <StackPanel Spacing="4">
                             <TextBlock Text="{Binding Header}" FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource AccentBrush}" />
+                                       Foreground="{DynamicResource AccentBrush}" />
                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding Excerpt}" FontSize="12" TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding MatchedByText}" FontSize="11" Foreground="{StaticResource MutedBrush}" />
-                            <TextBlock Text="{Binding MediaText}" FontSize="11" Foreground="{StaticResource MutedBrush}" />
+                            <TextBlock Text="{Binding MatchedByText}" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
+                            <TextBlock Text="{Binding MediaText}" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
                           </StackPanel>
                           <Button Grid.Column="1" Classes="secondary" Content="定位"
                                   Command="{Binding NavigateCommand}" VerticalAlignment="Top"
@@ -247,7 +247,7 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
               </ScrollViewer>
-              <Border Grid.Row="2" Background="#F8FAFC" CornerRadius="8" Padding="14" Margin="0,10,0,0">
+              <Border Grid.Row="2" Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="14" Margin="0,10,0,0">
                 <StackPanel Spacing="8">
                   <Grid ColumnDefinitions="*,Auto,Auto">
                     <TextBlock Text="周报与统计" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -256,16 +256,16 @@
                     <Button Grid.Column="2" Classes="secondary" Content="导出"
                             Command="{Binding ExportWeeklyCommand}" IsEnabled="{Binding HasWeeklyReport}" />
                   </Grid>
-                  <TextBlock Text="{Binding WeeklyStatus}" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                  <TextBlock Text="{Binding WeeklyStatus}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                   <ItemsControl ItemsSource="{Binding WeeklyBars}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:DailyBarItem">
                         <Grid ColumnDefinitions="56,*,90" Margin="0,2">
                           <TextBlock Text="{Binding DateText}" FontSize="11" VerticalAlignment="Center" />
-                          <Border Grid.Column="1" Height="14" Background="{StaticResource AccentBrush}"
+                          <Border Grid.Column="1" Height="14" Background="{DynamicResource AccentBrush}"
                                   CornerRadius="3" HorizontalAlignment="Left" Width="{Binding BarWidthPixels}" />
                           <TextBlock Grid.Column="2" Text="{Binding CountText}" FontSize="11"
-                                     Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Right" />
+                                     Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Right" />
                         </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -282,40 +282,40 @@
       <TabItem Header="隐私与控制" automation:AutomationProperties.Name="隐私与控制" automation:AutomationProperties.AcceleratorKey="Ctrl+3">
         <ScrollViewer DataContext="{Binding Capture}" x:DataType="vm:CaptureControlViewModel" Margin="0,12,0,0">
           <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
-            <Border Grid.Row="0" Grid.Column="0" Background="White" CornerRadius="10" Padding="24" Margin="0,0,8,12">
+            <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,12">
               <StackPanel Spacing="14">
                 <TextBlock Text="采集状态" FontSize="20" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding CaptureStateText}" FontSize="15" Foreground="{StaticResource AccentBrush}" />
+                <TextBlock Text="{Binding CaptureStateText}" FontSize="15" Foreground="{DynamicResource AccentBrush}" />
                 <TextBlock Text="暂停会立即阻断入口并清空待处理队列。恢复后不会补写暂停期间的活动。"
-                           TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                           TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
                 <WrapPanel>
                   <Button Classes="primary" Content="{Binding PauseButtonText}" Command="{Binding TogglePauseCommand}" Margin="0,0,8,8" />
                   <Button Classes="secondary" Content="立即快照" Command="{Binding CaptureSnapshotCommand}" Margin="0,0,8,8" />
                 </WrapPanel>
-                <TextBlock Text="{Binding MetricsText}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                <TextBlock Text="{Binding MetricsText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
               </StackPanel>
             </Border>
 
-            <Border Grid.Row="0" Grid.Column="1" Background="White" CornerRadius="10" Padding="24" Margin="8,0,0,12">
+            <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,12">
               <StackPanel Spacing="14">
                 <TextBlock Text="开机与隐私" FontSize="20" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding AutoStartText}" />
                 <Button Classes="secondary" Content="切换开机自启" Command="{Binding ToggleAutoStartCommand}" HorizontalAlignment="Left" />
-                <Border Background="#EFF6F1" CornerRadius="8" Padding="14">
+                <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
                   <TextBlock Text="数据库使用 SQLite3MC 加密，媒体使用 AES-GCM 加密；密钥由系统密钥库保护。默认不监视全盘、不记录按键或剪贴板。"
-                             TextWrapping="Wrap" Foreground="#256044" />
+                             TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
                 </Border>
               </StackPanel>
             </Border>
 
-            <Border Grid.Row="1" Grid.ColumnSpan="2" Background="White" CornerRadius="10" Padding="24">
+            <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24">
               <StackPanel Spacing="12">
                 <TextBlock Text="应用与窗口黑名单" FontSize="20" FontWeight="SemiBold" />
                 <TextBlock Text="每行一个关键字，匹配应用名或窗口标题，不区分大小写。密码管理器与隐私浏览的内置规则也会显示在下方。"
-                           TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                           TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
                 <TextBox Text="{Binding BlacklistText}" AcceptsReturn="True" MinHeight="170" TextWrapping="NoWrap" />
                 <Button Classes="primary" Content="保存并立即生效" Command="{Binding SaveBlacklistCommand}" HorizontalAlignment="Left" />
-                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
           </Grid>
@@ -325,12 +325,12 @@
       <TabItem Header="语音" automation:AutomationProperties.Name="语音" automation:AutomationProperties.AcceleratorKey="Ctrl+4">
         <Grid DataContext="{Binding Voice}" x:DataType="vm:VoiceControlViewModel"
               ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" Margin="0,12,0,0">
-          <Border Grid.Row="0" Grid.Column="0" Background="White" CornerRadius="10" Padding="24" Margin="0,0,8,12">
+          <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,12">
             <StackPanel Spacing="14">
               <TextBlock Text="本地语音命令" FontSize="20" FontWeight="SemiBold" />
-              <TextBlock Text="{Binding StatusText}" FontSize="16" Foreground="{StaticResource AccentBrush}" />
+              <TextBlock Text="{Binding StatusText}" FontSize="16" Foreground="{DynamicResource AccentBrush}" />
               <TextBlock Text="唤醒词：你好时光。唤醒后 8 秒内说出固定命令，命令音频默认仅驻留内存。"
-                         TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                         TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
               <WrapPanel>
                 <Button Classes="primary" Content="{Binding ToggleButtonText}" Command="{Binding ToggleCommand}" Margin="0,0,8,8" />
               </WrapPanel>
@@ -339,21 +339,21 @@
                         Command="{Binding ToggleCommandAudioCommand}"
                         automation:AutomationProperties.Name="记录命令音频" />
               <TextBlock Text="{Binding CommandAudioStatus}" TextWrapping="Wrap" FontSize="12"
-                         Foreground="{StaticResource MutedBrush}" />
-              <TextBlock Text="{Binding CapabilityText}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
-              <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Foreground="#B42318" IsVisible="{Binding HasError}" />
+                         Foreground="{DynamicResource MutedBrush}" />
+              <TextBlock Text="{Binding CapabilityText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+              <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Foreground="{DynamicResource DangerForegroundBrush}" IsVisible="{Binding HasError}" />
             </StackPanel>
           </Border>
-          <Border Grid.Row="0" Grid.Column="1" Background="White" CornerRadius="10" Padding="24" Margin="8,0,0,12">
+          <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,12">
             <StackPanel Spacing="14">
               <TextBlock Text="最近一次交互" FontSize="20" FontWeight="SemiBold" />
               <TextBlock Text="识别文本" FontWeight="SemiBold" />
               <TextBlock Text="{Binding LastTranscript}" TextWrapping="Wrap" />
               <TextBlock Text="反馈" FontWeight="SemiBold" />
-              <TextBlock Text="{Binding LastFeedback}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
-              <Border Background="#EFF6F1" CornerRadius="8" Padding="14">
+              <TextBlock Text="{Binding LastFeedback}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+              <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
                 <TextBlock Text="固定命令：生成日报、暂停采集、恢复采集、打开时间线、打开日报；以“问一下”开头可对近 7 天本地证据提问，回答与检索面板共用同一证据用例。退出应用需要二次确认。"
-                           TextWrapping="Wrap" Foreground="#256044" />
+                           TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
               </Border>
             </StackPanel>
           </Border>
@@ -363,10 +363,10 @@
       <TabItem Header="数据与导出" automation:AutomationProperties.Name="数据与导出" automation:AutomationProperties.AcceleratorKey="Ctrl+5">
         <Grid DataContext="{Binding Data}" x:DataType="vm:DataManagementViewModel"
               ColumnDefinitions="*,*" Margin="0,12,0,0">
-          <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="24" Margin="0,0,8,0">
+          <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,0">
             <StackPanel Spacing="14">
               <TextBlock Text="删除本地数据" FontSize="20" FontWeight="SemiBold" />
-              <TextBlock Text="{Binding RetentionNotice}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+              <TextBlock Text="{Binding RetentionNotice}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
               <DatePicker SelectedDate="{Binding SelectedDate}" />
               <WrapPanel>
                 <Button Classes="secondary" Content="{Binding DeleteDateButtonText}"
@@ -378,25 +378,25 @@
                 <Button Classes="secondary" Content="取消" Command="{Binding CancelPendingCommand}"
                         IsVisible="{Binding HasPending}" Margin="0,0,8,8" />
               </WrapPanel>
-              <Border Background="#FFF1F0" CornerRadius="8" Padding="12" IsVisible="{Binding HasPending}">
-                <TextBlock Text="{Binding PendingText}" Foreground="#B42318" TextWrapping="Wrap" />
+              <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPending}">
+                <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
               </Border>
               <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
-              <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
-              <TextBlock Text="{Binding ErrorMessage}" Foreground="#B42318" TextWrapping="Wrap"
+              <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
                          IsVisible="{Binding HasError}" />
             </StackPanel>
           </Border>
-          <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="24" Margin="8,0,0,0">
+          <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,0">
             <StackPanel Spacing="14">
               <TextBlock Text="导出与保留" FontSize="20" FontWeight="SemiBold" />
               <TextBlock Text="{Binding ExportNotice}" TextWrapping="Wrap" />
-              <Border Background="#EFF6F1" CornerRadius="8" Padding="14">
+              <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
                 <TextBlock Text="所有导出均在本机生成，不经过云端。删除数据前请先导出需要保留的日报与问答。"
-                           TextWrapping="Wrap" Foreground="#256044" />
+                           TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
               </Border>
               <TextBlock Text="键盘快捷键：Ctrl+D1…D7 切换页面，Ctrl+F 打开检索，F5 刷新当前页。"
-                         TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                         TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
             </StackPanel>
           </Border>
         </Grid>
@@ -408,7 +408,7 @@
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
               <StackPanel>
                 <TextBlock Text="系统健康与能力矩阵" FontSize="20" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding PlatformName}" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" />
+                <TextBlock Text="{Binding PlatformName}" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
               </StackPanel>
               <Button Grid.Column="1" Classes="secondary" Content="生成脱敏导出预览" Command="{Binding GeneratePreviewCommand}" Margin="0,0,8,0" />
               <Button Grid.Column="2" Classes="secondary" Content="确认导出" Command="{Binding ExportPreviewCommand}" Margin="0,0,8,0" />
@@ -416,42 +416,42 @@
                       automation:AutomationProperties.Name="重新检查平台能力" />
             </Grid>
             <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" />
-            <Border Background="#FFF1F0" CornerRadius="8" Padding="14" IsVisible="{Binding HasError}">
-              <TextBlock Text="{Binding ErrorMessage}" Foreground="#B42318" TextWrapping="Wrap" />
+            <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="14" IsVisible="{Binding HasError}">
+              <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
             </Border>
             <Grid ColumnDefinitions="*,*,*">
-              <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="18" Margin="0,0,6,0">
+              <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,6,0">
                 <StackPanel Spacing="7">
                   <TextBlock Text="加密数据库" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding DatabaseText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                  <TextBlock Text="{Binding DatabaseText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
                 </StackPanel>
               </Border>
-              <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="18" Margin="6,0,6,0">
+              <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="6,0,6,0">
                 <StackPanel Spacing="7">
                   <TextBlock Text="采集管道" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding PipelineText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                  <TextBlock Text="{Binding PipelineText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
                 </StackPanel>
               </Border>
-              <Border Grid.Column="2" Background="White" CornerRadius="10" Padding="18" Margin="6,0,0,0">
+              <Border Grid.Column="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="6,0,0,0">
                 <StackPanel Spacing="7">
                   <TextBlock Text="媒体保留清理" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding RetentionText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                  <TextBlock Text="{Binding RetentionText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
                 </StackPanel>
               </Border>
             </Grid>
-            <Border Background="White" CornerRadius="10" Padding="18">
+            <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
               <StackPanel Spacing="7">
                 <TextBlock Text="本机模型网关" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding ModelText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
-                <TextBlock Text="{Binding ModelEndpointsText}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                <TextBlock Text="{Binding ModelText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+                <TextBlock Text="{Binding ModelEndpointsText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
               </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="10" Padding="18" IsVisible="{Binding HasMcpControl}">
+            <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasMcpControl}">
               <StackPanel Spacing="8">
                 <TextBlock Text="只读本地 MCP（默认关闭）" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding McpStatusText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                <TextBlock Text="{Binding McpStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
                 <TextBlock Text="仅暴露 search_events、activity_stats、list_reports、get_report 四个只读工具；无写工具，强制 loopback 与本地令牌。"
-                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                           TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                 <TextBox Text="{Binding McpTokenText}" IsReadOnly="True" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" />
                 <WrapPanel>
                   <Button Classes="secondary" Content="显示令牌" Command="{Binding RevealMcpTokenCommand}" Margin="0,0,8,8" />
@@ -459,11 +459,11 @@
                 </WrapPanel>
               </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="10" Padding="18" IsVisible="{Binding HasSecretAdmin}">
+            <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasSecretAdmin}">
               <StackPanel Spacing="8">
                 <TextBlock Text="模型端点密钥" FontWeight="SemiBold" />
                 <TextBlock Text="密钥以 AES-GCM 加密保存在本机；写入后不可读取，models.json 通过 apiKeySecret 引用名称。"
-                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                           TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                 <Grid ColumnDefinitions="*,*">
                   <TextBox Text="{Binding SecretName}" PlaceholderText="密钥名称，例如 corp-api-key" Margin="0,0,6,0" />
                   <TextBox Grid.Column="1" Text="{Binding SecretValue}" PasswordChar="●" PlaceholderText="密钥值" Margin="6,0,0,0" />
@@ -475,34 +475,34 @@
                 </WrapPanel>
                 <ListBox ItemsSource="{Binding SecretNames}" SelectedItem="{Binding SelectedSecret}"
                          MaxHeight="120" Background="Transparent" BorderThickness="0" />
-                <TextBlock Text="{Binding SecretStatus}" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding SecretStatus}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="10" Padding="18" IsVisible="{Binding HasExportPreview}">
+            <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasExportPreview}">
               <StackPanel Spacing="8">
                 <TextBlock Text="诊断导出预览（仅元数据，用户确认前不写外部文件）" FontWeight="SemiBold" />
                 <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180" FontFamily="Consolas" FontSize="11" />
-                <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="10" Padding="18">
+            <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
               <StackPanel Spacing="8">
                 <TextBlock Text="权限引导" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding PermissionGuidanceText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                <TextBlock Text="{Binding PermissionGuidanceText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
               </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="10" Padding="18">
+            <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
               <StackPanel Spacing="10">
                 <TextBlock Text="平台能力" FontWeight="SemiBold" />
                 <ItemsControl ItemsSource="{Binding Capabilities}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:CapabilityItem">
-                      <Border BorderBrush="#E7EBF1" BorderThickness="0,0,0,1" Padding="0,9">
+                      <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,9">
                         <Grid ColumnDefinitions="130,85,*,260">
                           <TextBlock Text="{Binding KindText}" FontWeight="SemiBold" />
-                          <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{StaticResource AccentBrush}" />
+                          <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{DynamicResource AccentBrush}" />
                           <TextBlock Grid.Column="2" Text="{Binding Summary}" TextWrapping="Wrap" Margin="8,0" />
-                          <TextBlock Grid.Column="3" Text="{Binding RemediationHint}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                          <TextBlock Grid.Column="3" Text="{Binding RemediationHint}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                         </Grid>
                       </Border>
                     </DataTemplate>
@@ -510,7 +510,7 @@
                 </ItemsControl>
               </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="10" Padding="18">
+            <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
               <StackPanel Spacing="10">
                 <TextBlock Text="最近后台任务" FontWeight="SemiBold" />
                 <ItemsControl ItemsSource="{Binding RecentJobs}">
@@ -520,23 +520,23 @@
                         <TextBlock Text="{Binding DateText}" />
                         <TextBlock Grid.Column="1" Text="{Binding StatusText}" />
                         <TextBlock Grid.Column="2" Text="{Binding AttemptText}" />
-                        <TextBlock Grid.Column="3" Text="{Binding CreatedText}" Foreground="{StaticResource MutedBrush}" />
+                        <TextBlock Grid.Column="3" Text="{Binding CreatedText}" Foreground="{DynamicResource MutedBrush}" />
                       </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
               </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="10" Padding="18">
+            <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
               <StackPanel Spacing="10">
                 <TextBlock Text="最近脱敏结构化日志" FontWeight="SemiBold" />
                 <ItemsControl ItemsSource="{Binding RecentLogs}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:DiagnosticLogItem">
                       <Grid ColumnDefinitions="80,90,150,*" Margin="0,4">
-                        <TextBlock Text="{Binding TimeText}" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource MutedBrush}" />
+                        <TextBlock Text="{Binding TimeText}" FontFamily="Consolas" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
                         <TextBlock Grid.Column="1" Text="{Binding LevelText}" FontSize="11" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="2" Text="{Binding CategoryText}" FontSize="11" Foreground="{StaticResource AccentBrush}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" Text="{Binding CategoryText}" FontSize="11" Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Column="3" Text="{Binding MessageText}" FontSize="12" TextWrapping="Wrap" />
                       </Grid>
                     </DataTemplate>
@@ -544,14 +544,14 @@
                 </ItemsControl>
               </StackPanel>
             </Border>
-            <TextBlock Text="{Binding LastRefreshText}" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12" />
+            <TextBlock Text="{Binding LastRefreshText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,12" />
           </StackPanel>
         </ScrollViewer>
       </TabItem>
       <TabItem Header="日报" automation:AutomationProperties.Name="日报" automation:AutomationProperties.AcceleratorKey="Ctrl+7">
         <Grid DataContext="{Binding Reports}" x:DataType="vm:ReportsViewModel"
               ColumnDefinitions="360,*" Margin="0,12,0,0">
-          <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="18" Margin="0,0,12,0">
+          <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,12,0">
             <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
               <TextBlock Text="日报与站会" FontSize="20" FontWeight="SemiBold" />
               <DatePicker Grid.Row="1" SelectedDate="{Binding SelectedDate}" Margin="0,14,0,10" />
@@ -572,23 +572,23 @@
                 <ProgressBar IsIndeterminate="True" VerticalAlignment="Top" IsVisible="{Binding IsBusy}" />
               </Grid>
               <StackPanel Grid.Row="4" Spacing="5" Margin="0,12,0,0">
-                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
-                <TextBlock Text="{Binding ErrorMessage}" Foreground="#B42318" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
               </StackPanel>
             </Grid>
           </Border>
 
-          <Border Grid.Column="1" Background="White" CornerRadius="10" Padding="22">
+          <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="22">
             <Grid RowDefinitions="Auto,Auto,*">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel>
                   <TextBlock Text="日报正文" FontSize="22" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding VersionText}" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" />
+                  <TextBlock Text="{Binding VersionText}" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
                 </StackPanel>
                 <Button Grid.Column="1" Classes="secondary" Content="导出 Markdown"
                         Command="{Binding ExportCommand}" IsEnabled="{Binding HasReport}" />
               </Grid>
-              <Border Grid.Row="1" Background="#F8FAFC" CornerRadius="8" Padding="14" Margin="0,14,0,12">
+              <Border Grid.Row="1" Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="14" Margin="0,14,0,12">
                 <StackPanel Spacing="6">
                   <TextBlock Text="站会视图" FontWeight="SemiBold" />
                   <TextBlock Text="{Binding StandupText}" TextWrapping="Wrap" />

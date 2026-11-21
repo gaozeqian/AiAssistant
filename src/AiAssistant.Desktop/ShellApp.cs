@@ -8,6 +8,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using CommunityToolkit.Mvvm.Input;
 
@@ -22,6 +23,8 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
     public override void Initialize()
     {
         Styles.Add(new FluentTheme());
+        Resources.ThemeDictionaries.Add(ThemeVariant.Light, BuildThemeDictionary(isDark: false));
+        Resources.ThemeDictionaries.Add(ThemeVariant.Dark, BuildThemeDictionary(isDark: true));
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -39,6 +42,18 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
 
             desktop.MainWindow = window;
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            // Follow the system theme on first launch, then honour manual toggles.
+            // AIASSISTANT_THEME=light|dark pins a variant (useful for tests and user preference).
+            var themeOverride = Environment.GetEnvironmentVariable("AIASSISTANT_THEME");
+            shell.ThemeVariant = themeOverride switch
+            {
+                "light" => ThemeVariant.Light,
+                "dark" => ThemeVariant.Dark,
+                _ => ActualThemeVariant == ThemeVariant.Dark ? ThemeVariant.Dark : ThemeVariant.Light
+            };
+            RequestedThemeVariant = shell.ThemeVariant;
+            shell.ThemeVariantChanged += variant => RequestedThemeVariant = variant;
 
             // UI E2E hook: the app normally starts as a tray-only agent; this shows the window
             // immediately so an external AX driver can exercise the real window without a tray click.
@@ -61,6 +76,62 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Semantic brushes keyed by theme variant. Controls reference them with {DynamicResource} so the
+    /// whole window restyles when the theme toggles. Hardcoded colors were the source of the mixed-theme
+    /// contrast bug (Fluent controls followed the system dark variant while the layout stayed light).
+    /// </summary>
+    private static ResourceDictionary BuildThemeDictionary(bool isDark)
+    {
+        var d = new ResourceDictionary();
+        void Add(string key, string hex) => d[key] = new SolidColorBrush(Color.Parse(hex));
+
+        if (!isDark)
+        {
+            Add("PageBackgroundBrush", "#F4F6FA");
+            Add("CardBackgroundBrush", "#FFFFFF");
+            Add("HeaderBackgroundBrush", "#111C36");
+            Add("HeaderTextSecondaryBrush", "#B7C3D9");
+            Add("HeaderBadgeBackgroundBrush", "#22304D");
+            Add("HeaderBadgeForegroundBrush", "#DCE5F5");
+            Add("AccentBrush", "#3157D5");
+            Add("AccentSoftBackgroundBrush", "#EEF2FF");
+            Add("MutedBrush", "#475569");
+            Add("SubtleCardBrush", "#F8FAFC");
+            Add("PlaceholderBrush", "#E8EDF5");
+            Add("DividerBrush", "#E7EBF1");
+            Add("SuccessForegroundBrush", "#256044");
+            Add("SuccessBackgroundBrush", "#EFF6F1");
+            Add("DangerForegroundBrush", "#B42318");
+            Add("DangerBackgroundBrush", "#FFF1F0");
+            Add("WarningForegroundBrush", "#8A4B0F");
+            Add("WarningBackgroundBrush", "#FFF4E5");
+        }
+        else
+        {
+            Add("PageBackgroundBrush", "#0F172A");
+            Add("CardBackgroundBrush", "#1E293B");
+            Add("HeaderBackgroundBrush", "#0B1220");
+            Add("HeaderTextSecondaryBrush", "#94A3B8");
+            Add("HeaderBadgeBackgroundBrush", "#1E293B");
+            Add("HeaderBadgeForegroundBrush", "#CBD5E1");
+            Add("AccentBrush", "#4F6BEF");
+            Add("AccentSoftBackgroundBrush", "#1E2A4A");
+            Add("MutedBrush", "#94A3B8");
+            Add("SubtleCardBrush", "#1E293B");
+            Add("PlaceholderBrush", "#334155");
+            Add("DividerBrush", "#334155");
+            Add("SuccessForegroundBrush", "#4ADE80");
+            Add("SuccessBackgroundBrush", "#0B2A1A");
+            Add("DangerForegroundBrush", "#F87171");
+            Add("DangerBackgroundBrush", "#2A1210");
+            Add("WarningForegroundBrush", "#FBBF24");
+            Add("WarningBackgroundBrush", "#2A1F08");
+        }
+
+        return d;
     }
 
     private static async Task InitializeShellSafelyAsync(ShellViewModel shell)
