@@ -181,6 +181,7 @@ AiAssistant.Host --benchmark-ocr --samples artifacts/golden/ocr --output artifac
 - 样本格式：ASR 为 `<name>.wav` + 同名 `.txt`（参考答案），任意采样率/声道会自动转 16 kHz 单声道；OCR 为 `<name>.png` + `.txt`。
 - 报告含逐样本 CER、编辑数/字数、耗时、识别结果、参考答案与错误；模型缺失时标记 `engine unavailable`（不计为 100% 错误）并退出码 1。
 - OCR 命令仅在注册了 `IImageOcrRecognizer` 的平台可用（Linux RapidOCR）；macOS 走 Vision/辅助功能树，不支持该命令。
+- 语料覆盖与目录约定见 `docs/testing/golden-sets.md`。
 
 ### 3.5 本地语音模型与命令
 `AIASSISTANT_SHERPA_MODEL_DIR` 指向同一语音模型根目录，建议结构：
