@@ -26,13 +26,13 @@
   </ItemGroup>
 
   <ItemGroup Label="Extensions and AI">
-    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.11.0" />
-    <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="11.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="11.0.1" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.15" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.15" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.15" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.15" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.15" />
     <PackageVersion Include="System.Numerics.Tensors" Version="10.0.15" />
   </ItemGroup>
