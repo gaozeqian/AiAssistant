@@ -391,7 +391,7 @@ Supported / PermissionRequired / Degraded / Unavailable / DisabledByPolicy
 
 **任务**
 
-1. Windows MSIX/自包含 exe 签名；macOS 主应用与 helper 签名公证；Linux AppImage/deb 等按 RID 验证。
+1. Windows 自包含 zip / MSI 签名；macOS 主应用与 helper 签名公证；Linux AppImage/deb 等按 RID 验证。
 2. 执行 24 小时与多日浸泡测试，覆盖待机、活跃、休眠唤醒、插拔显示器和麦克风。
 3. 完成磁盘满、数据库损坏、密钥不可用、模型离线、helper 崩溃的故障注入。
 4. 完成升级迁移、降级策略、备份恢复、卸载数据处理说明。

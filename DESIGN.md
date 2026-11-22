@@ -452,7 +452,7 @@ Avalonia TrayIcon, 平台全局热键（Wayland 降级）, 浏览器 Native Mess
 
 | 平台 | 形式 | 注意 |
 |---|---|---|
-| Windows | MSIX 或自包含 exe | 代码签名避免 SmartScreen 警告；验证 SQLite3MC/sqlite-vec/sherpa-onnx 原生库打包 |
+| Windows | 自包含 zip 或 MSI | 代码签名避免 SmartScreen 警告；验证 SQLite3MC/sqlite-vec/sherpa-onnx 原生库打包 |
 | macOS | .app（arm64），签名 + 公证 | Swift helper 与主应用统一签名/公证；声明屏幕录制/麦克风/辅助功能权限 |
 | Linux | AppImage / deb / Flatpak | 按 RID 携带原生依赖；Flatpak 需 portal 权限；托盘/热键按桌面环境降级 |
 

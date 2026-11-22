@@ -25,4 +25,25 @@ public sealed class SherpaVoiceOptionsTests
         Assert.Equal(1.5f, options.KeywordsScore);
         Assert.Equal(0.4f, options.KeywordsThreshold);
     }
+
+    /// <summary>
+    /// The bundled MeloTTS payload adds a jieba dictionary and four text-normalization FSTs.
+    /// If the staging script or these defaults drift apart, TTS still starts but reads numbers,
+    /// phone numbers and heteronyms incorrectly, so pin the layout here.
+    /// </summary>
+    [Fact]
+    public void TtsDefaultsMatchBundledMeloTtsLayout()
+    {
+        var root = Path.Combine("models", "sherpa");
+        var options = new SherpaVoiceOptions { ModelDirectory = root };
+
+        Assert.Equal(Path.Combine(root, "tts", "model.onnx"), options.TtsModelPath);
+        Assert.Equal(Path.Combine(root, "tts", "dict"), options.TtsDictDirPath);
+        Assert.Collection(
+            options.TtsRuleFstsPaths,
+            path => Assert.Equal(Path.Combine(root, "tts", "date.fst"), path),
+            path => Assert.Equal(Path.Combine(root, "tts", "number.fst"), path),
+            path => Assert.Equal(Path.Combine(root, "tts", "phone.fst"), path),
+            path => Assert.Equal(Path.Combine(root, "tts", "new_heteronym.fst"), path));
+    }
 }

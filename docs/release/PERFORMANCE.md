@@ -22,7 +22,7 @@
 
 ## 3. 安装包体积
 
-| 平台 | 产物 | 体积（2026-11-22，含随包语音模型 126MB） |
+| 平台 | 产物 | 体积（2026-11-22 上午，AISHELL-3 载荷 126MB） |
 |---|---|---|
 | Windows | 自包含目录（staging） | 369 MB |
 | Windows | `AiAssistant-<ver>-win-x64.zip` | **188 MB** |
@@ -32,9 +32,11 @@
 | Linux | `.tar.gz` | **163 MB** |
 | macOS | `AiAssistant.app`（含 .NET 运行时与模型） | 285 MB |
 
-体积主要来自 .NET 自包含运行时、sherpa-onnx 原生库与随包语音模型（KWS 4.9MB + Paraformer ASR 78MB + VITS int8 39MB + VAD 2.3MB）。如需更小安装包可改用框架依赖发布（`-FrameworkDependent` / `--framework-dependent`），代价是要求目标机安装 .NET 10 运行时；也可用 `-SkipModelBundle` / `--skip-models` 产出不含语音模型的开发包。
+体积主要来自 .NET 自包含运行时、sherpa-onnx 原生库与随包语音模型（KWS 4.9MB + Paraformer ASR 78MB + TTS + VAD 2.3MB）。如需更小安装包可改用框架依赖发布（`-FrameworkDependent` / `--framework-dependent`），代价是要求目标机安装 .NET 10 运行时；也可用 `-SkipModelBundle` / `--skip-models` 产出不含语音模型的开发包。
 
-> 2026-11-22 起安装包默认携带 `models/sherpa`（11 个文件、126MB），对话/Embedding 模型仍在外部。上表已按新载荷复测；不含模型的旧包约为 zip 84MB / MSI 86MB / deb 58MB。
+> 2026-11-22 上午起安装包默认携带 `models/sherpa`（11 个文件、126MB），对话/Embedding 模型仍在外部。上表按该载荷实测；不含模型的旧包约为 zip 84MB / MSI 86MB / deb 58MB。
+>
+> 2026-11-22 晚：TTS 由 AISHELL-3 VITS（39MB）替换为 MeloTTS（权重 163MB，含 `dict/` 与 4 个 FST 共 183MB），随包模型由 126MB 增至 **268MB**（26 个文件，+142MB，实测）。**上表体积基于旧载荷，必须在重新打包后复测**，复测前不要把旧数值用于发布说明。
 
 ## 4. 存储与检索
 

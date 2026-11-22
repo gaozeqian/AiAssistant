@@ -13,20 +13,21 @@
 
 ## 2. 打包与签名
 
-- [ ] Windows：`pwsh build/package/package-windows.ps1 -RequireSigning` 产出已签名 zip；MSIX 使用与证书一致的 Publisher。
-- [ ] Windows：`signtool verify /pa` 对 exe 与 MSIX 均通过。
+- [ ] Windows：`pwsh build/package/package-windows.ps1 -RequireSigning` 产出已签名 zip；`package-windows-msi.ps1` 产出已签名 MSI。Windows 只发布 zip 与 MSI，不构建 MSIX。
+- [ ] Windows：`signtool verify /pa` 对 zip 内 exe 与 MSI 安装包均通过。
 - [ ] macOS：`swift build -c release` 成功，`package-macos.sh --require-sign` 完成 codesign + notarytool + stapler。
 - [ ] macOS：`codesign --verify --deep --strict` 与 `spctl --assess` 通过。
 - [ ] Linux：`package-linux.sh` 产出 tar.gz 与 .deb；`dpkg-deb --info` 显示正确版本与依赖。
 - [ ] 安装包体积与 `PERFORMANCE.md` 记录一致（显著增大需说明原因）。
-- [ ] 安装包内含 `models/sherpa`（KWS/ASR/TTS/VAD，约 126MB、11 个文件）；对话/Embedding 模型仍保持外部。
+- [ ] 安装包内含 `models/sherpa`（KWS/ASR/MeloTTS/VAD，约 268MB、26 个文件）；对话/Embedding 模型仍保持外部。
+- [ ] 安装包内含法务文件：`LICENSE`、`EULA.md`、`THIRD-PARTY-NOTICES.md`、`THIRD-PARTY-NOTICES-ONNXRUNTIME.txt`（Windows 安装根、macOS `Contents/Resources`、Linux `/usr/lib/aiassistant` 与 `/usr/share/doc/aiassistant`），且第三方声明与当前模型版本一致。
 - [ ] 空数据目录启动后语音页显示「本机唤醒与语音命令已就绪」，`--benchmark-asr` 不报引擎缺失。
 
 ## 3. 安装 / 升级 / 卸载实测
 
 - [ ] 全新安装后首次启动成功，`--startup-check` 输出 OK，`--doctor` 显示存储健康。
 - [ ] Windows zip 解压后 `--version`/`--smoke-check`/`--startup-check` 均通过，`SHA256SUMS` 与产物一致。
-- [ ] MSIX：签名校验通过、安装/启动/卸载成功，卸载后 `%LOCALAPPDATA%\AiAssistant` 与密钥保留。
+- [ ] MSI：签名校验通过、安装/启动/卸载成功，卸载后 `%LOCALAPPDATA%\AiAssistant` 与密钥保留。
 - [ ] 从上一版本覆盖升级：Schema 迁移成功，抽查事件/日报/语音日志。
 - [ ] 备份 → 恢复 → 启动成功（`--backup` / `--restore --confirm-restore`）。
 - [ ] 卸载后按文档清理数据目录与密钥库条目，确认无残留进程与自启项。

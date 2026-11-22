@@ -4,7 +4,7 @@
 
 ## 模型载荷（三平台共用）
 
-安装包默认携带本机语音模型（KWS 唤醒词、Paraformer ASR、VITS TTS、Silero VAD），**只有对话与 Embedding 模型保持外部**（Ollama / 内网 / 公网端点）。打包前先汇总资产：
+安装包默认携带本机语音模型（KWS 唤醒词、Paraformer ASR、MeloTTS TTS、Silero VAD），**只有对话与 Embedding 模型保持外部**（Ollama / 内网 / 公网端点）。打包前先汇总资产：
 
 ```bash
 bash build/models/stage-bundle.sh
@@ -12,9 +12,10 @@ bash build/models/stage-bundle.sh
 bash build/models/stage-bundle.sh --with-rapidocr --with-whisper
 ```
 
-- `stage-bundle.sh` 从 `artifacts/models/sherpa-kws/kws`、`sherpa-onnx-paraformer-zh-small-2024-03-09`、`sherpa-tts`、`sherpa-vad` 汇总到 `artifacts/models/bundle`；缺 KWS/ASR/TTS/VAD 任一项直接失败。
+- `stage-bundle.sh` 从 `artifacts/models/sherpa-kws/kws`、`sherpa-onnx-paraformer-zh-small-2024-03-09`、`sherpa-tts`、`sherpa-vad` 汇总到 `artifacts/models/bundle`；缺 KWS/ASR/TTS/VAD 任一项直接失败。MeloTTS 还要求 `sherpa-tts/dict/` 与 4 个 `*.fst`，缺失会导致数字、电话与多音字读错，因此一并纳入必检项。
 - 三个平台的打包脚本都会把 bundle 复制到应用目录：Windows `models\`、macOS `AiAssistant.app/Contents/MacOS/models`、Linux `/usr/lib/aiassistant/models`。
 - 应用解析顺序：`AIASSISTANT_*_MODEL_DIR` → `<数据目录>/models/...` → `<应用目录>/models/...`，用户可用数据目录覆盖随包模型。
+- 法务文件随包分发：`LICENSE`、`EULA.md`、`THIRD-PARTY-NOTICES.md` 与 `THIRD-PARTY-NOTICES-ONNXRUNTIME.txt`；Windows 安装目录根、macOS `AiAssistant.app/Contents/Resources/`、Linux `/usr/lib/aiassistant/` 与 `/usr/share/doc/aiassistant/`。任一文件缺失时打包脚本都会直接失败。
 - 开发调试可加 `-SkipModelBundle`（PowerShell）或 `--skip-models`（bash）跳过；**正式发布不要使用**。
 
 ## Windows
@@ -23,9 +24,8 @@ bash build/models/stage-bundle.sh --with-rapidocr --with-whisper
 pwsh build/package/package-windows.ps1 -Version 0.1.0
 ```
 
-- 默认 `win-x64` 自包含发布，输出 `AiAssistant-<version>-win-x64.zip`。
+- 默认 `win-x64` 自包含发布，输出 `AiAssistant-<version>-win-x64.zip`；MSI 由 `package-windows-msi.ps1` 单独产出。Windows 只发这两种格式，不再构建 MSIX。
 - 签名：设置 `AIASSISTANT_SIGN_CERT_THUMBPRINT`（证书指纹）与可选 `AIASSISTANT_TIMESTAMP_URL`；脚本会签名并校验全部 `.exe`/`.dll`。**指定了指纹但找不到 `signtool.exe` 时脚本会失败**，不会静默产出未签名包。
-- MSIX：追加 `-Msix -Publisher "CN=你的发布者"`，需要 Windows SDK 的 `makeappx.exe`；清单模板见 `windows/Package.appxmanifest.template`。清单已声明 `unvirtualizedResources` 并关闭 AppData 虚拟化，数据写入真实 `%LOCALAPPDATA%\AiAssistant`，卸载不会删除。
 - 自签名演练（不用于正式发布）：
 
   ```powershell
@@ -35,10 +35,10 @@ pwsh build/package/package-windows.ps1 -Version 0.1.0
   certutil -user -addstore -f Root "$env:TEMP\AiAssistantTest.cer"
   certutil -user -addstore -f TrustedPeople "$env:TEMP\AiAssistantTest.cer"
   $env:AIASSISTANT_SIGN_CERT_THUMBPRINT = $cert.Thumbprint
-  pwsh build/package/package-windows.ps1 -Msix -RequireSigning -SkipTimestamp -Publisher "CN=AiAssistant Test"
+  pwsh build/package/package-windows.ps1 -RequireSigning -SkipTimestamp
   ```
 
-  `-SkipTimestamp` 仅用于离线自签名；正式发布必须使用时间戳。非管理员无法把证书加入机器级信任时，可用 `Add-AppxPackage -Register artifacts/packages/staging/msix-win-x64/AppxManifest.xml` 做布局/启动/卸载演练（不验证安装签名）。
+  `-SkipTimestamp` 仅用于离线自签名；正式发布必须使用时间戳。
 - 图标由 `assets/generate-icon.py` 生成（纯 Python，无第三方依赖）：`python build/package/assets/generate-icon.py`。
 
 ## macOS

@@ -59,7 +59,7 @@
 
 ## 7. 卸载与残留
 
-自包含 zip 与当前 MSIX 卸载都不会自动删除 `%LOCALAPPDATA%\AiAssistant` 与系统密钥库条目，避免误删；MSIX 清单已关闭 AppData 虚拟化，数据不在包容器内。旧版 MSIX（未关闭虚拟化）卸载会删除包容器数据，请先导出/备份。彻底清除步骤见 `UPGRADE-AND-UNINSTALL.md`。
+自包含 zip 与 MSI 卸载都不会自动删除 `%LOCALAPPDATA%\AiAssistant` 与系统密钥库条目，避免误删。彻底清除步骤见 `UPGRADE-AND-UNINSTALL.md`。
 
 ## 8. 联系方式
 

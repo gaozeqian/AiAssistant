@@ -75,6 +75,11 @@ else
   echo "bundled models: $(du -sh "$APP_DIR/models" | cut -f1)"
 fi
 
+bash "$SCRIPT_DIR/legal-files.sh" "$APP_DIR"
+mkdir -p "$STAGE/usr/share/doc/aiassistant"
+cp "$APP_DIR/LICENSE" "$APP_DIR/EULA.md" "$APP_DIR/THIRD-PARTY-NOTICES.md" \
+   "$APP_DIR/THIRD-PARTY-NOTICES-ONNXRUNTIME.txt" "$STAGE/usr/share/doc/aiassistant/"
+
 cat > "$STAGE/usr/bin/aiassistant" <<'LAUNCHER'
 #!/bin/sh
 exec /usr/lib/aiassistant/AiAssistant.Host "$@"

@@ -29,7 +29,7 @@
    AiAssistant.Host --restore /path/to/pre-upgrade-backup.enc --confirm-restore
    ```
    该命令会校验备份完整性与 Schema 版本，拒绝更高版本备份。
-4. **安装上一版本**：使用保留的安装包覆盖安装（Windows zip/MSIX、macOS app、Linux deb/tar.gz）。
+4. **安装上一版本**：使用保留的安装包覆盖安装（Windows zip/MSI、macOS app、Linux deb/tar.gz）。
 5. **验证**：`--startup-check` 输出 OK；抽查时间线、日报、检索与语音日志。
 6. **记录**：把故障现象、版本号、回滚时间、数据备份路径写入发布说明与 `PROGRESS.md`。
 

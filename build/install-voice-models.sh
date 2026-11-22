@@ -25,12 +25,19 @@ cp "$ASR_SRC/model.int8.onnx" "$DEST/model.int8.onnx"
 cp "$ASR_SRC/tokens.txt" "$DEST/tokens.txt"
 
 if [[ -f "$TTS_SRC/model.onnx" ]]; then
-  mkdir -p "$DEST/tts"
+  mkdir -p "$DEST/tts/dict"
   cp "$TTS_SRC/model.onnx" "$TTS_SRC/tokens.txt" "$TTS_SRC/lexicon.txt" "$DEST/tts/"
+  cp "$TTS_SRC"/*.fst "$DEST/tts/"
+  cp -R "$TTS_SRC/dict/." "$DEST/tts/dict/"
+  if [[ -f "$TTS_SRC/LICENSE" ]]; then
+    cp "$TTS_SRC/LICENSE" "$DEST/tts/LICENSE"
+  fi
 fi
 
 echo "语音模型已安装到：$DEST"
 echo "  - KWS（你好时光）：$DEST/kws/"
 echo "  - 命令 ASR（Paraformer zh）：$DEST/model.int8.onnx"
-[[ -f "$DEST/tts/model.onnx" ]] && echo "  - TTS（VITS zh）：$DEST/tts/"
+if [[ -f "$DEST/tts/model.onnx" ]]; then
+  echo "  - TTS（MeloTTS zh_en）：$DEST/tts/"
+fi
 echo "下一步：在语音页点「启用语音」，状态应变为「正在聆听」。"

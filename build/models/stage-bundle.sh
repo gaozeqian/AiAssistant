@@ -5,7 +5,7 @@
 # Expected source layout (all gitignored, download once per machine):
 #   artifacts/models/sherpa-kws/kws/{encoder,decoder,joiner}.onnx, tokens.txt, keywords.txt
 #   artifacts/models/sherpa-onnx-paraformer-zh-small-2024-03-09/model.int8.onnx, tokens.txt
-#   artifacts/models/sherpa-tts/{model.onnx,tokens.txt,lexicon.txt}
+#   artifacts/models/sherpa-tts/{model.onnx,tokens.txt,lexicon.txt,*.fst,dict/}  (MeloTTS, MIT)
 #   artifacts/models/sherpa-vad/silero_vad.onnx
 # Optional:
 #   artifacts/models/rapidocr/{ch_PP-OCRv4_det_infer.onnx,ch_PP-OCRv4_rec_infer.onnx,ppocr_keys_v1.txt}
@@ -37,7 +37,11 @@ VAD_SRC="$MODELS/sherpa-vad/silero_vad.onnx"
 missing=()
 [[ -f "$KWS_SRC/encoder.onnx" ]] || missing+=("$KWS_SRC/encoder.onnx (KWS 模型，见 docs/MODELS.md)")
 [[ -f "$ASR_SRC/model.int8.onnx" ]] || missing+=("$ASR_SRC/model.int8.onnx (Paraformer ASR，见 docs/MODELS.md)")
-[[ -f "$TTS_SRC/model.onnx" ]] || missing+=("$TTS_SRC/model.onnx (VITS TTS，见 docs/MODELS.md)")
+[[ -f "$TTS_SRC/model.onnx" ]] || missing+=("$TTS_SRC/model.onnx (MeloTTS TTS，见 docs/MODELS.md)")
+[[ -d "$TTS_SRC/dict" ]] || missing+=("$TTS_SRC/dict (MeloTTS 分词词典，见 docs/MODELS.md)")
+for fst in date number phone new_heteronym; do
+  [[ -f "$TTS_SRC/$fst.fst" ]] || missing+=("$TTS_SRC/$fst.fst (MeloTTS 文本正则化规则，见 docs/MODELS.md)")
+done
 [[ -f "$VAD_SRC" ]] || missing+=("$VAD_SRC (Silero VAD，见 docs/MODELS.md)")
 
 if [[ ${#missing[@]} -gt 0 ]]; then
@@ -47,13 +51,18 @@ if [[ ${#missing[@]} -gt 0 ]]; then
 fi
 
 rm -rf "$BUNDLE"
-mkdir -p "$BUNDLE/sherpa/kws" "$BUNDLE/sherpa/tts"
+mkdir -p "$BUNDLE/sherpa/kws" "$BUNDLE/sherpa/tts/dict"
 
 cp "$KWS_SRC/encoder.onnx" "$KWS_SRC/decoder.onnx" "$KWS_SRC/joiner.onnx" \
    "$KWS_SRC/tokens.txt" "$KWS_SRC/keywords.txt" "$BUNDLE/sherpa/kws/"
 cp "$ASR_SRC/model.int8.onnx" "$ASR_SRC/tokens.txt" "$BUNDLE/sherpa/"
 cp "$VAD_SRC" "$BUNDLE/sherpa/silero_vad.onnx"
 cp "$TTS_SRC/model.onnx" "$TTS_SRC/tokens.txt" "$TTS_SRC/lexicon.txt" "$BUNDLE/sherpa/tts/"
+cp "$TTS_SRC"/*.fst "$BUNDLE/sherpa/tts/"
+cp -R "$TTS_SRC/dict/." "$BUNDLE/sherpa/tts/dict/"
+if [[ -f "$TTS_SRC/LICENSE" ]]; then
+  cp "$TTS_SRC/LICENSE" "$BUNDLE/sherpa/tts/LICENSE"
+fi
 
 if [[ "$WITH_RAPIDOCR" -eq 1 ]]; then
   if [[ -f "$MODELS/rapidocr/ch_PP-OCRv4_det_infer.onnx" ]]; then
@@ -71,6 +80,11 @@ if [[ "$WITH_WHISPER" -eq 1 ]]; then
   else
     echo "warning: --with-whisper set but $MODELS/whisper/ggml-small.bin is missing; skipping" >&2
   fi
+fi
+
+if find "$BUNDLE" -iname '*aishell3*' | grep -q .; then
+  echo "拒绝打包：bundle 中出现已退役的 AISHELL-3 权重（许可证不明，见 docs/compliance/MODEL-ASSETS.md）" >&2
+  exit 1
 fi
 
 echo "模型包已就绪：$BUNDLE ($(du -sh "$BUNDLE" | cut -f1))"

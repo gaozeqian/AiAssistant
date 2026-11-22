@@ -16,6 +16,25 @@ public sealed class SherpaVoiceOptions
     public string TtsModel { get; init; } = "tts/model.onnx";
     public string TtsTokens { get; init; } = "tts/tokens.txt";
     public string TtsLexicon { get; init; } = "tts/lexicon.txt";
+
+    /// <summary>
+    /// Jieba dictionary directory required by MeloTTS models. Older VITS assets do not ship one;
+    /// the directory is only passed to sherpa-onnx when it exists.
+    /// </summary>
+    public string TtsDictDir { get; init; } = "tts/dict";
+
+    /// <summary>
+    /// Text-normalization FSTs (dates, numbers, phone numbers, heteronyms) shipped with MeloTTS.
+    /// Missing entries are skipped so a stripped install still synthesizes plain text.
+    /// </summary>
+    public IReadOnlyList<string> TtsRuleFsts { get; init; } =
+    [
+        "tts/date.fst",
+        "tts/number.fst",
+        "tts/phone.fst",
+        "tts/new_heteronym.fst"
+    ];
+
     public int Threads { get; init; } = 1;
 
     /// <summary>
@@ -37,6 +56,8 @@ public sealed class SherpaVoiceOptions
     public string TtsModelPath => Resolve(TtsModel);
     public string TtsTokensPath => Resolve(TtsTokens);
     public string TtsLexiconPath => Resolve(TtsLexicon);
+    public string TtsDictDirPath => Resolve(TtsDictDir);
+    public IReadOnlyList<string> TtsRuleFstsPaths => TtsRuleFsts.Select(Resolve).ToArray();
 
     public bool HasKwsAssets =>
         File.Exists(KeywordsPath) &&
@@ -277,6 +298,17 @@ public sealed class SherpaOnnxTtsService : ITtsService
         config.Model.Vits.Model = _options.TtsModelPath;
         config.Model.Vits.Tokens = _options.TtsTokensPath;
         config.Model.Vits.Lexicon = _options.TtsLexiconPath;
+        if (Directory.Exists(_options.TtsDictDirPath))
+        {
+            config.Model.Vits.DictDir = _options.TtsDictDirPath;
+        }
+
+        var ruleFsts = _options.TtsRuleFstsPaths.Where(File.Exists).ToArray();
+        if (ruleFsts.Length > 0)
+        {
+            config.RuleFsts = string.Join(",", ruleFsts);
+        }
+
         config.Model.Vits.NoiseScale = 0.667f;
         config.Model.Vits.NoiseScaleW = 0.8f;
         config.Model.Vits.LengthScale = 1.0f;

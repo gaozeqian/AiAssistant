@@ -56,6 +56,9 @@ else {
     }
 }
 
+. (Join-Path $PSScriptRoot "legal-files.ps1")
+Copy-LegalFiles -Destination $stage -RepoRoot $repoRoot
+
 if (-not $SkipSigning -and -not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
     $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
         Where-Object { $_.FullName -match '\\x64\\' } |

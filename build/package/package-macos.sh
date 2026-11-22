@@ -107,6 +107,8 @@ else
   echo "bundled models: $(du -sh "$CONTENTS/MacOS/models" | cut -f1)"
 fi
 
+bash "$SCRIPT_DIR/legal-files.sh" "$CONTENTS/Resources"
+
 sed "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/macos/Info.plist.template" > "$CONTENTS/Info.plist"
 chmod +x "$CONTENTS/MacOS/AiAssistant.Host"
 

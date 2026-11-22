@@ -54,6 +54,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash build/models/fetch-bundle.sh
 
+      - name: Build and sign zip
+        shell: pwsh
+        run: |
+          ./build/package/package-windows.ps1 -Version $env:APP_VERSION -RequireSigning
+
       - name: Build and sign MSI
         shell: pwsh
         run: |
@@ -66,6 +71,7 @@ jobs:
         with:
           name: release-win-x64
           path: |
+            artifacts/packages/*.zip
             artifacts/packages/*.msi
             artifacts/packages/*.cer
           if-no-files-found: error

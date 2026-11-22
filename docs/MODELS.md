@@ -58,7 +58,7 @@ bash build/install-voice-models.sh /path/to/data-directory
 
 - `kws/`：唤醒词「你好时光」的 encoder / decoder / joiner / tokens / keywords
 - 根目录：`model.int8.onnx` + `tokens.txt`：命令识别 Paraformer（中文）
-- `tts/`（可选）：`model.onnx` + `tokens.txt` + `lexicon.txt`：VITS 语音合成
+- `tts/`（可选）：`model.onnx` + `tokens.txt` + `lexicon.txt` + `dict/` + `date.fst` / `number.fst` / `phone.fst` / `new_heteronym.fst`：MeloTTS 语音合成（中英混读，MIT）
 
 安装后无需设置 `AIASSISTANT_SHERPA_MODEL_DIR`。若想用外部目录，也可直接设该环境变量指向包含上述结构的根目录。
 
@@ -67,11 +67,11 @@ bash build/install-voice-models.sh /path/to/data-directory
 
 ### 2.1 安装包载荷：只有对话/Embedding 模型在外部（2026-11-22 实测）
 
-安装包携带 `artifacts/models/bundle`（KWS 唤醒词、Paraformer ASR、VITS TTS、Silero VAD，约 126MB），放在应用目录 `models/sherpa`。**只有对话与 Embedding 模型保持外部**（Ollama / 内网 / 公网）。
+安装包携带 `artifacts/models/bundle`（KWS 唤醒词、Paraformer ASR、MeloTTS TTS、Silero VAD，约 268MB），放在应用目录 `models/sherpa`。**只有对话与 Embedding 模型保持外部**（Ollama / 内网 / 公网）。
 
 | 平台 | 随包模型位置 |
 |---|---|
-| Windows zip / MSIX / MSI | `<安装目录>\models\sherpa` |
+| Windows zip / MSI | `<安装目录>\models\sherpa` |
 | macOS `.app` | `AiAssistant.app/Contents/MacOS/models/sherpa` |
 | Linux tar.gz / deb | `/usr/lib/aiassistant/models/sherpa` |
 
@@ -86,7 +86,7 @@ bash build/install-voice-models.sh /path/to/data-directory
 
 **平台门槛**
 
-- Windows：无需 .NET 运行时；发布产物全量扫描无 `MSVCP140`/`VCRUNTIME140` 导入，**不需要 VC++ Redistributable**。MSIX 要求 Windows 10 2004（`10.0.19041`）以上；MSI 为 `perMachine`，安装需管理员；未签名包会被 SmartScreen/证书信任拦截。数据目录 `%LOCALAPPDATA%\AiAssistant`，卸载保留。PDF 可检索依赖系统 CJK 字体。
+- Windows：无需 .NET 运行时；发布产物全量扫描无 `MSVCP140`/`VCRUNTIME140` 导入，**不需要 VC++ Redistributable**。发布格式只有自包含 zip 与 MSI；MSI 为 `perMachine`，安装需管理员；未签名包会被 SmartScreen/证书信任拦截。数据目录 `%LOCALAPPDATA%\AiAssistant`，卸载保留。PDF 可检索依赖系统 CJK 字体。
 - macOS：默认 `osx-arm64`、最低 13.0；干净机器必须 Developer ID 签名 + 公证。首次运行需授予屏幕录制、辅助功能、麦克风。Swift Helper 必须随 `.app` 打入。Intel Mac 需另出 `osx-x64`/universal 包。
 - Linux：deb 声明依赖 `libsecret-1-0, libx11-6, libice6, libsm6, libfontconfig1`；运行期还需要 `libpulse-simple.so.0`、`xdg-desktop-portal` + `pipewire`（Wayland 抓屏）与 CJK 字体（PDF）。GNOME 默认无托盘，关闭只隐藏、用顶部「退出」。
 
@@ -96,12 +96,13 @@ bash build/install-voice-models.sh /path/to/data-directory
 <数据目录>/models/sherpa/
   kws/  encoder.onnx  decoder.onnx  joiner.onnx  tokens.txt  keywords.txt
   model.int8.onnx  tokens.txt  silero_vad.onnx
-  tts/  model.onnx  tokens.txt  lexicon.txt
+  tts/  model.onnx  tokens.txt  lexicon.txt  date.fst  number.fst  phone.fst  new_heteronym.fst
+  tts/dict/  （MeloTTS 分词词典）
 ```
 
 `keywords.txt` 一行一个唤醒词：`n ǐ h ǎo sh í g uāng @你好时光`。
 打包前用 `bash build/models/stage-bundle.sh` 汇总资产（或 `fetch-bundle.sh` 直接下载官方模型）。
-随包资产来源与许可证见 `docs/compliance/MODEL-ASSETS.md`；ASR/TTS 许可证仍需发布前确认并补齐 `THIRD-PARTY-NOTICES`。
+随包资产来源与许可证见 `docs/compliance/MODEL-ASSETS.md`（全部为 Apache-2.0 / MIT，已移除许可不明的 AISHELL-3 VITS）；`THIRD-PARTY-NOTICES.md` 已生成并随安装包分发。
 
 ## 2.5 从 UI 配置模型
 

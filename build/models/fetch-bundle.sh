@@ -4,10 +4,10 @@
 #
 #   bash build/models/fetch-bundle.sh [--with-rapidocr] [--with-whisper]
 #
-# Assets (all Apache-2.0 upstream unless noted):
+# Assets (all Apache-2.0 or MIT upstream):
 #   KWS   kws-models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2
-#   ASR   asr-models/sherpa-onnx-paraformer-zh-small-2024-03-09.tar.bz2
-#   TTS   tts-models/vits-zh-aishell3.tar.bz2
+#   ASR   asr-models/sherpa-onnx-paraformer-zh-small-2024-03-09.tar.bz2  (Apache-2.0)
+#   TTS   tts-models/vits-melo-tts-zh_en.tar.bz2                          (MeloTTS, MIT)
 #   VAD   asr-models/silero_vad_v5.onnx
 set -euo pipefail
 
@@ -43,7 +43,7 @@ extract() {
 
 fetch kws-models sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2
 fetch asr-models sherpa-onnx-paraformer-zh-small-2024-03-09.tar.bz2
-fetch tts-models vits-zh-aishell3.tar.bz2
+fetch tts-models vits-melo-tts-zh_en.tar.bz2
 fetch asr-models silero_vad_v5.onnx
 
 KWS_ROOT="$CACHE/kws-extract"
@@ -54,13 +54,14 @@ mkdir -p "$KWS_ROOT" "$ASR_ROOT" "$TTS_ROOT"
 
 extract "$CACHE/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2" "$KWS_ROOT"
 extract "$CACHE/sherpa-onnx-paraformer-zh-small-2024-03-09.tar.bz2" "$ASR_ROOT"
-extract "$CACHE/vits-zh-aishell3.tar.bz2" "$TTS_ROOT"
+extract "$CACHE/vits-melo-tts-zh_en.tar.bz2" "$TTS_ROOT"
 
 KWS_SRC="$(find "$KWS_ROOT" -type d -name 'sherpa-onnx-kws-*' | head -1)"
 ASR_SRC="$(find "$ASR_ROOT" -type d -name 'sherpa-onnx-paraformer-*' | head -1)"
-TTS_MODEL="$(find "$TTS_ROOT" -name 'vits-aishell3.int8.onnx' | head -1)"
+TTS_MODEL="$(find "$TTS_ROOT" -type f -name 'model.onnx' | head -1)"
 if [[ -z "$TTS_MODEL" ]]; then
-  TTS_MODEL="$(find "$TTS_ROOT" -name '*.onnx' | head -1)"
+  echo "TTS archive does not contain model.onnx: $CACHE/vits-melo-tts-zh_en.tar.bz2" >&2
+  exit 1
 fi
 TTS_DIR="$(dirname "$TTS_MODEL")"
 
@@ -74,8 +75,15 @@ printf 'n ǐ h ǎo sh í g uāng @你好时光\n' > "$MODELS/sherpa-kws/kws/keyw
 rm -rf "$MODELS/sherpa-onnx-paraformer-zh-small-2024-03-09"
 cp -R "$ASR_SRC" "$MODELS/sherpa-onnx-paraformer-zh-small-2024-03-09"
 
+rm -rf "$MODELS/sherpa-tts"
+mkdir -p "$MODELS/sherpa-tts/dict"
 cp "$TTS_MODEL" "$MODELS/sherpa-tts/model.onnx"
 cp "$TTS_DIR/tokens.txt" "$TTS_DIR/lexicon.txt" "$MODELS/sherpa-tts/"
+cp "$TTS_DIR"/*.fst "$MODELS/sherpa-tts/"
+cp -R "$TTS_DIR/dict/." "$MODELS/sherpa-tts/dict/"
+if [[ -f "$TTS_DIR/LICENSE" ]]; then
+  cp "$TTS_DIR/LICENSE" "$MODELS/sherpa-tts/LICENSE"
+fi
 cp "$CACHE/silero_vad_v5.onnx" "$MODELS/sherpa-vad/silero_vad.onnx"
 
 bash "$SCRIPT_DIR/stage-bundle.sh" "$@"

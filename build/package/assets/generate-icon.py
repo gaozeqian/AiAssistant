@@ -83,43 +83,6 @@ def render(size: int = SIZE) -> bytes:
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", compressed) + chunk(b"IEND", b"")
 
 
-def render_wide(width: int, height: int) -> bytes:
-    """Letterboxes the square icon onto a transparent wide canvas for MSIX tiles."""
-    scale = SIZE / height
-    rows = []
-    left_pad = (width - height) // 2
-    for py in range(height):
-        row = bytearray(b"\x00" * (left_pad * 4))
-        # Re-use the square row by re-rendering only the visible columns.
-        for px in range(height):
-            x = (px + 0.5) * scale
-            y = (py + 0.5) * scale
-            alpha = rounded_alpha(x, y)
-            if alpha <= 0.0:
-                row.extend((0, 0, 0, 0))
-                continue
-            t = (x + y) / (2 * SIZE)
-            base = tuple(int(ACCENT[i] * (1 - t) + DARK[i] * t) for i in range(3))
-            glyph = clock_coverage(x, y)
-            color = tuple(int(base[i] * (1 - glyph) + WHITE[i] * glyph) for i in range(3))
-            row.extend((color[0], color[1], color[2], int(alpha * 255)))
-        row.extend(b"\x00" * ((width - height - left_pad) * 4))
-        rows.append(bytes(row))
-    raw = b"".join(rows)
-    compressed = zlib.compress(raw, 9)
-
-    def chunk(kind: bytes, payload: bytes) -> bytes:
-        return (
-            struct.pack(">I", len(payload))
-            + kind
-            + payload
-            + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
-        )
-
-    header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
-    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", compressed) + chunk(b"IEND", b"")
-
-
 def main() -> None:
     out_dir = Path(__file__).resolve().parent
     png = render(SIZE)
@@ -135,19 +98,6 @@ def main() -> None:
         offset += len(data)
     ico = struct.pack("<HHH", 0, 1, len(images)) + entries + b"".join(images)
     (out_dir / "aiassistant.ico").write_bytes(ico)
-
-    # MSIX tile assets (generated only when the Windows package layout is requested).
-    msix_dir = out_dir / "msix"
-    if not msix_dir.exists():
-        msix_dir.mkdir(parents=True)
-    for name, size in [
-        ("StoreLogo.png", 50),
-        ("Square44x44Logo.png", 44),
-        ("Square150x150Logo.png", 150),
-    ]:
-        (msix_dir / name).write_bytes(render(size))
-    (msix_dir / "Wide310x150Logo.png").write_bytes(render_wide(310, 150))
-    (msix_dir / "SplashScreen.png").write_bytes(render_wide(620, 300))
     print(f"wrote icon assets under {out_dir}")
 
 

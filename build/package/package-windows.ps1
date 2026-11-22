@@ -1,11 +1,12 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Builds the Windows release artifacts for AiAssistant (self-contained folder + zip + optional MSIX).
+    Builds the Windows release artifacts for AiAssistant (self-contained folder + zip).
 
 .DESCRIPTION
     Produces a self-contained win-x64 publish, optionally Authenticode-signs every binary,
-    zips the folder, and can additionally pack a sideloadable MSIX when the Windows SDK is present.
+    copies the legal documents (LICENSE, EULA, THIRD-PARTY-NOTICES) and zips the folder.
+    The MSI is produced separately by package-windows-msi.ps1; MSIX is no longer supported.
 
     Signing is opt-in: set AIASSISTANT_SIGN_CERT_THUMBPRINT (and optionally AIASSISTANT_TIMESTAMP_URL).
     When a thumbprint is supplied but signtool is missing, the script fails instead of silently
@@ -16,7 +17,7 @@
 
 .EXAMPLE
     $env:AIASSISTANT_SIGN_CERT_THUMBPRINT = "ABCDEF..."
-    pwsh build/package/package-windows.ps1 -Msix -Publisher "CN=AiAssistant"
+    pwsh build/package/package-windows.ps1
 #>
 [CmdletBinding()]
 param(
@@ -26,11 +27,9 @@ param(
     [string]$TimestampUrl = $env:AIASSISTANT_TIMESTAMP_URL,
     [string]$VerifyRootPath = $env:AIASSISTANT_SIGN_ROOT_CER,
     [switch]$FrameworkDependent,
-    [switch]$Msix,
     [switch]$RequireSigning,
     [switch]$SkipTimestamp,
-    [switch]$SkipModelBundle,
-    [string]$Publisher = "CN=AiAssistant"
+    [switch]$SkipModelBundle
 )
 
 $ErrorActionPreference = "Stop"
@@ -54,7 +53,6 @@ if ([string]::IsNullOrWhiteSpace($TimestampUrl)) {
 
 $outputDir = Join-Path $repoRoot $OutputRoot
 $stageDir = Join-Path $outputDir "staging\$runtime"
-$msixStage = Join-Path $outputDir "staging\msix-$runtime"
 $selfContained = -not $FrameworkDependent
 
 function Find-SdkTool {
@@ -134,6 +132,10 @@ else {
     Write-Host ("Bundled models: {0:N1} MB" -f ($bundleBytes / 1MB))
 }
 
+# Legal documents are part of the deliverable, not an optional extra.
+. (Join-Path $PSScriptRoot "legal-files.ps1")
+Copy-LegalFiles -Destination $stageDir -RepoRoot $repoRoot
+
 $binaries = Get-ChildItem -Path $stageDir -Recurse -Include *.exe, *.dll
 if (-not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
     $signtool = Find-SdkTool -Name "signtool.exe"
@@ -181,65 +183,8 @@ if (Test-Path $zipPath) {
 Compress-Archive -Path (Join-Path $stageDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
 Write-Host "zip: $zipPath"
 
-if ($Msix) {
-    if ([string]::IsNullOrWhiteSpace($Publisher)) {
-        throw "MSIX packaging requires -Publisher matching the signing certificate subject."
-    }
-
-    $makeappx = Find-SdkTool -Name "makeappx.exe"
-    if ($null -eq $makeappx) {
-        throw "MSIX packaging was requested but makeappx.exe was not found. Install the Windows SDK."
-    }
-
-    if (Test-Path $msixStage) {
-        Remove-Item -Path $msixStage -Recurse -Force
-    }
-
-    New-Item -ItemType Directory -Path $msixStage -Force | Out-Null
-    Copy-Item -Path (Join-Path $stageDir "*") -Destination $msixStage -Recurse -Force
-    Copy-Item -Path (Join-Path $PSScriptRoot "assets\msix") -Destination (Join-Path $msixStage "Assets") -Recurse -Force
-
-    $msixVersion = $Version
-    if ($Version -match '^\d+\.\d+\.\d+$') {
-        $msixVersion = "$Version.0"
-    }
-    elseif ($Version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-        throw "MSIX requires a numeric version such as 0.1.0 or 0.1.0.0, got '$Version'."
-    }
-
-    $manifest = Get-Content (Join-Path $PSScriptRoot "windows\Package.appxmanifest.template") -Raw
-    $manifest = $manifest.Replace("__PUBLISHER__", $Publisher).Replace("__VERSION__", $msixVersion)
-    Set-Content -Path (Join-Path $msixStage "AppxManifest.xml") -Value $manifest -Encoding UTF8
-
-    $msixPath = Join-Path $outputDir "AiAssistant-$Version-$runtime.msix"
-    if (Test-Path $msixPath) {
-        Remove-Item $msixPath -Force
-    }
-
-    & $makeappx pack /d $msixStage /p $msixPath /o
-    if ($LASTEXITCODE -ne 0) {
-        throw "makeappx failed with exit code $LASTEXITCODE"
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
-        $signtool = Find-SdkTool -Name "signtool.exe"
-        if ($SkipTimestamp) {
-            & $signtool sign /fd SHA256 /sha1 $SignThumbprint $msixPath
-        }
-        else {
-            & $signtool sign /fd SHA256 /td SHA256 /tr $TimestampUrl /sha1 $SignThumbprint $msixPath
-        }
-
-        if ($LASTEXITCODE -ne 0) {
-            throw "MSIX signing failed"
-        }
-    }
-
-    Write-Host "msix: $msixPath"
-}
-
 $checksumFiles = Get-ChildItem -Path $outputDir -File |
-    Where-Object { $_.Extension -in @(".zip", ".msix") } |
+    Where-Object { $_.Extension -eq ".zip" } |
     Sort-Object Name
 if ($checksumFiles.Count -gt 0) {
     $checksumLines = foreach ($file in $checksumFiles) {
