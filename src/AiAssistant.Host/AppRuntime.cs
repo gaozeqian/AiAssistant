@@ -247,7 +247,13 @@ public sealed class AppRuntime : IAsyncDisposable
         var sherpaModelDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_SHERPA_MODEL_DIR");
         if (string.IsNullOrWhiteSpace(sherpaModelDirectory))
         {
-            sherpaModelDirectory = Path.Combine(dataDirectory, "models", "sherpa");
+            sherpaModelDirectory = ResolveModelDirectory(
+                dataDirectory,
+                "sherpa",
+                Path.Combine("kws", "encoder.onnx"),
+                "model.int8.onnx",
+                Path.Combine("tts", "model.onnx"),
+                "silero_vad.onnx");
         }
 
         services.AddSingleton(new SherpaOnnxOptions { ModelDirectory = Path.GetFullPath(sherpaModelDirectory) });
@@ -449,6 +455,40 @@ public sealed class AppRuntime : IAsyncDisposable
         await _services.DisposeAsync();
     }
 
+    /// <summary>
+    /// Resolves an optional model folder: the user data directory wins when it already contains
+    /// model assets (so users can override a bundled model), otherwise the folder shipped next to
+    /// the executable by the installer is used. Callers handle explicit environment overrides first.
+    /// </summary>
+    private static string ResolveModelDirectory(string dataDirectory, string name, params string[] markers)
+    {
+        var dataPath = Path.GetFullPath(Path.Combine(dataDirectory, "models", name));
+        if (HasModelMarker(dataPath, markers))
+        {
+            return dataPath;
+        }
+
+        var bundledPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "models", name));
+        return HasModelMarker(bundledPath, markers) ? bundledPath : dataPath;
+    }
+
+    private static string ResolveModelFile(string dataDirectory, string name, string fileName)
+    {
+        var dataPath = Path.GetFullPath(Path.Combine(dataDirectory, "models", name, fileName));
+        if (File.Exists(dataPath))
+        {
+            return dataPath;
+        }
+
+        var bundledPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "models", name, fileName));
+        return File.Exists(bundledPath) ? bundledPath : dataPath;
+    }
+
+    private static bool HasModelMarker(string directory, string[] markers) =>
+        markers.Length == 0
+            ? Directory.Exists(directory)
+            : markers.Any(marker => File.Exists(Path.Combine(directory, marker)));
+
     /// <summary>Whisper is opt-in for high-quality batch recognition; sherpa-onnx stays the default.</summary>
     private static void RegisterAsrEngine(IServiceCollection services, string dataDirectory)
     {
@@ -463,7 +503,7 @@ public sealed class AppRuntime : IAsyncDisposable
         var modelPath = Environment.GetEnvironmentVariable("AIASSISTANT_WHISPER_MODEL_PATH");
         if (string.IsNullOrWhiteSpace(modelPath))
         {
-            modelPath = Path.Combine(dataDirectory, "models", "whisper", "ggml-small.bin");
+            modelPath = ResolveModelFile(dataDirectory, "whisper", "ggml-small.bin");
         }
 
         services.AddSingleton(new WhisperAsrOptions { ModelPath = Path.GetFullPath(modelPath) });
@@ -475,7 +515,13 @@ public sealed class AppRuntime : IAsyncDisposable
         var modelDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_SHERPA_MODEL_DIR");
         if (string.IsNullOrWhiteSpace(modelDirectory))
         {
-            modelDirectory = Path.Combine(dataDirectory, "models", "sherpa");
+            modelDirectory = ResolveModelDirectory(
+                dataDirectory,
+                "sherpa",
+                Path.Combine("kws", "encoder.onnx"),
+                "model.int8.onnx",
+                Path.Combine("tts", "model.onnx"),
+                "silero_vad.onnx");
         }
 
         // Fall back to the tuned defaults declared on SherpaVoiceOptions so the two cannot drift.
@@ -786,7 +832,11 @@ public sealed class AppRuntime : IAsyncDisposable
         var rapidOcrDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_RAPIDOCR_MODEL_DIR");
         if (string.IsNullOrWhiteSpace(rapidOcrDirectory))
         {
-            rapidOcrDirectory = Path.Combine(options.DataDirectory, "models", "rapidocr");
+            rapidOcrDirectory = ResolveModelDirectory(
+                options.DataDirectory,
+                "rapidocr",
+                "ch_PP-OCRv4_det_infer.onnx",
+                "ch_PP-OCRv4_rec_infer.onnx");
         }
 
         services.AddSingleton(new RapidOcrOptions { ModelDirectory = Path.GetFullPath(rapidOcrDirectory) });

@@ -54,15 +54,54 @@ bash build/install-voice-models.sh
 bash build/install-voice-models.sh /path/to/data-directory
 ```
 
-脚本把两类模型放到 `<数据目录>/models/sherpa/`：
+脚本把语音模型放到 `<数据目录>/models/sherpa/`：
 
 - `kws/`：唤醒词「你好时光」的 encoder / decoder / joiner / tokens / keywords
 - 根目录：`model.int8.onnx` + `tokens.txt`：命令识别 Paraformer（中文）
+- `tts/`（可选）：`model.onnx` + `tokens.txt` + `lexicon.txt`：VITS 语音合成
 
 安装后无需设置 `AIASSISTANT_SHERPA_MODEL_DIR`。若想用外部目录，也可直接设该环境变量指向包含上述结构的根目录。
 
 验证：启动 GUI → 语音页，能力状态应从「Wake-word model assets are not installed」变为
 「Wake word ready」（若 TTS 资产未装会追加 `TTS feedback unavailable`，不影响唤醒与识别）。
+
+### 2.1 安装包载荷：只有对话/Embedding 模型在外部（2026-11-22 实测）
+
+安装包携带 `artifacts/models/bundle`（KWS 唤醒词、Paraformer ASR、VITS TTS、Silero VAD，约 126MB），放在应用目录 `models/sherpa`。**只有对话与 Embedding 模型保持外部**（Ollama / 内网 / 公网）。
+
+| 平台 | 随包模型位置 |
+|---|---|
+| Windows zip / MSIX / MSI | `<安装目录>\models\sherpa` |
+| macOS `.app` | `AiAssistant.app/Contents/MacOS/models/sherpa` |
+| Linux tar.gz / deb | `/usr/lib/aiassistant/models/sherpa` |
+
+应用解析顺序：`AIASSISTANT_SHERPA_MODEL_DIR` → `<数据目录>/models/sherpa` → `<应用目录>/models/sherpa`。
+数据目录存在资产时优先，用户仍可覆盖随包模型；两个目录都没有时保持原有降级提示。
+
+**仍需外部准备**
+
+- Ollama 与 `gemma4:12b`（约 7.1GB）+ `embeddinggemma-2:740m`（约 1.2GB），或配置内网/公网端点。
+- 可选资产：Whisper `ggml-small.bin`（466MB，`--with-whisper` 打包）、RapidOCR（Linux 图像 OCR 兜底，`--with-rapidocr`）、说话人分离 `segmentation.onnx` + `speaker-embedding.onnx`（实验特性，默认不打包）。
+- 麦克风权限：Windows「设置 → 隐私 → 麦克风 → 允许桌面应用」；macOS 首次运行 TCC 授权。
+
+**平台门槛**
+
+- Windows：无需 .NET 运行时；发布产物全量扫描无 `MSVCP140`/`VCRUNTIME140` 导入，**不需要 VC++ Redistributable**。MSIX 要求 Windows 10 2004（`10.0.19041`）以上；MSI 为 `perMachine`，安装需管理员；未签名包会被 SmartScreen/证书信任拦截。数据目录 `%LOCALAPPDATA%\AiAssistant`，卸载保留。PDF 可检索依赖系统 CJK 字体。
+- macOS：默认 `osx-arm64`、最低 13.0；干净机器必须 Developer ID 签名 + 公证。首次运行需授予屏幕录制、辅助功能、麦克风。Swift Helper 必须随 `.app` 打入。Intel Mac 需另出 `osx-x64`/universal 包。
+- Linux：deb 声明依赖 `libsecret-1-0, libx11-6, libice6, libsm6, libfontconfig1`；运行期还需要 `libpulse-simple.so.0`、`xdg-desktop-portal` + `pipewire`（Wayland 抓屏）与 CJK 字体（PDF）。GNOME 默认无托盘，关闭只隐藏、用顶部「退出」。
+
+**开发机手动覆盖（可选）**
+
+```text
+<数据目录>/models/sherpa/
+  kws/  encoder.onnx  decoder.onnx  joiner.onnx  tokens.txt  keywords.txt
+  model.int8.onnx  tokens.txt  silero_vad.onnx
+  tts/  model.onnx  tokens.txt  lexicon.txt
+```
+
+`keywords.txt` 一行一个唤醒词：`n ǐ h ǎo sh í g uāng @你好时光`。
+打包前用 `bash build/models/stage-bundle.sh` 汇总资产（或 `fetch-bundle.sh` 直接下载官方模型）。
+随包资产来源与许可证见 `docs/compliance/MODEL-ASSETS.md`；ASR/TTS 许可证仍需发布前确认并补齐 `THIRD-PARTY-NOTICES`。
 
 ## 2.5 从 UI 配置模型
 

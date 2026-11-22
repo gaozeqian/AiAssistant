@@ -435,6 +435,9 @@ FodyWeavers.xsd
 
 # Local speech/OCR model assets are never committed
 models/
+# But the scripts that stage/bundle those assets are tracked.
+!build/models/
+!build/models/*.sh
 *.onnx
 models.json
 

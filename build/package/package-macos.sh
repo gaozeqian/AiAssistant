@@ -9,6 +9,7 @@ IDENTITY="${AIASSISTANT_CODESIGN_IDENTITY:-}"
 NOTARY_PROFILE="${AIASSISTANT_NOTARY_PROFILE:-}"
 OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-artifacts/packages}"
 SKIP_SIGN=0
+SKIP_MODELS=0
 REQUIRE_SIGN=0
 CERTIFICATE_PATH=""
 FRAMEWORK_DEPENDENT=0
@@ -23,6 +24,7 @@ while [[ $# -gt 0 ]]; do
     --output) OUTPUT_ROOT="$2"; shift 2 ;;
     --runtime) RUNTIME="$2"; shift 2 ;;
     --skip-sign) SKIP_SIGN=1; shift ;;
+    --skip-models) SKIP_MODELS=1; shift ;;
     --require-sign) REQUIRE_SIGN=1; shift ;;
     --certificate) CERTIFICATE_PATH="$2"; shift 2 ;;
     --keychain) KEYCHAIN="$2"; shift 2 ;;
@@ -82,6 +84,27 @@ if [[ -x "$HELPER" ]]; then
   chmod +x "$CONTENTS/MacOS/aiassistant-mac-helper"
 else
   echo "warning: Swift helper binary not found; build native/AiAssistant.MacHelper first" >&2
+fi
+
+# Local model assets ship inside the .app (Contents/MacOS/models, beside the executable).
+# Only the chat/embedding models stay external.
+if [[ "$SKIP_MODELS" -eq 1 ]]; then
+  echo "warning: --skip-models set; the app will not include voice model assets" >&2
+else
+  MODEL_BUNDLE="$REPO_ROOT/artifacts/models/bundle"
+  if [[ ! -d "$MODEL_BUNDLE" ]]; then
+    echo "model bundle not found: $MODEL_BUNDLE (run build/models/stage-bundle.sh, or pass --skip-models)" >&2
+    exit 1
+  fi
+
+  cp -R "$MODEL_BUNDLE" "$CONTENTS/MacOS/models"
+  for required in "sherpa/kws/encoder.onnx" "sherpa/model.int8.onnx" "sherpa/silero_vad.onnx" "sherpa/tts/model.onnx"; do
+    if [[ ! -f "$CONTENTS/MacOS/models/$required" ]]; then
+      echo "bundled model missing: $required" >&2
+      exit 1
+    fi
+  done
+  echo "bundled models: $(du -sh "$CONTENTS/MacOS/models" | cut -f1)"
 fi
 
 sed "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/macos/Info.plist.template" > "$CONTENTS/Info.plist"

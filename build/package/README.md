@@ -2,6 +2,21 @@
 
 跨平台发布脚本，产物统一落在 `artifacts/packages/`（已被 `.gitignore` 忽略）。
 
+## 模型载荷（三平台共用）
+
+安装包默认携带本机语音模型（KWS 唤醒词、Paraformer ASR、VITS TTS、Silero VAD），**只有对话与 Embedding 模型保持外部**（Ollama / 内网 / 公网端点）。打包前先汇总资产：
+
+```bash
+bash build/models/stage-bundle.sh
+# 可选：把 Linux OCR 兜底与 Whisper 也带上
+bash build/models/stage-bundle.sh --with-rapidocr --with-whisper
+```
+
+- `stage-bundle.sh` 从 `artifacts/models/sherpa-kws/kws`、`sherpa-onnx-paraformer-zh-small-2024-03-09`、`sherpa-tts`、`sherpa-vad` 汇总到 `artifacts/models/bundle`；缺 KWS/ASR/TTS/VAD 任一项直接失败。
+- 三个平台的打包脚本都会把 bundle 复制到应用目录：Windows `models\`、macOS `AiAssistant.app/Contents/MacOS/models`、Linux `/usr/lib/aiassistant/models`。
+- 应用解析顺序：`AIASSISTANT_*_MODEL_DIR` → `<数据目录>/models/...` → `<应用目录>/models/...`，用户可用数据目录覆盖随包模型。
+- 开发调试可加 `-SkipModelBundle`（PowerShell）或 `--skip-models`（bash）跳过；**正式发布不要使用**。
+
 ## Windows
 
 ```powershell

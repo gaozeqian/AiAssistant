@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory = $true)][string]$CertificatePath,
     [string]$OutputDirectory = "artifacts/packages",
     [string]$SignThumbprint = $env:AIASSISTANT_SIGN_CERT_THUMBPRINT,
-    [switch]$SkipSigning
+    [switch]$SkipSigning,
+    [switch]$SkipModelBundle
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,6 +33,28 @@ dotnet publish (Join-Path $repoRoot "src\AiAssistant.Host\AiAssistant.Host.cspro
 
 Copy-Item $CertificatePath (Join-Path $stage "AiAssistant.cer") -Force
 Copy-Item (Join-Path $repoRoot "build\package\assets\aiassistant.ico") (Join-Path $stage "aiassistant.ico") -Force
+
+# Local model assets ship with the installer; only the chat/embedding models stay external.
+$modelBundleSource = Join-Path $repoRoot "artifacts/models/bundle"
+if ($SkipModelBundle) {
+    Write-Warning "Model bundle skipped; the installer will not include wake-word/ASR/TTS assets."
+}
+else {
+    if (-not (Test-Path -Path $modelBundleSource)) {
+        throw "Model bundle not found at $modelBundleSource. Run 'bash build/models/stage-bundle.sh' first, or pass -SkipModelBundle."
+    }
+
+    Copy-Item -Path $modelBundleSource -Destination (Join-Path $stage "models") -Recurse -Force
+    foreach ($required in @(
+        (Join-Path $stage "models\sherpa\kws\encoder.onnx"),
+        (Join-Path $stage "models\sherpa\model.int8.onnx"),
+        (Join-Path $stage "models\sherpa\silero_vad.onnx"),
+        (Join-Path $stage "models\sherpa\tts\model.onnx"))) {
+        if (-not (Test-Path -Path $required)) {
+            throw "Bundled model missing: $required"
+        }
+    }
+}
 
 if (-not $SkipSigning -and -not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
     $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |

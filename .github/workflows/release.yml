@@ -48,6 +48,12 @@ jobs:
           certutil -user -addstore -f TrustedPeople $cer | Out-Null
           "AIASSISTANT_SIGN_CERT_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
 
+      - name: Fetch bundled voice models
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash build/models/fetch-bundle.sh
+
       - name: Build and sign MSI
         shell: pwsh
         run: |
@@ -90,6 +96,11 @@ jobs:
             "$GITHUB_WORKSPACE/artifacts/packages/AiAssistant-$version-osx-arm64.cer" \
             "AiAssistant Self-Signed"
 
+      - name: Fetch bundled voice models
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash build/models/fetch-bundle.sh
+
       - name: Package, sign and create PKG
         env:
           AIASSISTANT_CODESIGN_IDENTITY: AiAssistant Self-Signed
@@ -121,6 +132,11 @@ jobs:
         run: |
           dotnet restore AiAssistant.sln
           dotnet test AiAssistant.sln -c Release
+
+      - name: Fetch bundled voice models
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash build/models/fetch-bundle.sh
 
       - name: Package deb
         run: bash build/package/package-linux.sh --version "$APP_VERSION"

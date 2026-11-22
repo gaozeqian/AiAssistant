@@ -6,6 +6,7 @@ VERSION="${VERSION:-}"
 OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-artifacts/packages}"
 RUNTIME="linux-x64"
 FRAMEWORK_DEPENDENT=0
+SKIP_MODELS=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -13,6 +14,7 @@ while [[ $# -gt 0 ]]; do
     --output) OUTPUT_ROOT="$2"; shift 2 ;;
     --runtime) RUNTIME="$2"; shift 2 ;;
     --framework-dependent) FRAMEWORK_DEPENDENT=1; shift ;;
+    --skip-models) SKIP_MODELS=1; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -51,6 +53,27 @@ dotnet publish "$REPO_ROOT/src/AiAssistant.Host/AiAssistant.Host.csproj" \
   -p:Version="$VERSION" -p:InformationalVersion="$VERSION" \
   -tl:off -v:m \
   -o "$APP_DIR"
+
+# Local model assets ship beside the executable (/usr/lib/aiassistant/models).
+# Only the chat/embedding models stay external.
+if [[ "$SKIP_MODELS" -eq 1 ]]; then
+  echo "warning: --skip-models set; the package will not include voice model assets" >&2
+else
+  MODEL_BUNDLE="$REPO_ROOT/artifacts/models/bundle"
+  if [[ ! -d "$MODEL_BUNDLE" ]]; then
+    echo "model bundle not found: $MODEL_BUNDLE (run build/models/stage-bundle.sh, or pass --skip-models)" >&2
+    exit 1
+  fi
+
+  cp -R "$MODEL_BUNDLE" "$APP_DIR/models"
+  for required in "sherpa/kws/encoder.onnx" "sherpa/model.int8.onnx" "sherpa/silero_vad.onnx" "sherpa/tts/model.onnx"; do
+    if [[ ! -f "$APP_DIR/models/$required" ]]; then
+      echo "bundled model missing: $required" >&2
+      exit 1
+    fi
+  done
+  echo "bundled models: $(du -sh "$APP_DIR/models" | cut -f1)"
+fi
 
 cat > "$STAGE/usr/bin/aiassistant" <<'LAUNCHER'
 #!/bin/sh

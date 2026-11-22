@@ -29,6 +29,7 @@ param(
     [switch]$Msix,
     [switch]$RequireSigning,
     [switch]$SkipTimestamp,
+    [switch]$SkipModelBundle,
     [string]$Publisher = "CN=AiAssistant"
 )
 
@@ -105,6 +106,32 @@ $publishArgs = @(
 & dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
+}
+
+# Local model assets ship with the installer; only the chat/embedding models stay external.
+$modelBundleSource = Join-Path $repoRoot "artifacts/models/bundle"
+$modelBundleTarget = Join-Path $stageDir "models"
+if ($SkipModelBundle) {
+    Write-Warning "Model bundle skipped; the installer will not include wake-word/ASR/TTS assets."
+}
+else {
+    if (-not (Test-Path -Path $modelBundleSource)) {
+        throw "Model bundle not found at $modelBundleSource. Run 'bash build/models/stage-bundle.sh' first, or pass -SkipModelBundle for a developer build."
+    }
+
+    Copy-Item -Path $modelBundleSource -Destination $modelBundleTarget -Recurse -Force
+    foreach ($required in @(
+        (Join-Path $modelBundleTarget "sherpa\kws\encoder.onnx"),
+        (Join-Path $modelBundleTarget "sherpa\model.int8.onnx"),
+        (Join-Path $modelBundleTarget "sherpa\silero_vad.onnx"),
+        (Join-Path $modelBundleTarget "sherpa\tts\model.onnx"))) {
+        if (-not (Test-Path -Path $required)) {
+            throw "Bundled model missing: $required"
+        }
+    }
+
+    $bundleBytes = (Get-ChildItem -Path $modelBundleTarget -Recurse -File | Measure-Object -Property Length -Sum).Sum
+    Write-Host ("Bundled models: {0:N1} MB" -f ($bundleBytes / 1MB))
 }
 
 $binaries = Get-ChildItem -Path $stageDir -Recurse -Include *.exe, *.dll
