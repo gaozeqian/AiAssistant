@@ -34,10 +34,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string? _selectedSecret;
     private string _secretStatus = "密钥值写入后不可读取；models.json 通过 apiKeySecret 引用名称。";
     private bool _isLoading;
-    private string _baseUrl = "http://127.0.0.1:11434";
+    private string _chatBaseUrl = "http://127.0.0.1:11434";
     private string _chatModel = string.Empty;
+    private ModelTierOption _chatTier = new("LocalOffline", "本机 Ollama");
+    private string _embeddingBaseUrl = "http://127.0.0.1:11434";
     private string _embeddingModel = string.Empty;
-    private ModelTierOption _selectedTier = new("LocalOffline", "本机 Ollama");
+    private ModelTierOption _embeddingTier = new("LocalOffline", "本机 Ollama");
     private string _modelConfigStatus = "保存后需重启应用生效。";
 
     public DiagnosticsViewModel(
@@ -55,10 +57,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
         if (modelConfiguration is not null)
         {
             var view = modelConfiguration.Current;
-            _baseUrl = view.BaseUrl;
-            _chatModel = view.ChatModel;
-            _embeddingModel = view.EmbeddingModel;
-            _selectedTier = TierOptions.First(option => option.Value == view.Tier);
+            _chatBaseUrl = view.Chat.BaseUrl;
+            _chatModel = view.Chat.Model;
+            _chatTier = TierOptions.First(option => option.Value == view.Chat.Tier);
+            _embeddingBaseUrl = view.Embedding.BaseUrl;
+            _embeddingModel = view.Embedding.Model;
+            _embeddingTier = TierOptions.First(option => option.Value == view.Embedding.Tier);
         }
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
@@ -185,10 +189,10 @@ public sealed class DiagnosticsViewModel : ObservableObject
 
     public bool HasModelConfiguration => _modelConfiguration is not null;
 
-    public string BaseUrl
+    public string ChatBaseUrl
     {
-        get => _baseUrl;
-        set => SetProperty(ref _baseUrl, value);
+        get => _chatBaseUrl;
+        set => SetProperty(ref _chatBaseUrl, value);
     }
 
     public string ChatModel
@@ -197,20 +201,38 @@ public sealed class DiagnosticsViewModel : ObservableObject
         set => SetProperty(ref _chatModel, value);
     }
 
+    public ModelTierOption ChatTier
+    {
+        get => _chatTier;
+        set
+        {
+            if (SetProperty(ref _chatTier, value) && value.Value != "LocalOffline" && string.IsNullOrWhiteSpace(ChatBaseUrl))
+            {
+                ChatBaseUrl = "https://";
+            }
+        }
+    }
+
+    public string EmbeddingBaseUrl
+    {
+        get => _embeddingBaseUrl;
+        set => SetProperty(ref _embeddingBaseUrl, value);
+    }
+
     public string EmbeddingModel
     {
         get => _embeddingModel;
         set => SetProperty(ref _embeddingModel, value);
     }
 
-    public ModelTierOption SelectedTier
+    public ModelTierOption EmbeddingTier
     {
-        get => _selectedTier;
+        get => _embeddingTier;
         set
         {
-            if (SetProperty(ref _selectedTier, value) && value.Value != "LocalOffline" && string.IsNullOrWhiteSpace(BaseUrl))
+            if (SetProperty(ref _embeddingTier, value) && value.Value != "LocalOffline" && string.IsNullOrWhiteSpace(EmbeddingBaseUrl))
             {
-                BaseUrl = "https://";
+                EmbeddingBaseUrl = "https://";
             }
         }
     }
@@ -386,7 +408,9 @@ public sealed class DiagnosticsViewModel : ObservableObject
         try
         {
             await _modelConfiguration.SaveAsync(
-                new ModelConfigurationView(BaseUrl, ChatModel, EmbeddingModel, SelectedTier.Value),
+                new ModelConfigurationView(
+                    new ModelEndpointView(ChatBaseUrl, ChatModel, ChatTier.Value),
+                    new ModelEndpointView(EmbeddingBaseUrl, EmbeddingModel, EmbeddingTier.Value)),
                 CancellationToken.None);
             ModelConfigStatus = "已保存到 models.json；重启应用后生效。";
         }

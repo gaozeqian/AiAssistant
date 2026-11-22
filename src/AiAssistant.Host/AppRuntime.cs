@@ -502,16 +502,43 @@ public sealed class AppRuntime : IAsyncDisposable
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<EndpointModelGateway>.Instance);
         }
 
-        var router = new TierRoutingModelGateway(
-            endpointGateways,
-            configuration.Policy,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<TierRoutingModelGateway>.Instance);
-        var gateway = new AuditedModelGateway(
+        var chatRouter = new TierRoutingModelGateway(endpointGateways, configuration.Policy);
+        var chatGateway = new AuditedModelGateway(
             new PolicyEnforcedModelGateway(
-                new ThreeGateModelGateway(router, redactor),
+                new ThreeGateModelGateway(chatRouter, redactor),
                 configuration.Policy,
                 consent),
             auditSink);
+
+        // Embedding may target an independent endpoint (different tier/address/model). When no
+        // dedicated embedding endpoint is configured, reuse the default tier's endpoint.
+        var defaultTierEndpoint = configuration.Endpoints.First(item => item.Tier == configuration.Policy.DefaultTier);
+        var embeddingEndpoint = configuration.EmbeddingEndpoint ?? defaultTierEndpoint;
+        var embeddingClient = ModelHttpClientFactory.Create(embeddingEndpoint);
+        services.AddSingleton(embeddingClient);
+        var embeddingBackend = new HttpModelBackend(embeddingClient, new ModelGatewayOptions
+        {
+            Provider = embeddingEndpoint.Provider,
+            BaseAddress = embeddingEndpoint.BaseAddress,
+            ChatModel = embeddingEndpoint.ChatModel,
+            EmbeddingModel = embeddingEndpoint.EmbeddingModel,
+            ApiKey = embeddingEndpoint.ApiKey,
+            RequestTimeout = embeddingEndpoint.Timeout,
+            AllowRemoteEndpoint = true
+        });
+        services.AddSingleton(embeddingBackend);
+        var embeddingEndpointGateway = new EndpointModelGateway(
+            embeddingBackend,
+            embeddingEndpoint,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<EndpointModelGateway>.Instance);
+        var embeddingGateway = new AuditedModelGateway(
+            new PolicyEnforcedModelGateway(
+                new ThreeGateModelGateway(embeddingEndpointGateway, redactor),
+                configuration.Policy,
+                consent),
+            auditSink);
+
+        var gateway = new SplitChatEmbeddingGateway(chatGateway, embeddingGateway, embeddingEndpoint.Tier);
         services.AddSingleton(gateway);
         services.AddSingleton<IModelGateway>(gateway);
         var standardClient = new GatewayChatClient(gateway, configuration.Policy.DefaultTier);

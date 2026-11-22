@@ -268,7 +268,10 @@ public sealed partial class EvidenceQuestionAnswerUseCase(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning("Evidence QA degraded with {ExceptionType}; using extractive answer.", ex.GetType().Name);
-            return ExtractiveFallback(question, result.Evidence, "extractive", ModelEndpointTier.LocalOffline, "model-unavailable");
+            var reason = string.IsNullOrWhiteSpace(ex.Message)
+                ? "model-unavailable"
+                : $"模型不可用：{ex.Message}";
+            return ExtractiveFallback(question, result.Evidence, "extractive", tier, reason);
         }
     }
 

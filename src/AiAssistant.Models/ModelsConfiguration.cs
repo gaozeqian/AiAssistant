@@ -8,6 +8,20 @@ public sealed record ModelsFileDocument
     public int SchemaVersion { get; init; } = 1;
     public ModelPolicyDocument Policy { get; init; } = new();
     public IReadOnlyList<ModelEndpointDocument> Endpoints { get; init; } = [];
+
+    /// <summary>Optional independent embedding endpoint. When absent, embedding reuses the default tier's endpoint.</summary>
+    public EmbeddingEndpointDocument? Embedding { get; init; }
+}
+
+public sealed record EmbeddingEndpointDocument
+{
+    public string Tier { get; init; } = "LocalOffline";
+    public string Provider { get; init; } = "ollama";
+    public string BaseUrl { get; init; } = "http://127.0.0.1:11434";
+    public string Model { get; init; } = "embeddinggemma-2:740m";
+    public int TimeoutSeconds { get; init; } = 120;
+    public string? ApiKeySecret { get; init; }
+    public bool AllowRemoteEndpoint { get; init; }
 }
 
 public sealed record ModelPolicyDocument
@@ -61,7 +75,8 @@ public sealed record ModelEndpointSettings(
 public sealed record ModelsConfiguration(
     int SchemaVersion,
     ModelPolicy Policy,
-    IReadOnlyList<ModelEndpointSettings> Endpoints);
+    IReadOnlyList<ModelEndpointSettings> Endpoints,
+    ModelEndpointSettings? EmbeddingEndpoint = null);
 
 public interface IModelSecretResolver
 {
@@ -137,7 +152,64 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
             throw new ModelConfigurationException("A LocalOffline endpoint is required as the safety fallback.");
         }
 
-        return new ModelsConfiguration(document.SchemaVersion, policy, endpoints);
+        ModelEndpointSettings? embeddingEndpoint = document.Embedding is null
+            ? null
+            : await ParseEmbeddingEndpointAsync(document.Embedding, ct);
+
+        return new ModelsConfiguration(document.SchemaVersion, policy, endpoints, embeddingEndpoint);
+    }
+
+    private async Task<ModelEndpointSettings> ParseEmbeddingEndpointAsync(EmbeddingEndpointDocument document, CancellationToken ct)
+    {
+        if (!Enum.TryParse<ModelEndpointTier>(document.Tier, ignoreCase: true, out var tier))
+        {
+            throw new ModelConfigurationException($"Unknown embedding tier '{document.Tier}'.");
+        }
+
+        var provider = document.Provider.ToLowerInvariant() switch
+        {
+            "ollama" => ModelProviderKind.Ollama,
+            "openai" or "lmstudio" or "openai-compatible" => ModelProviderKind.OpenAiCompatible,
+            _ => throw new ModelConfigurationException($"Unknown embedding provider '{document.Provider}'.")
+        };
+
+        if (!Uri.TryCreate(document.BaseUrl, UriKind.Absolute, out var baseAddress) ||
+            baseAddress.Scheme is not ("http" or "https"))
+        {
+            throw new ModelConfigurationException($"Invalid embedding base URL for tier {tier}.");
+        }
+
+        var remoteAllowed = document.AllowRemoteEndpoint || baseAddress.IsLoopback;
+        if (!remoteAllowed)
+        {
+            throw new ModelConfigurationException($"Embedding tier {tier} remote endpoint requires allowRemoteEndpoint=true.");
+        }
+
+        if (tier == ModelEndpointTier.LocalOffline && !baseAddress.IsLoopback && !document.AllowRemoteEndpoint)
+        {
+            throw new ModelConfigurationException("LocalOffline embedding endpoint must be loopback.");
+        }
+
+        if (string.IsNullOrWhiteSpace(document.Model))
+        {
+            throw new ModelConfigurationException($"Embedding tier {tier} is missing model.");
+        }
+
+        var apiKey = await ResolveSecretAsync(document.ApiKeySecret, ct);
+        return new ModelEndpointSettings(
+            tier,
+            provider,
+            baseAddress,
+            string.Empty,
+            document.Model,
+            TimeSpan.FromSeconds(document.TimeoutSeconds),
+            apiKey,
+            null,
+            null,
+            null,
+            null,
+            null,
+            document.AllowRemoteEndpoint);
     }
 
     private async Task<ModelEndpointSettings> ParseEndpointAsync(ModelEndpointDocument document, CancellationToken ct)

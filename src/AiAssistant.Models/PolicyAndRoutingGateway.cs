@@ -10,6 +10,29 @@ namespace AiAssistant.Models;
 
 public sealed class ModelPolicyViolationException(string message) : Exception(message);
 
+/// <summary>
+/// Routes chat and embedding to independent endpoints. CompleteAsync goes through the chat tier
+/// router; EmbedAsync is forced onto the (possibly independent) embedding endpoint tier so policy
+/// gating applies to the embedding endpoint's actual tier, not the chat tier.
+/// </summary>
+public sealed class SplitChatEmbeddingGateway(
+    IModelGateway chat,
+    IModelGateway embedding,
+    ModelEndpointTier embeddingTier) : IModelGateway
+{
+    public CapabilityState Capability => chat.Capability;
+    public string ChatModelId => chat.ChatModelId;
+    public string EmbeddingModelId => embedding.EmbeddingModelId;
+
+    public Task<ModelCompletionResult> CompleteAsync(ModelCompletionRequest request, CancellationToken ct) =>
+        chat.CompleteAsync(request, ct);
+
+    public Task<ModelEmbeddingResult> EmbedAsync(ModelEmbeddingRequest request, CancellationToken ct) =>
+        embedding.EmbedAsync(request with { Tier = embeddingTier }, ct);
+
+    public Task<ModelCapabilitySnapshot> ProbeAsync(CancellationToken ct) => chat.ProbeAsync(ct);
+}
+
 /// <summary>Explicit runtime consent for public-cloud use; configuration alone is never sufficient.</summary>
 public sealed class PublicCloudConsentGate
 {
@@ -131,11 +154,10 @@ public sealed class PolicyEnforcedModelGateway(
     }
 }
 
-/// <summary>Routes to configured endpoints and falls back from an unhealthy intranet tier to local.</summary>
+/// <summary>Routes to the configured endpoint for the requested tier. No automatic local fallback.</summary>
 public sealed class TierRoutingModelGateway(
     IReadOnlyDictionary<ModelEndpointTier, IModelGateway> endpoints,
-    ModelPolicy policy,
-    ILogger<TierRoutingModelGateway> logger) : IModelGateway
+    ModelPolicy policy) : IModelGateway
 {
     public CapabilityState Capability =>
         endpoints.TryGetValue(policy.DefaultTier, out var gateway)
@@ -148,34 +170,11 @@ public sealed class TierRoutingModelGateway(
     public string EmbeddingModelId =>
         endpoints.TryGetValue(policy.DefaultTier, out var gateway) ? gateway.EmbeddingModelId : string.Empty;
 
-    public async Task<ModelCompletionResult> CompleteAsync(ModelCompletionRequest request, CancellationToken ct)
-    {
-        try
-        {
-            return await GetGateway(request.Tier).CompleteAsync(request, ct);
-        }
-        catch (ModelGatewayException ex) when (request.Tier == ModelEndpointTier.CorporateIntranet && policy.AllowLocalFallback)
-        {
-            logger.LogWarning("Intranet model unavailable ({ExceptionType}); falling back to local.", ex.GetType().Name);
-            var local = GetGateway(ModelEndpointTier.LocalOffline);
-            var fallback = await local.CompleteAsync(request with { Tier = ModelEndpointTier.LocalOffline }, ct);
-            return fallback with { Tier = ModelEndpointTier.LocalOffline };
-        }
-    }
+    public async Task<ModelCompletionResult> CompleteAsync(ModelCompletionRequest request, CancellationToken ct) =>
+        await GetGateway(request.Tier).CompleteAsync(request, ct);
 
-    public async Task<ModelEmbeddingResult> EmbedAsync(ModelEmbeddingRequest request, CancellationToken ct)
-    {
-        try
-        {
-            return await GetGateway(request.Tier).EmbedAsync(request, ct);
-        }
-        catch (ModelGatewayException ex) when (request.Tier == ModelEndpointTier.CorporateIntranet && policy.AllowLocalFallback)
-        {
-            logger.LogWarning("Intranet embedding unavailable ({ExceptionType}); falling back to local.", ex.GetType().Name);
-            return await GetGateway(ModelEndpointTier.LocalOffline)
-                .EmbedAsync(request with { Tier = ModelEndpointTier.LocalOffline }, ct);
-        }
-    }
+    public async Task<ModelEmbeddingResult> EmbedAsync(ModelEmbeddingRequest request, CancellationToken ct) =>
+        await GetGateway(request.Tier).EmbedAsync(request, ct);
 
     public Task<ModelCapabilitySnapshot> ProbeAsync(CancellationToken ct) =>
         endpoints.TryGetValue(policy.DefaultTier, out var gateway)
@@ -193,11 +192,6 @@ public sealed class TierRoutingModelGateway(
         if (endpoints.TryGetValue(tier, out var gateway))
         {
             return gateway;
-        }
-
-        if (tier == ModelEndpointTier.CorporateIntranet && policy.AllowLocalFallback)
-        {
-            return endpoints[ModelEndpointTier.LocalOffline];
         }
 
         throw new ModelGatewayException($"No endpoint configured for tier {tier}.");

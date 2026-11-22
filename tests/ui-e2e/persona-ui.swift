@@ -228,8 +228,9 @@ tab("本地诊断")
 check("诊断页显示「系统健康」", waitText(win, "系统健康"))
 _ = tap("重新检查", in: r)
 check("重新检查后显示「本机模型网关」", waitText(win, "本机模型网关"))
-check("诊断页显示「本机模型配置」编辑区", ocrHas("本机模型配置", in: r))
-check("模型配置含对话/Embedding/Base URL 输入", ocrHas("对话模型", in: r) && ocrHas("Embedding", in: r) && ocrHas("Base URL", in: r))
+check("诊断页显示「模型配置」编辑区", ocrHas("模型配置", in: r))
+check("模型配置分对话/Embedding 两块，各含来源/模型名/Base URL",
+      ocrHas("对话模型", in: r) && ocrHas("Embedding 模型", in: r) && ocrHas("Base URL", in: r))
 
 // ── 场景 8：主题按钮文案应为「可切换到的模式」（当前深色 → 显示浅色模式）──
 check("主题按钮显示可切换模式（浅色模式）", ocrHas("浅色模式", in: r) || waitText(win, "浅色模式"))

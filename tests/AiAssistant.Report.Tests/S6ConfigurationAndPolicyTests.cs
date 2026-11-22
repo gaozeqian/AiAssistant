@@ -185,7 +185,7 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
     }
 
     [Fact]
-    public async Task TierRouter_FallsBackFromIntranetToLocal_ButNeverSilentlyFromPublic()
+    public async Task TierRouter_DoesNotFallBackFromIntranetOrPublicCloud()
     {
         var local = new RecordingGateway { FixedTier = ModelEndpointTier.LocalOffline };
         var intranet = new FailingGateway();
@@ -197,14 +197,12 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
                 [ModelEndpointTier.CorporateIntranet] = intranet,
                 [ModelEndpointTier.PublicCloud] = new FailingGateway()
             },
-            policy,
-            NullLogger<TierRoutingModelGateway>.Instance);
+            policy);
 
-        var fallback = await router.CompleteAsync(
-            new ModelCompletionRequest("s", "u", ModelEndpointTier.CorporateIntranet),
-            CancellationToken.None);
-        Assert.Equal(ModelEndpointTier.LocalOffline, fallback.Tier);
-        Assert.Equal(1, local.Calls);
+        // Intranet failure surfaces as an exception instead of silently falling back to local.
+        await Assert.ThrowsAsync<ModelGatewayException>(() =>
+            router.CompleteAsync(new ModelCompletionRequest("s", "u", ModelEndpointTier.CorporateIntranet), CancellationToken.None));
+        Assert.Equal(0, local.Calls);
 
         await Assert.ThrowsAsync<ModelGatewayException>(() =>
             router.CompleteAsync(new ModelCompletionRequest("s", "u", ModelEndpointTier.PublicCloud), CancellationToken.None));
@@ -270,16 +268,17 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
             .LoadAsync(path, CancellationToken.None);
         var admin = new ModelConfigurationAdmin(path, configuration);
 
-        Assert.Equal("old-chat", admin.Current.ChatModel);
+        Assert.Equal("old-chat", admin.Current.Chat.Model);
         await admin.SaveAsync(
-            new ModelConfigurationView("http://127.0.0.1:11434", "gemma4:12b-mlx", "embeddinggemma-2:740m", "LocalOffline"),
+            new ModelConfigurationView(
+                new ModelEndpointView("http://127.0.0.1:11434", "gemma4:12b-mlx", "LocalOffline"),
+                new ModelEndpointView("http://127.0.0.1:11434", "embeddinggemma-2:740m", "LocalOffline")),
             CancellationToken.None);
 
         var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
             .LoadAsync(path, CancellationToken.None);
         var local = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.LocalOffline);
         Assert.Equal("gemma4:12b-mlx", local.ChatModel);
-        Assert.Equal("embeddinggemma-2:740m", local.EmbeddingModel);
         var corp = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.CorporateIntranet);
         Assert.Equal("corp-chat", corp.ChatModel);
     }
@@ -304,12 +303,16 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
         // LocalOffline must stay loopback.
         await Assert.ThrowsAsync<ModelConfigurationException>(() =>
             admin.SaveAsync(
-                new ModelConfigurationView("https://api.example.com/v1", "c", "e", "LocalOffline"),
+                new ModelConfigurationView(
+                    new ModelEndpointView("https://api.example.com/v1", "c", "LocalOffline"),
+                    new ModelEndpointView("http://127.0.0.1:11434", "e", "LocalOffline")),
                 CancellationToken.None));
 
         // CorporateIntranet accepts a remote URL and marks allowRemoteEndpoint.
         await admin.SaveAsync(
-            new ModelConfigurationView("https://llm.corp.example/v1", "corp-chat", "corp-embed", "CorporateIntranet"),
+            new ModelConfigurationView(
+                new ModelEndpointView("https://llm.corp.example/v1", "corp-chat", "CorporateIntranet"),
+                new ModelEndpointView("http://127.0.0.1:11434", "corp-embed", "LocalOffline")),
             CancellationToken.None);
         var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
             .LoadAsync(path, CancellationToken.None);
@@ -341,7 +344,9 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
         var admin = new ModelConfigurationAdmin(path, configuration);
 
         await admin.SaveAsync(
-            new ModelConfigurationView("https://api.example.com/v1", "cloud-chat", "cloud-embed", "PublicCloud"),
+            new ModelConfigurationView(
+                new ModelEndpointView("https://api.example.com/v1", "cloud-chat", "PublicCloud"),
+                new ModelEndpointView("https://api.example.com/v1", "cloud-embed", "PublicCloud")),
             CancellationToken.None);
 
         var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
@@ -351,6 +356,40 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
         Assert.Equal(ModelEndpointTier.PublicCloud, reloaded.Policy.DefaultTier);
         var cloud = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.PublicCloud);
         Assert.True(cloud.AllowRemoteEndpoint);
+    }
+
+    [Fact]
+    public async Task ModelConfigurationAdmin_StoresIndependentEmbeddingEndpoint_WhenTiersDiffer()
+    {
+        var path = Path.Combine(_tempRoot, "models.json");
+        await File.WriteAllTextAsync(path, """
+            {
+              "schemaVersion": 1,
+              "policy": { "defaultTier": "LocalOffline" },
+              "endpoints": [
+                { "tier": "LocalOffline", "provider": "ollama", "baseUrl": "http://127.0.0.1:11434", "chatModel": "gemma4:12b", "embeddingModel": "embeddinggemma-2:740m" }
+              ]
+            }
+            """);
+        var configuration = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+        var admin = new ModelConfigurationAdmin(path, configuration);
+
+        // Chat on local, embedding on a separate intranet endpoint.
+        await admin.SaveAsync(
+            new ModelConfigurationView(
+                new ModelEndpointView("http://127.0.0.1:11434", "gemma4:12b", "LocalOffline"),
+                new ModelEndpointView("https://embed.corp.example/v1", "corp-embed-v2", "CorporateIntranet")),
+            CancellationToken.None);
+
+        var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+        Assert.NotNull(reloaded.EmbeddingEndpoint);
+        Assert.Equal(ModelEndpointTier.CorporateIntranet, reloaded.EmbeddingEndpoint!.Tier);
+        Assert.Equal("corp-embed-v2", reloaded.EmbeddingEndpoint.EmbeddingModel);
+        Assert.Equal("https://embed.corp.example/v1", reloaded.EmbeddingEndpoint.BaseAddress.ToString().TrimEnd('/'));
+        // Chat default tier is unchanged (local).
+        Assert.Equal(ModelEndpointTier.LocalOffline, reloaded.Policy.DefaultTier);
     }
 
     private sealed class FakeSecretResolver(IReadOnlyDictionary<string, string> values) : IModelSecretResolver    {
