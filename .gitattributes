@@ -1,0 +1,48 @@
+# 文本文件默认 LF，检出即规范（Windows 亦不转 CRLF）。
+* text=auto eol=lf
+
+# 脚本与配置文件强制 LF，避免在 Windows 上被转换后破坏 shebang。
+*.sh text eol=lf
+*.ps1 text eol=lf
+*.cs text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.sln text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+
+# 二进制产物：不做行尾与 diff 处理。
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.deb binary
+*.msi binary
+*.pkg binary
+*.cer binary
+*.pfx binary
+*.dll binary
+*.exe binary
+*.so binary
+*.dylib binary
+*.onnx binary
+*.bin binary
+*.model binary
+*.gguf binary
+
+# 图片不参与文本 diff（截图类证据用二进制比较）。
+*.png -diff -merge -text
+*.jpg -diff -merge -text
+
+# 生成物与锁文件在评审里折叠显示。
+Directory.Packages.props linguist-generated=false

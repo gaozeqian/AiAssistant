@@ -18,26 +18,19 @@
 mono_crash.*
 
 # Build results
+# MSBuild 输出的 `Debug/`、`Release/` 目录一定位于 bin/ 或 obj/ 之下，因此只锚定这两类目录。
+# 不再使用未锚定的 `[Dd]ebug/`、`[Rr]elease/`：它们会连带忽略文档目录 docs/release/，
+# 迫使我们为文档写反忽略特例（结构缺陷，见 docs/guides/conventions.md）。
 .build/
-[Dd]ebug/
+**/[Bb]in/
+**/[Oo]bj/
 [Dd]ebugPublic/
-[Rr]elease/
 [Rr]eleases/
 
-# Release documentation is versioned even though build output directories are not.
-!docs/release/
-!docs/release/**
-
-[Dd]ebug/x64/
-[Dd]ebugPublic/x64/
-[Rr]elease/x64/
-[Rr]eleases/x64/
 bin/x64/
 obj/x64/
 
-[Dd]ebug/x86/
 [Dd]ebugPublic/x86/
-[Rr]elease/x86/
 [Rr]eleases/x86/
 bin/x86/
 obj/x86/
@@ -430,13 +423,12 @@ FodyWeavers.xsd
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
 
-# Local AI workspace state (PROGRESS.md is tracked for cross-machine handoff)
+# 本地 AI 工作区状态（docs/status/ 下的文档才是随仓库交接的单一事实源）
 .workbuddy-ai/
 .workbuddy/
 
-# Local speech/OCR model assets are never committed
+# 本机语音与 OCR 模型资产永不入库；汇总/打包它们的脚本要入库。
 models/
-# But the scripts that stage/bundle those assets are tracked.
 !build/models/
 !build/models/*.sh
 *.onnx

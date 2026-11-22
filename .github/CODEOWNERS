@@ -1,0 +1,15 @@
+# 默认评审人。专有闭源仓库，仅授权维护者可合并。
+* @gaozeqian
+
+# 法务与许可文件变更需要维护者单独确认。
+/LICENSE @gaozeqian
+/EULA.md @gaozeqian
+/THIRD-PARTY-NOTICES.md @gaozeqian
+/docs/compliance/ @gaozeqian
+
+# 构建与发布流水线。
+/build/ @gaozeqian
+/.github/ @gaozeqian
+/Directory.Build.props @gaozeqian
+/Directory.Packages.props @gaozeqian
+/global.json @gaozeqian

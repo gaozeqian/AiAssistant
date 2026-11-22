@@ -60,7 +60,7 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
 
 ### 3.4 模型端点与日报配置
 
-优先使用 `models.json`（示例见仓库根目录 `models.example.json`）。默认路径为数据目录下 `models.json`，也可用 `AIASSISTANT_MODELS_CONFIG` 指定。
+优先使用 `models.json`（示例见 `samples/models.example.json`）。默认路径为数据目录下 `models.json`，也可用 `AIASSISTANT_MODELS_CONFIG` 指定。
 
 ```json
 {
@@ -254,7 +254,7 @@ AIASSISTANT_MCP_RPM=60          # 每分钟请求上限
 - 工具返回结构化证据与 `mediaAvailable` 标记，从不返回截图或音频字节；媒体到期清理后该标记为 `false`。
 - 协议兼容：JSON-RPC 2.0 over Streamable HTTP，支持 `application/json` 与单事件 `text/event-stream`、`Mcp-Session-Id`、协议版本协商（`2024-11-05` / `2025-03-26` / `2025-06-18`）与 `DELETE /mcp` 会话结束。
 - 无头运行与令牌：`AiAssistant.Host --mcp-serve` 仅启动加密库与 MCP（不启动采集/UI）；`--mcp-token` 打印本地令牌供客户端粘贴。
-- 一致性校验：`python build/mcp/mcp-client.py --token <token> --check-unauthorized`（17 项）或追加 `--accept sse`（18 项）。
+- 一致性校验：`python tools/mcp/mcp-client.py --token <token> --check-unauthorized`（17 项）或追加 `--accept sse`（18 项）。
 
 ### 3.7 维护命令（备份 / 恢复 / 清空）
 
