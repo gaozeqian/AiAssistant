@@ -368,7 +368,11 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
 
 public sealed record TimelineDateItem(DateOnly Date)
 {
-    public string DisplayName => Date.ToString("yyyy年MM月dd日 dddd", CultureInfo.CurrentCulture);
+    // The panel is Chinese-only: format the weekday with zh-CN so an English OS locale does not
+    // render "2026年11月22日 Sunday" in the date picker.
+    private static readonly CultureInfo DisplayCulture = CultureInfo.GetCultureInfo("zh-CN");
+
+    public string DisplayName => Date.ToString("yyyy年MM月dd日 dddd", DisplayCulture);
 }
 
 public sealed class TimelineEventItem(ActivityEvent activityEvent)

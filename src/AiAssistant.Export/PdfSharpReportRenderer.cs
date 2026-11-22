@@ -1,4 +1,5 @@
 using AiAssistant.Application.Ports;
+using AiAssistant.Application.UseCases;
 using PdfSharp;
 using PdfSharp.Drawing;
 using PdfSharp.Fonts;
@@ -141,13 +142,14 @@ public static class PdfSharpReportRenderer
         XPen axisPen)
     {
         var maxEvents = Math.Max(1, report.MaxDailyEvents);
-        for (var step = 0; step <= 4; step++)
+        var intervals = ChartAxis.Intervals(maxEvents);
+        for (var step = 0; step <= intervals; step++)
         {
-            var ratio = step / 4.0;
+            var ratio = step / (double)intervals;
             var y = ChartBottom - ((ChartBottom - ChartTop) * ratio);
             graphics.DrawLine(gridPen, ChartLeft, y, ChartRight, y);
             graphics.DrawString(
-                ((int)Math.Round(maxEvents * ratio)).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ChartAxis.Label(maxEvents, step, intervals),
                 smallFont,
                 smallBrush,
                 new XPoint(ChartLeft - 10, y + 4),

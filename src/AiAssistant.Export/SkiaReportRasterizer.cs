@@ -1,4 +1,5 @@
 using AiAssistant.Application.Ports;
+using AiAssistant.Application.UseCases;
 using SkiaSharp;
 
 namespace AiAssistant.Export;
@@ -123,14 +124,15 @@ public sealed class SkiaReportRasterizer : IReportRasterizer
         bool vectorText)
     {
         var maxEvents = Math.Max(1, report.MaxDailyEvents);
-        for (var step = 0; step <= 4; step++)
+        var intervals = ChartAxis.Intervals(maxEvents);
+        for (var step = 0; step <= intervals; step++)
         {
-            var ratio = step / 4f;
+            var ratio = step / (float)intervals;
             var y = ChartBottom - ((ChartBottom - ChartTop) * ratio);
             canvas.DrawLine(ChartLeft, y, ChartRight, y, gridPaint);
             DrawText(
                 canvas,
-                ((int)Math.Round(maxEvents * ratio)).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ChartAxis.Label(maxEvents, step, intervals),
                 ChartLeft - 10,
                 y + 4,
                 SKTextAlign.Right,

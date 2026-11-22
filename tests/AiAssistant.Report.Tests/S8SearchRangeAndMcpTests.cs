@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
 using AiAssistant.Core.Domain;
@@ -317,6 +318,35 @@ public sealed class RangeReportTests
         Assert.Contains("（统计模式）", svg, StringComparison.Ordinal);
         Assert.Equal(7, CountOccurrences(svg, " 分钟</text>"));
         Assert.Contains("11-22", svg, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RangeReportSvg_WithSmallMaximum_RendersDistinctYAxisTicks()
+    {
+        var stats = new[]
+        {
+            new DailyActivityStat(
+                new DateOnly(2026, 11, 22),
+                3,
+                5,
+                new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Rider"] = 3 })
+        };
+        var report = new RangeReport(
+            new DateOnly(2026, 11, 22),
+            new DateOnly(2026, 11, 22),
+            "# report",
+            "{}",
+            stats,
+            "model",
+            false,
+            "model-unavailable");
+
+        var svg = RangeReportSvgRenderer.Render(report);
+
+        var ticks = Regex.Matches(svg, "text-anchor=\"end\"[^>]*>([0-9]+)</text>")
+            .Select(match => match.Groups[1].Value)
+            .ToArray();
+        Assert.Equal(["0", "1", "2", "3"], ticks);
     }
 
     private static int CountOccurrences(string value, string token)

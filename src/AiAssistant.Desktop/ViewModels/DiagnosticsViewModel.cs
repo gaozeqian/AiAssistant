@@ -345,7 +345,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
             ModelEndpointsText = snapshot.ModelEndpoints is { Count: > 0 }
                 ? string.Join(Environment.NewLine, snapshot.ModelEndpoints.Select(endpoint =>
                     $"{TierLabel(endpoint.Tier)}：对话={(endpoint.ChatAvailable ? "可用" : "不可用")} · 流式={(endpoint.StreamingAvailable ? "可用" : "不可用")} · 向量={(endpoint.EmbeddingsAvailable ? "可用" : "不可用")} · 结构化={(endpoint.StructuredOutputAvailable ? "可用" : "不可用")} · 工具={(endpoint.ToolCallingAvailable ? "可用" : "不可用")} · {endpoint.Diagnostic}"))
-                : "尚未探测或没有可用端点";
+                : "尚未探测端点能力";
 
             Capabilities.Clear();
             foreach (var capability in snapshot.Capabilities)

@@ -49,11 +49,12 @@ public static class RangeReportSvgRenderer
     private static void AppendChart(StringBuilder builder, RangeReport report)
     {
         var maxEvents = Math.Max(1, report.MaxDailyEvents);
-        for (var step = 0; step <= 4; step++)
+        var intervals = ChartAxis.Intervals(maxEvents);
+        for (var step = 0; step <= intervals; step++)
         {
-            var ratio = step / 4.0;
+            var ratio = step / (double)intervals;
             var y = ChartBottom - ((ChartBottom - ChartTop) * ratio);
-            var value = (int)Math.Round(maxEvents * ratio);
+            var value = ChartAxis.Label(maxEvents, step, intervals);
             builder.AppendLine(CultureInfo.InvariantCulture,
                 $"  <line x1=\"{ChartLeft}\" y1=\"{y:F1}\" x2=\"{ChartRight}\" y2=\"{y:F1}\" stroke=\"#E2E8F0\" stroke-width=\"1\"/>");
             builder.AppendLine(CultureInfo.InvariantCulture,
