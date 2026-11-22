@@ -137,8 +137,8 @@ public sealed class WindowsWindowActivitySource(IClock clock, IScreenCapture? sc
     public SourceKind Kind => SourceKind.WindowActivity;
 
     public CapabilityState Capability => OperatingSystem.IsWindows()
-        ? CapabilityState.Supported(CapabilityKind.WindowActivity, "Win32 ForegroundWindow + Process metadata")
-        : CapabilityState.Unavailable(CapabilityKind.WindowActivity, "Windows adapter inactive on non-Windows host");
+        ? CapabilityState.Supported(CapabilityKind.WindowActivity, "Win32 前台窗口 + 进程信息")
+        : CapabilityState.Unavailable(CapabilityKind.WindowActivity, "Windows 适配器仅在 Windows 主机可用");
 
     public Task<CapturedSample?> GetCurrentForegroundAsync(CancellationToken ct)
     {
@@ -262,8 +262,8 @@ public sealed class WindowsWindowActivitySource(IClock clock, IScreenCapture? sc
 public sealed class WindowsScreenCapture(IClock clock) : IScreenCapture
 {
     public CapabilityState Capability => OperatingSystem.IsWindows()
-        ? CapabilityState.Supported(CapabilityKind.ScreenCapture, "Win32 GDI BitBlt/StretchBlt + PNG + pHash")
-        : CapabilityState.Unavailable(CapabilityKind.ScreenCapture, "Windows screen capture inactive on non-Windows host");
+        ? CapabilityState.Supported(CapabilityKind.ScreenCapture, "Win32 GDI 截图（PNG + 感知哈希）")
+        : CapabilityState.Unavailable(CapabilityKind.ScreenCapture, "Windows 屏幕采集仅在 Windows 主机可用");
 
     public Task<ScreenCaptureFrame?> CaptureFrameAsync(CancellationToken ct)
     {
@@ -373,7 +373,7 @@ public sealed class WhitelistedFileActivitySource(IClock clock) : IFileActivityS
     public SourceKind Kind => SourceKind.FileActivity;
 
     public CapabilityState Capability =>
-        CapabilityState.Supported(CapabilityKind.FileActivity, "Whitelisted directory FileSystemWatcher (<=200KB text/code only)");
+        CapabilityState.Supported(CapabilityKind.FileActivity, "白名单目录 FileSystemWatcher（仅 ≤200KB 文本/代码）");
 
     public async IAsyncEnumerable<CapturedSample> CaptureAsync(
         CaptureContext context,
@@ -493,14 +493,14 @@ public sealed class WhitelistedFileActivitySource(IClock clock) : IFileActivityS
 public sealed class WindowsTextExtractor(Func<byte[], CancellationToken, Task<string?>>? ocrFallback = null) : ITextExtractor
 {
     public CapabilityState AccessibilityCapability => OperatingSystem.IsWindows()
-        ? CapabilityState.Supported(CapabilityKind.AccessibilityText, "Win32 UI control tree (ES_PASSWORD excluded)")
-        : CapabilityState.Unavailable(CapabilityKind.AccessibilityText, "Windows accessibility inactive on non-Windows host");
+        ? CapabilityState.Supported(CapabilityKind.AccessibilityText, "Win32 UI 控件树（排除密码框）")
+        : CapabilityState.Unavailable(CapabilityKind.AccessibilityText, "Windows 无障碍仅在 Windows 主机可用");
 
     public CapabilityState OcrCapability => ocrFallback is not null
-        ? CapabilityState.Supported(CapabilityKind.Ocr, "Configured OCR fallback")
+        ? CapabilityState.Supported(CapabilityKind.Ocr, "已配置 OCR 兜底")
         : OperatingSystem.IsWindows()
-            ? CapabilityState.Degraded(CapabilityKind.Ocr, "Windows.Media.Ocr on-demand fallback (accessibility tree active)")
-            : CapabilityState.Unavailable(CapabilityKind.Ocr, "Windows OCR inactive on non-Windows host");
+            ? CapabilityState.Degraded(CapabilityKind.Ocr, "Windows.Media.Ocr 按需兜底（无障碍树优先）")
+            : CapabilityState.Unavailable(CapabilityKind.Ocr, "Windows OCR 仅在 Windows 主机可用");
 
     public async Task<ExtractedTextResult> ExtractAsync(TextExtractionRequest request, CancellationToken ct)
     {
@@ -604,7 +604,7 @@ public sealed class WindowsAutoStartService(string executableCommand, string val
 
     public CapabilityState Capability => OperatingSystem.IsWindows()
         ? CapabilityState.Supported(CapabilityKind.AutoStart, @"HKCU\...\Run user auto-start")
-        : CapabilityState.Unavailable(CapabilityKind.AutoStart, "Windows registry auto-start inactive on non-Windows host");
+        : CapabilityState.Unavailable(CapabilityKind.AutoStart, "Windows 注册表自启仅在 Windows 主机可用");
 
     public Task<bool> IsEnabledAsync(CancellationToken ct)
     {
@@ -684,11 +684,11 @@ public sealed class WindowsCapabilityProvider(
         textExtractor.OcrCapability,
         keyStore.Capability,
         autoStartService.Capability,
-        CapabilityState.Supported(CapabilityKind.SystemTray, "Avalonia TrayIcon active"),
-        CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI shared-mode capture through AudioHub"),
+        CapabilityState.Supported(CapabilityKind.SystemTray, "Avalonia 托盘已启用"),
+        CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI 共享模式采集（AudioHub）"),
         CapabilityState.Degraded(
             CapabilityKind.WakeWord,
-            "Voice is opt-in; enable it on the Voice page",
-            "Requires sherpa-onnx KWS/TTS models under AIASSISTANT_SHERPA_MODEL_DIR.")
+            "语音为可选功能，请在「语音」页开启",
+            "需要在 AIASSISTANT_SHERPA_MODEL_DIR 下提供 sherpa-onnx KWS/TTS 模型。")
     ];
 }

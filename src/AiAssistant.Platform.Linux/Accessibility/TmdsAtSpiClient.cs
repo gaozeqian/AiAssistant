@@ -54,12 +54,12 @@ public sealed class TmdsAtSpiClient : IAtSpiAccessibilityClient
     private bool _disposed;
 
     public CapabilityState Capability => !OperatingSystem.IsLinux()
-        ? CapabilityState.Unavailable(CapabilityKind.AccessibilityText, "AT-SPI2 is unavailable on this host")
+        ? CapabilityState.Unavailable(CapabilityKind.AccessibilityText, "AT-SPI2 在当前主机不可用")
         : _lastErrorType is not null
             ? CapabilityState.Degraded(CapabilityKind.AccessibilityText, $"AT-SPI2 degraded ({_lastErrorType})")
             : _hasConnected
-                ? CapabilityState.Supported(CapabilityKind.AccessibilityText, "AT-SPI2 accessibility bus connected")
-                : CapabilityState.Degraded(CapabilityKind.AccessibilityText, "AT-SPI2 will be probed on first use");
+                ? CapabilityState.Supported(CapabilityKind.AccessibilityText, "AT-SPI2 无障碍总线已连接")
+                : CapabilityState.Degraded(CapabilityKind.AccessibilityText, "AT-SPI2 将在首次使用时探测");
 
     public async Task<AtSpiWindowSnapshot?> GetFocusedWindowAsync(CancellationToken ct)
     {
@@ -412,11 +412,11 @@ public sealed class AtSpiWindowActivitySource(IAtSpiAccessibilityClient client, 
     public SourceKind Kind => SourceKind.WindowActivity;
 
     public CapabilityState Capability => client.Capability.Status == CapabilityStatus.Unavailable
-        ? CapabilityState.Degraded(CapabilityKind.WindowActivity, "Wayland compositor does not expose a global active window; AT-SPI unavailable")
+        ? CapabilityState.Degraded(CapabilityKind.WindowActivity, "Wayland 合成器未暴露全局前台窗口；AT-SPI 不可用")
         : CapabilityState.Degraded(
             CapabilityKind.WindowActivity,
             "Wayland active/focused window through AT-SPI2 (compositor/application dependent)",
-            "Enable desktop accessibility support; global window enumeration is intentionally restricted on Wayland.");
+            "请开启桌面无障碍支持；Wayland 下全局窗口枚举被有意限制。");
 
     public async Task<CapturedSample?> GetCurrentForegroundAsync(CancellationToken ct)
     {

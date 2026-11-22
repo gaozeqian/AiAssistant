@@ -183,7 +183,7 @@ public sealed class EnergyTurnDiarizationEngine(int minimumTurnMs = 800) : ISpea
     public CapabilityState Capability => CapabilityState.Degraded(
         CapabilityKind.AudioCapture,
         "Energy-gap speaker turn heuristic (no embedding model)",
-        "Install a speaker embedding model and sherpa-onnx diarization for production accuracy.");
+        "请安装说话人嵌入模型与 sherpa-onnx 说话人分离以提升准确度。");
 
     public string ModelVersion => "energy-turn-v1";
 

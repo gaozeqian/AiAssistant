@@ -48,6 +48,9 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public int RecoveredJobCount { get; private set; }
 
+    /// <summary>Socket the running GUI listens on so a second launch can show its hidden window.</summary>
+    public string InstanceSocketPath => Path.Combine(_dataDirectory, "instance.sock");
+
     public LinuxDisplayBackendState? LinuxBackendState { get; private set; }
 
     public ILocalMcpControl McpControl => _services.GetRequiredService<ILocalMcpControl>();
@@ -546,6 +549,8 @@ public sealed class AppRuntime : IAsyncDisposable
                 BaseAddress = endpoint.BaseAddress,
                 ChatModel = endpoint.ChatModel,
                 EmbeddingModel = endpoint.EmbeddingModel,
+                Think = endpoint.Think,
+                ThinkingLevel = endpoint.ThinkingLevel,
                 ApiKey = endpoint.ApiKey,
                 RequestTimeout = endpoint.Timeout,
                 AllowRemoteEndpoint = true

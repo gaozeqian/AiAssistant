@@ -52,28 +52,28 @@ public static class LinuxDisplayBackendSelector
         if (string.Equals(forced, "X11", StringComparison.OrdinalIgnoreCase))
         {
             return session.HasX11Display
-                ? new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.X11, LinuxBackendSelectionReason.ForcedByUser, "X11/XWayland explicitly selected by user", false)
-                : new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.Unavailable, LinuxBackendSelectionReason.NoDisplay, "X11 was requested but DISPLAY is unavailable", false);
+                ? new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.X11, LinuxBackendSelectionReason.ForcedByUser, "用户显式选择 X11/XWayland", false)
+                : new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.Unavailable, LinuxBackendSelectionReason.NoDisplay, "已请求 X11 但 DISPLAY 不可用", false);
         }
 
         if (string.Equals(forced, "Wayland", StringComparison.OrdinalIgnoreCase))
         {
             return session.HasWaylandDisplay
-                ? new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.Wayland, LinuxBackendSelectionReason.ForcedByUser, "Native Wayland explicitly selected by user", session.HasX11Display)
-                : new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.Unavailable, LinuxBackendSelectionReason.NoDisplay, "Wayland was requested but WAYLAND_DISPLAY is unavailable", session.HasX11Display);
+                ? new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.Wayland, LinuxBackendSelectionReason.ForcedByUser, "用户显式选择原生 Wayland", session.HasX11Display)
+                : new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.Unavailable, LinuxBackendSelectionReason.NoDisplay, "已请求 Wayland 但 WAYLAND_DISPLAY 不可用", session.HasX11Display);
         }
 
         if (session.HasWaylandDisplay)
         {
-            return new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.Wayland, LinuxBackendSelectionReason.DefaultWayland, "Native Wayland selected by default", session.HasX11Display);
+            return new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.Wayland, LinuxBackendSelectionReason.DefaultWayland, "默认使用原生 Wayland", session.HasX11Display);
         }
 
         if (session.HasX11Display)
         {
-            return new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.X11, LinuxBackendSelectionReason.MissingWaylandDisplay, "X11 fallback selected because WAYLAND_DISPLAY is unavailable", false);
+            return new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.X11, LinuxBackendSelectionReason.MissingWaylandDisplay, "未检测到 Wayland，回退 X11", false);
         }
 
-        return new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.Unavailable, LinuxBackendSelectionReason.NoDisplay, "Neither Wayland nor X11 display is available", false);
+        return new LinuxDisplayBackendDecision(LinuxDisplayBackendKind.Unavailable, LinuxBackendSelectionReason.NoDisplay, "Wayland 与 X11 显示均不可用", false);
     }
 }
 
@@ -117,7 +117,7 @@ public sealed class LinuxDisplayBackendState
             _decision = new LinuxDisplayBackendDecision(
                 LinuxDisplayBackendKind.X11,
                 LinuxBackendSelectionReason.InitializationFailure,
-                $"Native Wayland initialization failed ({exceptionType}); using X11/XWayland fallback",
+                $"原生 Wayland 初始化失败（{exceptionType}）；已回退 X11/XWayland",
                 false);
             return true;
         }

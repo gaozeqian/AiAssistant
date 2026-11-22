@@ -158,10 +158,12 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
         var embeddings = await TryEmbeddingsAsync(client, endpoint, ct);
         var structured = chat && await TryStructuredAsync(client, endpoint, ct);
         var tools = chat && await TryToolsAsync(client, endpoint, ct);
-        var diagnostic = $"chat={chat}, stream={streaming}, embed={embeddings}, json={structured}, tools={tools}";
+        var diagnostic = string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"对话={chat}, 流式={streaming}, 向量={embeddings}, 结构化={structured}, 工具={tools}");
         if (!chat)
         {
-            diagnostic += "; endpoint or chat model unavailable";
+            diagnostic += "；端点或对话模型不可用";
         }
 
         _logger.LogInformation("Model capability probe {Tier}: {Diagnostic}", endpoint.Tier, diagnostic);

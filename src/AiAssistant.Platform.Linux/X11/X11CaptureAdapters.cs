@@ -168,8 +168,8 @@ public static class X11PixelConverter
 public sealed class X11ScreenCapture(IClock clock) : IScreenCapture
 {
     public CapabilityState Capability => OperatingSystem.IsLinux() && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DISPLAY"))
-        ? CapabilityState.Supported(CapabilityKind.ScreenCapture, "X11 XGetImage root capture with PNG + pHash")
-        : CapabilityState.Unavailable(CapabilityKind.ScreenCapture, "X11 display is unavailable");
+        ? CapabilityState.Supported(CapabilityKind.ScreenCapture, "X11 XGetImage 截图（PNG + 感知哈希）")
+        : CapabilityState.Unavailable(CapabilityKind.ScreenCapture, "X11 显示不可用");
 
     public Task<ScreenCaptureFrame?> CaptureFrameAsync(CancellationToken ct)
     {
@@ -261,8 +261,8 @@ public sealed class X11WindowActivitySource(IClock clock, IScreenCapture? screen
     public SourceKind Kind => SourceKind.WindowActivity;
 
     public CapabilityState Capability => OperatingSystem.IsLinux() && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DISPLAY"))
-        ? CapabilityState.Supported(CapabilityKind.WindowActivity, "X11 EWMH _NET_ACTIVE_WINDOW + _NET_WM_PID")
-        : CapabilityState.Unavailable(CapabilityKind.WindowActivity, "X11 display is unavailable");
+        ? CapabilityState.Supported(CapabilityKind.WindowActivity, "X11 EWMH 前台窗口监听")
+        : CapabilityState.Unavailable(CapabilityKind.WindowActivity, "X11 显示不可用");
 
     public Task<CapturedSample?> GetCurrentForegroundAsync(CancellationToken ct)
     {

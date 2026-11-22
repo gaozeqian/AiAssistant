@@ -24,10 +24,10 @@ public sealed class LinuxInotifyFileActivitySource(IClock clock) : IFileActivity
     public SourceKind Kind => SourceKind.FileActivity;
 
     public CapabilityState Capability => !OperatingSystem.IsLinux()
-        ? CapabilityState.Unavailable(CapabilityKind.FileActivity, "Linux inotify adapter is inactive on this host")
+        ? CapabilityState.Unavailable(CapabilityKind.FileActivity, "Linux inotify 适配器在当前主机不可用")
         : _lastErrorType is null
-            ? CapabilityState.Supported(CapabilityKind.FileActivity, "inotify-backed watcher restricted to whitelisted directories")
-            : CapabilityState.Degraded(CapabilityKind.FileActivity, $"inotify watcher degraded ({_lastErrorType})", "Check inotify watch limits and directory permissions.");
+            ? CapabilityState.Supported(CapabilityKind.FileActivity, "inotify 监听白名单目录")
+            : CapabilityState.Degraded(CapabilityKind.FileActivity, $"inotify watcher degraded ({_lastErrorType})", "请检查 inotify 监听上限与目录权限。");
 
     public async IAsyncEnumerable<CapturedSample> CaptureAsync(CaptureContext context, [EnumeratorCancellation] CancellationToken ct)
     {
@@ -160,10 +160,10 @@ public sealed class LinuxPulseAudioCapture(IClock clock) : IAudioCapture
     private volatile string? _lastErrorType;
 
     public CapabilityState Capability => !OperatingSystem.IsLinux()
-        ? CapabilityState.Unavailable(CapabilityKind.AudioCapture, "PulseAudio adapter is inactive on this host")
+        ? CapabilityState.Unavailable(CapabilityKind.AudioCapture, "PulseAudio 适配器在当前主机不可用")
         : _lastErrorType is null
-            ? CapabilityState.Supported(CapabilityKind.AudioCapture, "PulseAudio/PipeWire pulse-simple 16kHz mono on-demand capture")
-            : CapabilityState.Degraded(CapabilityKind.AudioCapture, $"PulseAudio capture degraded ({_lastErrorType})", "Check PulseAudio or PipeWire pulse compatibility service.");
+            ? CapabilityState.Supported(CapabilityKind.AudioCapture, "PulseAudio/PipeWire 16kHz 单声道按需采集")
+            : CapabilityState.Degraded(CapabilityKind.AudioCapture, $"PulseAudio capture degraded ({_lastErrorType})", "请检查 PulseAudio 或 PipeWire 兼容服务。");
 
     public async IAsyncEnumerable<AudioFrame> ReadFramesAsync([EnumeratorCancellation] CancellationToken ct)
     {

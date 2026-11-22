@@ -37,7 +37,7 @@ public sealed record XdgPortalSessionSnapshot(
 {
     public static readonly XdgPortalSessionSnapshot Initial = new(
         XdgPortalSessionStatus.NotRequested,
-        "Portal authorization is requested only when screen capture is used.",
+        "仅在使用屏幕采集时才会请求 portal 授权。",
         0,
         0,
         null);

@@ -10,8 +10,8 @@ namespace AiAssistant.Platform.Windows;
 public sealed class WindowsAudioCaptureFactory(IClock clock) : IAudioCaptureFactory
 {
     public CapabilityState Capability => OperatingSystem.IsWindows()
-        ? CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI shared mode via AudioHub (16kHz mono)")
-        : CapabilityState.Unavailable(CapabilityKind.AudioCapture, "WASAPI is unavailable on this host");
+        ? CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI 共享模式（AudioHub，16kHz 单声道）")
+        : CapabilityState.Unavailable(CapabilityKind.AudioCapture, "WASAPI 在当前主机不可用");
 
     public IAudioCapture Create() => new WindowsWasapiAudioCapture(clock);
 }
@@ -23,8 +23,8 @@ public sealed class WindowsAudioCaptureFactory(IClock clock) : IAudioCaptureFact
 public sealed class WindowsWasapiAudioCapture(IClock clock) : IAudioCapture
 {
     public CapabilityState Capability => OperatingSystem.IsWindows()
-        ? CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI microphone capture")
-        : CapabilityState.Unavailable(CapabilityKind.AudioCapture, "WASAPI is unavailable on this host");
+        ? CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI 麦克风采集")
+        : CapabilityState.Unavailable(CapabilityKind.AudioCapture, "WASAPI 在当前主机不可用");
 
     public async IAsyncEnumerable<AudioFrame> ReadFramesAsync([EnumeratorCancellation] CancellationToken ct)
     {

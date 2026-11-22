@@ -53,7 +53,7 @@ public sealed class SherpaOnnxAsrEngine : IAsrEngine
         ? CapabilityState.Supported(CapabilityKind.AudioCapture, $"sherpa-onnx Paraformer Chinese ASR ({_options.AsrModelVersion})")
         : CapabilityState.PermissionRequired(
             CapabilityKind.AudioCapture,
-            "Chinese ASR model assets are not installed",
+            "中文语音识别模型资产未安装",
             "Set AIASSISTANT_SHERPA_MODEL_DIR to a directory containing model.int8.onnx and tokens.txt.");
 
     public async Task<AudioTranscriptionResult> TranscribeAsync(AudioTranscriptionRequest request, CancellationToken ct)
@@ -145,7 +145,7 @@ public sealed class SherpaOnnxVadSegmenter : IVadSegmenter
     }
 
     public CapabilityState Capability => _options.HasVadAssets
-        ? CapabilityState.Supported(CapabilityKind.WakeWord, "sherpa-onnx Silero VAD")
+        ? CapabilityState.Supported(CapabilityKind.WakeWord, "sherpa-onnx 语音活动检测（Silero VAD）")
         : CapabilityState.PermissionRequired(
             CapabilityKind.WakeWord,
             "Silero VAD model asset is not installed",
@@ -269,10 +269,10 @@ public sealed class SherpaOnnxDiarizationEngine : ISpeakerDiarizationEngine
     }
 
     public CapabilityState Capability => _options.HasDiarizationAssets
-        ? CapabilityState.Supported(CapabilityKind.AudioCapture, "sherpa-onnx pyannote segmentation + speaker embedding")
+        ? CapabilityState.Supported(CapabilityKind.AudioCapture, "sherpa-onnx 说话人分割与声纹嵌入")
         : CapabilityState.PermissionRequired(
             CapabilityKind.AudioCapture,
-            "Speaker diarization model assets are not installed",
+            "说话人分离模型资产未安装",
             "Set AIASSISTANT_SHERPA_MODEL_DIR with segmentation.onnx and speaker-embedding.onnx.");
 
     public string ModelVersion => "sherpa-onnx-pyannote-3.0";

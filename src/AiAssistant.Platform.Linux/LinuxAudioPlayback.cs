@@ -8,8 +8,8 @@ namespace AiAssistant.Platform.Linux;
 public sealed class LinuxAudioPlayback : IAudioPlayback
 {
     public CapabilityState Capability => OperatingSystem.IsLinux()
-        ? CapabilityState.Supported(CapabilityKind.WakeWord, "PulseAudio feedback playback")
-        : CapabilityState.Unavailable(CapabilityKind.WakeWord, "PulseAudio playback inactive on this host");
+        ? CapabilityState.Supported(CapabilityKind.WakeWord, "PulseAudio 提示音播放")
+        : CapabilityState.Unavailable(CapabilityKind.WakeWord, "PulseAudio 播放在当前主机不可用");
 
     public Task PlayAsync(ReadOnlyMemory<float> samples, int sampleRateHz, CancellationToken ct)
     {

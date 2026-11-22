@@ -41,8 +41,16 @@ public sealed class ModelConfigurationAdmin(
             var embeddingEndpoint = current.EmbeddingEndpoint ?? chatEndpoint;
 
             return new ModelConfigurationView(
-                new ModelEndpointView(chatEndpoint.BaseAddress.ToString(), chatEndpoint.ChatModel, chatEndpoint.Tier.ToString()),
-                new ModelEndpointView(embeddingEndpoint.BaseAddress.ToString(), embeddingEndpoint.EmbeddingModel, embeddingEndpoint.Tier.ToString()));
+                new ModelEndpointView(
+                    chatEndpoint.BaseAddress.ToString(),
+                    chatEndpoint.ChatModel,
+                    chatEndpoint.Tier.ToString(),
+                    chatEndpoint.Think,
+                    chatEndpoint.ThinkingLevel),
+                new ModelEndpointView(
+                    embeddingEndpoint.BaseAddress.ToString(),
+                    embeddingEndpoint.EmbeddingModel,
+                    embeddingEndpoint.Tier.ToString()));
         }
     }
 
@@ -62,12 +70,21 @@ public sealed class ModelConfigurationAdmin(
         var chatTierName = chatTier.ToString();
         var chatIndex = endpoints.FindIndex(item => item.Tier == chatTierName);
         var chatEndpoint = chatIndex < 0 ? new ModelEndpointDocument() : endpoints[chatIndex];
+        var chatBaseUrl = ParseUri(update.Chat.BaseUrl).TrimEnd('/');
         var updatedChat = chatEndpoint with
         {
             Tier = chatTierName,
-            Provider = chatTier == ModelEndpointTier.LocalOffline ? "ollama" : "openai",
-            BaseUrl = ParseUri(update.Chat.BaseUrl).TrimEnd('/'),
+            // Local endpoints are not necessarily Ollama: keep the configured provider, otherwise
+            // probe once and fall back to an OpenAI-compatible endpoint.
+            Provider = chatTier == ModelEndpointTier.LocalOffline
+                ? await ResolveLocalProviderAsync(chatBaseUrl, chatIndex < 0 ? null : chatEndpoint.Provider, ct)
+                : "openai",
+            BaseUrl = chatBaseUrl,
             ChatModel = update.Chat.Model.Trim(),
+            Think = update.Chat.Think,
+            ThinkingLevel = string.IsNullOrWhiteSpace(update.Chat.ThinkingLevel)
+                ? null
+                : update.Chat.ThinkingLevel.ToLowerInvariant(),
             AllowRemoteEndpoint = chatTier != ModelEndpointTier.LocalOffline || chatEndpoint.AllowRemoteEndpoint
         };
         if (chatIndex < 0)
@@ -86,7 +103,12 @@ public sealed class ModelConfigurationAdmin(
             : new EmbeddingEndpointDocument
             {
                 Tier = embeddingTier.ToString(),
-                Provider = embeddingTier == ModelEndpointTier.LocalOffline ? "ollama" : "openai",
+                Provider = embeddingTier == ModelEndpointTier.LocalOffline
+                    ? await ResolveLocalProviderAsync(
+                        ParseUri(update.Embedding.BaseUrl).TrimEnd('/'),
+                        document.Embedding?.Provider,
+                        ct)
+                    : "openai",
                 BaseUrl = ParseUri(update.Embedding.BaseUrl).TrimEnd('/'),
                 Model = update.Embedding.Model.Trim(),
                 AllowRemoteEndpoint = embeddingTier != ModelEndpointTier.LocalOffline
@@ -102,6 +124,36 @@ public sealed class ModelConfigurationAdmin(
         policy = policy with { DefaultTier = chatTierName };
 
         await SaveDocumentAsync(document with { Endpoints = endpoints, Embedding = embedding, Policy = policy }, ct);
+    }
+
+    /// <summary>
+    /// "本机" is not tied to a specific runtime. Keep an existing provider, otherwise probe
+    /// Ollama's /api/tags once and fall back to the OpenAI-compatible API (LM Studio, vLLM, ...).
+    /// </summary>
+    private static async Task<string> ResolveLocalProviderAsync(
+        string baseUrl,
+        string? existingProvider,
+        CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(existingProvider))
+        {
+            return existingProvider;
+        }
+
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+            using var response = await http.GetAsync(new Uri(new Uri(baseUrl), "/api/tags"), ct);
+            if (response.IsSuccessStatusCode)
+            {
+                return "ollama";
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or UriFormatException)
+        {
+        }
+
+        return "openai";
     }
 
     private static void ValidateEndpoint(ModelEndpointView view, ModelEndpointTier tier, bool isEmbedding)

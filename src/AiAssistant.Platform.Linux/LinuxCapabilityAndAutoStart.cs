@@ -77,9 +77,9 @@ public sealed class LinuxCapabilityProvider : ICapabilityProvider
             [
                 CapabilityState.Degraded(CapabilityKind.ScreenCapture, _backend.Decision.Summary),
                 CapabilityState.Degraded(CapabilityKind.WindowActivity, _backend.Decision.Summary),
-                CapabilityState.Supported(CapabilityKind.FileActivity, "inotify-backed whitelisted directories"),
+                CapabilityState.Supported(CapabilityKind.FileActivity, "inotify 监听白名单目录"),
                 _keyStore.Capability,
-                CapabilityState.Supported(CapabilityKind.AutoStart, "XDG autostart user entry")
+                CapabilityState.Supported(CapabilityKind.AutoStart, "XDG 用户自启条目")
             ];
         }
 
@@ -94,9 +94,9 @@ public sealed class LinuxCapabilityProvider : ICapabilityProvider
             _keyStore.Capability,
             _autoStart.Capability,
             _backend.Decision.Backend == LinuxDisplayBackendKind.Wayland
-                ? CapabilityState.Degraded(CapabilityKind.GlobalHotkey, "Wayland restricts global hotkeys; use tray or voice commands")
-                : CapabilityState.Degraded(CapabilityKind.GlobalHotkey, "X11 global hotkeys are not registered in the minimal shell"),
-            CapabilityState.Degraded(CapabilityKind.SystemTray, "Requires StatusNotifierItem/AppIndicator support from the desktop")
+                ? CapabilityState.Degraded(CapabilityKind.GlobalHotkey, "Wayland 限制全局热键；请使用托盘或语音命令")
+                : CapabilityState.Degraded(CapabilityKind.GlobalHotkey, "当前精简外壳未注册 X11 全局热键"),
+            CapabilityState.Degraded(CapabilityKind.SystemTray, "需要桌面支持 StatusNotifierItem/AppIndicator")
         ];
     }
 }
@@ -120,8 +120,8 @@ public sealed class XdgAutoStartService : IAutoStartService
     public string? DesktopFilePath => _autostartDirectory is null ? null : Path.Combine(_autostartDirectory, "aiassistant.desktop");
 
     public CapabilityState Capability => _autostartDirectory is null
-        ? CapabilityState.Unavailable(CapabilityKind.AutoStart, "XDG autostart is unavailable on this host")
-        : CapabilityState.Supported(CapabilityKind.AutoStart, "XDG ~/.config/autostart user entry");
+        ? CapabilityState.Unavailable(CapabilityKind.AutoStart, "XDG 自启在当前主机不可用")
+        : CapabilityState.Supported(CapabilityKind.AutoStart, "XDG ~/.config/autostart 用户条目");
 
     public async Task<bool> IsEnabledAsync(CancellationToken ct)
     {

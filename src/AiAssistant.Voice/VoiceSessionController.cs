@@ -106,20 +106,20 @@ public sealed class VoiceSessionController : IVoiceSession
 
             if (!_asr.Capability.IsOperational)
             {
-                return CapabilityState.Degraded(CapabilityKind.WakeWord, "Wake word ready; command ASR model missing");
+                return CapabilityState.Degraded(CapabilityKind.WakeWord, "唤醒词已就绪；命令识别模型缺失");
             }
 
             if (!_tts.Capability.IsOperational)
             {
-                return CapabilityState.Degraded(CapabilityKind.WakeWord, "Wake word ready; TTS feedback unavailable");
+                return CapabilityState.Degraded(CapabilityKind.WakeWord, "唤醒词已就绪；语音反馈不可用");
             }
 
             if (!_playback.Capability.IsOperational)
             {
-                return CapabilityState.Degraded(CapabilityKind.WakeWord, "Wake word ready; audio feedback playback unavailable");
+                return CapabilityState.Degraded(CapabilityKind.WakeWord, "唤醒词已就绪；提示音播放不可用");
             }
 
-            return CapabilityState.Supported(CapabilityKind.WakeWord, "Local wake word and voice commands ready");
+            return CapabilityState.Supported(CapabilityKind.WakeWord, "本机唤醒与语音命令已就绪");
         }
     }
 

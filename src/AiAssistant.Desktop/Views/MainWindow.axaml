@@ -162,7 +162,7 @@
                   <TextBlock Text="{Binding CapturedTimeText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                 </StackPanel>
                 <Border Grid.Column="1" Background="{DynamicResource AccentSoftBackgroundBrush}" CornerRadius="6" Padding="9,5" VerticalAlignment="Top">
-                  <TextBlock Text="LOCAL ONLY" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                  <TextBlock Text="仅本机" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
                 </Border>
               </Grid>
 
@@ -483,11 +483,11 @@
                 <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasModelConfiguration}">
                   <StackPanel Spacing="8">
                     <TextBlock Text="模型配置" FontWeight="SemiBold" />
-                    <TextBlock Text="对话与 Embedding 可独立配置端点（本机/内网/公网），保存后重启应用生效。" FontSize="12"
+                    <TextBlock Text="对话与向量模型可独立配置端点（本机/内网/公网），保存后重启应用生效。" FontSize="12"
                                Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
 
                     <TextBlock Text="对话模型" FontWeight="SemiBold" />
-                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
                       <TextBlock Text="模型来源" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                       <ComboBox Grid.Column="1" ItemsSource="{Binding TierOptions}" SelectedItem="{Binding ChatTier}"
                                 HorizontalAlignment="Stretch" Margin="0,0,0,6">
@@ -499,11 +499,25 @@
                       </ComboBox>
                       <TextBlock Grid.Row="1" Text="模型名" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                       <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ChatModel}" PlaceholderText="例如 gemma4:12b" Margin="0,0,0,6" />
-                      <TextBlock Grid.Row="2" Text="Base URL" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                      <TextBlock Grid.Row="2" Text="接口地址" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                       <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ChatBaseUrl}" PlaceholderText="http://127.0.0.1:11434" Margin="0,0,0,6" />
+                      <TextBlock Grid.Row="3" Text="允许思考" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                      <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding ChatThink}" Content="启用推理（thinking）"
+                                Margin="0,0,0,6" automation:AutomationProperties.Name="允许思考" />
+                      <TextBlock Grid.Row="4" Text="思考强度" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                      <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding ThinkingLevelOptions}"
+                                SelectedItem="{Binding ChatThinkingLevel}" IsEnabled="{Binding ChatThink}"
+                                HorizontalAlignment="Stretch" Margin="0,0,0,6"
+                                automation:AutomationProperties.Name="思考强度">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Label}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
                     </Grid>
 
-                    <TextBlock Text="Embedding 模型" FontWeight="SemiBold" />
+                    <TextBlock Text="向量模型（Embedding）" FontWeight="SemiBold" />
                     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
                       <TextBlock Text="模型来源" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                       <ComboBox Grid.Column="1" ItemsSource="{Binding TierOptions}" SelectedItem="{Binding EmbeddingTier}"
@@ -516,7 +530,7 @@
                       </ComboBox>
                       <TextBlock Grid.Row="1" Text="模型名" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                       <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EmbeddingModel}" PlaceholderText="例如 embeddinggemma-2:740m" Margin="0,0,0,6" />
-                      <TextBlock Grid.Row="2" Text="Base URL" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                      <TextBlock Grid.Row="2" Text="接口地址" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                       <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding EmbeddingBaseUrl}" PlaceholderText="http://127.0.0.1:11434" Margin="0,0,0,6" />
                     </Grid>
 

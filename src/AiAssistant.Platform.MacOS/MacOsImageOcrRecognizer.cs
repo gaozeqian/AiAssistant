@@ -13,11 +13,11 @@ namespace AiAssistant.Platform.MacOS;
 public sealed class MacOsImageOcrRecognizer(IMacHelperSupervisor supervisor) : IImageOcrRecognizer
 {
     public CapabilityState Capability => supervisor.Status == MacHelperSupervisorStatus.Healthy
-        ? CapabilityState.Supported(CapabilityKind.Ocr, "Vision VNRecognizeTextRequest via Swift Helper")
+        ? CapabilityState.Supported(CapabilityKind.Ocr, "Vision 文字识别（Swift Helper）")
         : CapabilityState.Degraded(
             CapabilityKind.Ocr,
             $"macOS helper {supervisor.Status}; Vision OCR unavailable",
-            "Check the helper status on the diagnostics page.");
+            "请在诊断页检查 Helper 状态。");
 
     public async Task<string?> RecognizeAsync(ImageFrameBuffer frame, CancellationToken ct)
     {

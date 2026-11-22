@@ -252,6 +252,21 @@ public static class UiE2ERunner
             return $"rows={shell.Diagnostics.Capabilities.Count}";
         });
 
+        await StepAsync("保存思考开关与强度", async () =>
+        {
+            shell.SelectedSectionIndex = 5;
+            shell.Diagnostics.ChatThink = true;
+            shell.Diagnostics.ChatThinkingLevel = shell.Diagnostics.ThinkingLevelOptions
+                .First(option => option.Value == "high");
+            await shell.Diagnostics.SaveModelConfigurationCommand.ExecuteAsync(null);
+            if (!shell.Diagnostics.ModelConfigStatus.Contains("已保存", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(shell.Diagnostics.ModelConfigStatus);
+            }
+
+            return $"{shell.Diagnostics.ModelConfigStatus} think={shell.Diagnostics.ChatThink} level={shell.Diagnostics.ChatThinkingLevel.Value}";
+        });
+
         await StepAsync("日报生成（真实模型）", async () =>
         {
             shell.SelectedSectionIndex = 6;
@@ -315,19 +330,32 @@ public static class UiE2ERunner
             return $"status={shell.Data.StatusMessage}";
         });
 
-        await StepAsync("退出入口可用（无托盘时关闭即退出）", () =>
+        await StepAsync("关闭仅隐藏、退出按钮可退出", () =>
         {
             if (!shell.RequestExitCommand.CanExecute(null))
             {
                 throw new InvalidOperationException("退出命令不可用");
             }
 
-            if (OperatingSystem.IsLinux() && !shell.ExitOnClose)
+            // Closing must only hide the window so background capture keeps running.
+            window.Close();
+            if (shell.IsExitRequested)
             {
-                throw new InvalidOperationException("无托盘环境下关闭窗口应直接退出");
+                throw new InvalidOperationException("关闭窗口被误判为退出");
             }
 
-            return Task.FromResult<string?>($"exitOnClose={shell.ExitOnClose} canExit=true");
+            if (window.IsVisible)
+            {
+                throw new InvalidOperationException("关闭窗口后仍可见");
+            }
+
+            window.ShowFromTray();
+            if (!window.IsVisible)
+            {
+                throw new InvalidOperationException("无法重新显示窗口");
+            }
+
+            return Task.FromResult<string?>("close=hide show=ok exitCommand=ok");
         });
 
         var reportPath = Path.Combine(directory, "report.md");

@@ -52,7 +52,7 @@ public sealed class WaylandScreenCapture(
             return sessionManager.Snapshot.Status switch
             {
                 XdgPortalSessionStatus.Unavailable => CapabilityState.Unavailable(CapabilityKind.ScreenCapture, sessionManager.Snapshot.Summary),
-                XdgPortalSessionStatus.Degraded => CapabilityState.Degraded(CapabilityKind.ScreenCapture, sessionManager.Snapshot.Summary, "Check xdg-desktop-portal and its desktop backend."),
+                XdgPortalSessionStatus.Degraded => CapabilityState.Degraded(CapabilityKind.ScreenCapture, sessionManager.Snapshot.Summary, "请检查 xdg-desktop-portal 及其桌面后端。"),
                 _ => CapabilityState.Degraded(
                     CapabilityKind.ScreenCapture,
                     $"Wayland portal on-demand capture; {sessionManager.Snapshot.Summary}",
@@ -195,7 +195,7 @@ public sealed class LinuxScreenCapture : IScreenCapture
     }
 
     public CapabilityState Capability => !OperatingSystem.IsLinux()
-        ? CapabilityState.Unavailable(CapabilityKind.ScreenCapture, "Linux capture is inactive on this host")
+        ? CapabilityState.Unavailable(CapabilityKind.ScreenCapture, "Linux 采集在当前主机不可用")
         : _backend.Decision.Backend == LinuxDisplayBackendKind.Wayland ? _wayland.Capability : _x11.Capability;
 
     public Task<ScreenCaptureFrame?> CaptureFrameAsync(CancellationToken ct) =>
@@ -218,7 +218,7 @@ public sealed class LinuxWindowActivitySource(
     public SourceKind Kind => SourceKind.WindowActivity;
 
     public CapabilityState Capability => !OperatingSystem.IsLinux()
-        ? CapabilityState.Unavailable(CapabilityKind.WindowActivity, "Linux window capture is inactive on this host")
+        ? CapabilityState.Unavailable(CapabilityKind.WindowActivity, "Linux 窗口采集在当前主机不可用")
         : backend.Decision.Backend == LinuxDisplayBackendKind.Wayland ? _waylandSource.Capability : _x11Source.Capability;
 
     public Task<CapturedSample?> GetCurrentForegroundAsync(CancellationToken ct) =>
@@ -286,7 +286,7 @@ public sealed class LinuxTextExtractor(
         : CapabilityState.Degraded(
             CapabilityKind.Ocr,
             "RapidOCR models are not configured; AT-SPI accessibility remains available",
-            "Set AIASSISTANT_RAPIDOCR_MODEL_DIR to enable the ONNX image OCR fallback.");
+            "请设置 AIASSISTANT_RAPIDOCR_MODEL_DIR 以启用 ONNX 图像 OCR 兜底。");
 
     public async Task<ExtractedTextResult> ExtractAsync(TextExtractionRequest request, CancellationToken ct)
     {

@@ -13,11 +13,15 @@ public sealed class ModelGatewayOptions
     public string ChatModel { get; init; } = "gemma4:12b";
 
     /// <summary>
-    /// Ollama thinking models (e.g. gemma4 / qwen3) spend the output budget on internal reasoning,
-    /// which makes structured reports slow and can return empty content once the cap is hit.
-    /// Sending <c>think: false</c> keeps answers direct. Ignored by models without a thinking mode.
+    /// Whether to let Ollama thinking models (e.g. gemma4 / qwen3) reason before answering.
+    /// Defaults to off: reasoning consumes the output budget, which made structured reports slow
+    /// and could return empty content. Ignored by models without a thinking mode.
     /// </summary>
-    public bool DisableThinking { get; init; } = true;
+    public bool Think { get; init; }
+
+    /// <summary>Optional thinking effort for Ollama (<c>low</c>/<c>medium</c>/<c>high</c>); ignored when <see cref="Think"/> is false.</summary>
+    public string? ThinkingLevel { get; init; }
+
     public string EmbeddingModel { get; init; } = "embeddinggemma-2:740m";
     public string? ApiKey { get; init; }
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(120);
@@ -50,6 +54,11 @@ public sealed class ModelGatewayOptions
                 : new Uri(defaultBase),
             ChatModel = chatModel,
             EmbeddingModel = embeddingModel,
+            Think = string.Equals(
+                Environment.GetEnvironmentVariable("AIASSISTANT_MODEL_THINK"),
+                "true",
+                StringComparison.OrdinalIgnoreCase),
+            ThinkingLevel = Environment.GetEnvironmentVariable("AIASSISTANT_MODEL_THINKING_LEVEL"),
             ApiKey = Environment.GetEnvironmentVariable("AIASSISTANT_MODEL_API_KEY"),
             AllowRemoteEndpoint = string.Equals(
                 Environment.GetEnvironmentVariable("AIASSISTANT_MODEL_ALLOW_REMOTE"),

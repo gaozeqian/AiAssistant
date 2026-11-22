@@ -271,7 +271,12 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
         Assert.Equal("old-chat", admin.Current.Chat.Model);
         await admin.SaveAsync(
             new ModelConfigurationView(
-                new ModelEndpointView("http://127.0.0.1:11434", "gemma4:12b-mlx", "LocalOffline"),
+                new ModelEndpointView(
+                    "http://127.0.0.1:11434",
+                    "gemma4:12b-mlx",
+                    "LocalOffline",
+                    Think: true,
+                    ThinkingLevel: "medium"),
                 new ModelEndpointView("http://127.0.0.1:11434", "embeddinggemma-2:740m", "LocalOffline")),
             CancellationToken.None);
 
@@ -279,8 +284,42 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
             .LoadAsync(path, CancellationToken.None);
         var local = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.LocalOffline);
         Assert.Equal("gemma4:12b-mlx", local.ChatModel);
+        Assert.True(local.Think);
+        Assert.Equal("medium", local.ThinkingLevel);
         var corp = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.CorporateIntranet);
         Assert.Equal("corp-chat", corp.ChatModel);
+    }
+
+    [Fact]
+    public async Task ModelConfigurationAdmin_PreservesNonOllamaLocalProvider()
+    {
+        // "本机" is not tied to Ollama: an OpenAI-compatible local runtime (LM Studio, vLLM, ...) must
+        // keep its provider instead of being silently rewritten to Ollama.
+        var path = Path.Combine(_tempRoot, "models.json");
+        await File.WriteAllTextAsync(path, """
+            {
+              "schemaVersion": 1,
+              "policy": { "defaultTier": "LocalOffline" },
+              "endpoints": [
+                { "tier": "LocalOffline", "provider": "lmstudio", "baseUrl": "http://127.0.0.1:1234", "chatModel": "local-chat", "embeddingModel": "local-embed" }
+              ]
+            }
+            """);
+        var configuration = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+        var admin = new ModelConfigurationAdmin(path, configuration);
+
+        await admin.SaveAsync(
+            new ModelConfigurationView(
+                new ModelEndpointView("http://127.0.0.1:1234", "local-chat-2", "LocalOffline"),
+                new ModelEndpointView("http://127.0.0.1:1234", "local-embed-2", "LocalOffline")),
+            CancellationToken.None);
+
+        var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+        var local = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.LocalOffline);
+        Assert.Equal(ModelProviderKind.OpenAiCompatible, local.Provider);
+        Assert.Equal("local-chat-2", local.ChatModel);
     }
 
     [Fact]

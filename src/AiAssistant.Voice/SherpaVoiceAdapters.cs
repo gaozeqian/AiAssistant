@@ -75,11 +75,11 @@ public sealed class SherpaOnnxWakeWordDetector : IWakeWordDetector
     public CapabilityState Capability => _errorType is not null
         ? CapabilityState.Degraded(CapabilityKind.WakeWord, $"KWS degraded ({_errorType})")
         : _options.HasKwsAssets
-            ? CapabilityState.Supported(CapabilityKind.WakeWord, "sherpa-onnx KWS 你好时光")
+            ? CapabilityState.Supported(CapabilityKind.WakeWord, "sherpa-onnx 唤醒词「你好时光」")
             : CapabilityState.PermissionRequired(
                 CapabilityKind.WakeWord,
-                "Wake-word model assets are not installed",
-                "Set AIASSISTANT_SHERPA_MODEL_DIR with KWS encoder/decoder/joiner/tokens and keywords.txt.");
+                "唤醒词模型资产未安装",
+                "请在 AIASSISTANT_SHERPA_MODEL_DIR 下提供 KWS encoder/decoder/joiner/tokens 与 keywords.txt。");
 
     public IReadOnlyList<WakeWordDetection> Accept(AudioFrame frame)
     {
@@ -202,11 +202,11 @@ public sealed class SherpaOnnxTtsService : ITtsService
     public CapabilityState Capability => _errorType is not null
         ? CapabilityState.Degraded(CapabilityKind.WakeWord, $"TTS degraded ({_errorType})")
         : _options.HasTtsAssets
-            ? CapabilityState.Supported(CapabilityKind.WakeWord, "sherpa-onnx local TTS")
+            ? CapabilityState.Supported(CapabilityKind.WakeWord, "sherpa-onnx 本机语音合成")
             : CapabilityState.PermissionRequired(
                 CapabilityKind.WakeWord,
-                "TTS model assets are not installed",
-                "Set AIASSISTANT_SHERPA_MODEL_DIR with TTS model/tokens/lexicon.");
+                "语音合成模型资产未安装",
+                "请在 AIASSISTANT_SHERPA_MODEL_DIR 下提供语音合成模型、tokens 与 lexicon。");
 
     public async Task<SpeechSynthesisResult> SynthesizeAsync(
         SpeechSynthesisRequest request,

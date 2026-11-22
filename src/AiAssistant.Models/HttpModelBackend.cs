@@ -47,6 +47,12 @@ public sealed class HttpModelBackend : IChatClient, IEmbeddingGenerator<string, 
             throw new ModelGatewayException("No chat model is configured.");
         }
 
+        // Thinking models otherwise burn the output budget on reasoning and can return empty
+        // content; `think` accepts false, true, or an effort level (low/medium/high).
+        object think = !_options.Think
+            ? false
+            : string.IsNullOrWhiteSpace(_options.ThinkingLevel) ? true : _options.ThinkingLevel;
+
         object payload = _options.Provider == ModelProviderKind.Ollama
             ? new
             {
@@ -57,9 +63,7 @@ public sealed class HttpModelBackend : IChatClient, IEmbeddingGenerator<string, 
                     content = message.Text
                 }),
                 stream = false,
-                // Thinking models otherwise burn the output budget on reasoning and can return
-                // empty content; Ollama ignores this flag for models without a thinking mode.
-                think = !_options.DisableThinking,
+                think,
                 options = new
                 {
                     temperature = options?.Temperature ?? 0.2,
@@ -197,11 +201,11 @@ public sealed class HttpModelBackend : IChatClient, IEmbeddingGenerator<string, 
                 chat,
                 embeddings,
                 models,
-                chat ? "Local model endpoint ready." : "Configured chat model is not installed.");
+                chat ? "模型端点已就绪。" : "配置的对话模型未安装。");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return new ModelEndpointProbeResult(false, false, [], $"Endpoint probe failed ({ex.GetType().Name}).");
+            return new ModelEndpointProbeResult(false, false, [], $"端点探测失败（{ex.GetType().Name}）。");
         }
     }
 

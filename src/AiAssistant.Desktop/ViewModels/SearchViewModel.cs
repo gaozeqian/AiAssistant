@@ -265,9 +265,10 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
         {
         }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        catch (Exception ex)
         {
-            ErrorMessage = "检索或生成失败，请稍后重试或查看诊断页。";
+            // Surface the real reason (model unreachable, policy block, invalid output, ...).
+            ErrorMessage = $"检索或生成失败：{ex.Message}";
             StatusMessage = "操作失败";
         }
         finally
@@ -312,7 +313,15 @@ public sealed class EvidenceCardItem
 
     public string MatchedByText => string.Create(
         CultureInfo.InvariantCulture,
-        $"召回：{Reference.MatchedBy} · 分数 {Reference.Score:F4}");
+        $"召回：{MatchMethodLabel(Reference.MatchedBy)} · 分数 {Reference.Score:F4}");
+
+    private static string MatchMethodLabel(string matchedBy) => matchedBy switch
+    {
+        "keyword+vector" => "关键词+向量",
+        "vector" => "向量",
+        "keyword" => "关键词",
+        _ => matchedBy
+    };
 
     public string MediaText => Reference.HasMedia
         ? "媒体仍在保留期内，可在时间线按需解密查看"

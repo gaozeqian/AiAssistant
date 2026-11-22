@@ -115,13 +115,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     public bool IsExitRequested { get; set; }
 
-    /// <summary>
-    /// True when the desktop has no usable system tray: closing the window must exit the app
-    /// instead of hiding it, otherwise the window would be unreachable.
-    /// </summary>
-    public bool ExitOnClose { get; set; }
-
-    /// <summary>Explicit exit affordance for environments without a tray icon.</summary>
+    /// <summary>Explicit exit affordance; closing the window only hides it.</summary>
     public void RequestExit()
     {
         IsExitRequested = true;

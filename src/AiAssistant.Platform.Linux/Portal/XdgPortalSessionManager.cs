@@ -60,7 +60,7 @@ public sealed class XdgPortalSessionManager(
             _snapshot = new XdgPortalSessionSnapshot(
                 XdgPortalSessionStatus.Ready,
                 session.RestoreTokenUsed
-                    ? "ScreenCast session restored through encrypted restore token."
+                    ? "已通过加密恢复令牌恢复 ScreenCast 会话。"
                     : "ScreenCast session authorized through xdg-desktop-portal.",
                 session.Streams.Count,
                 _tokenRotationCount,
@@ -99,7 +99,7 @@ public sealed class XdgPortalSessionManager(
 
             _snapshot = new XdgPortalSessionSnapshot(
                 clearRestoreToken ? XdgPortalSessionStatus.PermissionRequired : XdgPortalSessionStatus.NotRequested,
-                clearRestoreToken ? "Portal authorization was revoked; a new grant is required." : "Portal session closed.",
+                clearRestoreToken ? "Portal 授权已撤销，需要重新授权。" : "Portal 会话已关闭。",
                 0,
                 _tokenRotationCount,
                 null);
@@ -168,7 +168,7 @@ public sealed class XdgPortalSessionManager(
         {
             _snapshot = new XdgPortalSessionSnapshot(
                 ex.ResponseCode == 1 ? XdgPortalSessionStatus.PermissionRequired : XdgPortalSessionStatus.Degraded,
-                ex.ResponseCode == 1 ? "Portal authorization was cancelled or revoked." : "Portal request did not complete.",
+                ex.ResponseCode == 1 ? "Portal 授权已取消或撤销。" : "Portal 请求未完成。",
                 0,
                 _tokenRotationCount,
                 nameof(XdgPortalRequestException));

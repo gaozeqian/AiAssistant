@@ -58,10 +58,23 @@ public static class Program
 
         try
         {
+            // The UI E2E writes model settings, so give it a private copy of the configured
+            // models.json instead of mutating the shared file used by normal runs.
+            PrepareUiE2EConfiguration(args);
+
             // Blocking is intentional: it keeps the main thread free to own the AppKit/Avalonia loop.
             var runtime = AppRuntime.CreateAsync().GetAwaiter().GetResult();
             try
             {
+                // Closing the window hides it (capture keeps running); launching again should
+                // surface the existing window instead of starting a second recorder.
+                if (IsGuiInvocation(args) &&
+                    Desktop.SingleInstance.TryActivateExisting(runtime.InstanceSocketPath))
+                {
+                    Console.WriteLine("AiAssistant 已在运行，已请求显示主窗口。");
+                    return 0;
+                }
+
                 if (args.Contains("--ui-e2e", StringComparer.OrdinalIgnoreCase))
                 {
                     // Give the self-driven UI flow a realistic day of local activity to search/report on.
@@ -99,6 +112,7 @@ public static class Program
                 }
 
                 Desktop.ShellApp.TrayAvailable = runtime.IsSystemTraySupported;
+                Desktop.ShellApp.InstanceSocketPath = runtime.InstanceSocketPath;
                 Desktop.ShellApp.ViewModelFactory = runtime.CreateShellViewModel;
                 return OperatingSystem.IsLinux() && runtime.LinuxBackendState is { } linuxBackend
                     ? StartLinuxDesktop(linuxBackend, args)
@@ -648,6 +662,42 @@ public static class Program
             "artifacts",
             "benchmarks",
             $"{prefix}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.md"));
+    }
+
+    /// <summary>Arguments that run headless and must never touch the GUI single-instance socket.</summary>
+    private static readonly string[] HeadlessArgumentPrefixes =
+    [
+        "--smoke-check", "--help", "-h", "--version", "--mcp-token", "--mcp-serve", "--doctor",
+        "--probe-model", "--benchmark-", "--report-range", "--ask", "--rebuild-vectors",
+        "--backup", "--restore", "--purge-data", "--import-model-secret", "--list-model-secrets",
+        "--delete-model-secret", "--capture-smoke", "--startup-check", "--ui-e2e"
+    ];
+
+    private static bool IsGuiInvocation(string[] args) =>
+        !args.Any(argument => HeadlessArgumentPrefixes.Any(prefix =>
+            argument.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)));
+
+    private static void PrepareUiE2EConfiguration(string[] args)
+    {
+        if (!args.Contains("--ui-e2e", StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var source = Environment.GetEnvironmentVariable("AIASSISTANT_MODELS_CONFIG");
+        var dataDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY");
+        if (string.IsNullOrWhiteSpace(source) || !File.Exists(source) || string.IsNullOrWhiteSpace(dataDirectory))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(dataDirectory);
+        var target = Path.Combine(dataDirectory, "models.json");
+        if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.Ordinal))
+        {
+            File.Copy(source, target, overwrite: true);
+            Environment.SetEnvironmentVariable("AIASSISTANT_MODELS_CONFIG", target);
+        }
     }
 
     private static int StartLinuxDesktop(LinuxDisplayBackendState backendState, string[] args)

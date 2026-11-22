@@ -15,14 +15,18 @@ namespace AiAssistant.Desktop;
 public sealed class ShellApp : Avalonia.Application, IDisposable
 {
     private TrayIcon? _trayIcon;
+    private SingleInstance? _singleInstance;
 
     public static Func<ShellViewModel>? ViewModelFactory { get; set; }
 
     /// <summary>
-    /// Set by Host from the platform capability matrix. On desktops without a real tray
-    /// (Linux GNOME by default) closing the window exits instead of hiding an unreachable window.
+    /// Set by Host from the platform capability matrix. Only used for diagnostics; closing the
+    /// window always hides it and keeps capture running, quitting needs the explicit 退出 action.
     /// </summary>
     public static bool TrayAvailable { get; set; } = true;
+
+    /// <summary>Unix socket used to bring the hidden window back when the app is launched again.</summary>
+    public static string? InstanceSocketPath { get; set; }
 
     public ShellApp()
     {
@@ -60,7 +64,19 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
                 WaylandProperties.SetAppId(window, "aiassistant");
             }
 
-            shell.ExitOnClose = !TrayAvailable;
+            // Closing hides the window; launching again (dock icon / desktop entry) shows it.
+            if (!string.IsNullOrWhiteSpace(InstanceSocketPath))
+            {
+                _singleInstance = new SingleInstance(InstanceSocketPath);
+                try
+                {
+                    _singleInstance.Start(() => Avalonia.Threading.Dispatcher.UIThread.Post(window.ShowFromTray));
+                }
+                catch
+                {
+                    // Activation is best-effort; capture keeps running regardless.
+                }
+            }
 
             // Follow the system theme on first launch, then honour manual toggles.
             // AIASSISTANT_THEME=light|dark pins a variant (useful for tests and user preference).
@@ -84,7 +100,9 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
                 Environment.GetEnvironmentVariable("AIASSISTANT_UI_E2E"),
                 "1",
                 StringComparison.Ordinal);
-            if (showWindow || runUiE2E)
+            // Tray-only on desktops that actually have a tray; without one the window must be
+            // visible, otherwise the app would start with no reachable UI at all.
+            if (showWindow || runUiE2E || !TrayAvailable)
             {
                 window.Show();
             }
@@ -275,6 +293,8 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
     {
         _trayIcon?.Dispose();
         _trayIcon = null;
+        _singleInstance?.Dispose();
+        _singleInstance = null;
         GC.SuppressFinalize(this);
     }
 

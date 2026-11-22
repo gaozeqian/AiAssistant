@@ -91,7 +91,7 @@ public sealed class PipeWireScreenCastStream : IDisposable
             return CapabilityState.Degraded(
                 CapabilityKind.ScreenCapture,
                 "Wayland PipeWire stream is idle; portal screenshots are used on demand",
-                "The stream starts on the first capture request after portal authorization.");
+                "首次采集请求时才会在 portal 授权后启动帧流。");
         }
     }
 

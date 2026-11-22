@@ -23,17 +23,17 @@ internal static class MacHelperCapabilityEvaluator
                 CapabilityState.Degraded(
                     kind,
                     supervisor.StatusSummary,
-                    "Reinstall the complete macOS app bundle so Host and Swift helper IPC versions match."),
+                    "请重新安装完整的 macOS 应用包，使 Host 与 Swift Helper 的 IPC 版本一致。"),
             MacHelperSupervisorStatus.Unavailable or MacHelperSupervisorStatus.Stopped =>
                 CapabilityState.Unavailable(
                     kind,
                     supervisor.StatusSummary,
-                    "Ensure aiassistant-mac-helper is bundled inside Contents/MacOS and signed."),
+                    "请确保 aiassistant-mac-helper 已打包到 Contents/MacOS 并完成签名。"),
             MacHelperSupervisorStatus.Starting or MacHelperSupervisorStatus.BackoffRestarting =>
                 CapabilityState.Degraded(
                     kind,
                     $"{supervisor.StatusSummary} (restarts={supervisor.RestartCount.ToString(CultureInfo.InvariantCulture)})",
-                    "Supervisor is recovering the macOS Swift helper with exponential backoff."),
+                    "监督器正在以指数退避恢复 macOS Swift Helper。"),
             MacHelperSupervisorStatus.Healthy => requiredGrant switch
             {
                 null or MacPermissionGrant.Granted => CapabilityState.Supported(kind, supportedSummary),
@@ -113,12 +113,12 @@ public sealed class MacOsCapabilityProvider : ICapabilityProvider
         {
             return
             [
-                CapabilityState.PermissionRequired(CapabilityKind.ScreenCapture, "ScreenCaptureKit via Swift Helper", "Grant Screen Recording in System Settings > Privacy & Security."),
-                CapabilityState.PermissionRequired(CapabilityKind.WindowActivity, "NSWorkspace + AX via Swift Helper", "Grant Accessibility permission in System Settings > Privacy & Security."),
-                CapabilityState.Supported(CapabilityKind.FileActivity, "FSEvents + whitelisted directory watcher"),
+                CapabilityState.PermissionRequired(CapabilityKind.ScreenCapture, "ScreenCaptureKit（Swift Helper）", "请在「系统设置 > 隐私与安全性」中授予「屏幕录制」。"),
+                CapabilityState.PermissionRequired(CapabilityKind.WindowActivity, "NSWorkspace + AX（Swift Helper）", "请在「系统设置 > 隐私与安全性」中授予「辅助功能」。"),
+                CapabilityState.Supported(CapabilityKind.FileActivity, "FSEvents 白名单目录监听"),
                 _keyStore.Capability,
-                CapabilityState.Supported(CapabilityKind.SystemTray, "Avalonia TrayIcon active"),
-                CapabilityState.Supported(CapabilityKind.AutoStart, "launchd LaunchAgent user agent")
+                CapabilityState.Supported(CapabilityKind.SystemTray, "Avalonia 托盘已启用"),
+                CapabilityState.Supported(CapabilityKind.AutoStart, "launchd LaunchAgent 用户代理")
             ];
         }
 
@@ -132,11 +132,11 @@ public sealed class MacOsCapabilityProvider : ICapabilityProvider
             _audioCapture.Capability,
             _keyStore.Capability,
             _autoStartService.Capability,
-            CapabilityState.Supported(CapabilityKind.SystemTray, "Avalonia NSStatusItem TrayIcon active"),
+            CapabilityState.Supported(CapabilityKind.SystemTray, "Avalonia NSStatusItem 托盘已启用"),
             CapabilityState.Degraded(
                 CapabilityKind.WakeWord,
-                "Voice is opt-in; enable it on the Voice page",
-                "Requires sherpa-onnx KWS/TTS models under AIASSISTANT_SHERPA_MODEL_DIR.")
+                "语音为可选功能，请在「语音」页开启",
+                "需要在 AIASSISTANT_SHERPA_MODEL_DIR 下提供 sherpa-onnx KWS/TTS 模型。")
         ];
     }
 }
@@ -172,7 +172,7 @@ public sealed class MacOsLaunchAgentAutoStartService : IAutoStartService
 
     public CapabilityState Capability => _launchAgentsDirectory is not null
         ? CapabilityState.Supported(CapabilityKind.AutoStart, $"launchd LaunchAgent ({_agentLabel}.plist)")
-        : CapabilityState.Unavailable(CapabilityKind.AutoStart, "macOS LaunchAgent inactive on non-macOS host");
+        : CapabilityState.Unavailable(CapabilityKind.AutoStart, "macOS LaunchAgent 仅在 macOS 主机可用");
 
     public Task<bool> IsEnabledAsync(CancellationToken ct)
     {

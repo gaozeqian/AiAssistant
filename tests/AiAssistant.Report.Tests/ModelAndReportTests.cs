@@ -67,6 +67,30 @@ public sealed class ModelGatewayTests
         Assert.Single(embeddings);
         Assert.Equal([0.1f, 0.2f, 0.3f], embeddings[0].Vector.ToArray());
         Assert.Contains("\"stream\":false", handler.LastChatBody, StringComparison.Ordinal);
+        // Thinking is off by default so reasoning cannot exhaust the output budget.
+        Assert.Contains("\"think\":false", handler.LastChatBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OllamaHttpBackend_SendsThinkingLevelWhenEnabled()
+    {
+        var handler = new OllamaHandler();
+        var options = new ModelGatewayOptions
+        {
+            ChatModel = "gemma4:12b",
+            EmbeddingModel = "embeddinggemma-2:740m",
+            Think = true,
+            ThinkingLevel = "high"
+        };
+        using var http = new HttpClient(handler);
+        var backend = new HttpModelBackend(http, options);
+
+        _ = await backend.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "生成日报")],
+            null,
+            CancellationToken.None);
+
+        Assert.Contains("\"think\":\"high\"", handler.LastChatBody, StringComparison.Ordinal);
     }
 
     private sealed class RecordingModelGateway : IModelGateway

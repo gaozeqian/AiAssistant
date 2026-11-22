@@ -14,7 +14,9 @@
       "baseUrl": "http://127.0.0.1:11434",
       "chatModel": "gemma4:12b",
       "embeddingModel": "embeddinggemma-2:740m",
-      "timeoutSeconds": 120
+      "timeoutSeconds": 120,
+      "think": false,
+      "thinkingLevel": null
     },
     {
       "tier": "CorporateIntranet",

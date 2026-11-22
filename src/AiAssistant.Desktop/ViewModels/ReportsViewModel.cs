@@ -179,9 +179,10 @@ public sealed class ReportsViewModel : ObservableObject
         {
             ErrorMessage = "日报任务仍在运行，请稍后刷新。";
         }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException or Core.Exceptions.AiAssistantDomainException)
+        catch (Exception ex)
         {
-            ErrorMessage = "日报生成失败；原始活动数据未被修改。请检查本机模型配置。";
+            // Show the underlying reason (model endpoint, structured-output rejection, policy, ...).
+            ErrorMessage = $"日报生成失败：{ex.Message}（原始活动数据未被修改）";
         }
         finally
         {

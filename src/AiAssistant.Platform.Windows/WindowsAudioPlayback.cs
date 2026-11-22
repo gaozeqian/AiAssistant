@@ -8,8 +8,8 @@ namespace AiAssistant.Platform.Windows;
 public sealed class WindowsAudioPlayback : IAudioPlayback
 {
     public CapabilityState Capability => OperatingSystem.IsWindows()
-        ? CapabilityState.Supported(CapabilityKind.WakeWord, "WinMM WaveOut feedback")
-        : CapabilityState.Unavailable(CapabilityKind.WakeWord, "Windows playback inactive on this host");
+        ? CapabilityState.Supported(CapabilityKind.WakeWord, "WinMM WaveOut 提示音播放")
+        : CapabilityState.Unavailable(CapabilityKind.WakeWord, "Windows 音频播放在当前主机不可用");
 
     public async Task PlayAsync(ReadOnlyMemory<float> samples, int sampleRateHz, CancellationToken ct)
     {

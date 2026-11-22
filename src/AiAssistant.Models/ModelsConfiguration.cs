@@ -48,6 +48,12 @@ public sealed record ModelEndpointDocument
     public string? EnterpriseCaPath { get; init; }
     public string? ProxyUrl { get; init; }
     public bool AllowRemoteEndpoint { get; init; }
+
+    /// <summary>Whether the chat model may reason before answering (Ollama thinking models).</summary>
+    public bool Think { get; init; }
+
+    /// <summary>Optional thinking effort: low / medium / high.</summary>
+    public string? ThinkingLevel { get; init; }
 }
 
 public sealed record ModelPolicy(
@@ -70,7 +76,9 @@ public sealed record ModelEndpointSettings(
     string? ClientCertificatePassword,
     string? EnterpriseCaPath,
     Uri? Proxy,
-    bool AllowRemoteEndpoint);
+    bool AllowRemoteEndpoint,
+    bool Think = false,
+    string? ThinkingLevel = null);
 
 public sealed record ModelsConfiguration(
     int SchemaVersion,
@@ -290,7 +298,9 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
             certificatePassword,
             document.EnterpriseCaPath,
             proxy,
-            document.AllowRemoteEndpoint);
+            document.AllowRemoteEndpoint,
+            document.Think,
+            string.IsNullOrWhiteSpace(document.ThinkingLevel) ? null : document.ThinkingLevel.ToLowerInvariant());
     }
 
     private async Task<string?> ResolveSecretAsync(string? reference, CancellationToken ct) =>
@@ -337,7 +347,9 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
             null,
             null,
             null,
-            AllowRemoteEndpoint: options.AllowRemoteEndpoint);
+            AllowRemoteEndpoint: options.AllowRemoteEndpoint,
+            Think: options.Think,
+            ThinkingLevel: options.ThinkingLevel);
         return new ModelsConfiguration(
             1,
             new ModelPolicy(true, false, ModelEndpointTier.LocalOffline, true, true),

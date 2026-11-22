@@ -36,10 +36,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private bool _isLoading;
     private string _chatBaseUrl = "http://127.0.0.1:11434";
     private string _chatModel = string.Empty;
-    private ModelTierOption _chatTier = new("LocalOffline", "本机 Ollama");
+    private ModelTierOption _chatTier = new("LocalOffline", "本机");
+    private bool _chatThink;
+    private ModelThinkingLevelOption _chatThinkingLevel = new("low", "低");
     private string _embeddingBaseUrl = "http://127.0.0.1:11434";
     private string _embeddingModel = string.Empty;
-    private ModelTierOption _embeddingTier = new("LocalOffline", "本机 Ollama");
+    private ModelTierOption _embeddingTier = new("LocalOffline", "本机");
     private string _modelConfigStatus = "保存后需重启应用生效。";
 
     public DiagnosticsViewModel(
@@ -60,6 +62,10 @@ public sealed class DiagnosticsViewModel : ObservableObject
             _chatBaseUrl = view.Chat.BaseUrl;
             _chatModel = view.Chat.Model;
             _chatTier = TierOptions.First(option => option.Value == view.Chat.Tier);
+            _chatThink = view.Chat.Think;
+            _chatThinkingLevel = ThinkingLevelOptions.FirstOrDefault(option =>
+                                        option.Value == (view.Chat.ThinkingLevel ?? "low"))
+                                    ?? ThinkingLevelOptions[0];
             _embeddingBaseUrl = view.Embedding.BaseUrl;
             _embeddingModel = view.Embedding.Model;
             _embeddingTier = TierOptions.First(option => option.Value == view.Embedding.Tier);
@@ -239,10 +245,31 @@ public sealed class DiagnosticsViewModel : ObservableObject
 
     public IReadOnlyList<ModelTierOption> TierOptions { get; } =
     [
-        new("LocalOffline", "本机 Ollama"),
+        new("LocalOffline", "本机"),
         new("CorporateIntranet", "企业内网"),
         new("PublicCloud", "公网 API")
     ];
+
+    /// <summary>Thinking effort passed to Ollama thinking models when 允许思考 is enabled.</summary>
+    public IReadOnlyList<ModelThinkingLevelOption> ThinkingLevelOptions { get; } =
+    [
+        new("low", "低"),
+        new("medium", "中"),
+        new("high", "高")
+    ];
+
+    /// <summary>Whether the chat model may reason before answering (Ollama thinking models).</summary>
+    public bool ChatThink
+    {
+        get => _chatThink;
+        set => SetProperty(ref _chatThink, value);
+    }
+
+    public ModelThinkingLevelOption ChatThinkingLevel
+    {
+        get => _chatThinkingLevel;
+        set => SetProperty(ref _chatThinkingLevel, value);
+    }
 
     public string ModelConfigStatus
     {
@@ -306,7 +333,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
             var snapshot = await _diagnostics.GetSnapshotAsync();
             PlatformName = snapshot.PlatformName;
             DatabaseText = snapshot.DatabaseHealth.IsHealthy
-                ? $"正常 · Schema v{snapshot.DatabaseHealth.SchemaVersion.Number} · {snapshot.DatabaseHealth.EventCount} 条事件 · {snapshot.DatabaseHealth.EncryptedBlobCount} 个加密媒体"
+                ? $"正常 · 数据库结构 v{snapshot.DatabaseHealth.SchemaVersion.Number} · {snapshot.DatabaseHealth.EventCount} 条事件 · {snapshot.DatabaseHealth.EncryptedBlobCount} 个加密媒体"
                 : "数据库健康检查未通过";
             PipelineText = $"队列 {snapshot.PipelineMetrics.QueuedDataItems} / 已保存 {snapshot.PipelineMetrics.PersistedEvents} / 控制命令 {snapshot.PipelineMetrics.ControlCommandsProcessed}";
             RetentionText = snapshot.RetentionMetrics is null
@@ -314,10 +341,10 @@ public sealed class DiagnosticsViewModel : ObservableObject
                 : $"已扫描 {snapshot.RetentionMetrics.TotalSweeps} 次 · 安全擦除过期媒体 {snapshot.RetentionMetrics.TotalPurgedBlobs} 个";
             ModelText = snapshot.ModelCapability is null
                 ? "未配置模型网关"
-                : $"{(snapshot.ModelCapability.ChatAvailable ? "可用" : "降级")} · Chat {snapshot.ModelCapability.ChatModel ?? "未配置"} · Embedding {snapshot.ModelCapability.EmbeddingModel} · {snapshot.ModelCapability.Diagnostic}";
+                : $"{(snapshot.ModelCapability.ChatAvailable ? "可用" : "降级")} · 对话 {snapshot.ModelCapability.ChatModel ?? "未配置"} · 向量 {snapshot.ModelCapability.EmbeddingModel} · {snapshot.ModelCapability.Diagnostic}";
             ModelEndpointsText = snapshot.ModelEndpoints is { Count: > 0 }
                 ? string.Join(Environment.NewLine, snapshot.ModelEndpoints.Select(endpoint =>
-                    $"{endpoint.Tier}: chat={endpoint.ChatAvailable} stream={endpoint.StreamingAvailable} embed={endpoint.EmbeddingsAvailable} json={endpoint.StructuredOutputAvailable} tools={endpoint.ToolCallingAvailable} · {endpoint.Diagnostic}"))
+                    $"{TierLabel(endpoint.Tier)}：对话={(endpoint.ChatAvailable ? "可用" : "不可用")} · 流式={(endpoint.StreamingAvailable ? "可用" : "不可用")} · 向量={(endpoint.EmbeddingsAvailable ? "可用" : "不可用")} · 结构化={(endpoint.StructuredOutputAvailable ? "可用" : "不可用")} · 工具={(endpoint.ToolCallingAvailable ? "可用" : "不可用")} · {endpoint.Diagnostic}"))
                 : "尚未探测或没有可用端点";
 
             Capabilities.Clear();
@@ -350,7 +377,8 @@ public sealed class DiagnosticsViewModel : ObservableObject
                 ? "当前平台权限齐全，无需额外授权。"
                 : string.Join(
                     Environment.NewLine,
-                    needsAttention.Select(item => $"{item.Kind}：{item.RemediationHint ?? item.Summary}"));
+                    needsAttention.Select(item =>
+                        $"{CapabilityItem.KindLabel(item.Kind)}：{item.RemediationHint ?? item.Summary}"));
             LastRefreshText = $"最后刷新：{DateTimeOffset.Now:HH:mm:ss} · 诊断不包含正文、密钥或完整文件路径";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
@@ -362,6 +390,14 @@ public sealed class DiagnosticsViewModel : ObservableObject
             IsLoading = false;
         }
     }
+
+    private static string TierLabel(ModelEndpointTier tier) => tier switch
+    {
+        ModelEndpointTier.LocalOffline => "本机",
+        ModelEndpointTier.CorporateIntranet => "企业内网",
+        ModelEndpointTier.PublicCloud => "公网",
+        _ => tier.ToString()
+    };
 
     private static string BuildMcpStatus(LocalMcpSnapshot snapshot) => snapshot switch
     {
@@ -409,7 +445,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
         {
             await _modelConfiguration.SaveAsync(
                 new ModelConfigurationView(
-                    new ModelEndpointView(ChatBaseUrl, ChatModel, ChatTier.Value),
+                    new ModelEndpointView(
+                        ChatBaseUrl,
+                        ChatModel,
+                        ChatTier.Value,
+                        ChatThink,
+                        ChatThinkingLevel.Value),
                     new ModelEndpointView(EmbeddingBaseUrl, EmbeddingModel, EmbeddingTier.Value)),
                 CancellationToken.None);
             ModelConfigStatus = "已保存到 models.json；重启应用后生效。";
@@ -566,7 +607,9 @@ public sealed class DiagnosticsViewModel : ObservableObject
 
 public sealed class CapabilityItem(CapabilityState capability)
 {
-    public string KindText => capability.Kind switch
+    public string KindText => KindLabel(capability.Kind);
+
+    public static string KindLabel(CapabilityKind kind) => kind switch
     {
         CapabilityKind.ScreenCapture => "屏幕采集",
         CapabilityKind.WindowActivity => "窗口活动",
@@ -581,7 +624,7 @@ public sealed class CapabilityItem(CapabilityState capability)
         CapabilityKind.VectorSearch => "向量检索",
         CapabilityKind.WakeWord => "唤醒词",
         CapabilityKind.ModelGateway => "本机模型",
-        _ => capability.Kind.ToString()
+        _ => kind.ToString()
     };
 
     public string StatusText => capability.Status switch
@@ -623,9 +666,19 @@ public sealed class ReportJobItem(ReportJob job)
 public sealed class DiagnosticLogItem(DiagnosticLogEntry entry)
 {
     public string TimeText => entry.TimestampUtc.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture);
-    public string LevelText => entry.Level;
+    public string LevelText => entry.Level switch
+    {
+        "Information" or "Info" => "信息",
+        "Warning" or "Warn" => "警告",
+        "Error" => "错误",
+        "Debug" => "调试",
+        "Trace" => "跟踪",
+        _ => entry.Level
+    };
     public string CategoryText => entry.Category;
     public string MessageText => entry.SanitizedMessage;
 }
 
 public sealed record ModelTierOption(string Value, string Label);
+
+public sealed record ModelThinkingLevelOption(string Value, string Label);

@@ -18,8 +18,8 @@ public sealed class MacOsScreenCapture(IMacHelperSupervisor supervisor, IClock c
         supervisor,
         CapabilityKind.ScreenCapture,
         supervisor.Permissions.ScreenRecording,
-        "ScreenCaptureKit via Swift Helper (<=1280px PNG + pHash)",
-        "Open System Settings > Privacy & Security > Screen & System Audio Recording and enable AiAssistant.");
+        "ScreenCaptureKit（Swift Helper，≤1280px PNG + 感知哈希）",
+        "请在「系统设置 > 隐私与安全性 > 屏幕与系统音频录制」中启用 AiAssistant。");
 
     public async Task<ScreenCaptureFrame?> CaptureFrameAsync(CancellationToken ct)
     {
@@ -77,8 +77,8 @@ public sealed class MacOsWindowActivitySource(
         supervisor,
         CapabilityKind.WindowActivity,
         supervisor.Permissions.Accessibility,
-        "NSWorkspace + AXUIElement foreground inspection",
-        "Open System Settings > Privacy & Security > Accessibility and enable AiAssistant for full window titles.",
+        "NSWorkspace + AXUIElement 前台窗口识别",
+        "请在「系统设置 > 隐私与安全性 > 辅助功能」中启用 AiAssistant 以获取完整窗口标题。",
         degradeInsteadOfRequirePermission: true);
 
     public async Task<CapturedSample?> GetCurrentForegroundAsync(CancellationToken ct)
@@ -190,8 +190,8 @@ public sealed class MacOsFileActivitySource(
     public SourceKind Kind => SourceKind.FileActivity;
 
     public CapabilityState Capability => supervisor.Status == MacHelperSupervisorStatus.Healthy
-        ? CapabilityState.Supported(CapabilityKind.FileActivity, "FSEvents via Swift Helper (<=200KB whitelisted text/code)")
-        : CapabilityState.Degraded(CapabilityKind.FileActivity, "Managed FileSystemWatcher fallback (<=200KB whitelisted text/code)");
+        ? CapabilityState.Supported(CapabilityKind.FileActivity, "FSEvents（Swift Helper，≤200KB 白名单文本/代码）")
+        : CapabilityState.Degraded(CapabilityKind.FileActivity, "托管 FileSystemWatcher 兜底（≤200KB 白名单文本/代码）");
 
     public async IAsyncEnumerable<CapturedSample> CaptureAsync(
         CaptureContext context,
@@ -349,14 +349,14 @@ public sealed class MacOsTextExtractor(IMacHelperSupervisor supervisor) : ITextE
         supervisor,
         CapabilityKind.AccessibilityText,
         supervisor.Permissions.Accessibility,
-        "macOS AXUIElement tree (AXSecureTextField excluded)",
-        "Open System Settings > Privacy & Security > Accessibility and enable AiAssistant.");
+        "macOS AXUIElement 树（排除安全输入框）",
+        "请在「系统设置 > 隐私与安全性 > 辅助功能」中启用 AiAssistant。");
 
     public CapabilityState OcrCapability => MacHelperCapabilityEvaluator.EvaluateHelperCapability(
         supervisor,
         CapabilityKind.Ocr,
         requiredGrant: null,
-        "macOS Vision VNRecognizeTextRequest (zh-Hans/en-US)");
+        "macOS Vision 文字识别（简繁中文/英文）");
 
     public async Task<ExtractedTextResult> ExtractAsync(TextExtractionRequest request, CancellationToken ct)
     {
@@ -419,11 +419,11 @@ public sealed class MacOsAudioPlayback(IMacHelperSupervisor supervisor) : IAudio
     public CapabilityState Capability => supervisor.Status == MacHelperSupervisorStatus.Healthy
         ? CapabilityState.Supported(
             CapabilityKind.WakeWord,
-            "AVAudioEngine feedback playback via Swift Helper")
+            "AVAudioEngine 提示音播放（Swift Helper）")
         : CapabilityState.Degraded(
             CapabilityKind.WakeWord,
-            $"macOS helper {supervisor.Status}; voice feedback playback unavailable",
-            "Voice commands still work; check the helper status on the diagnostics page.");
+            $"macOS Helper {supervisor.Status}；语音反馈播放不可用",
+            "语音命令仍可用；请在诊断页检查 Helper 状态。");
 
     public async Task PlayAsync(ReadOnlyMemory<float> samples, int sampleRateHz, CancellationToken ct)
     {
@@ -463,8 +463,8 @@ public sealed class MacOsAudioCapture(
         supervisor,
         CapabilityKind.AudioCapture,
         supervisor.Permissions.Microphone,
-        "CoreAudio / AVAudioEngine 16kHz mono via Swift Helper",
-        "Open System Settings > Privacy & Security > Microphone and enable AiAssistant.");
+        "CoreAudio / AVAudioEngine 16kHz 单声道（Swift Helper）",
+        "请在「系统设置 > 隐私与安全性 > 麦克风」中启用 AiAssistant。");
 
     public async IAsyncEnumerable<AudioFrame> ReadFramesAsync([EnumeratorCancellation] CancellationToken ct)
     {
