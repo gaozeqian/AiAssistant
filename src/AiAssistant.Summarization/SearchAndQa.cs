@@ -32,7 +32,8 @@ public sealed class HybridSearchService(
     IModelGateway model,
     HybridSearchOptions options,
     ILogger<HybridSearchService> logger,
-    Func<CancellationToken, Task>? ensureIndexed = null) : IEvidenceSearch
+    Func<CancellationToken, Task>? ensureIndexed = null,
+    ModelEndpointTier tier = ModelEndpointTier.LocalOffline) : IEvidenceSearch
 {
     private int _indexEnsured;
 
@@ -99,7 +100,7 @@ public sealed class HybridSearchService(
                     ? query
                     : options.EmbeddingQueryPrefix + query;
                 var embedding = await model.EmbedAsync(
-                    new ModelEmbeddingRequest([embeddingText], Purpose: "evidence-search"),
+                    new ModelEmbeddingRequest([embeddingText], tier, Purpose: "evidence-search"),
                     ct);
                 if (embedding.Vectors.Count > 0)
                 {
@@ -191,7 +192,8 @@ public sealed class HybridSearchService(
 public sealed partial class EvidenceQuestionAnswerUseCase(
     IEvidenceSearch search,
     IModelGateway model,
-    ILogger<EvidenceQuestionAnswerUseCase> logger) : IEvidenceQuestionAnswerer
+    ILogger<EvidenceQuestionAnswerUseCase> logger,
+    ModelEndpointTier tier = ModelEndpointTier.LocalOffline) : IEvidenceQuestionAnswerer
 {
     public async Task<EvidenceQaAnswer> AnswerAsync(
         string question,
@@ -231,6 +233,7 @@ public sealed partial class EvidenceQuestionAnswerUseCase(
                     使用简体中文，简洁回答，不要输出 Markdown 表格。
                     """,
                     $"问题：{question}\n证据：\n{evidenceBlock}",
+                    Tier: tier,
                     Purpose: "evidence-qa",
                     Temperature: 0),
                 ct);

@@ -95,7 +95,20 @@ public sealed class ModelConfigurationAdmin(
             endpoints[index] = updated;
         }
 
-        await SaveDocumentAsync(document with { Endpoints = endpoints }, ct);
+        // Make the selected tier the active default and relax the matching policy flag so the
+        // endpoint is usable immediately after restart. Public cloud has no separate consent gate:
+        // choosing it in the UI is the explicit consent.
+        var policy = document.Policy;
+        if (tier == ModelEndpointTier.PublicCloud)
+        {
+            // Selecting public cloud in the UI is the explicit consent: allow it and disable the
+            // separate runtime consent gate so it is usable immediately after restart.
+            policy = policy with { AllowPublicCloud = true, RequirePublicCloudConsent = false };
+        }
+
+        policy = policy with { DefaultTier = tierName };
+
+        await SaveDocumentAsync(document with { Endpoints = endpoints, Policy = policy }, ct);
     }
 
     private static ModelEndpointTier ParseTier(string tier) =>

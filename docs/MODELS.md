@@ -64,7 +64,7 @@ bash build/install-voice-models.sh /path/to/data-directory
 - Embedding 模型名（例如 `embeddinggemma-2:740m`）
 - Base URL（本机默认 `http://127.0.0.1:11434`；外部模型可填远程地址）
 
-点「保存模型配置」写入数据目录的 `models.json`。本机（LocalOffline）端点必须使用 loopback；选择「企业内网」或「公网 API」时允许远程地址并自动标记 `allowRemoteEndpoint`，且**始终保留 LocalOffline 兜底端点**。公网层受 `AllowPublicCloud` 策略与运行期同意门禁约束。保存后**重启应用生效**。
+点「保存模型配置」写入数据目录的 `models.json`。本机（LocalOffline）端点必须使用 loopback；选择「企业内网」或「公网 API」时允许远程地址并自动标记 `allowRemoteEndpoint`，**始终保留 LocalOffline 兜底端点**。保存后把 `defaultTier` 切到所选层，问答/检索/日报请求随之路由到该端点；选择公网时同时放开 `allowPublicCloud`（选择公网即视为显式同意）。保存后**重启应用生效**。
 
 ## 3. 完整流程 UI 测试
 

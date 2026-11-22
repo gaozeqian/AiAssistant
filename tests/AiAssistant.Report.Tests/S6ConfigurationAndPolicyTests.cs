@@ -319,6 +319,38 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
         Assert.Equal(ModelProviderKind.OpenAiCompatible, corp.Provider);
         // LocalOffline safety fallback is preserved.
         Assert.Contains(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.LocalOffline);
+        // Default tier now routes to the configured intranet endpoint.
+        Assert.Equal(ModelEndpointTier.CorporateIntranet, reloaded.Policy.DefaultTier);
+    }
+
+    [Fact]
+    public async Task ModelConfigurationAdmin_PublicCloud_EnablesCloudAndBecomesDefault()
+    {
+        var path = Path.Combine(_tempRoot, "models.json");
+        await File.WriteAllTextAsync(path, """
+            {
+              "schemaVersion": 1,
+              "policy": { "defaultTier": "LocalOffline" },
+              "endpoints": [
+                { "tier": "LocalOffline", "provider": "ollama", "baseUrl": "http://127.0.0.1:11434", "chatModel": "gemma4:12b", "embeddingModel": "embeddinggemma-2:740m" }
+              ]
+            }
+            """);
+        var configuration = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+        var admin = new ModelConfigurationAdmin(path, configuration);
+
+        await admin.SaveAsync(
+            new ModelConfigurationView("https://api.example.com/v1", "cloud-chat", "cloud-embed", "PublicCloud"),
+            CancellationToken.None);
+
+        var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+        Assert.True(reloaded.Policy.AllowPublicCloud);
+        Assert.False(reloaded.Policy.RequirePublicCloudConsent);
+        Assert.Equal(ModelEndpointTier.PublicCloud, reloaded.Policy.DefaultTier);
+        var cloud = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.PublicCloud);
+        Assert.True(cloud.AllowRemoteEndpoint);
     }
 
     private sealed class FakeSecretResolver(IReadOnlyDictionary<string, string> values) : IModelSecretResolver    {

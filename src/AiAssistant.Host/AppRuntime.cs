@@ -277,11 +277,13 @@ public sealed class AppRuntime : IAsyncDisposable
                 {
                     await provider.GetRequiredService<EventEmbeddingIndexer>().RebuildAllAsync(ct);
                 }
-            }));
+            },
+            tier: configuration.Policy.DefaultTier));
         services.AddSingleton<IEvidenceQuestionAnswerer>(provider => new EvidenceQuestionAnswerUseCase(
             provider.GetRequiredService<IEvidenceSearch>(),
             provider.GetRequiredService<IModelGateway>(),
-            provider.GetRequiredService<ILogger<EvidenceQuestionAnswerUseCase>>()));
+            provider.GetRequiredService<ILogger<EvidenceQuestionAnswerUseCase>>(),
+            configuration.Policy.DefaultTier));
         services.AddSingleton<EvidenceSearchUseCase>();
 
         services.AddSingleton(CreateMcpOptions());
