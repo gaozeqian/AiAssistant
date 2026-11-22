@@ -224,6 +224,33 @@ public sealed class RangeReportTests
     }
 
     [Fact]
+    public async Task Report_ForwardsConfiguredTierToModelCompletion()
+    {
+        // Regression: the range report used to omit the tier, so ModelCompletionRequest defaulted
+        // to LocalOffline and a CorporateIntranet/remote default tier always degraded to extractive.
+        var events = new QueryableEventRepository(
+        [
+            HybridSearchAndEvidenceTests.Event("e1", new DateTimeOffset(2026, 11, 17, 1, 0, 0, TimeSpan.Zero), "Rider", "开发")
+        ]);
+        var model = new ScriptedModelGateway("区间总结。");
+        var service = new ActivityRangeReportService(
+            events,
+            model,
+            new SensitiveDataRedactor(),
+            NullLogger<ActivityRangeReportService>.Instance,
+            ModelEndpointTier.CorporateIntranet);
+
+        var report = await service.GenerateAsync(
+            new DateOnly(2026, 11, 16),
+            new DateOnly(2026, 11, 22),
+            CancellationToken.None);
+
+        Assert.False(report.Degraded);
+        Assert.Equal("fake-chat", report.ModelId);
+        Assert.Equal(ModelEndpointTier.CorporateIntranet, model.LastRequestedTier);
+    }
+
+    [Fact]
     public async Task Export_WritesMarkdownAndStatsSidecar()
     {
         var events = new QueryableEventRepository(
@@ -704,6 +731,8 @@ internal sealed class ScriptedModelGateway(string completion, bool operational =
 {
     public int CompleteCalls { get; private set; }
 
+    public ModelEndpointTier LastRequestedTier { get; private set; }
+
     public CapabilityState Capability => operational
         ? CapabilityState.Supported(CapabilityKind.ModelGateway, "fake model")
         : CapabilityState.Unavailable(CapabilityKind.ModelGateway, "offline");
@@ -715,10 +744,11 @@ internal sealed class ScriptedModelGateway(string completion, bool operational =
     public Task<ModelCompletionResult> CompleteAsync(ModelCompletionRequest request, CancellationToken ct)
     {
         CompleteCalls++;
+        LastRequestedTier = request.Tier;
         return Task.FromResult(new ModelCompletionResult(
             completion,
             ChatModelId,
-            ModelEndpointTier.LocalOffline,
+            request.Tier,
             false,
             TimeSpan.Zero));
     }

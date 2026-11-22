@@ -12,7 +12,8 @@ public sealed class ActivityRangeReportService(
     IEventRepository events,
     IModelGateway model,
     ITextRedactor redactor,
-    ILogger<ActivityRangeReportService> logger) : IRangeReportService
+    ILogger<ActivityRangeReportService> logger,
+    ModelEndpointTier tier = ModelEndpointTier.LocalOffline) : IRangeReportService
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
 
@@ -54,6 +55,7 @@ public sealed class ActivityRangeReportService(
                     new ModelCompletionRequest(
                         "你是本机活动周报助手。只根据给定统计与记录写 2-3 段简体中文总结，不编造，不输出 Markdown 表格。",
                         prompt,
+                        Tier: tier,
                         Purpose: "range-report",
                         Temperature: 0.2,
                         MaxOutputTokens: 900),

@@ -239,7 +239,8 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<IEventRepository>(),
             provider.GetRequiredService<IModelGateway>(),
             provider.GetRequiredService<ITextRedactor>(),
-            provider.GetRequiredService<ILogger<ActivityRangeReportService>>()));
+            provider.GetRequiredService<ILogger<ActivityRangeReportService>>(),
+            configuration.Policy.DefaultTier));
         services.AddSingleton<IReportRasterizer, SkiaReportRasterizer>();
         services.AddSingleton<RangeReportUseCase>();
         var configuredEmbeddingModel = configuration.Endpoints
