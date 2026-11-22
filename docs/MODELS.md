@@ -37,8 +37,12 @@ AiAssistant.Host --benchmark-model            # 对话基准（退出码非 0 �
 >
 > **推理型模型**（如带 `thinking` 能力的 `gemma4`）默认会先思考再回答，容易耗尽输出预算，
 > 表现为结构化日报为空或单次调用 20–60 秒。应用默认在 Ollama 请求中发送 `think: false`
-> （`ModelGatewayOptions.DisableThinking`，无思考能力的模型会忽略该参数）；实测
-> `--benchmark-model` 由 67%/17.4s 提升到 100%/0.86s。
+> （`ModelGatewayOptions.Think`，无思考能力的模型会忽略该参数）；实测 `--benchmark-model`
+> 由 67%/17.4s 提升到 100%/0.86s。
+>
+> 需要思考时可在诊断页「模型配置」勾选「允许思考」并选择思考强度（低/中/高），保存后写入
+> `models.json` 的 `think` / `thinkingLevel`（对应 Ollama 的 `think: true|low|medium|high`）；
+> 也可用 `AIASSISTANT_MODEL_THINK=true` / `AIASSISTANT_MODEL_THINKING_LEVEL=high` 覆盖。
 
 ## 2. 语音唤醒 / 命令识别模型
 
@@ -64,7 +68,8 @@ bash build/install-voice-models.sh /path/to/data-directory
 
 诊断页「模型配置」内可**独立**配置对话模型与 Embedding 模型，各自有：
 
-- **模型来源**：本机 Ollama / 企业内网 / 公网 API
+- **模型来源**：本机 / 企业内网 / 公网 API（「本机」不绑定具体运行时：保存时保留已有 provider，
+  新端点自动探测 Ollama `/api/tags`，否则按 OpenAI 兼容接口处理，可对接 LM Studio / vLLM 等）
 - **模型名**（例如 `gemma4:12b-mlx` / `embeddinggemma-2:740m`）
 - **Base URL**（本机默认 `http://127.0.0.1:11434`；外部模型可填远程地址）
 
@@ -87,8 +92,9 @@ bash build/install-desktop-entry.sh          # 默认指向 Release 构建产物
 
 - 写入 `~/.local/share/applications/aiassistant.desktop` 与
   `~/.local/share/icons/hicolor/256x256/apps/aiassistant.png`（`Icon=aiassistant`）。
-- GNOME 默认没有 StatusNotifierItem 托盘：此时窗口关闭即退出应用（顶部也有「退出」按钮），
-  不会再出现「隐藏后无法找回」的窗口。
+- 点击窗口关闭按钮只隐藏窗口，采集继续在后台运行；退出需显式点击顶部「退出」按钮（或托盘菜单）。
+- 再次启动（Dock 图标 / desktop 条目）会通过 `<数据目录>/instance.sock` 通知已运行实例显示窗口，
+  不会重复启动第二个采集进程。GNOME 默认无 StatusNotifierItem 托盘时，启动会直接显示主窗口。
 
 ## 3. 完整流程 UI 测试
 
