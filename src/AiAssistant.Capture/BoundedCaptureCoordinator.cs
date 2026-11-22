@@ -19,7 +19,7 @@ public sealed class CapturePipelineOptions
 /// <summary>
 /// Orchestrates capture sources through a bounded data channel and an isolated high-priority control channel.
 /// Enforces pause (without backfilling paused intervals), privacy blacklists, pHash frame deduplication,
-/// and strict memory bounds under overload (IMPLEMENTATION.md §2.6, S2.2).
+/// and strict memory bounds under overload (implementation.md §2.6, S2.2).
 /// </summary>
 public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
 {

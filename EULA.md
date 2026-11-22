@@ -58,7 +58,7 @@
 
 5.3 当被许可方配置外部模型端点（本机 Ollama、内网网关或公网 API）时，相关数据会发送至该端点，由被许可方自行评估并承担相应合规责任。
 
-5.4 隐私实践的详细说明见 `docs/release/PRIVACY.md`。
+5.4 隐私实践的详细说明见 `docs/release/privacy.md`。
 
 ## 6. 更新、支持与变更
 
@@ -104,4 +104,4 @@
 
 第三方组件清单与许可证全文：`THIRD-PARTY-NOTICES.md`
 专有权利声明：`LICENSE`
-隐私说明：`docs/release/PRIVACY.md`
+隐私说明：`docs/release/privacy.md`

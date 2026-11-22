@@ -50,7 +50,7 @@ internal static class MacHelperCapabilityEvaluator
 
 /// <summary>
 /// Dynamic macOS capability provider reflecting live Swift Helper supervision state, protocol compatibility,
-/// and TCC permission grants (ADR-0005, IMPLEMENTATION.md §3.5, S3).
+/// and TCC permission grants (ADR-0005, implementation.md §3.5, S3).
 /// </summary>
 public sealed class CapabilityProvider : ICapabilityProvider
 {

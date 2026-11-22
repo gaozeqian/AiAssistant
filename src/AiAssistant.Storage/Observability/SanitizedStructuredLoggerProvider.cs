@@ -10,7 +10,7 @@ namespace AiAssistant.Storage.Observability;
 /// <summary>
 /// Privacy-preserving local structured JSONL logger provider and ring-buffer reader.
 /// Enforces strict sanitization so extracted text, window titles, full file paths, URL paths/queries,
-/// and cryptographic keys or tokens never enter local logs or diagnostic bundles (IMPLEMENTATION.md §2.5, S2.7, §7.3).
+/// and cryptographic keys or tokens never enter local logs or diagnostic bundles (implementation.md §2.5, S2.7, §7.3).
 /// </summary>
 public sealed partial class SanitizedStructuredLoggerProvider : ILoggerProvider, IDiagnosticLogReader
 {

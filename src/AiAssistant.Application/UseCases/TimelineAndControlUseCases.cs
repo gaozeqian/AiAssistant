@@ -165,7 +165,7 @@ public sealed class DiagnosticsUseCase(
     }
 
     /// <summary>
-    /// Builds a sanitized, metadata-only JSON preview so the user can inspect every field before exporting (IMPLEMENTATION.md §7.3).
+    /// Builds a sanitized, metadata-only JSON preview so the user can inspect every field before exporting (implementation.md §7.3).
     /// </summary>
     public async Task<string> BuildSanitizedExportPreviewAsync(CancellationToken ct = default)
     {

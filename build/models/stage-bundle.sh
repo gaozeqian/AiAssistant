@@ -61,14 +61,14 @@ TTS_SRC="$MODELS/sherpa-tts"
 VAD_SRC="$MODELS/sherpa-vad/silero_vad.onnx"
 
 missing=()
-[[ -f "$KWS_SRC/encoder.onnx" ]] || missing+=("$KWS_SRC/encoder.onnx (KWS 模型，见 docs/MODELS.md)")
-[[ -f "$ASR_SRC/model.int8.onnx" ]] || missing+=("$ASR_SRC/model.int8.onnx (Paraformer ASR，见 docs/MODELS.md)")
-[[ -f "$TTS_SRC/model.onnx" ]] || missing+=("$TTS_SRC/model.onnx (MeloTTS TTS，见 docs/MODELS.md)")
-[[ -d "$TTS_SRC/dict" ]] || missing+=("$TTS_SRC/dict (MeloTTS 分词词典，见 docs/MODELS.md)")
+[[ -f "$KWS_SRC/encoder.onnx" ]] || missing+=("$KWS_SRC/encoder.onnx (KWS 模型，见 docs/guides/models.md)")
+[[ -f "$ASR_SRC/model.int8.onnx" ]] || missing+=("$ASR_SRC/model.int8.onnx (Paraformer ASR，见 docs/guides/models.md)")
+[[ -f "$TTS_SRC/model.onnx" ]] || missing+=("$TTS_SRC/model.onnx (MeloTTS TTS，见 docs/guides/models.md)")
+[[ -d "$TTS_SRC/dict" ]] || missing+=("$TTS_SRC/dict (MeloTTS 分词词典，见 docs/guides/models.md)")
 for fst in date number phone new_heteronym; do
-  [[ -f "$TTS_SRC/$fst.fst" ]] || missing+=("$TTS_SRC/$fst.fst (MeloTTS 文本正则化规则，见 docs/MODELS.md)")
+  [[ -f "$TTS_SRC/$fst.fst" ]] || missing+=("$TTS_SRC/$fst.fst (MeloTTS 文本正则化规则，见 docs/guides/models.md)")
 done
-[[ -f "$VAD_SRC" ]] || missing+=("$VAD_SRC (Silero VAD，见 docs/MODELS.md)")
+[[ -f "$VAD_SRC" ]] || missing+=("$VAD_SRC (Silero VAD，见 docs/guides/models.md)")
 
 if [[ ${#missing[@]} -gt 0 ]]; then
   echo "缺少随包分发的模型资产：" >&2
@@ -121,7 +121,7 @@ if [[ "$WITH_WHISPER" -eq 1 ]]; then
 fi
 
 if find "$BUNDLE" -iname '*aishell3*' | grep -q .; then
-  die "拒绝打包：bundle 中出现已退役的 AISHELL-3 权重（许可证不明，见 docs/compliance/MODEL-ASSETS.md）"
+  die "拒绝打包：bundle 中出现已退役的 AISHELL-3 权重（许可证不明，见 docs/compliance/model-assets.md）"
 fi
 
 log "模型包已就绪：$BUNDLE ($(du -sh "$BUNDLE" | cut -f1))"

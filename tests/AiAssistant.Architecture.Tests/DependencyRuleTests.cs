@@ -21,7 +21,7 @@ using NetArchTest.Rules;
 namespace AiAssistant.Architecture.Tests;
 
 /// <summary>
-/// Enforces all 6 physical architecture &amp; dependency rules from IMPLEMENTATION.md §3.2.
+/// Enforces all 6 physical architecture &amp; dependency rules from implementation.md §3.2.
 /// </summary>
 public sealed class DependencyRuleTests
 {

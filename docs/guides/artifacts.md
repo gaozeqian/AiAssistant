@@ -80,4 +80,4 @@ python build/sbom/generate-sbom.py --verify
 - 不被应用解析：`AIASSISTANT_SHERPA_MODEL_DIR` 与数据目录模型路径都不会指向该目录。
 - 不参与清理：`clean-artifacts.sh` 显式跳过。
 
-是否退役的判定与依据见 [模型资产与许可](../compliance/MODEL-ASSETS.md)。
+是否退役的判定与依据见 [模型资产与许可](../compliance/model-assets.md)。

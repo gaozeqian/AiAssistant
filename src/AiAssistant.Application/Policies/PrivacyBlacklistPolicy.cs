@@ -2,7 +2,7 @@ namespace AiAssistant.Application.Policies;
 
 /// <summary>
 /// Evaluates whether an app or window title matches built-in privacy exclusions (password managers, private browsing)
-/// or user-configured blacklist patterns (DESIGN.md §12, IMPLEMENTATION.md §2.5).
+/// or user-configured blacklist patterns (design.md §12, implementation.md §2.5).
 /// </summary>
 public sealed class PrivacyBlacklistPolicy
 {

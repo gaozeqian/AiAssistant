@@ -27,7 +27,7 @@ public enum CapabilityKind
 }
 
 /// <summary>
-/// Uniform platform capability model driving UI &amp; scheduling without scattering OS checks (IMPLEMENTATION.md §3.5).
+/// Uniform platform capability model driving UI &amp; scheduling without scattering OS checks (implementation.md §3.5).
 /// </summary>
 public sealed record CapabilityState(
     CapabilityKind Kind,

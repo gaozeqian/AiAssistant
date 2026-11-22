@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 namespace AiAssistant.Platform.macOS.Ipc;
 
 /// <summary>
-/// Versioned local IPC wire protocol (v1) between .NET host and macOS Swift helper (ADR-0005, IMPLEMENTATION.md S3).
+/// Versioned local IPC wire protocol (v1) between .NET host and macOS Swift helper (ADR-0005, implementation.md S3).
 /// Framing: 4-byte big-endian payload length (max 16 MiB) + UTF-8 JSON object.
 /// </summary>
 public static class MacHelperProtocol

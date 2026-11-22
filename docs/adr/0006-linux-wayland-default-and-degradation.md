@@ -2,11 +2,13 @@
 
 - **状态**：已采纳 (Accepted)
 - **日期**：2026-11-20
+- **适用版本**：0.1.x
+- **维护触发条件**：决策被取代或修订时新增 ADR，本文件结论不改
 - **阶段**：S0 / S3
 
 ## 背景
 
-`DESIGN.md` v2.5 确定 Linux 桌面 UI 采用 `Avalonia.Wayland` 原生 Wayland 作为默认路径，但 Avalonia 12.1 中 Wayland 后端仍带实验性标记，且 Wayland 安全模型限制应用直接抓取屏幕、枚举全局前台窗口或注册全局热键。
+`design.md` v2.5 确定 Linux 桌面 UI 采用 `Avalonia.Wayland` 原生 Wayland 作为默认路径，但 Avalonia 12.1 中 Wayland 后端仍带实验性标记，且 Wayland 安全模型限制应用直接抓取屏幕、枚举全局前台窗口或注册全局热键。
 
 ## 决策
 

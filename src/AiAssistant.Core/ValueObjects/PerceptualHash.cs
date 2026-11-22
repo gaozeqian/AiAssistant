@@ -3,7 +3,7 @@ using System.Numerics;
 namespace AiAssistant.Core.ValueObjects;
 
 /// <summary>
-/// 64-bit perceptual difference hash (dHash/pHash) with Hamming distance comparison (DESIGN.md §9: distance &lt;= 5 = duplicate).
+/// 64-bit perceptual difference hash (dHash/pHash) with Hamming distance comparison (design.md §9: distance &lt;= 5 = duplicate).
 /// </summary>
 public static class PerceptualHash
 {

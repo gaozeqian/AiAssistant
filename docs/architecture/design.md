@@ -1,5 +1,11 @@
 # AI 个人活动追踪助手 · 设计方案
 
+> **状态**：living ｜ **最后更新**：2026-11-22 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：架构取舍、技术选型或模块边界变化时
+
+> **文档边界**：本文回答「为什么这么设计」。落地步骤、阶段门禁与风险见 [implementation.md](implementation.md)。
+> 依赖与许可证的唯一权威是 [../compliance/dependency-manifest.md](../compliance/dependency-manifest.md)，
+> 本文 §10 仅作选型概述，不再逐项维护。
+
 > 全天候采集电脑上的操作行为（屏幕、文件、麦克风、窗口/网页），结构化存储到本地，
 > 再由大模型按天聚合成可读的「数字日记」。
 >
@@ -380,44 +386,16 @@ tool calling 等能力，并对不支持项禁用或降级；结构化日报输�
 
 ---
 
-## 10. 依赖清单
+## 10. 依赖清单（概述）
 
-```
-# .NET 基础
-.NET 10 SDK (LTS), Avalonia 12.1+, CommunityToolkit.Mvvm (MVVM)
+选型概览见上方 §2、§8；**已批准依赖、版本与许可证的唯一权威**是 [../compliance/dependency-manifest.md](../compliance/dependency-manifest.md)，
+随包模型资产的许可见 [../compliance/model-assets.md](../compliance/model-assets.md)。本节不再逐项重复，以免漂移。
 
-# 采集（平台相关）
-Windows: CsWinRT / Windows.Graphics.Capture, NAudio, UIAutomationClient
-macOS:   自研 Swift helper + 本地 IPC（ScreenCaptureKit / Vision / CoreAudio / AX / NSWorkspace）
-Linux:   Avalonia.Wayland + UseWayland()（默认）, X11/XWayland 回退,
-         AT-SPI, Tmds.DBus (portal), PipeWire / PulseAudio
-
-# 预处理与语音（v2.4）
-org.k2fsa.sherpa.onnx: KWS / ASR / VAD / speaker diarization / TTS
-Whisper.net: 可选高质量 ASR（whisper.cpp，CPU / CUDA / CoreML / Metal）
-RapidOCR (ONNX): Linux 中文 OCR；Tesseract 仅作备选
-脱敏: 正则 + 本地 NER；公网档增加最小化发送与预览
-
-# 存储（v2.4）
-Microsoft.Data.Sqlite.Core, SQLite3MC.PCLRaw.bundle, sqlite-vec
-商业可选: 官方 SQLCipher / SQLite SEE
-密钥: Windows DPAPI / macOS Keychain / Linux libsecret；媒体文件 AES-GCM
-
-# 推理（v2.4）
-抽象: Microsoft.Extensions.AI（IChatClient / IEmbeddingGenerator / 语音接口）
-适配: OpenAI 兼容 Provider + OllamaSharp 等现有适配器
-本机: Ollama / LM Studio；内网: vLLM / Xinference / 企业网关；公网: 显式开启
-策略: 档位路由 + 脱敏 + 审计 + 能力探测 + 回退；models.json + MDM/组策略
-
-# 调度
-Microsoft.Extensions.Hosting.BackgroundService + PeriodicTimer
-（已有 SQLite 持久任务队列，不引入 Quartz.NET）
-
-# 托盘/热键/浏览器
-Avalonia TrayIcon, 平台全局热键（Wayland 降级）, 浏览器 Native Messaging + 本地认证
-```
-
----
+- .NET 10 SDK（LTS）· Avalonia 12.1+ · CommunityToolkit.Mvvm
+- 存储：Microsoft.Data.Sqlite.Core · SQLite3MC · sqlite-vec
+- 语音/OCR：org.k2fsa.sherpa.onnx · Whisper.net · RapidOCR(ONNX)
+- 推理抽象：Microsoft.Extensions.AI（IChatClient / IEmbeddingGenerator）
+- 密钥：Windows DPAPI / macOS Keychain / Linux libsecret；媒体 AES-GCM
 
 ## 11. 必须提前验证的工程点
 

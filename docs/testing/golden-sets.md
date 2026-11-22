@@ -1,6 +1,8 @@
 # 识别黄金集（ASR / OCR）
 
-> 对应 `IMPLEMENTATION.md` S4 第 6 项与 `PROGRESS.md` 遗留项 `S4-R1` / `S4-R2` / `S4-R3` / `S7-R1`。
+> **状态**：living ｜ **最后更新**：2026-11-22 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：黄金集构成、来源或评测口径变化时
+
+> 对应 [../architecture/implementation.md](../architecture/implementation.md) S4 第 6 项与 [../status/backlog.md](../status/backlog.md) 遗留项 `S4-R1` / `S4-R2` / `S4-R3` / `S7-R1`。
 > 模型资产与真实语料都不入库；`artifacts/` 已在 `.gitignore` 中。
 
 ## 1. 目录约定

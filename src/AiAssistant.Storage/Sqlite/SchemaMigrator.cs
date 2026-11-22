@@ -5,7 +5,7 @@ using Microsoft.Data.Sqlite;
 namespace AiAssistant.Storage.Sqlite;
 
 /// <summary>
-/// Sequential forward-only schema migration runner. Refuses to run old application code against a newer schema (IMPLEMENTATION.md §3.4).
+/// Sequential forward-only schema migration runner. Refuses to run old application code against a newer schema (implementation.md §3.4).
 /// </summary>
 public static class SchemaMigrator
 {

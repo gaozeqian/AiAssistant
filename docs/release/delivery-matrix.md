@@ -1,5 +1,7 @@
 # 三平台交付矩阵
 
+> **状态**：living ｜ **最后更新**：2026-11-22 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：交付格式、签名方式或平台支持变化时
+
 | 平台 | 安装包 | 构建位置 | 签名 | 证书信任方式 |
 |---|---|---|---|---|
 | Windows x64 | `AiAssistant-<ver>-win-x64.zip` + `.msi` | GitHub Actions `windows-latest` | 自签名 Authenticode | MSI 提权 custom action 调用 `certutil` 导入本机 Root/TrustedPeople；zip 解压即用 |

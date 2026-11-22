@@ -17,7 +17,7 @@ using Microsoft.Extensions.Logging;
 namespace AiAssistant.Platform.Tests;
 
 /// <summary>
-/// S2 Final Gate Acceptance Suite (IMPLEMENTATION.md §4 S2 Gate, §5 S2 Acceptance, §11 DoD):
+/// S2 Final Gate Acceptance Suite (implementation.md §4 S2 Gate, §5 S2 Acceptance, §11 DoD):
 /// Validates a full 24-hour accelerated soak across midnight local-date boundaries with overload bursts,
 /// quota pressure, pause/resume intervals, blacklists, media retention sweeps, and zero-leak diagnostics.
 /// </summary>

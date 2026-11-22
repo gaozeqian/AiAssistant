@@ -1,5 +1,7 @@
 # 随包模型资产与许可证
 
+> **状态**：living ｜ **最后更新**：2026-11-22 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：随包模型增删、替换或上游许可证变化时
+
 安装包会携带 `artifacts/models/bundle`（KWS / Paraformer ASR / MeloTTS TTS / Silero VAD）。对话与 Embedding 模型不随包分发。
 
 > 核查日期：2026-11-22。核查依据：ModelScope API 的 License 字段、模型归档内的 LICENSE/README、ONNX 内嵌 metadata、上游仓库与 issue 回复。逐条证据见下文。

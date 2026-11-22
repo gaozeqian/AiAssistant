@@ -129,7 +129,7 @@ internal static partial class Win32Native
 }
 
 /// <summary>
-/// Event-driven foreground window &amp; focus source with 10s periodic fallback heartbeat (DESIGN.md §3.2, §9).
+/// Event-driven foreground window &amp; focus source with 10s periodic fallback heartbeat (design.md §3.2, §9).
 /// Never captures keystrokes or clipboard contents.
 /// </summary>
 public sealed class WindowsWindowActivitySource(IClock clock, IScreenCapture? screenCapture = null) : IWindowActivitySource
@@ -361,7 +361,7 @@ public sealed class WindowsScreenCapture(IClock clock) : IScreenCapture
 }
 
 /// <summary>
-/// Monitors ONLY user-whitelisted directories and reads text snippets strictly within size &amp; extension limits (DESIGN.md §3.2).
+/// Monitors ONLY user-whitelisted directories and reads text snippets strictly within size &amp; extension limits (design.md §3.2).
 /// </summary>
 public sealed class WhitelistedFileActivitySource(IClock clock) : IFileActivitySource
 {
@@ -488,7 +488,7 @@ public sealed class WhitelistedFileActivitySource(IClock clock) : IFileActivityS
 
 /// <summary>
 /// Accessibility-first text extractor: inspects Win32 accessible child controls (strictly skipping ES_PASSWORD controls)
-/// and falls back to pluggable OCR delegate when accessibility yields no text (IMPLEMENTATION.md S2.3).
+/// and falls back to pluggable OCR delegate when accessibility yields no text (implementation.md S2.3).
 /// </summary>
 public sealed class WindowsTextExtractor(Func<byte[], CancellationToken, Task<string?>>? ocrFallback = null) : ITextExtractor
 {

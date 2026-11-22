@@ -1,5 +1,7 @@
 # 升级、备份、恢复与卸载
 
+> **状态**：living ｜ **最后更新**：2026-11-22 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：安装器、升级路径或卸载行为变化时
+
 > 本文档中的命令均使用安装目录内的 `AiAssistant.Host`（Windows 为 `AiAssistant.Host.exe`）。
 > 数据目录默认：`%LOCALAPPDATA%\AiAssistant`、`~/Library/Application Support/AiAssistant`、`~/.local/share/AiAssistant`；
 > 可用 `AIASSISTANT_DATA_DIRECTORY` 覆盖。以下示例用 `$DATA` 表示该目录。

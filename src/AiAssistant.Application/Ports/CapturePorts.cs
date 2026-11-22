@@ -21,7 +21,7 @@ public sealed record CapturedSample(
     IReadOnlyDictionary<string, string>? Metadata = null);
 
 /// <summary>
-/// Streaming capture source contract (IMPLEMENTATION.md §3.3).
+/// Streaming capture source contract (implementation.md §3.3).
 /// </summary>
 public interface ICaptureSource : IAsyncDisposable
 {

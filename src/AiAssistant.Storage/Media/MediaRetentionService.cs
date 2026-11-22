@@ -5,7 +5,7 @@ namespace AiAssistant.Storage.Media;
 
 /// <summary>
 /// Background retention sweep coordinator that periodically purges expired encrypted media blobs
-/// while keeping structured event history intact (IMPLEMENTATION.md S2.4).
+/// while keeping structured event history intact (implementation.md S2.4).
 /// </summary>
 public sealed class MediaRetentionService : IRetentionService
 {

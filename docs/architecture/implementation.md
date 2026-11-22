@@ -1,11 +1,16 @@
 # AI 个人活动追踪助手 · 分步骤实现方案
 
-> 版本：v1.1 ｜ 日期：2026-11-21 ｜ 基线：`DESIGN.md` v2.5
+> **状态**：living ｜ **最后更新**：2026-11-22 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：实施步骤、阶段门禁或物理分层调整时
+
+> **文档边界**：本文回答「怎么做」：实施步骤、物理分层、阶段门禁与风险。
+> 设计依据见 [design.md](design.md)；门禁状态的唯一权威是 [../status/status.md](../status/status.md)。
+
+> 版本：v1.1 ｜ 日期：2026-11-21 ｜ 基线：`design.md` v2.5
 >
 > 本文是工程实施计划，不重复产品设计；重点定义架构边界、实现顺序、阶段交付物、
 > 验证方法与回退策略。实施中若发现底层技术组合不成立，先回到对应 POC，不用业务代码掩盖问题。
 >
-> 第 10 节清单与 `PROGRESS.md` 第 5 节遗留项实时同步：`[x]` 表示代码与自动化验收均完成，
+> 第 10 节清单与 [../status/backlog.md](../status/backlog.md) 遗留项实时同步：`[x]` 表示代码与自动化验收均完成，
 > `[ ]` 表示仍欠缺真机环境、真实模型资产、真实凭据或人工签字。`*-R` 编号与 PROGRESS 一一对应。
 
 ---
@@ -101,7 +106,7 @@
 
 ### 3.1 项目划分
 
-在 `DESIGN.md` 的逻辑结构上，实施时补充 Application 与 Host 两个物理边界：
+在 `design.md` 的逻辑结构上，实施时补充 Application 与 Host 两个物理边界：
 
 ```
 AiAssistant.sln
@@ -557,7 +562,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.28：`linux-x64` 全量测试暴露 Skia 原生资产缺失，`AiAssistant.Export` 增加 `SkiaSharp.NativeAssets.Linux`，`Report.Tests` 在 Linux 61/61 通过。
 - [x] S9.29：`win-x64` 真实窗口 UI 全流程 E2E 17/17 连续 3 次通过、退出码 0（局域网 `gemma4:12b-mlx`：时间线 12 事件、检索 8 条证据、问答 `引用 E1`、周报/日报生成、导出 Markdown、暂停/黑名单、数据两步删除 18 事件、关闭仅隐藏）；另用 UIA 驱动 7 个标签页与「检索证据」「重新检查平台能力」验证命中测试与启用态；截图归档 `artifacts/e2e/ui-20261122-170737/`。
 - [x] S9.30：修复小样本区间报告 Y 轴刻度重复（3 条事件渲染为 0/1/2/2/3）——新增 `ChartAxis` 统一 SVG/Skia/PDFsharp 三处刻度并补回归测试；日期下拉星期改为 `zh-CN`（英文系统不再出现 `Sunday`）；诊断页「尚未探测或没有可用端点」改为「尚未探测端点能力」，消除与「端点已就绪」的矛盾。
-- [x] S9.31：安装 KWS 唤醒词模型（zipformer wenetspeech 3.3M，`<数据目录>/models/sherpa/kws` 4.9MB），`--ui-e2e` 第 10 步转绿、整轮 17/17 且 0 跳过；补 `docs/MODELS.md` §2.1 干净机器依赖评估：Windows 自包含产物无需 .NET/VC++ Redistributable（全量扫描无 MSVCP/VCRUNTIME 导入）、MSIX 最低 Windows 10 2004、安装包不含任何模型资产。
+- [x] S9.31：安装 KWS 唤醒词模型（zipformer wenetspeech 3.3M，`<数据目录>/models/sherpa/kws` 4.9MB），`--ui-e2e` 第 10 步转绿、整轮 17/17 且 0 跳过；补 `docs/guides/models.md` §2.1 干净机器依赖评估：Windows 自包含产物无需 .NET/VC++ Redistributable（全量扫描无 MSVCP/VCRUNTIME 导入）、MSIX 最低 Windows 10 2004、安装包不含任何模型资产。
 - [x] S9.32：三平台安装包随带本机语音模型（KWS + Paraformer ASR + VITS TTS + Silero VAD，126MB/11 文件），仅对话/Embedding 模型保持外部。`AppRuntime` 按 `环境变量 → 数据目录 → 应用目录` 解析模型；新增 `stage-bundle.sh`/`fetch-bundle.sh`，Windows zip(188MB)/MSI(173MB)、Linux tar.gz/deb(163MB)、macOS `.app`(285MB) 均含 `models/sherpa`；空数据目录 `--ui-e2e` 17/17、0 跳过，ASR/TTS 冒烟通过；`release.yml` 打包前自动拉取官方模型。
 - [ ] S9-R1：用真实证书执行 Windows Authenticode/MSIX 签名与 macOS Developer ID 签名/公证（脚本与 `release.yml` 就绪，仅自签名演练过）。
 - [ ] S9-R2：真实时钟 90 分钟以上浸泡 + 显示器/麦克风热插拔（**2026-11-22 `win-x64` 90 分钟通过**：5402.3s、2523 轮、控制 32/32、黑名单 84/84、4727 事件、2348 媒体、暂停窗口 0、完整性 ok；外部 81 点采样工作集 60.7–66.9MB、句柄 428–464 无增长；14 天加速浸泡此前已通过；仅剩真机热插拔）。
@@ -572,7 +577,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 
 一个功能只有同时满足以下条件才算完成：
 
-1. 用户可观察行为与 DESIGN.md 一致，平台降级已明确呈现。
+1. 用户可观察行为与 design.md 一致，平台降级已明确呈现。
 2. 依赖方向、接口契约和资源释放符合本文约束。
 3. 单元/集成/契约测试齐全，关键故障路径已验证。
 4. 默认配置不扩大采集范围、不新增隐式外发、不降低加密要求。

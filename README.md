@@ -46,7 +46,7 @@ AiAssistant.Host --report-range --from 2026-11-16 --to 2026-11-22
 |---|---|
 | `src/` | 产品代码（16 个工程，扁平布局） |
 | `tests/` | 单元、集成、契约与架构测试 |
-| `docs/` | 全部文档，索引见 `docs/README.md` |
+| `docs/` | 全部文档，索引见 [docs/README.md](docs/README.md) |
 | `build/` | 构建、打包、签名、SBOM |
 | `tools/` | 审计、清理与联调工具 |
 | `native/` | macOS Swift Helper |
@@ -57,21 +57,21 @@ AiAssistant.Host --report-range --from 2026-11-16 --to 2026-11-22
 
 | 主题 | 位置 |
 |---|---|
-| 本机模型与语音模型安装 | [docs/MODELS.md](docs/MODELS.md) |
+| 本机模型与语音模型安装 | [docs/guides/models.md](docs/guides/models.md) |
 | 设计方案 | [docs/architecture/design.md](docs/architecture/design.md) |
 | 实施方案 | [docs/architecture/implementation.md](docs/architecture/implementation.md) |
-| 当前状态与门禁 | [docs/status/progress.md](docs/status/progress.md) |
+| 当前状态与门禁 | [docs/status/status.md](docs/status/status.md) |
 | 架构决策记录 | [docs/adr/](docs/adr/) |
 | 依赖与模型许可 | [docs/compliance/](docs/compliance/) |
 | 发布、升级与回滚 | [docs/release/](docs/release/) |
 
 ## 当前状态
 
-版本 `0.1.0`。代码与自动化测试已收口；剩余项依赖真实证书、真机与 GitHub 账单，逐条列在 `docs/status/progress.md` 第 5、6 节。
+版本 `0.1.0`。代码与自动化测试已收口；剩余项依赖真实证书、真机与 GitHub 账单，逐条列在 [docs/status/backlog.md](docs/status/backlog.md)。
 
 ## 隐私与许可
 
-- 隐私说明：[docs/release/PRIVACY.md](docs/release/PRIVACY.md)
+- 隐私说明：[docs/release/privacy.md](docs/release/privacy.md)
 - 许可：[LICENSE](LICENSE) · [EULA.md](EULA.md)
 - 第三方组件：[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
 - 安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。

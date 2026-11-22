@@ -22,7 +22,7 @@ public sealed record ExtractedTextResult(
     double Confidence);
 
 /// <summary>
-/// Unified text extraction port: accessibility tree preferred, OCR fallback (DESIGN.md §3.1, IMPLEMENTATION.md S2.3).
+/// Unified text extraction port: accessibility tree preferred, OCR fallback (design.md §3.1, implementation.md S2.3).
 /// </summary>
 public interface ITextExtractor
 {
@@ -46,7 +46,7 @@ public interface IImageOcrRecognizer
 }
 
 /// <summary>
-/// Composable preprocessing stage contract with explicit timeout &amp; cancellation (IMPLEMENTATION.md S4.1).
+/// Composable preprocessing stage contract with explicit timeout &amp; cancellation (implementation.md S4.1).
 /// </summary>
 public interface IProcessingStage<TInput, TOutput>
 {

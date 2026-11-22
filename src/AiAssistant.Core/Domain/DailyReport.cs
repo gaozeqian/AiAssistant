@@ -8,7 +8,7 @@ public enum ModelEndpointTier
 }
 
 /// <summary>
-/// Versioned daily report recording model tier and redaction metadata for auditability (DESIGN.md §4.1, §8.4).
+/// Versioned daily report recording model tier and redaction metadata for auditability (design.md §4.1, §8.4).
 /// </summary>
 public sealed record DailyReport(
     string Id,

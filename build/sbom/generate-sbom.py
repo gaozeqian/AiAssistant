@@ -185,7 +185,7 @@ def verify(bom: dict) -> list[str]:
 
 def check_manifest(repo: Path) -> list[str]:
     props = (repo / "Directory.Packages.props").read_text(encoding="utf-8")
-    manifest = (repo / "docs/compliance/DEPENDENCY_MANIFEST.md").read_text(encoding="utf-8")
+    manifest = (repo / "docs/compliance/dependency-manifest.md").read_text(encoding="utf-8")
     declared = re.findall(r'PackageVersion Include="([^"]+)"', props)
     missing = [name for name in declared if f"`{name}`" not in manifest]
     return missing

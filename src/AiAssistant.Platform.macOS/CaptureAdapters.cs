@@ -173,7 +173,7 @@ public sealed class WindowActivitySource(
 
 /// <summary>
 /// macOS FSEvents whitelisted directory activity source via Swift Helper IPC with managed FileSystemWatcher fallback.
-/// Enforces strict <=200KB text/code extension limits (DESIGN.md §3.1, §3.2).
+/// Enforces strict <=200KB text/code extension limits (design.md §3.1, §3.2).
 /// </summary>
 public sealed class FileActivitySource(
     IMacHelperSupervisor supervisor,

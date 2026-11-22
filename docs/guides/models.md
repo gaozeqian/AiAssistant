@@ -1,5 +1,7 @@
 # 本机模型配置与语音模型安装
 
+> **状态**：living ｜ **最后更新**：2026-11-22 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：默认模型、端点配置或语音模型安装方式变化时
+
 应用默认使用本机 Ollama（`http://127.0.0.1:11434`），不向云端发送任何数据。
 
 ## 1. Ollama 对话 / 向量模型
@@ -102,7 +104,7 @@ bash build/install-voice-models.sh /path/to/data-directory
 
 `keywords.txt` 一行一个唤醒词：`n ǐ h ǎo sh í g uāng @你好时光`。
 打包前用 `bash build/models/stage-bundle.sh` 汇总资产（或 `fetch-bundle.sh` 直接下载官方模型）。
-随包资产来源与许可证见 `docs/compliance/MODEL-ASSETS.md`（全部为 Apache-2.0 / MIT，已移除许可不明的 AISHELL-3 VITS）；`THIRD-PARTY-NOTICES.md` 已生成并随安装包分发。
+随包资产来源与许可证见 `docs/compliance/model-assets.md`（全部为 Apache-2.0 / MIT，已移除许可不明的 AISHELL-3 VITS）；`THIRD-PARTY-NOTICES.md` 已生成并随安装包分发。
 
 ## 2.5 从 UI 配置模型
 
