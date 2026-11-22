@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Platform.macOS.Ipc;
 
@@ -13,7 +14,7 @@ public static class MacHelperProtocol
 {
     public const int CurrentVersion = 1;
     public const int MaxFrameBytes = 16 * 1024 * 1024;
-    public const string AuthTokenEnvVar = "AIASSISTANT_IPC_TOKEN";
+    public const string AuthTokenEnvVar = EnvironmentNames.IpcToken;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {

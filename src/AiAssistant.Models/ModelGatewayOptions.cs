@@ -1,3 +1,4 @@
+using AiAssistant.Core.Configuration;
 namespace AiAssistant.Models;
 
 public enum ModelProviderKind
@@ -33,7 +34,7 @@ public sealed class ModelGatewayOptions
     public static ModelGatewayOptions FromEnvironment()
     {
         var provider = string.Equals(
-            Environment.GetEnvironmentVariable("AIASSISTANT_MODEL_PROVIDER"),
+            Environment.GetEnvironmentVariable(EnvironmentNames.ModelProvider),
             "lmstudio",
             StringComparison.OrdinalIgnoreCase)
             ? ModelProviderKind.OpenAiCompatible
@@ -42,9 +43,9 @@ public sealed class ModelGatewayOptions
         var defaultBase = provider == ModelProviderKind.Ollama
             ? "http://127.0.0.1:11434"
             : "http://127.0.0.1:1234";
-        var baseUrl = Environment.GetEnvironmentVariable("AIASSISTANT_MODEL_BASE_URL");
-        var chatModel = Environment.GetEnvironmentVariable("AIASSISTANT_CHAT_MODEL") ?? "gemma4:12b";
-        var embeddingModel = Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_MODEL") ?? "embeddinggemma-2:740m";
+        var baseUrl = Environment.GetEnvironmentVariable(EnvironmentNames.ModelBaseUrl);
+        var chatModel = Environment.GetEnvironmentVariable(EnvironmentNames.ChatModel) ?? "gemma4:12b";
+        var embeddingModel = Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingModel) ?? "embeddinggemma-2:740m";
 
         return new ModelGatewayOptions
         {
@@ -55,13 +56,13 @@ public sealed class ModelGatewayOptions
             ChatModel = chatModel,
             EmbeddingModel = embeddingModel,
             Think = string.Equals(
-                Environment.GetEnvironmentVariable("AIASSISTANT_MODEL_THINK"),
+                Environment.GetEnvironmentVariable(EnvironmentNames.ModelThink),
                 "true",
                 StringComparison.OrdinalIgnoreCase),
-            ThinkingLevel = Environment.GetEnvironmentVariable("AIASSISTANT_MODEL_THINKING_LEVEL"),
-            ApiKey = Environment.GetEnvironmentVariable("AIASSISTANT_MODEL_API_KEY"),
+            ThinkingLevel = Environment.GetEnvironmentVariable(EnvironmentNames.ModelThinkingLevel),
+            ApiKey = Environment.GetEnvironmentVariable(EnvironmentNames.ModelApiKey),
             AllowRemoteEndpoint = string.Equals(
-                Environment.GetEnvironmentVariable("AIASSISTANT_MODEL_ALLOW_REMOTE"),
+                Environment.GetEnvironmentVariable(EnvironmentNames.ModelAllowRemote),
                 "true",
                 StringComparison.OrdinalIgnoreCase)
         };

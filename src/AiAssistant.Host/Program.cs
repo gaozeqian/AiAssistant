@@ -98,18 +98,18 @@ public static class Program
                 // 供外部 AX 驱动测试；`--ui-e2e` 额外启用内置真实 UI 自驱动流程（真实窗口 + 真实渲染）。
                 if (args.Contains("--show-window", StringComparer.OrdinalIgnoreCase))
                 {
-                    Environment.SetEnvironmentVariable("AIASSISTANT_UI_E2E_SHOW", "1");
+                    Environment.SetEnvironmentVariable(EnvironmentNames.UiE2EShow, "1");
                 }
 
                 if (args.Contains("--ui-e2e", StringComparer.OrdinalIgnoreCase))
                 {
-                    Environment.SetEnvironmentVariable("AIASSISTANT_UI_E2E_SHOW", "1");
-                    Environment.SetEnvironmentVariable("AIASSISTANT_UI_E2E", "1");
+                    Environment.SetEnvironmentVariable(EnvironmentNames.UiE2EShow, "1");
+                    Environment.SetEnvironmentVariable(EnvironmentNames.UiE2E, "1");
                 }
 
                 if (TryGetOption(args, "--data-directory", out var dataDirectory))
                 {
-                    Environment.SetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY", dataDirectory);
+                    Environment.SetEnvironmentVariable(EnvironmentNames.DataDirectory, dataDirectory);
                 }
 
                 Desktop.ShellApp.TrayAvailable = runtime.IsSystemTraySupported;
@@ -685,8 +685,8 @@ public static class Program
             return;
         }
 
-        var source = Environment.GetEnvironmentVariable("AIASSISTANT_MODELS_CONFIG");
-        var dataDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY");
+        var source = Environment.GetEnvironmentVariable(EnvironmentNames.ModelsConfig);
+        var dataDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.DataDirectory);
         if (string.IsNullOrWhiteSpace(source) || !File.Exists(source) || string.IsNullOrWhiteSpace(dataDirectory))
         {
             return;
@@ -697,7 +697,7 @@ public static class Program
         if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.Ordinal))
         {
             File.Copy(source, target, overwrite: true);
-            Environment.SetEnvironmentVariable("AIASSISTANT_MODELS_CONFIG", target);
+            Environment.SetEnvironmentVariable(EnvironmentNames.ModelsConfig, target);
         }
     }
 

@@ -78,7 +78,7 @@ public sealed class S9RealTimeSoakTests : IDisposable
 
     private static int ResolveMinutes()
     {
-        var raw = Environment.GetEnvironmentVariable("AIASSISTANT_REAL_SOAK_MINUTES");
+        var raw = Environment.GetEnvironmentVariable(EnvironmentNames.RealSoakMinutes);
         return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
             ? Math.Clamp(parsed, 1, 120)
             : 0;

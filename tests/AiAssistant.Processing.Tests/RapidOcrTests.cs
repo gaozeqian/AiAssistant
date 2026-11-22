@@ -2,6 +2,7 @@ using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Processing.Ocr;
 using Microsoft.Extensions.Logging.Abstractions;
+using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Processing.Tests;
 
@@ -20,7 +21,7 @@ public sealed class RapidOcrTests
 
         Assert.Equal(CapabilityStatus.PermissionRequired, recognizer.Capability.Status);
         Assert.NotNull(recognizer.Capability.RemediationHint);
-        Assert.Contains("AIASSISTANT_RAPIDOCR_MODEL_DIR", recognizer.Capability.RemediationHint, StringComparison.Ordinal);
+        Assert.Contains(EnvironmentNames.RapidOcrModelDir, recognizer.Capability.RemediationHint, StringComparison.Ordinal);
 
         var text = await recognizer.RecognizeAsync(WhiteFrame(32, 32), CancellationToken.None);
 

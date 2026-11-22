@@ -1,3 +1,4 @@
+using AiAssistant.Core.Configuration;
 namespace AiAssistant.Platform.Linux.Desktop;
 
 public enum LinuxDisplayBackendKind
@@ -31,7 +32,7 @@ public sealed record LinuxDesktopSessionSnapshot(
             OperatingSystem.IsLinux(),
             !string.IsNullOrWhiteSpace(env("WAYLAND_DISPLAY")),
             !string.IsNullOrWhiteSpace(env("DISPLAY")),
-            env("AIASSISTANT_LINUX_BACKEND"),
+            env(EnvironmentNames.LinuxBackend),
             env("XDG_CURRENT_DESKTOP"),
             env("XDG_SESSION_TYPE"));
     }

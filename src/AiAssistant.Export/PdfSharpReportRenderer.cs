@@ -5,6 +5,7 @@ using PdfSharp.Drawing;
 using PdfSharp.Fonts;
 using PdfSharp.Pdf;
 using SkiaSharp;
+using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Export;
 
@@ -210,7 +211,7 @@ public static class PdfSharpReportRenderer
 
     private static string? FindFont()
     {
-        var configured = Environment.GetEnvironmentVariable("AIASSISTANT_PDF_FONT_PATH");
+        var configured = Environment.GetEnvironmentVariable(EnvironmentNames.PdfFontPath);
         if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured))
         {
             return configured;

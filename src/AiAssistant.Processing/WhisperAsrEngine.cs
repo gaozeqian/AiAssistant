@@ -3,6 +3,7 @@ using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using Whisper.net;
+using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Processing;
 
@@ -123,7 +124,7 @@ public enum AsrEngineKind
 
 public static class AsrEngineSelection
 {
-    public const string EnvironmentVariableName = "AIASSISTANT_ASR_ENGINE";
+    public const string EnvironmentVariableName = EnvironmentNames.AsrEngine;
 
     public static AsrEngineKind Parse(string? value) =>
         string.Equals(value, "whisper", StringComparison.OrdinalIgnoreCase)

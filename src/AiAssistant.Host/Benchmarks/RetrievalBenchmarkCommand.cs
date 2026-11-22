@@ -5,6 +5,7 @@ using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Summarization;
 using Microsoft.Extensions.Logging.Abstractions;
+using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Host.Benchmarks;
 
@@ -19,11 +20,11 @@ public sealed class RetrievalBenchmarkCommand(IModelGateway model)
 
     private string DocumentStyle => EmbeddingProfile.ResolveDocumentStyle(
         model.EmbeddingModelId,
-        Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_DOCUMENT_STYLE"));
+        Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingDocumentStyle));
 
     private string QueryPrefix => EmbeddingProfile.ResolveQueryPrefix(
         model.EmbeddingModelId,
-        Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_QUERY_PREFIX"));
+        Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingQueryPrefix));
 
     public async Task<int> RunAsync(string outputPath, CancellationToken ct)
     {

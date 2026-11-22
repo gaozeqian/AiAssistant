@@ -71,7 +71,7 @@ public sealed class S9MultiDaySoakTests : IDisposable
 
     private static int ResolveDays()
     {
-        var raw = Environment.GetEnvironmentVariable("AIASSISTANT_SOAK_DAYS");
+        var raw = Environment.GetEnvironmentVariable(EnvironmentNames.SoakDays);
         return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
             ? Math.Clamp(parsed, 1, 14)
             : 3;

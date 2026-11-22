@@ -81,7 +81,7 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
 
             // Follow the system theme on first launch, then honour manual toggles.
             // AIASSISTANT_THEME=light|dark pins a variant (useful for tests and user preference).
-            var themeOverride = Environment.GetEnvironmentVariable("AIASSISTANT_THEME");
+            var themeOverride = Environment.GetEnvironmentVariable(EnvironmentNames.Theme);
             shell.ThemeVariant = themeOverride switch
             {
                 "light" => ThemeVariant.Light,
@@ -94,11 +94,11 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             // UI E2E hook: the app normally starts as a tray-only agent; this shows the window
             // immediately so an external driver (or the in-app runner below) can exercise the real window.
             var showWindow = string.Equals(
-                Environment.GetEnvironmentVariable("AIASSISTANT_UI_E2E_SHOW"),
+                Environment.GetEnvironmentVariable(EnvironmentNames.UiE2EShow),
                 "1",
                 StringComparison.Ordinal);
             var runUiE2E = string.Equals(
-                Environment.GetEnvironmentVariable("AIASSISTANT_UI_E2E"),
+                Environment.GetEnvironmentVariable(EnvironmentNames.UiE2E),
                 "1",
                 StringComparison.Ordinal);
             // Tray-only on desktops that actually have a tray; without one the window must be
@@ -118,7 +118,7 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             var initialization = InitializeShellSafelyAsync(shell);
             if (runUiE2E)
             {
-                var outputRoot = Environment.GetEnvironmentVariable("AIASSISTANT_UI_E2E_OUTPUT");
+                var outputRoot = Environment.GetEnvironmentVariable(EnvironmentNames.UiE2EOutput);
                 if (string.IsNullOrWhiteSpace(outputRoot))
                 {
                     outputRoot = ArtifactPaths.Resolve("evidence", "e2e");

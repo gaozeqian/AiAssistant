@@ -8,6 +8,7 @@ using AiAssistant.Models;
 using AiAssistant.Processing;
 using AiAssistant.Storage.KeyStores;
 using Microsoft.Extensions.Logging.Abstractions;
+using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Report.Tests;
 
@@ -118,7 +119,7 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
             Assert.Equal("top-secret-value", await store.GetAsync("intranet-key", CancellationToken.None));
 
             var resolver = new ModelSecretResolver(store);
-            var envName = $"AIASSISTANT_TEST_SECRET_{Guid.NewGuid():N}";
+            var envName = $"{EnvironmentNames.TestSecretPrefix}{Guid.NewGuid():N}";
             Environment.SetEnvironmentVariable(envName, "env-secret");
             try
             {

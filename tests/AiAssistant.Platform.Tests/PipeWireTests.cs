@@ -2,6 +2,7 @@ using AiAssistant.Core.ValueObjects;
 using AiAssistant.Platform.Linux.PipeWire;
 using AiAssistant.Platform.Linux.Portal;
 using Microsoft.Extensions.Logging.Abstractions;
+using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Platform.Tests;
 
@@ -121,7 +122,7 @@ public sealed class PipeWireTests
     public async Task LiveWaylandScreenCast_ProducesFrame()
     {
         if (!string.Equals(
-                Environment.GetEnvironmentVariable("AIASSISTANT_PORTAL_E2E"),
+                Environment.GetEnvironmentVariable(EnvironmentNames.PortalE2E),
                 "1",
                 StringComparison.Ordinal))
         {

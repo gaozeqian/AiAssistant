@@ -125,7 +125,7 @@ public sealed class MacPlatformLiveHelperTests : IDisposable
     }
 
     private static bool LiveHelperEnabled =>
-        string.Equals(Environment.GetEnvironmentVariable("AIASSISTANT_MAC_HELPER_E2E"), "1", StringComparison.Ordinal);
+        string.Equals(Environment.GetEnvironmentVariable(EnvironmentNames.MacHelperE2E), "1", StringComparison.Ordinal);
 
     private static CapabilityStatus ExpectedScreenStatus(MacPermissionGrant grant) =>
         grant == MacPermissionGrant.Granted ? CapabilityStatus.Supported : CapabilityStatus.PermissionRequired;
@@ -234,7 +234,7 @@ public sealed class MacPlatformLiveHelperTests : IDisposable
 
     private static string ResolveHelperPath()
     {
-        var overridePath = Environment.GetEnvironmentVariable("AIASSISTANT_MAC_HELPER_PATH");
+        var overridePath = Environment.GetEnvironmentVariable(EnvironmentNames.MacHelperPath);
         if (!string.IsNullOrWhiteSpace(overridePath))
         {
             return Path.GetFullPath(overridePath);

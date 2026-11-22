@@ -2,6 +2,7 @@ using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Processing;
 using Microsoft.Extensions.Logging.Abstractions;
+using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Processing.Tests;
 
@@ -20,7 +21,7 @@ public sealed class WhisperAsrEngineTests
             NullLogger<WhisperAsrEngine>.Instance);
 
         Assert.Equal(CapabilityStatus.PermissionRequired, engine.Capability.Status);
-        Assert.Contains("AIASSISTANT_WHISPER_MODEL_PATH", engine.Capability.RemediationHint, StringComparison.Ordinal);
+        Assert.Contains(EnvironmentNames.WhisperModelPath, engine.Capability.RemediationHint, StringComparison.Ordinal);
 
         var result = await engine.TranscribeAsync(
             new AudioTranscriptionRequest(new float[1600], 16_000),
@@ -74,6 +75,6 @@ public sealed class WhisperAsrEngineTests
     public void AsrEngineSelection_OnlySwitchesOnExplicitWhisperValue(string? value, AsrEngineKind expected)
     {
         Assert.Equal(expected, AsrEngineSelection.Parse(value));
-        Assert.Equal("AIASSISTANT_ASR_ENGINE", AsrEngineSelection.EnvironmentVariableName);
+        Assert.Equal(EnvironmentNames.AsrEngine, AsrEngineSelection.EnvironmentVariableName);
     }
 }

@@ -31,6 +31,7 @@ using AiAssistant.Voice;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Host;
 
@@ -154,7 +155,7 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public static async Task<AppRuntime> CreateAsync(CancellationToken ct = default)
     {
-        var dataDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY");
+        var dataDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.DataDirectory);
         if (string.IsNullOrWhiteSpace(dataDirectory))
         {
             dataDirectory = Path.Combine(
@@ -165,7 +166,7 @@ public sealed class AppRuntime : IAsyncDisposable
         dataDirectory = Path.GetFullPath(dataDirectory);
         Directory.CreateDirectory(dataDirectory);
 
-        var whitelist = (Environment.GetEnvironmentVariable("AIASSISTANT_CAPTURE_DIRECTORIES") ?? string.Empty)
+        var whitelist = (Environment.GetEnvironmentVariable(EnvironmentNames.CaptureDirectories) ?? string.Empty)
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(Path.GetFullPath)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -182,7 +183,7 @@ public sealed class AppRuntime : IAsyncDisposable
         var structuredLogProvider = new SanitizedStructuredLoggerProvider(options, clock);
         var linuxBackendState = OperatingSystem.IsLinux() ? new LinuxDisplayBackendState() : null;
         var secretStore = new ProtectedModelSecretStore(Path.Combine(dataDirectory, "secrets"), keyStore);
-        var modelsConfigPath = Environment.GetEnvironmentVariable("AIASSISTANT_MODELS_CONFIG");
+        var modelsConfigPath = Environment.GetEnvironmentVariable(EnvironmentNames.ModelsConfig);
         if (string.IsNullOrWhiteSpace(modelsConfigPath))
         {
             modelsConfigPath = Path.Combine(dataDirectory, "models.json");
@@ -244,7 +245,7 @@ public sealed class AppRuntime : IAsyncDisposable
             RegisterLinux(services, clock, keyStore, options, linuxBackendState ?? new LinuxDisplayBackendState());
         }
 
-        var sherpaModelDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_SHERPA_MODEL_DIR");
+        var sherpaModelDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.SherpaModelDir);
         if (string.IsNullOrWhiteSpace(sherpaModelDirectory))
         {
             sherpaModelDirectory = ResolveModelDirectory(
@@ -312,7 +313,7 @@ public sealed class AppRuntime : IAsyncDisposable
             ?.EmbeddingModel ?? string.Empty;
         var queryPrefix = EmbeddingProfile.ResolveQueryPrefix(
             configuredEmbeddingModel,
-            Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_QUERY_PREFIX"));
+            Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingQueryPrefix));
 
         services.AddSingleton(new HybridSearchOptions { EmbeddingQueryPrefix = queryPrefix });
         services.AddSingleton<IEvidenceSearch>(provider => new HybridSearchService(
@@ -364,11 +365,11 @@ public sealed class AppRuntime : IAsyncDisposable
     private static McpServerOptions CreateMcpOptions() => new()
     {
         Enabled = string.Equals(
-            Environment.GetEnvironmentVariable("AIASSISTANT_MCP_ENABLED"),
+            Environment.GetEnvironmentVariable(EnvironmentNames.McpEnabled),
             "true",
             StringComparison.OrdinalIgnoreCase),
-        Port = ParseBoundedInt(Environment.GetEnvironmentVariable("AIASSISTANT_MCP_PORT"), 47831, 0, 65535),
-        MaxRequestsPerMinute = ParseBoundedInt(Environment.GetEnvironmentVariable("AIASSISTANT_MCP_RPM"), 60, 1, 10_000)
+        Port = ParseBoundedInt(Environment.GetEnvironmentVariable(EnvironmentNames.McpPort), 47831, 0, 65535),
+        MaxRequestsPerMinute = ParseBoundedInt(Environment.GetEnvironmentVariable(EnvironmentNames.McpRpm), 60, 1, 10_000)
     };
 
     private static int ParseBoundedInt(string? raw, int fallback, int min, int max) =>
@@ -500,7 +501,7 @@ public sealed class AppRuntime : IAsyncDisposable
             return;
         }
 
-        var modelPath = Environment.GetEnvironmentVariable("AIASSISTANT_WHISPER_MODEL_PATH");
+        var modelPath = Environment.GetEnvironmentVariable(EnvironmentNames.WhisperModelPath);
         if (string.IsNullOrWhiteSpace(modelPath))
         {
             modelPath = ResolveModelFile(dataDirectory, "whisper", "ggml-small.bin");
@@ -512,7 +513,7 @@ public sealed class AppRuntime : IAsyncDisposable
 
     private static void RegisterVoice(IServiceCollection services, string dataDirectory, IClock clock)
     {
-        var modelDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_SHERPA_MODEL_DIR");
+        var modelDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.SherpaModelDir);
         if (string.IsNullOrWhiteSpace(modelDirectory))
         {
             modelDirectory = ResolveModelDirectory(
@@ -529,21 +530,21 @@ public sealed class AppRuntime : IAsyncDisposable
         var voiceOptions = new SherpaVoiceOptions
         {
             ModelDirectory = Path.GetFullPath(modelDirectory),
-            KeywordsScore = ReadFloatEnvironment("AIASSISTANT_KWS_SCORE", voiceDefaults.KeywordsScore, 0.1f, 10f),
-            KeywordsThreshold = ReadFloatEnvironment("AIASSISTANT_KWS_THRESHOLD", voiceDefaults.KeywordsThreshold, 0.01f, 0.99f)
+            KeywordsScore = ReadFloatEnvironment(EnvironmentNames.KwsScore, voiceDefaults.KeywordsScore, 0.1f, 10f),
+            KeywordsThreshold = ReadFloatEnvironment(EnvironmentNames.KwsThreshold, voiceDefaults.KeywordsThreshold, 0.01f, 0.99f)
         };
         var sessionOptions = new VoiceSessionOptions
         {
             EnableWakeChime = !string.Equals(
-                Environment.GetEnvironmentVariable("AIASSISTANT_VOICE_DISABLE_CHIME"),
+                Environment.GetEnvironmentVariable(EnvironmentNames.VoiceDisableChime),
                 "true",
                 StringComparison.OrdinalIgnoreCase),
             RecordCommandAudio = string.Equals(
-                Environment.GetEnvironmentVariable("AIASSISTANT_VOICE_RECORD_COMMAND_AUDIO"),
+                Environment.GetEnvironmentVariable(EnvironmentNames.VoiceRecordCommandAudio),
                 "true",
                 StringComparison.OrdinalIgnoreCase),
             CommandAudioRetention = TimeSpan.FromDays(ParseBoundedInt(
-                Environment.GetEnvironmentVariable("AIASSISTANT_VOICE_AUDIO_RETENTION_DAYS"),
+                Environment.GetEnvironmentVariable(EnvironmentNames.VoiceAudioRetentionDays),
                 7,
                 1,
                 365))
@@ -677,7 +678,7 @@ public sealed class AppRuntime : IAsyncDisposable
             ?.EmbeddingModel ?? string.Empty;
         var documentStyle = EmbeddingProfile.ResolveDocumentStyle(
             localEmbeddingModel,
-            Environment.GetEnvironmentVariable("AIASSISTANT_EMBEDDING_DOCUMENT_STYLE"));
+            Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingDocumentStyle));
         services.AddSingleton(provider => new EventEmbeddingIndexer(
             provider.GetRequiredService<IEventRepository>(),
             provider.GetRequiredService<IVectorIndex>(),
@@ -689,7 +690,7 @@ public sealed class AppRuntime : IAsyncDisposable
             configuration.Policy.DefaultTier));
 
         var scheduleTime = TimeOnly.TryParse(
-            Environment.GetEnvironmentVariable("AIASSISTANT_REPORT_TIME"),
+            Environment.GetEnvironmentVariable(EnvironmentNames.ReportTime),
             out var parsedTime)
             ? parsedTime
             : new TimeOnly(18, 30);
@@ -697,7 +698,7 @@ public sealed class AppRuntime : IAsyncDisposable
         {
             DailyLocalTime = scheduleTime,
             EnableScheduledDaily = !string.Equals(
-                Environment.GetEnvironmentVariable("AIASSISTANT_REPORT_DISABLE_SCHEDULE"),
+                Environment.GetEnvironmentVariable(EnvironmentNames.ReportDisableSchedule),
                 "true",
                 StringComparison.OrdinalIgnoreCase),
             EnableStartupCatchUp = true
@@ -804,7 +805,7 @@ public sealed class AppRuntime : IAsyncDisposable
         var pipeWireOptions = new WaylandPipeWireOptions
         {
             EnablePipeWire = !string.Equals(
-                Environment.GetEnvironmentVariable("AIASSISTANT_WAYLAND_PIPEWIRE"),
+                Environment.GetEnvironmentVariable(EnvironmentNames.WaylandPipeWire),
                 "false",
                 StringComparison.OrdinalIgnoreCase)
         };
@@ -829,7 +830,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IFileActivitySource>(new LinuxInotifyFileActivitySource(clock));
         services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IWindowActivitySource>());
         services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IFileActivitySource>());
-        var rapidOcrDirectory = Environment.GetEnvironmentVariable("AIASSISTANT_RAPIDOCR_MODEL_DIR");
+        var rapidOcrDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.RapidOcrModelDir);
         if (string.IsNullOrWhiteSpace(rapidOcrDirectory))
         {
             rapidOcrDirectory = ResolveModelDirectory(
@@ -870,7 +871,7 @@ public sealed class AppRuntime : IAsyncDisposable
 
     private static string? ResolveMacHelperPath()
     {
-        var overridePath = Environment.GetEnvironmentVariable("AIASSISTANT_MAC_HELPER_PATH");
+        var overridePath = Environment.GetEnvironmentVariable(EnvironmentNames.MacHelperPath);
         if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
         {
             return Path.GetFullPath(overridePath);
