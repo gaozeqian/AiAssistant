@@ -22,19 +22,19 @@
 
 ## 3. 安装包体积
 
-| 平台 | 产物 | 体积 |
+| 平台 | 产物 | 体积（2026-11-22，含随包语音模型 126MB） |
 |---|---|---|
-| Windows | 自包含目录（staging） | 239 MB |
-| Windows | `AiAssistant-<ver>-win-x64.msi` | **68.1 MB**（自签名，安装时导入证书） |
-| Linux | `AiAssistant-<ver>-linux-x64.deb` | **57.6 MB** |
-| macOS | `AiAssistant-<ver>-osx-arm64.pkg` | 待 macOS runner 生成 |
-| Linux | 自包含目录（`usr/lib/aiassistant`） | 144 MB |
-| Linux | `.tar.gz` | **58 MB** |
-| macOS | `AiAssistant.app`（含 .NET 运行时） | 155 MB |
+| Windows | 自包含目录（staging） | 369 MB |
+| Windows | `AiAssistant-<ver>-win-x64.zip` | **188 MB** |
+| Windows | `AiAssistant-<ver>-win-x64.msi` | **173 MB**（自签名，安装时导入证书） |
+| Linux | `AiAssistant-<ver>-linux-x64.deb` | **163 MB** |
+| Linux | 自包含目录（`usr/lib/aiassistant`） | 270 MB |
+| Linux | `.tar.gz` | **163 MB** |
+| macOS | `AiAssistant.app`（含 .NET 运行时与模型） | 285 MB |
 
-体积主要来自 .NET 自包含运行时与 sherpa-onnx 原生库；如需更小安装包可改用框架依赖发布（`-FrameworkDependent` / `--framework-dependent`），代价是要求目标机安装 .NET 10 运行时。
+体积主要来自 .NET 自包含运行时、sherpa-onnx 原生库与随包语音模型（KWS 4.9MB + Paraformer ASR 78MB + VITS int8 39MB + VAD 2.3MB）。如需更小安装包可改用框架依赖发布（`-FrameworkDependent` / `--framework-dependent`），代价是要求目标机安装 .NET 10 运行时；也可用 `-SkipModelBundle` / `--skip-models` 产出不含语音模型的开发包。
 
-> 2026-11-21 起新增可选 Whisper.net 批处理引擎原生库（约 2.5 MB/平台）。`Whisper.net.Runtime` 默认携带全部桌面 RID，发布目标 `TrimForeignWhisperRuntimes` 会删除非目标平台文件（`linux-x64` 自包含目录实测 163 MB → 149 MB）。RapidOCR 只引入 `Microsoft.ML.OnnxRuntime.Managed` 托管绑定并复用 sherpa 自带原生 ORT，无额外原生库：`linux-x64` 自包含目录实测仍为 149 MB。上表体积为新增依赖前的实测值，下一次发布需复测并更新。
+> 2026-11-22 起安装包默认携带 `models/sherpa`（11 个文件、126MB），对话/Embedding 模型仍在外部。上表已按新载荷复测；不含模型的旧包约为 zip 84MB / MSI 86MB / deb 58MB。
 
 ## 4. 存储与检索
 

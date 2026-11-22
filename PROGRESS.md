@@ -7,12 +7,12 @@
 
 ## 1. 当前总体状态快照
 
-- **当前活跃阶段**：`S9 发布加固 + macOS 真机验收`：代码与自动化验收已收口，剩余为真机/真实资产/真实凭据/人工签字类门禁
-- **最近更新时间**：`2026-11-21`
-- **最近执行环境**：`osx-arm64` macOS 26.7.3（Apple Silicon）+ `.NET SDK 10.0.404` + Swift 6.4；上一轮 `linux-x64` Ubuntu 26.04 + GNOME Wayland；再上一轮 Windows 11 `win-x64` / SDK 11.0.100
-- **当前构建状态**：✅ `osx-arm64` 本地 Release 0 警告 0 错误；Swift Helper `swift build -c release` 通过；`linux-x64` / `win-x64` 历史结论见第 4 节日志
-- **当前测试状态**：✅ 217/217 测试通过（`Architecture.Tests` 6、`Core.Tests` 6、`Storage.Tests` 18、`Capture.Tests` 4、`Platform.Tests` 63、`Processing.Tests` 48、`Report.Tests` 61、`Voice.Tests` 11），本机 `osx-arm64` 全量实跑；另含 3 项需 `AIASSISTANT_MAC_HELPER_E2E=1` 的 macOS 真机 Helper 测试（音频回放、TCC 降级、崩溃重启，本机通过）与 1 项 `AIASSISTANT_PORTAL_E2E=1` 的 GNOME Wayland 真机测试
-- **下一步待确认事项**：macOS 侧的 TCC 允许流程（屏幕录制/辅助功能）与签名公证仍需人工授权与签字；S9-R4 待 Actions 配额恢复；黄金集（S4-R/S7-R1）需外挂模型资产。详见第 6 节
+- **当前活跃阶段**：`S9 发布加固`：`win-x64` 已完成真实 UI 全流程与 90 分钟浸泡；剩余为真机签名/公证、管理员安装卸载、热插拔、模型资产与真实企业端点等门禁
+- **最近更新时间**：`2026-11-22`
+- **最近执行环境**：`win-x64` Windows 11（10.0.26300）+ `.NET SDK 10.0.402` + 局域网模型 `http://192.168.1.109:11434`（`gemma4:12b-mlx` / `embeddinggemma-2:740m`）；上一轮 `osx-arm64` macOS 26.7.3 + SDK 10.0.404；再上一轮 `linux-x64` Ubuntu 26.04 + GNOME Wayland
+- **当前构建状态**：✅ `win-x64` 本轮 Release 0 警告 0 错误（Host/Desktop/Report.Tests 实建）；`osx-arm64` Swift Helper 历史结论见第 4 节日志
+- **当前测试状态**：✅ 本轮 `win-x64`：真实窗口 `--ui-e2e` **17/17 连续 3 次通过（退出码 0）**，装入 KWS 唤醒词模型后 **17/17、0 跳过**（语音页可启用/关闭）；`S9RealTimeSoakTests` **90 分钟真实时钟浸泡通过**（5402.3s、2523 轮、控制 32/32、黑名单 84/84、4727 事件、2348 媒体、暂停窗口 0、完整性 ok）；`--benchmark-model` 100%/100%/783ms；定向用例 3/3 通过。⚠️ 本机 `dotnet test` 因 VSTest 宿主回环 socket 崩溃（`0xC0000005`，沙箱内外均复现）无法全量执行，改用进程内宿主加载同一测试程序集运行；历史全量结论仍为 `osx-arm64` 217/217
+- **下一步待确认事项**：`S9-R4` 需先恢复 GitHub 账单/支出限额；`S9-R1`/`S3-R1` 需真实证书与 macOS Developer ID；`S9-R3` 需管理员会话实装 MSI 并做人工走查签字；`S3-R2` 需 KDE Wayland/X11 真机；`S4-R`/`S7-R1` 需外挂语音/OCR 模型与真人唤醒词正样本；`S9-R2` 仅剩显示器/麦克风热插拔。详见第 6 节
 
 ---
 
@@ -29,7 +29,7 @@
 | **S6 内网与公网档** | P2.5 | 🔄 代码与契约完成；真实企业端点遗留 | `win-x64` 配置/策略/三闸/探测测试通过；两平台发布通过 | 版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理、Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、三闸脱敏、五能力探测缓存与诊断展示 |
 | **S7 唤醒与基础命令** | P2.6 | 🔄 代码与契约完成；macOS 音频输出已真机验证；真实 KWS/TTS 黄金集遗留 | `osx-arm64` 真机 Helper 音频回放与 TCC 降级通过；`win-x64` 状态机/命令/日志/UI 测试；`linux-x64` 全量 151/151；三平台发布通过 | sherpa-onnx “你好时光” KWS、四态语音会话、8 秒命令窗口、误唤醒冷却、固定命令、敏感命令二次确认、TTS 反馈、加密 voice_commands 文本日志与状态栏/语音面板；命令音频 opt-in（§3.5）；macOS `audio.play`（AVAudioEngine 内存 PCM） |
 | **S8 智能检索与对话** | P3 | 🔄 代码与契约完成；真实检索质量与 MCP 客户端联调遗留 | `win-x64` 混合检索/证据问答/区间报告/MCP 契约与 Headless UI 测试；两平台发布通过 | 时间过滤+关键词+向量 RRF 混合检索与 `[E#]` 证据引用、无证据/无引用/媒体清理三类降级、周报与任意区间 Markdown+stats 导出、只读 loopback MCP（加密令牌/限流/四个只读工具）、检索问答面板与证据回跳、语音问答复用同一用例 |
-| **S9 发布加固** | 全阶段 | 🔄 代码与工具链完成；真机签名/浸泡/人工验收遗留 | `win-x64` 打包与维护命令实测；`linux-x64` / `osx-arm64` 包布局验证 | 跨平台打包脚本（Windows zip+MSIX 模板+签名、macOS app+codesign/notarize、Linux tar.gz+deb）、应用图标、发布工作流、数据删除服务与 CLI（backup/restore/purge）、v1→v2 迁移与密钥丢失故障注入、数据与导出页面、键盘快捷键/无障碍名称/权限引导、隐私/限制/性能/升级卸载/回滚/发布检查表文档 |
+| **S9 发布加固** | 全阶段 | 🔄 代码与工具链完成；`win-x64` 90 分钟浸泡与真实 UI 全流程通过；真机签名/热插拔/安装卸载遗留 | `win-x64` 打包与维护命令实测、真实窗口 UI E2E 17/17×3、90 分钟真实浸泡通过；`linux-x64` / `osx-arm64` 包布局验证 | 跨平台打包脚本（Windows zip+MSIX 模板+签名、macOS app+codesign/notarize、Linux tar.gz+deb）、应用图标、发布工作流、数据删除服务与 CLI（backup/restore/purge）、v1→v2 迁移与密钥丢失故障注入、数据与导出页面、键盘快捷键/无障碍名称/权限引导、隐私/限制/性能/升级卸载/回滚/发布检查表文档 |
 
 ---
 
@@ -412,6 +412,9 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 - **2026-11-22 [linux-x64] [真实启动 UI 的端到端测试 `--ui-e2e`]**：真机确认 GUI 可在 Ubuntu 26.04 + GNOME Wayland 上真实启动（原生 Wayland 与 `AIASSISTANT_LINUX_BACKEND=X11` 两种后端均验证，窗口标题「时光 · AI 个人活动追踪助手」、真实窗口活动事件落库）。发现 GNOME Wayland 会拦截 XTest 外部输入注入（`xdotool` 指针/键盘均无效），且 Avalonia 不向 AT-SPI 暴露控件树，因此新增**进程内自驱动真实 UI E2E**：`UiE2ERunner` 在真实 Avalonia 窗口上按脚本切换 7 个页面并执行暂停/恢复、语音启停、数据两步删除、诊断刷新、主题切换，每步用 `RenderTargetBitmap`（`PngBitmapEncoderOptions`）输出 PNG，写出 Markdown 报告并以退出码 0/1 结束。`--ui-e2e` 由 Host 映射为 `AIASSISTANT_UI_E2E`/`AIASSISTANT_UI_E2E_SHOW`，输出目录 `AIASSISTANT_UI_E2E_OUTPUT`。真机实测 **11/11 通过**（含真实窗口标题、暂停横幅「已暂停 · 不补采暂停期间内容」、语音「Wake word ready」、诊断页 10 项能力与内网模型端点、主题深/浅切换），截图与报告写入当次 `artifacts/e2e/ui-<时间>/`。修复真实桌面退出时异步服务释放阻塞导致进程不退出的问题（写报告后 5 秒内确定性 `Environment.Exit`）。全量 224/224、0 警告。
 - **2026-11-22 [linux-x64] [全流程真人 UI 测试 + 托盘/图标/退出修复]**：①**全流程真实 UI 测试**：`--ui-e2e` 扩展为 16 步完整用户旅程（时间线 → 真实 embedding 检索 → 真实模型证据问答 → 真实模型周报 → 暂停/黑名单/快照 → 恢复 → 语音启停 → 诊断刷新 → 真实模型日报 → 导出 Markdown → 主题切换 → 数据两步删除 → 退出入口），Host 在 `--ui-e2e` 时先初始化 Schema 并写入 10 条贴近真人的本机工作事件（同一活动片段内，避免 10 次 map 调用）。真机 Ubuntu 26.04 + GNOME Wayland **16/16 通过、50 秒、退出码 0**。②**修复结构化日报永远失败**：`ReportJsonSchema.TryParse` 要求 `standup.today` 非空，但提示词明确允许「无法确定的计划用空字符串」，真实本机模型按提示返回空 `today` → 三次重试全部 `schema-violation`、日报永远生成失败；放宽校验并新增回归断言（空 standup 必须被接受）。③**修复推理型模型拖慢/空响应**：`gemma4:12b-mlx` 具备 `thinking` 能力，默认思考会把输出预算耗尽——`--benchmark-model` 由 67%/17.4s 提升到 **100%/0.86s**（`--ui-e2e` 从 366 秒 2 失败变为 50 秒全通过）。`ModelGatewayOptions.DisableThinking`（默认 true）在 Ollama 请求中发送 `think: false`，无思考能力的模型会忽略该参数。④**无托盘时窗口可正常退出**：GNOME 默认无 StatusNotifierItem，窗口关闭原本只是隐藏且无法再打开；新增顶部「退出」按钮（`RequestExitCommand`）并在托盘不可用时让关闭窗口直接退出（`ShellViewModel.ExitOnClose`，由 `--doctor`/能力矩阵判断）。⑤**图标与桌面身份**：Linux 上设置 Wayland `app_id=aiassistant`（`WaylandProperties.SetAppId`），X11 `WM_CLASS=AiAssistant.Host` 已实测；新增 `build/install-desktop-entry.sh` 安装用户级 `aiassistant.desktop` 与 hicolor 图标（`Icon=aiassistant`、`StartupWMClass=AiAssistant.Host`），Dock 与顶栏按 desktop 文件解析真实图标。全量 224/224、0 警告。
 - **2026-11-22 [linux-x64] [模型思考开关/关闭语义/中文化与通用本机来源]**：①**思考开关与强度**：`models.json` 端点新增 `think` / `thinkingLevel`，`ModelGatewayOptions` 以 `Think`+`ThinkingLevel` 取代 `DisableThinking`，Ollama 请求发送 `think: false | true | "low|medium|high"`；诊断页「模型配置」新增「允许思考」复选框与「思考强度」下拉（低/中/高，未勾选时禁用），保存后写入配置并在重启生效。新增 `OllamaHttpBackend_SendsThinkingLevelWhenEnabled`、配置持久化断言。②**失败原因可见**：检索/问答与日报的异常处理不再只给通用提示，直接展示 `ex.Message`（模型不可达、结构化输出被拒、策略拦截等）；诊断页模型端点与权限提示改为中文。③**关闭语义调整**：点击窗口关闭按钮只隐藏窗口、采集继续在后台运行，只有顶部「退出」按钮（或托盘菜单）才退出；新增单实例激活（`<数据目录>/instance.sock`），再次启动只唤起已有窗口并提示「已在运行」，不重复启动采集；无托盘（GNOME 默认）时启动直接显示主窗口。④**UI 全面中文化**：平台能力摘要、权限提示、语音/OCR/Portal 文案、`LOCAL ONLY`、`Base URL`、检索召回方式等统一为中文（17 个文件 107 处）。⑤**本机来源通用化**：模型来源「本机 Ollama」改为「本机」，保存时保留已有 provider，新端点探测 Ollama `/api/tags`，否则按 OpenAI 兼容接口处理（可对接 LM Studio/vLLM），新增 `ModelConfigurationAdmin_PreservesNonOllamaLocalProvider`。`--ui-e2e` 扩展为 17 步（新增「保存思考开关与强度」），并为 E2E 复制私有 `models.json` 避免污染共享配置；真机 **17/17 通过、48 秒、退出码 0**。全量 226/226、0 警告。
+- **2026-11-22 [win-x64] [真人 UI 全流程 + 90 分钟浸泡 + 图表刻度修复]**：①**真实窗口 UI E2E**：默认档切到局域网 `http://192.168.1.109:11434`（`gemma4:12b-mlx` 对话 + `embeddinggemma-2:740m` 向量，`defaultTier=CorporateIntranet` 且保留 `LocalOffline` 兜底），`--ui-e2e` 17 步全流程（时间线 12 事件 → 真实 embedding 检索命中 8 条 → 证据问答 `引用 E1 · 证据充分` → 周报 → 暂停/黑名单/恢复 → 语音（缺资产，跳过）→ 诊断 10 项能力 → 保存思考开关 → 日报 v1 → 导出 Markdown → 主题切换 → 数据两步删除 18 事件 → 关闭仅隐藏）**连续 3 次通过、退出码 0**，截图与 `report.md` 归档 `artifacts/e2e/ui-20261122-170737/`。②**交互级证据**：用临时 UIA 驱动（非产品代码）枚举 7 个标签页全部 `enabled=True` 并逐一切换，经无障碍树触发「检索证据」与「重新检查平台能力」，验证命中测试与启用态。③**修复真实缺陷**：区间报告 Y 轴固定 4 段导致小样本刻度重复（3 条事件显示 0/1/2/2/3）——新增 `ChartAxis` 统一 SVG/Skia/PDFsharp 三处渲染，现为 0/1/2/3，并补 `RangeReportSvg_WithSmallMaximum_RendersDistinctYAxisTicks`；日期下拉在英文系统区域显示 `2026年11月22日 Sunday` → 星期固定 `zh-CN`；诊断页同时显示「模型端点已就绪」与「尚未探测或没有可用端点」→ 改为「尚未探测端点能力」。④**S9-R2 90 分钟真实时钟浸泡**：5402.3s、2523 轮、控制 32/32、黑名单 84/84、事件 4727、媒体 2348、暂停窗口事件 0、完整性 ok；外部每分钟采样 81 点：工作集 60.7–66.9MB（末值 61.3）、私有内存 20.4–22.7MB（末值 21.3）、句柄 428–464（末值 444），无单调增长。⑤**S5-R1**：`--benchmark-model` 成功率 100%、JSON 合规 100%、平均 783ms（999/705/645ms）；`--probe-model` 显示 structured/tools=False，但 JSON 合规仍 100%，说明走的是提示词兜底而非原生结构化输出。⑥**受限项**：本机 `dotnet test` 因 VSTest 宿主回环 socket 崩溃（`0xC0000005`）无法执行，改用进程内宿主加载同一测试程序集；MSI 为 `perMachine`，当前非管理员会话无法实装；GitHub Actions 因账单/支出限额未启动。全解决方案 Release 0 警告。
+- **2026-11-22 [win-x64] [安装 KWS 唤醒词模型，语音步骤转绿]**：从 `k2-fsa/sherpa-onnx` 的 `kws-models` 发布下载 `sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01`（32MB），按 `encoder/decoder/joiner` 重命名 epoch-12 int8 三件套并写入 `keywords.txt`（`n ǐ h ǎo sh í g uāng @你好时光`），安装到 `<数据目录>/models/sherpa/kws`（4.9MB）。`--doctor` 不再报缺资产；`--ui-e2e` 由 17 步 1 跳过变为 **17/17、0 跳过、退出码 0**，第 10 步详情 `status=语音休眠`，语音页显示「唤醒词已就绪；命令识别模型缺失」（KWS 可用、ASR/TTS 仍缺，属降级但可启用）。②**安装包依赖评估**：`dotnet publish win-x64` 自包含产物 243MB/316 文件，全量 `objdump` 扫描无 `MSVCP140`/`VCRUNTIME140` 导入，干净 Windows 无需 .NET 与 VC++ Redistributable；MSIX 最低 Windows 10 2004；当时安装包不含任何模型资产（随后已改为随包分发，见下条），已写入 `docs/MODELS.md` §2.1 与 `KNOWN-LIMITATIONS.md`。
+- **2026-11-22 [win-x64] [三平台安装包随带本机语音模型]**：①**应用侧解析**：`AppRuntime` 新增 `ResolveModelDirectory/ResolveModelFile`，顺序为 `AIASSISTANT_*_MODEL_DIR` → `<数据目录>/models/...` → `<应用目录>/models/...`（sherpa 用 kws/encoder、ASR、VAD、TTS 作为存在标记；rapidocr/whisper 同理）。②**模型载荷**：新增 `build/models/stage-bundle.sh` 汇总 `sherpa-kws`、`sherpa-onnx-paraformer-zh-small-2024-03-09`、`sherpa-tts`、`sherpa-vad` 为 `artifacts/models/bundle`（126MB、11 文件：KWS 4.9MB + ASR 78MB + VITS int8 39MB + VAD 2.3MB）；新增 `fetch-bundle.sh` 从官方 release 拉取并解压（KWS/ASR/TTS/VAD，缓存到 `artifacts/models/downloads`）。③**三平台打包**：Windows zip/MSIX 与 MSI、macOS `.app`、Linux tar.gz/deb 都在 publish 后复制 bundle 到应用目录 `models/`；缺 KWS/ASR/VAD/TTS 任一文件直接失败（开发调试可用 `-SkipModelBundle` / `--skip-models`）。实测产物：zip **188MB**（含 11 个模型文件）、MSI **173MB**（文件表含 `models\sherpa`）、Linux tar.gz/deb **163MB**（`usr/lib/aiassistant/models/sherpa`）、macOS `.app` **285MB**（`Contents/MacOS/models/sherpa`）。④**干净数据目录验证**：用打包暂存目录、空数据目录跑 `--ui-e2e` **17/17、0 跳过**，语音页显示「本机唤醒与语音命令已就绪」；`--benchmark-asr` 用合成 WAV 成功加载 Paraformer（succeeded=1），TTS 冒烟合成 1.78s/8000Hz。⑤**发布工作流**：`release.yml` 三个作业增加 `fetch-bundle.sh`，打包前自动拉取官方模型；`docs/MODELS.md`、`build/package/README.md`、`RELEASE-CHECKLIST.md` 同步更新。⑥**仍外置**：对话/Embedding 模型（Ollama 约 8.3GB 或内网/公网端点）；Whisper（466MB）、RapidOCR、说话人分离为可选资产，用 `--with-whisper` / `--with-rapidocr` 或手工放入数据目录。⑦**合规**：新增 `docs/compliance/MODEL-ASSETS.md` 记录来源与许可证（KWS Apache-2.0、Silero VAD MIT；ASR/TTS 归档无 LICENSE，发布前需确认并补 `THIRD-PARTY-NOTICES`）。
 
 ---
 
@@ -427,7 +430,7 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S4-R1` | S4 语音 | 🟡 真人语料基线已跑（AISHELL-1 测试集 100 条）：sherpa Paraformer 中文 small **CER 6.34%**、热态 17–21 ms；合成语料为 12.45%。噪声/口音/多人场景仍未覆盖 | 干净朗读语料不等于真实使用（噪声、口音） | 补 AISHELL 噪声测试集或真实会议录音后复跑 `--benchmark-asr` |
 | `S4-R2` | S4 OCR | 🟡 macOS Vision 基线 0.00%（2026-11-21）；**Linux RapidOCR 首条基线已跑（2026-11-22）：12 张合成截图 CER 30.81%**（轻量 CPU 模型 vs Vision 差异预期，代码/低对比/暗色样本偏弱，详见 `artifacts/benchmarks/ocr-linux.md`） | 合成截图 ≠ 真实 UI；RapidOCR 在代码/英文/低对比场景质量有限 | 补真实截图集并评估是否按场景切换 OCR 引擎 |
 | `S4-R3` | S4 语音 | 🟡 Whisper.net 已跑真人对比（`ggml-small`）：AISHELL-1 100 条 **CER 17.13%**（未归一化 26.56%）、热态 214–251 ms，明显落后 sherpa（6.34%）；数字书写差异仍计入 | 中文口语/新闻域明显弱于专用模型；更大模型未测 | 可对比 `ggml-medium/large` 或换 prompt 优化后复测 |
-| `S5-R1` | S5 模型 | 已实测 `gemma4:12b`（本机 100%/100%/4.6s）与局域网 `gemma4:12b-mlx`（67%/100%/17.4s，语义标签用例偶发空响应）；其它候选模型与内存曲线仍未评测 | 不同模型质量/延迟差异较大，默认档位未定 | 对目标候选模型分别运行 `AiAssistant.Host --benchmark-model`，按质量/延迟选默认档 |
+| `S5-R1` | S5 模型 | 已实测 `gemma4:12b`（本机 100%/100%/4.6s）与局域网 `gemma4:12b-mlx`（think 修复前 67%/17.4s；**2026-11-22 `win-x64` 复测 100%/100%/783ms**，probe 显示结构化/工具=False，但 JSON 合规仍 100%，走提示词兜底）；`--ui-e2e` 中问答/周报/日报均用该端点真实生成；其它候选模型与内存曲线仍未评测 | 不同模型质量/延迟差异较大，默认档位未定 | 对目标候选模型分别运行 `AiAssistant.Host --benchmark-model`，按质量/延迟选默认档 |
 | `S5-R2` | S5 调度 | 每日定时、启动补偿与失败退避尚未进行多日浸泡 | 长时间休眠/跨日边界可能暴露时序问题 | S9 浸泡测试覆盖跨午夜、休眠唤醒、模型离线与重复触发 |
 | `S6-R1` | S6 企业端点 | 真实企业 mTLS、企业 CA、代理和公网 API 未联调；公网同意仅代码级门禁 | TLS/代理环境差异可能导致端点不可用 | 在企业网络与公网沙箱分别验证握手、证书轮换、代理认证、断网回退与策略审计 |
 | `S6-R2` | S6 密钥 | 已提供 `--import-model-secret`（stdin、终端隐藏输入）、列表/删除命令与诊断页密钥卡片；值只写不读 | 仍需用户自行准备密钥值并确保不进入 shell 历史 | 发布说明中提示使用 stdin 管道，避免命令行明文 |
@@ -438,24 +441,25 @@ AIASSISTANT_PORTAL_E2E=1 dotnet test tests/AiAssistant.Platform.Tests -c Release
 | `S8-R2` | S8 MCP | 已完成 MCP Inspector 2.16.0 真实客户端联调：initialize、tools/list、activity_stats/search_events、未授权退出码 3、写工具退出码 5；其他客户端（Claude Desktop 等）未测 | 其他客户端的会话/SSE 细节可能仍有差异 | 需要时用其他客户端复跑同一流程 |
 | `S8-R3` | S8 周报 | 已提供 SVG/PNG/PDF；PDF 自动发现系统 TrueType 中文字体并嵌入子集、文本可检索，无字体时回退矢量轮廓 | 极简 Linux 可能无任何 CJK TTF | 安装 CJK 字体或通过 `AIASSISTANT_PDF_FONT_PATH` 指定 |
 | `S9-R1` | S9 签名 | Windows Authenticode/MSIX 与 macOS Developer ID/公证未用真实证书执行；脚本与工作流已就绪 | 未验证的签名链可能导致安装被拦截 | 配置证书与公证凭据后运行 `release.yml`，并保存 `signtool verify` / `spctl` 输出 |
-| `S9-R2` | S9 浸泡 | 已跑通 14 天加速浸泡与 60 分钟真实时钟浸泡（3191 事件、1585 媒体、控制 22/22、队列 2/12、完整性 ok）；黑名单断言修正后 8 分钟复验 7/7 通过；真机热插拔未执行 | 真实设备热插拔与长稳内存曲线未量化 | 按 `RELEASE-CHECKLIST.md` 第 5 节执行 `AIASSISTANT_REAL_SOAK_MINUTES=90` 并记录 |
-| `S9-R3` | S9 人工验收 | 自动化已覆盖 7 个标签页无障碍名称/加速键、Ctrl+D1…D7 与 Ctrl+F 真实按键、关键控件名称；macOS `.pkg` 已生成并核对载荷，实际安装/升级/卸载需管理员权限（沙箱禁 sudo） | 安装器实装与卸载清理未在真机执行 | 用户 `sudo installer -pkg ... -target /` 后按 `UPGRADE-AND-UNINSTALL.md` 核验 |
-| `S9-R4` | S9 供应链 | 离线 SBOM 与 `SHA256SUMS` 已实现并本地验证；CI 因账单未运行，Release 附件未实际生成 | 供应链证据尚未随发布物提供 | 恢复 Actions 后运行 SBOM 作业与 `release.yml`，确认 `bom.json` 与 `SHA256SUMS` 出现在 Release |
+| `S9-R2` | S9 浸泡 | ✅ **2026-11-22 `win-x64` 90 分钟真实时钟浸泡通过**：5402.3s、2523 轮、控制 32/32、黑名单 84/84、事件 4727、媒体 2348、暂停窗口 0、完整性 ok；外部 81 点采样无增长（工作集 60.7–66.9MB、私有 20.4–22.7MB、句柄 428–464、线程 10–13）；此前 14 天加速浸泡与 60 分钟浸泡亦通过；**真机显示器/麦克风热插拔未执行** | 热插拔与多显示器切换未验证 | 在真机插拔显示器与麦克风后重跑 30 分钟段并记录设备变化事件 |
+| `S9-R3` | S9 人工验收 | 自动化已覆盖 7 个标签页无障碍名称/加速键、Ctrl+D1…D7 与 Ctrl+F 真实按键、关键控件名称；macOS `.pkg` 已生成并核对载荷，实际安装/升级/卸载需管理员权限（沙箱禁 sudo）；**2026-11-22 `win-x64` 复核：当前会话为普通用户，`Scope=perMachine` 的 MSI 无法实装**，本轮以真实窗口 UIA 点击（7 个标签页、检索、诊断刷新）补充了交互级证据 | 安装器实装与卸载清理未在真机执行 | 用管理员会话运行 MSI 安装→升级→卸载；macOS `sudo installer -pkg ... -target /` 后按 `UPGRADE-AND-UNINSTALL.md` 核验 |
+| `S9-R4` | S9 供应链 | 离线 SBOM 与 `SHA256SUMS` 已实现并本地验证；CI 因账单未运行（2026-11-22 复核 `gh run view 44998908076`：`The job was not started because recent account payments have failed or your spending limit needs to be increased`），Release 附件未实际生成 | 供应链证据尚未随发布物提供 | 恢复 GitHub 账单/支出限额后运行 SBOM 作业与 `release.yml`，确认 `bom.json` 与 `SHA256SUMS` 出现在 Release |
 
 ---
 
-## 6. 未完成项执行顺序（2026-11-21 排定）
+## 6. 未完成项执行顺序（2026-11-22 更新）
 
 代码与自动化测试已全部收口，剩余项都依赖特定环境。按“可在当前机器立即产出成果”优先排序：
 
 | 顺序 | 项 | 依赖 | 产出判定 |
 |---|---|---|---|
-| 1 | `S3-R1` macOS TCC 允许流程与公证 | 签名 `.app` + 人工授权 | 授予屏幕录制/辅助功能并撤销一次，记录 Helper 崩溃监督、`spctl` 与公证输出 |
-| 2 | `S9-R4` Release 与 SBOM 附件 | GitHub Actions 配额恢复（当前仍 5 秒失败） | `bom.json` + `SHA256SUMS` + 三平台安装包出现在 Release |
-| 3 | `S4-R` / `S7-R1` 黄金集 | 外挂 Paraformer/RapidOCR/Whisper/KWS/TTS 模型资产 | 中文语音、OCR、唤醒率与误唤醒率基线报告 |
-| 4 | `S5-R1` 候选模型档位 | 第 3 项完成后同机跑 `--benchmark-model` | 轻量档/质量档选型结论与内存曲线 |
-| 5 | `S9-R2` / `S9-R3` / `S3-R2` | 三平台真机 + 物理热插拔 | 90 分钟浸泡、安装升级卸载、无障碍与 KDE/X11 矩阵签字 |
-| 6 | `S6-R1` 企业端点联调 | 企业网络与公网沙箱 | mTLS/CA/代理/断网回退联调记录 |
+| 1 | `S9-R4` Release 与 SBOM 附件 | GitHub 账单/支出限额恢复（2026-11-22 复核：`recent account payments have failed or your spending limit needs to be increased`） | `bom.json` + `SHA256SUMS` + 三平台安装包出现在 Release |
+| 2 | `S9-R1` + `S3-R1` 签名/公证/TCC | Windows 代码签名证书、Apple Developer ID、人工授权 | `signtool verify` / `spctl` / 公证票据输出；撤销一次授权后复测 |
+| 3 | `S9-R3` 安装升级卸载与人工走查 | 管理员会话（MSI 为 `perMachine`）、三平台真机 | 安装→升级→卸载记录、数据保留核验、无障碍签字 |
+| 4 | `S4-R` / `S7-R1` 黄金集 | 外挂 Paraformer/RapidOCR/Whisper/KWS/TTS 模型资产 + 用户自录唤醒词 | 噪声/口音 CER、真实截图 OCR、真人唤醒率与误唤醒率、TTS 音质 |
+| 5 | `S5-R1` 候选模型档位 | 其它候选模型与同机内存曲线 | 轻量档/质量档选型结论 |
+| 6 | `S9-R2` 热插拔 / `S3-R2` | 物理显示器/麦克风、KDE Wayland 与 X11 真机 | 插拔后采集恢复记录、KDE/X11/多显示器能力矩阵签字 |
+| 7 | `S6-R1` 企业端点联调 | 企业网络与公网沙箱 | mTLS/CA/代理/断网回退联调记录 |
 
-> 2026-11-21 已关闭 `S7-R2`（第 1 项原计划），并顺带修复 Helper 心跳被 TCC 阻塞的性能缺陷。
-> `S5-R2` 跟随 `S9-R2` 一并执行；`S6-R2`、`S7-R3`、`S8-R*` 已关闭，仅在需要时做调优复跑。
+> 2026-11-22 已关闭：`S9-R2` 的 90 分钟真实浸泡与内存曲线、`S5-R1` 的局域网模型复测、`S9.29` 真实 UI 全流程、`S9.30` 图表/文案缺陷修复。
+> `S5-R2` 跟随 `S9-R2` 的调度段执行；`S6-R2`、`S7-R3`、`S8-R*` 已关闭，仅在需要时做调优复跑。

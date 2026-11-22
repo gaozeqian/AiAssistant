@@ -21,6 +21,7 @@
 | 公网端点未联调 | 仅代码级策略与同意门禁 | `S6-R1` |
 | MSIX 签名安装需机器级信任 | 非管理员无法导入根证书，`Add-AppxPackage` 签名安装会被拒（0x800B0109） | 管理员导入证书，或使用 `-Register` 做布局演练 |
 | 默认模型依赖 Ollama | 未安装 `gemma4:12b` / `embeddinggemma-2:740m` 时对话或向量召回降级 | 安装模型或设置 `AIASSISTANT_CHAT_MODEL` / `AIASSISTANT_EMBEDDING_MODEL`；`--rebuild-vectors` 重建索引 |
+| 对话/Embedding 模型需外部准备 | 安装包已含本机语音模型，但 Ollama 与约 8.3GB 的对话/向量模型仍需单独安装或连接内网端点 | 安装 Ollama 并拉取模型，或在诊断页配置内网/公网端点 |
 | 检索融合参数未调优 | TopK=8、候选 60、RRF k=60 为初始值；embeddinggemma 实测 95.8%，个别同义词仍漂移 | `S8-R1`，需用真实脱敏语料继续调参 |
 
 ## 语音
@@ -28,6 +29,7 @@
 | 限制 | 影响 | 现状 |
 |---|---|---|
 | KWS/TTS 未跑真实黄金集 | 合成基线唤醒率 92.3%（score=3.0，13 正）、误唤醒 0.00 次/小时（2.12 小时负样本）、延迟中位数 1100 ms；真人录音与 TTS 客观音质未评测 | 用真人录音复跑 `--benchmark-kws`，再按 score×threshold 网格调优 |
+| 可选语音/OCR 资产不随包 | 安装包已含 KWS/ASR/TTS/VAD（约 126MB）；Whisper（466MB）、RapidOCR、说话人分离模型默认不打包 | 需要时用 `stage-bundle.sh --with-whisper/--with-rapidocr` 重新打包，或手工放入 `<数据目录>/models/` |
 | 命令音频默认不落盘 | 默认无法回听；需在“语音”页显式开启（或 `AIASSISTANT_VOICE_RECORD_COMMAND_AUDIO=true`） | 已实现加密保存与到期擦除；暂无内置回听界面，需从加密媒体库导出后播放 |
 
 ## 集成与交付

@@ -509,7 +509,7 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S5.1：Microsoft.Extensions.AI 本机网关、Ollama/LM Studio 适配、loopback 策略、超时/脱敏/审计装饰器与能力探测。
 - [x] S5.2：事件向量索引、活动分段、map-reduce、结构化 JSON 校验重试、版本化加密日报与站会 Markdown。
 - [x] S5.3：单消费者三通道调度、启动补偿、幂等/失败保留、日报/站会面板、强制重生成与 Markdown 导出。
-- [ ] S5-R1：对目标候选对话模型分别运行 `--benchmark-model`，按质量/延迟/内存确定默认轻量档与质量档（`gemma4:12b` 已实测 100%/100%/4.6s；局域网 `gemma4:12b-mlx` 已实测 67%/100%/17.4s，语义标签用例偶发空响应）。
+- [ ] S5-R1：对目标候选对话模型分别运行 `--benchmark-model`，按质量/延迟/内存确定默认轻量档与质量档（`gemma4:12b` 已实测 100%/100%/4.6s；局域网 `gemma4:12b-mlx` 2026-11-22 `win-x64` 复测 **100%/100%/783ms**，probe 结构化/工具=False 但 JSON 合规 100%；其它候选与内存曲线仍缺）。
 - [ ] S5-R2：日报三通道多日调度浸泡（跨午夜、休眠唤醒、模型离线、重复触发），并入 S9-R2 一起执行。
 - [x] S6.1：版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理与三档端点装配。
 - [x] S6.2：Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、最小化/脱敏/残留检测三闸。
@@ -555,8 +555,12 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S9.26：Windows 打包复验（zip 83.6 MB / MSIX 86.3 MB / SHA256SUMS；解压后 version、smoke-check、startup-check 均通过）。
 - [x] S9.27：三平台自签名安装包（MSI + PKG + deb）与 GitHub Actions 发布工作流；MSI/PKG 安装时自动导入并信任证书。
 - [x] S9.28：`linux-x64` 全量测试暴露 Skia 原生资产缺失，`AiAssistant.Export` 增加 `SkiaSharp.NativeAssets.Linux`，`Report.Tests` 在 Linux 61/61 通过。
+- [x] S9.29：`win-x64` 真实窗口 UI 全流程 E2E 17/17 连续 3 次通过、退出码 0（局域网 `gemma4:12b-mlx`：时间线 12 事件、检索 8 条证据、问答 `引用 E1`、周报/日报生成、导出 Markdown、暂停/黑名单、数据两步删除 18 事件、关闭仅隐藏）；另用 UIA 驱动 7 个标签页与「检索证据」「重新检查平台能力」验证命中测试与启用态；截图归档 `artifacts/e2e/ui-20261122-170737/`。
+- [x] S9.30：修复小样本区间报告 Y 轴刻度重复（3 条事件渲染为 0/1/2/2/3）——新增 `ChartAxis` 统一 SVG/Skia/PDFsharp 三处刻度并补回归测试；日期下拉星期改为 `zh-CN`（英文系统不再出现 `Sunday`）；诊断页「尚未探测或没有可用端点」改为「尚未探测端点能力」，消除与「端点已就绪」的矛盾。
+- [x] S9.31：安装 KWS 唤醒词模型（zipformer wenetspeech 3.3M，`<数据目录>/models/sherpa/kws` 4.9MB），`--ui-e2e` 第 10 步转绿、整轮 17/17 且 0 跳过；补 `docs/MODELS.md` §2.1 干净机器依赖评估：Windows 自包含产物无需 .NET/VC++ Redistributable（全量扫描无 MSVCP/VCRUNTIME 导入）、MSIX 最低 Windows 10 2004、安装包不含任何模型资产。
+- [x] S9.32：三平台安装包随带本机语音模型（KWS + Paraformer ASR + VITS TTS + Silero VAD，126MB/11 文件），仅对话/Embedding 模型保持外部。`AppRuntime` 按 `环境变量 → 数据目录 → 应用目录` 解析模型；新增 `stage-bundle.sh`/`fetch-bundle.sh`，Windows zip(188MB)/MSI(173MB)、Linux tar.gz/deb(163MB)、macOS `.app`(285MB) 均含 `models/sherpa`；空数据目录 `--ui-e2e` 17/17、0 跳过，ASR/TTS 冒烟通过；`release.yml` 打包前自动拉取官方模型。
 - [ ] S9-R1：用真实证书执行 Windows Authenticode/MSIX 签名与 macOS Developer ID 签名/公证（脚本与 `release.yml` 就绪，仅自签名演练过）。
-- [ ] S9-R2：真实时钟 90 分钟以上浸泡 + 显示器/麦克风热插拔（已跑 14 天加速浸泡与 60 分钟真实浸泡：3191 事件、控制 22/22、队列 2/12、完整性 ok）。
+- [ ] S9-R2：真实时钟 90 分钟以上浸泡 + 显示器/麦克风热插拔（**2026-11-22 `win-x64` 90 分钟通过**：5402.3s、2523 轮、控制 32/32、黑名单 84/84、4727 事件、2348 媒体、暂停窗口 0、完整性 ok；外部 81 点采样工作集 60.7–66.9MB、句柄 428–464 无增长；14 天加速浸泡此前已通过；仅剩真机热插拔）。
 - [ ] S9-R3：三平台安装/升级/卸载与无障碍人工走查签字（自动化无障碍测试已覆盖标签页名称/加速键/真实按键）。
 - [ ] S9-R4：GitHub Actions 恢复后实际运行 SBOM 作业与 `release.yml`，确认 `bom.json` 与 `SHA256SUMS` 随 Release 发布（本地生成器已验证 110 组件 / 111 依赖边）。
 - [ ] S3-R1：真实 macOS 桌面的权限撤销恢复与 Developer ID 签名/公证人工验收（屏幕录制与辅助功能授权、抓屏→加密落库→报告导出闭环、授权弹窗、Helper 崩溃重启与未授权降级均已真机通过；`--doctor` 可直接查看 Helper 与能力状态）。

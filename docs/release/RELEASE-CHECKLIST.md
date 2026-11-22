@@ -19,6 +19,8 @@
 - [ ] macOS：`codesign --verify --deep --strict` 与 `spctl --assess` 通过。
 - [ ] Linux：`package-linux.sh` 产出 tar.gz 与 .deb；`dpkg-deb --info` 显示正确版本与依赖。
 - [ ] 安装包体积与 `PERFORMANCE.md` 记录一致（显著增大需说明原因）。
+- [ ] 安装包内含 `models/sherpa`（KWS/ASR/TTS/VAD，约 126MB、11 个文件）；对话/Embedding 模型仍保持外部。
+- [ ] 空数据目录启动后语音页显示「本机唤醒与语音命令已就绪」，`--benchmark-asr` 不报引擎缺失。
 
 ## 3. 安装 / 升级 / 卸载实测
 
