@@ -34,6 +34,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         ShowSearchCommand = new RelayCommand(ShowSearch);
         RefreshCurrentCommand = new AsyncRelayCommand(RefreshCurrentAsync);
         ToggleThemeCommand = new RelayCommand(ToggleTheme);
+        RequestExitCommand = new RelayCommand(RequestExit);
         Capture.StateChanged += OnCaptureStateChanged;
         CaptureStatus = Capture.CaptureStateText;
         if (_voiceNavigation is not null)
@@ -70,6 +71,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public IAsyncRelayCommand RefreshCurrentCommand { get; }
 
     public IRelayCommand ToggleThemeCommand { get; }
+
+    public IRelayCommand RequestExitCommand { get; }
 
     public event EventHandler? ExitRequested;
 
@@ -111,6 +114,19 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     }
 
     public bool IsExitRequested { get; set; }
+
+    /// <summary>
+    /// True when the desktop has no usable system tray: closing the window must exit the app
+    /// instead of hiding it, otherwise the window would be unreachable.
+    /// </summary>
+    public bool ExitOnClose { get; set; }
+
+    /// <summary>Explicit exit affordance for environments without a tray icon.</summary>
+    public void RequestExit()
+    {
+        IsExitRequested = true;
+        ExitRequested?.Invoke(this, EventArgs.Empty);
+    }
 
     public async Task InitializeAsync()
     {

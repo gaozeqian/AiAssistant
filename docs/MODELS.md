@@ -34,6 +34,11 @@ AiAssistant.Host --benchmark-model            # 对话基准（退出码非 0 �
 
 > 换 embedding 模型后需重建索引：`AiAssistant.Host --rebuild-vectors`。
 > 采集后直接问答会自动补建索引（无需手动 rebuild）。
+>
+> **推理型模型**（如带 `thinking` 能力的 `gemma4`）默认会先思考再回答，容易耗尽输出预算，
+> 表现为结构化日报为空或单次调用 20–60 秒。应用默认在 Ollama 请求中发送 `think: false`
+> （`ModelGatewayOptions.DisableThinking`，无思考能力的模型会忽略该参数）；实测
+> `--benchmark-model` 由 67%/17.4s 提升到 100%/0.86s。
 
 ## 2. 语音唤醒 / 命令识别模型
 
@@ -70,6 +75,20 @@ bash build/install-voice-models.sh /path/to/data-directory
 - 保存后把 `defaultTier` 切到对话模型所选层；选择公网时同时放开 `allowPublicCloud`（选择公网即视为显式同意）。
 - **内网/公网故障不会自动回落到本机**，会在界面提示「模型不可用」。
 - 始终保留 LocalOffline 兜底端点。保存后**重启应用生效**。
+
+## 2.7 Linux 桌面图标与托盘
+
+Wayland 下窗口图标由合成器按 `app_id` 匹配 `<app_id>.desktop` 解析（应用已设置
+`app_id=aiassistant`）；X11 使用 `WM_CLASS=AiAssistant.Host`。安装用户级 desktop 条目与图标：
+
+```bash
+bash build/install-desktop-entry.sh          # 默认指向 Release 构建产物
+```
+
+- 写入 `~/.local/share/applications/aiassistant.desktop` 与
+  `~/.local/share/icons/hicolor/256x256/apps/aiassistant.png`（`Icon=aiassistant`）。
+- GNOME 默认没有 StatusNotifierItem 托盘：此时窗口关闭即退出应用（顶部也有「退出」按钮），
+  不会再出现「隐藏后无法找回」的窗口。
 
 ## 3. 完整流程 UI 测试
 

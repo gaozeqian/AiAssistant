@@ -90,8 +90,16 @@ public sealed partial class MainWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
-        if (DataContext is ShellViewModel { IsExitRequested: false })
+        if (DataContext is ShellViewModel { IsExitRequested: false } shell)
         {
+            // Without a system tray a hidden window is unreachable, so close means exit.
+            if (shell.ExitOnClose)
+            {
+                shell.RequestExit();
+                base.OnClosing(e);
+                return;
+            }
+
             e.Cancel = true;
             Hide();
             return;

@@ -18,6 +18,12 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
 
     public static Func<ShellViewModel>? ViewModelFactory { get; set; }
 
+    /// <summary>
+    /// Set by Host from the platform capability matrix. On desktops without a real tray
+    /// (Linux GNOME by default) closing the window exits instead of hiding an unreachable window.
+    /// </summary>
+    public static bool TrayAvailable { get; set; } = true;
+
     public ShellApp()
     {
         // Overrides Avalonia's default "Avalonia Application" so the macOS menu bar / Dock label read 「时光」.
@@ -46,6 +52,15 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
 
             desktop.MainWindow = window;
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            // Wayland resolves the dock/top-bar icon by matching app_id to <app_id>.desktop;
+            // X11 uses StartupWMClass=AiAssistant.Host from the same desktop entry.
+            if (OperatingSystem.IsLinux())
+            {
+                WaylandProperties.SetAppId(window, "aiassistant");
+            }
+
+            shell.ExitOnClose = !TrayAvailable;
 
             // Follow the system theme on first launch, then honour manual toggles.
             // AIASSISTANT_THEME=light|dark pins a variant (useful for tests and user preference).

@@ -10,11 +10,14 @@ namespace AiAssistant.Desktop;
 
 /// <summary>
 /// Real-platform UI E2E: drives the actual Avalonia window (real X11/Wayland backend, real Skia
-/// rendering, real theme and tray) through a scripted user flow, renders the window to PNG after
-/// every step and writes a pass/fail report. Enabled with <c>--ui-e2e</c>; exits 0 on success.
+/// rendering, real theme and tray) through a full user journey — timeline, evidence search,
+/// evidence QA with the real model, weekly/daily reports, pause/blacklist, voice, diagnostics,
+/// theme switch and data deletion — rendering the window to PNG after every step and writing a
+/// pass/fail report. Enabled with <c>--ui-e2e</c>; exits 0 on success.
 ///
-/// This complements the Avalonia.Headless tests: those prove the view model wiring, while this
-/// proves the app really starts on the target desktop and paints the expected UI.
+/// This complements the Avalonia.Headless tests: those prove the view-model wiring, while this
+/// proves the app really starts on the target desktop, paints the expected UI and that the
+/// capture → embedding → model → report pipeline works end-to-end inside the real window.
 /// </summary>
 public static class UiE2ERunner
 {
@@ -61,7 +64,7 @@ public static class UiE2ERunner
             }
         }
 
-        var initError = await WaitAsync(initialization, TimeSpan.FromSeconds(45));
+        var initError = await WaitAsync(initialization, TimeSpan.FromSeconds(60));
         steps.Add(initError is null
             ? new StepResult("Shell 初始化完成", true, false, "InitializeAsync 返回", null)
             : new StepResult("Shell 初始化完成", false, false, initError.GetType().Name, null));
@@ -78,26 +81,86 @@ public static class UiE2ERunner
                 throw new InvalidOperationException($"标题不符：{window.Title}");
             }
 
+            if (window.Icon is null)
+            {
+                throw new InvalidOperationException("窗口图标为空");
+            }
+
             return Task.FromResult<string?>(
-                $"title={window.Title} size={window.ClientSize.Width:0}x{window.ClientSize.Height:0}");
+                $"title={window.Title} size={window.ClientSize.Width:0}x{window.ClientSize.Height:0} icon=ok");
         });
 
         await StepAsync("时间线页加载并渲染", async () =>
         {
             shell.SelectedSectionIndex = 0;
             await shell.Timeline.RefreshCommand.ExecuteAsync(null);
-            return $"events={shell.Timeline.Events.Count} status={shell.Timeline.StatusMessage}";
+            if (shell.Timeline.Events.Count == 0)
+            {
+                throw new InvalidOperationException("时间线没有事件（E2E 种子数据缺失）");
+            }
+
+            return $"events={shell.Timeline.Events.Count}";
         });
 
-        await StepAsync("切换到检索与问答页", () =>
+        await StepAsync("检索证据（真实 embedding）", async () =>
         {
             if (shell.Search is null)
             {
-                throw new InvalidOperationException("检索页未装配");
+                throw new SkipStepException("检索页未装配");
             }
 
             shell.SelectedSectionIndex = 1;
-            return Task.FromResult<string?>($"index={shell.SelectedSectionIndex}");
+            shell.Search.Query = "数据库迁移";
+            await WaitAsync(shell.Search.SearchCommand.ExecuteAsync(null), TimeSpan.FromSeconds(90));
+            if (shell.Search.Evidence.Count == 0)
+            {
+                throw new InvalidOperationException($"未命中证据：{shell.Search.StatusMessage}");
+            }
+
+            return $"evidence={shell.Search.Evidence.Count} status={shell.Search.StatusMessage}";
+        });
+
+        await StepAsync("证据问答（真实模型）", async () =>
+        {
+            if (shell.Search is null)
+            {
+                throw new SkipStepException("检索页未装配");
+            }
+
+            shell.Search.Query = "今天完成了哪些数据库相关工作";
+            await WaitAsync(shell.Search.AskCommand.ExecuteAsync(null), TimeSpan.FromSeconds(240));
+            if (!shell.Search.HasAnswer)
+            {
+                throw new InvalidOperationException($"未生成回答：{shell.Search.ErrorMessage}");
+            }
+
+            if (string.IsNullOrWhiteSpace(shell.Search.Answer))
+            {
+                throw new InvalidOperationException("回答为空");
+            }
+
+            return $"meta={shell.Search.AnswerMeta} chars={shell.Search.Answer.Length}";
+        });
+
+        await StepAsync("周报生成（真实模型）", async () =>
+        {
+            if (shell.Search is null)
+            {
+                throw new SkipStepException("检索页未装配");
+            }
+
+            await WaitAsync(shell.Search.WeeklyReportCommand.ExecuteAsync(null), TimeSpan.FromSeconds(240));
+            if (!shell.Search.HasWeeklyReport)
+            {
+                throw new InvalidOperationException($"周报未生成：{shell.Search.WeeklyStatus}");
+            }
+
+            if (string.IsNullOrWhiteSpace(shell.Search.WeeklyMarkdown))
+            {
+                throw new InvalidOperationException("周报正文为空");
+            }
+
+            return $"status={shell.Search.WeeklyStatus}";
         });
 
         await StepAsync("暂停采集并更新顶部横幅", async () =>
@@ -119,6 +182,22 @@ public static class UiE2ERunner
             }
 
             return $"status={shell.CaptureStatus}";
+        });
+
+        await StepAsync("追加黑名单并立即快照", async () =>
+        {
+            var lines = (shell.Capture.BlacklistText ?? string.Empty)
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+            if (!lines.Contains("E2E-Secret-App", StringComparer.Ordinal))
+            {
+                lines.Add("E2E-Secret-App");
+            }
+
+            shell.Capture.BlacklistText = string.Join('\n', lines);
+            await shell.Capture.SaveBlacklistCommand.ExecuteAsync(null);
+            await shell.Capture.CaptureSnapshotCommand.ExecuteAsync(null);
+            return $"blacklist={lines.Count} lines snapshot=ok";
         });
 
         await StepAsync("恢复采集", async () =>
@@ -166,6 +245,53 @@ public static class UiE2ERunner
             return $"status={shell.Voice.StatusText}";
         });
 
+        await StepAsync("诊断页刷新平台能力", async () =>
+        {
+            shell.SelectedSectionIndex = 5;
+            await shell.Diagnostics.RefreshCommand.ExecuteAsync(null);
+            return $"rows={shell.Diagnostics.Capabilities.Count}";
+        });
+
+        await StepAsync("日报生成（真实模型）", async () =>
+        {
+            shell.SelectedSectionIndex = 6;
+            await WaitAsync(shell.Reports.GenerateCommand.ExecuteAsync(null), TimeSpan.FromSeconds(300));
+            if (!shell.Reports.HasReport)
+            {
+                throw new InvalidOperationException($"日报未生成：{shell.Reports.StatusMessage}");
+            }
+
+            if (string.IsNullOrWhiteSpace(shell.Reports.Markdown))
+            {
+                throw new InvalidOperationException("日报正文为空");
+            }
+
+            return $"versions={shell.Reports.Versions.Count} status={shell.Reports.StatusMessage}";
+        });
+
+        await StepAsync("导出日报 Markdown", async () =>
+        {
+            await shell.Reports.ExportCommand.ExecuteAsync(null);
+            if (!shell.Reports.StatusMessage.Contains("已导出", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"导出未完成：{shell.Reports.StatusMessage}");
+            }
+
+            return shell.Reports.StatusMessage;
+        });
+
+        await StepAsync("主题切换生效", () =>
+        {
+            var before = shell.ThemeVariant;
+            shell.ToggleThemeCommand.Execute(null);
+            if (Equals(shell.ThemeVariant, before))
+            {
+                throw new InvalidOperationException("主题未切换");
+            }
+
+            return Task.FromResult<string?>($"theme={shell.ThemeVariant} button={shell.ThemeToggleText}");
+        });
+
         await StepAsync("数据删除两步确认", async () =>
         {
             shell.SelectedSectionIndex = 4;
@@ -189,31 +315,19 @@ public static class UiE2ERunner
             return $"status={shell.Data.StatusMessage}";
         });
 
-        await StepAsync("诊断页刷新平台能力", async () =>
+        await StepAsync("退出入口可用（无托盘时关闭即退出）", () =>
         {
-            shell.SelectedSectionIndex = 5;
-            await shell.Diagnostics.RefreshCommand.ExecuteAsync(null);
-            return $"rows={shell.Diagnostics.Capabilities.Count}";
-        });
-
-        await StepAsync("日报页加载", async () =>
-        {
-            shell.SelectedSectionIndex = 6;
-            await shell.Reports.RefreshCommand.ExecuteAsync(null);
-            return $"hasReport={shell.Reports.HasReport} versions={shell.Reports.Versions.Count}";
-        });
-
-        await StepAsync("主题切换生效", () =>
-        {
-            var before = shell.ThemeVariant;
-            shell.ToggleThemeCommand.Execute(null);
-            if (Equals(shell.ThemeVariant, before))
+            if (!shell.RequestExitCommand.CanExecute(null))
             {
-                throw new InvalidOperationException("主题未切换");
+                throw new InvalidOperationException("退出命令不可用");
             }
 
-            return Task.FromResult<string?>(
-                $"theme={shell.ThemeVariant} button={shell.ThemeToggleText}");
+            if (OperatingSystem.IsLinux() && !shell.ExitOnClose)
+            {
+                throw new InvalidOperationException("无托盘环境下关闭窗口应直接退出");
+            }
+
+            return Task.FromResult<string?>($"exitOnClose={shell.ExitOnClose} canExit=true");
         });
 
         var reportPath = Path.Combine(directory, "report.md");

@@ -62,6 +62,17 @@ public static class Program
             var runtime = AppRuntime.CreateAsync().GetAwaiter().GetResult();
             try
             {
+                if (args.Contains("--ui-e2e", StringComparer.OrdinalIgnoreCase))
+                {
+                    // Give the self-driven UI flow a realistic day of local activity to search/report on.
+                    runtime.DatabaseMaintenance.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+                    var seeded = runtime.SeedUiE2EEventsAsync().GetAwaiter().GetResult();
+                    if (seeded > 0)
+                    {
+                        Console.WriteLine($"ui-e2e: seeded {seeded} synthetic events");
+                    }
+                }
+
                 var handoff = new DesktopShellHandoff();
                 var exitCode = RunAsync(runtime, args, handoff).GetAwaiter().GetResult();
                 if (!handoff.Requested)
@@ -87,6 +98,7 @@ public static class Program
                     Environment.SetEnvironmentVariable("AIASSISTANT_DATA_DIRECTORY", dataDirectory);
                 }
 
+                Desktop.ShellApp.TrayAvailable = runtime.IsSystemTraySupported;
                 Desktop.ShellApp.ViewModelFactory = runtime.CreateShellViewModel;
                 return OperatingSystem.IsLinux() && runtime.LinuxBackendState is { } linuxBackend
                     ? StartLinuxDesktop(linuxBackend, args)
@@ -94,7 +106,16 @@ public static class Program
             }
             finally
             {
-                runtime.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                // Platform adapters can block on teardown (native event loop, audio device, IPC).
+                // Bound it so closing the window always exits instead of leaving an orphan process.
+                try
+                {
+                    runtime.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
+                }
+                catch (TimeoutException)
+                {
+                    // Bounded shutdown: the OS reclaims remaining resources when the process exits.
+                }
             }
         }
         catch (ArgumentException ex)

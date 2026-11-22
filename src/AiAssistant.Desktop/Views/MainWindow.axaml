@@ -89,6 +89,10 @@
           <Border Background="{DynamicResource HeaderBadgeBackgroundBrush}" CornerRadius="14" Padding="12,6">
             <TextBlock Text="{Binding Voice.StatusText}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}" FontSize="12" />
           </Border>
+          <Button Content="退出" Command="{Binding RequestExitCommand}"
+                  Background="{DynamicResource HeaderBadgeBackgroundBrush}" Foreground="{DynamicResource DangerForegroundBrush}"
+                  CornerRadius="14" Padding="12,6" FontSize="12"
+                  automation:AutomationProperties.Name="退出应用" />
         </StackPanel>
       </Grid>
     </Border>

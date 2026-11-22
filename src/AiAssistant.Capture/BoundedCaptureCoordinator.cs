@@ -254,16 +254,10 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
 
     public async ValueTask DisposeAsync()
     {
-        // 1. Stop capture sources first so no new frames enter the pipeline
+        // 1. Stop capture sources first so no new frames enter the pipeline. Native sources
+        // (portal/AT-SPI/PipeWire) can ignore cancellation, so never let them block app exit.
         await _sourceCts.CancelAsync();
-        try
-        {
-            await Task.WhenAll(_sourceTasks);
-        }
-        catch (OperationCanceledException)
-        {
-            // Normal source shutdown
-        }
+        await WaitOrTimeoutAsync(Task.WhenAll(_sourceTasks), TimeSpan.FromSeconds(3));
 
         // 2. Complete channels and let consumer gracefully drain any queued high-priority control commands
         _controlChannel.Writer.TryComplete();
@@ -272,28 +266,38 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
 
         if (_consumerTask is not null)
         {
-            try
-            {
-                await _consumerTask;
-            }
-            catch (OperationCanceledException)
-            {
-                // Normal consumer shutdown
-            }
+            await WaitOrTimeoutAsync(_consumerTask, TimeSpan.FromSeconds(3));
         }
 
         foreach (var source in _sources)
         {
-            await source.DisposeAsync();
+            await WaitOrTimeoutAsync(source.DisposeAsync().AsTask(), TimeSpan.FromSeconds(2));
         }
 
         if (_screenCapture is not null)
         {
-            await _screenCapture.DisposeAsync();
+            await WaitOrTimeoutAsync(_screenCapture.DisposeAsync().AsTask(), TimeSpan.FromSeconds(2));
         }
 
         _sourceCts.Dispose();
         _consumerCts.Dispose();
+    }
+
+    /// <summary>Bounded wait so a wedged platform adapter cannot hang application shutdown.</summary>
+    private static async Task WaitOrTimeoutAsync(Task task, TimeSpan timeout)
+    {
+        try
+        {
+            await task.WaitAsync(timeout);
+        }
+        catch (TimeoutException)
+        {
+            // Shutdown must stay bounded even when a native source does not observe cancellation.
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal cancellation during teardown.
+        }
     }
 
     private async Task PumpSourceAsync(ICaptureSource source, CaptureContext context, CancellationToken ct)
