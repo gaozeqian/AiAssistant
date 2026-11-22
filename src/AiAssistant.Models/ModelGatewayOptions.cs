@@ -11,6 +11,13 @@ public sealed class ModelGatewayOptions
     public ModelProviderKind Provider { get; init; } = ModelProviderKind.Ollama;
     public Uri BaseAddress { get; init; } = new("http://127.0.0.1:11434");
     public string ChatModel { get; init; } = "gemma4:12b";
+
+    /// <summary>
+    /// Ollama thinking models (e.g. gemma4 / qwen3) spend the output budget on internal reasoning,
+    /// which makes structured reports slow and can return empty content once the cap is hit.
+    /// Sending <c>think: false</c> keeps answers direct. Ignored by models without a thinking mode.
+    /// </summary>
+    public bool DisableThinking { get; init; } = true;
     public string EmbeddingModel { get; init; } = "embeddinggemma-2:740m";
     public string? ApiKey { get; init; }
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(120);

@@ -97,7 +97,9 @@ public sealed class ReportGenerationRunner : IReportGenerationRunner
                             Tier: _options.DefaultTier,
                             Purpose: "report-map",
                             Temperature: 0.2,
-                            MaxOutputTokens: 600),
+                            // Reasoning-heavy local models spend tokens on internal thinking before
+                            // emitting the answer, so the cap must leave room for both.
+                            MaxOutputTokens: 1200),
                         ct);
                     if (!string.IsNullOrWhiteSpace(response.Text))
                     {
@@ -184,7 +186,9 @@ public sealed class ReportGenerationRunner : IReportGenerationRunner
                         Tier: _options.DefaultTier,
                         Purpose: "report-reduce",
                         Temperature: attempt == 0 ? 0.2 : 0.0,
-                        MaxOutputTokens: 2400),
+                        // A truncated JSON counts as a schema violation; leave headroom for models
+                        // that emit reasoning tokens before the structured payload.
+                        MaxOutputTokens: 4096),
                     ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

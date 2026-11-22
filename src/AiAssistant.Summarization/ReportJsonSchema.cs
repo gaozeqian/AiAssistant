@@ -99,12 +99,13 @@ public static class ReportJsonSchema
             return false;
         }
 
+        // Standup.today may legitimately be empty: the prompt tells the model to use empty
+        // strings/arrays for plans it cannot infer from activity data, so it must not be required.
         if (document is null ||
             string.IsNullOrWhiteSpace(document.Overview) ||
             document.Highlights.Count == 0 ||
             document.Timeline.Count == 0 ||
             document.Standup is null ||
-            string.IsNullOrWhiteSpace(document.Standup.Today) ||
             document.Projects.Any(project => string.IsNullOrWhiteSpace(project.Name) || project.DurationMinutes < 0))
         {
             error = "schema-violation";

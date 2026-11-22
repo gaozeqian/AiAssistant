@@ -161,6 +161,15 @@ public sealed class ReportGenerationTests
         Assert.Equal("完成日报闭环", document!.Overview);
         Assert.Equal("S5", document.Standup.Today);
 
+        // The prompt tells the model to use empty strings/arrays for plans it cannot infer from
+        // activity data, so an empty standup must not be treated as a schema violation
+        // (regression: real local models returned an empty `today` and every retry was rejected).
+        const string emptyStandup = """
+            {"overview":"完成日报闭环","highlights":["接入模型"],"timeline":[{"time":"09:00","activity":"开发"}],"standup":{"yesterday":"","today":"","blockers":[]}}
+            """;
+        Assert.True(ReportJsonSchema.TryParse(emptyStandup, out var emptyDocument, out _));
+        Assert.Equal(string.Empty, emptyDocument!.Standup.Today);
+
         Assert.False(ReportJsonSchema.TryParse("""{"overview":"x"}""", out _, out var error));
         Assert.Equal("schema-violation", error);
         Assert.False(ReportJsonSchema.TryParse("not json", out _, out error));

@@ -57,6 +57,9 @@ public sealed class HttpModelBackend : IChatClient, IEmbeddingGenerator<string, 
                     content = message.Text
                 }),
                 stream = false,
+                // Thinking models otherwise burn the output budget on reasoning and can return
+                // empty content; Ollama ignores this flag for models without a thinking mode.
+                think = !_options.DisableThinking,
                 options = new
                 {
                     temperature = options?.Temperature ?? 0.2,
