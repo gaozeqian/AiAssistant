@@ -3,18 +3,18 @@ using System.Runtime.InteropServices;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
-using AiAssistant.Platform.MacOS;
-using AiAssistant.Platform.MacOS.Ipc;
+using AiAssistant.Platform.macOS;
+using AiAssistant.Platform.macOS.Ipc;
 using AiAssistant.Storage.KeyStores;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiAssistant.Platform.Tests;
 
-public sealed class MacOsIpcAndAdapterContractTests : IDisposable
+public sealed class MacPlatformIpcAndAdapterContractTests : IDisposable
 {
     private readonly string _tempRoot;
 
-    public MacOsIpcAndAdapterContractTests()
+    public MacPlatformIpcAndAdapterContractTests()
     {
         // AF_UNIX paths must stay short on every OS; artifacts is already the repo-local test scratch area.
         _tempRoot = Path.Combine(FindRepoRoot(), "artifacts", "test-temp", "s3", Guid.NewGuid().ToString("N")[..6]);
@@ -37,7 +37,7 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
     }
 
     [Fact]
-    public async Task RealUnixSocketHandshake_AuthenticatesOneTimeToken_AndFeedsMacOsAdapters()
+    public async Task RealUnixSocketHandshake_AuthenticatesOneTimeToken_AndFeedsMacAdapters()
     {
         var behavior = new FakeHelperBehavior();
         var launcher = new FakeMacHelperLauncher(behavior);
@@ -52,10 +52,10 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
         Assert.Equal(1, launcher.LaunchCount);
 
         var clock = new SystemClock();
-        var windowSource = new MacOsWindowActivitySource(supervisor, clock);
-        var screenCapture = new MacOsScreenCapture(supervisor, clock);
-        var textExtractor = new MacOsTextExtractor(supervisor);
-        var fileSource = new MacOsFileActivitySource(supervisor, clock, TimeSpan.FromMilliseconds(5));
+        var windowSource = new WindowActivitySource(supervisor, clock);
+        var screenCapture = new ScreenCapture(supervisor, clock);
+        var textExtractor = new TextExtractor(supervisor);
+        var fileSource = new FileActivitySource(supervisor, clock, TimeSpan.FromMilliseconds(5));
 
         var window = await windowSource.GetCurrentForegroundAsync(CancellationToken.None);
         Assert.NotNull(window);
@@ -89,21 +89,21 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
         Assert.Equal("authorized synthetic note", fileSample.ExtractedText);
 
         behavior.AudioSamples = [0.25f, -0.5f];
-        var audioCapture = new MacOsAudioCapture(supervisor, clock, TimeSpan.FromMilliseconds(5));
+        var audioCapture = new AudioCapture(supervisor, clock, TimeSpan.FromMilliseconds(5));
         using var audioCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         var audioFrame = await audioCapture.ReadFramesAsync(audioCts.Token).FirstAsync(audioCts.Token);
         Assert.Equal(16_000, audioFrame.SampleRateHz);
         Assert.Equal(1, audioFrame.Channels);
         Assert.Equal([0.25f, -0.5f], audioFrame.Samples.ToArray());
 
-        var capabilityProvider = new MacOsCapabilityProvider(
+        var capabilityProvider = new CapabilityProvider(
             screenCapture,
             windowSource,
             fileSource,
             textExtractor,
             audioCapture,
             new StaticKeyStore(new byte[32]),
-            new MacOsLaunchAgentAutoStartService("/Applications/AiAssistant.app/Contents/MacOS/AiAssistant.Host", launchAgentsDirectory: _tempRoot),
+            new LaunchAgentAutoStartService("/Applications/AiAssistant.app/Contents/MacOS/AiAssistant.Host", launchAgentsDirectory: _tempRoot),
             supervisor);
         var capabilities = capabilityProvider.GetCapabilities();
         Assert.Contains(capabilities, c => c.Kind == CapabilityKind.ScreenCapture && c.Status == CapabilityStatus.Supported);
@@ -151,7 +151,7 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
             CancellationToken.None);
         Assert.Equal(MacHelperProtocol.ErrorCodes.Disconnected, unavailable.ErrorCode);
 
-        var screen = new MacOsScreenCapture(incompatibleSupervisor, new SystemClock());
+        var screen = new ScreenCapture(incompatibleSupervisor, new SystemClock());
         Assert.Equal(CapabilityStatus.Degraded, screen.Capability.Status);
         Assert.Contains("protocol", screen.Capability.Summary, StringComparison.OrdinalIgnoreCase);
     }
@@ -173,9 +173,9 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
             CancellationToken.None);
         Assert.True(permissionRefresh.Ok);
 
-        var screen = new MacOsScreenCapture(supervisor, new SystemClock());
-        var window = new MacOsWindowActivitySource(supervisor, new SystemClock());
-        var audio = new MacOsAudioCapture(supervisor, new SystemClock());
+        var screen = new ScreenCapture(supervisor, new SystemClock());
+        var window = new WindowActivitySource(supervisor, new SystemClock());
+        var audio = new AudioCapture(supervisor, new SystemClock());
         Assert.Equal(CapabilityStatus.PermissionRequired, screen.Capability.Status);
         Assert.Equal(CapabilityStatus.Degraded, window.Capability.Status);
         Assert.Equal(CapabilityStatus.PermissionRequired, audio.Capability.Status);
@@ -201,7 +201,7 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
         await supervisor.StartAsync(CancellationToken.None);
         await WaitUntilAsync(() => supervisor.Status == MacHelperSupervisorStatus.Healthy);
 
-        var playback = new MacOsAudioPlayback(supervisor);
+        var playback = new AudioPlayback(supervisor);
         Assert.Equal(CapabilityStatus.Supported, playback.Capability.Status);
 
         await playback.PlayAsync(new float[] { 0.25f, -0.5f, 0.75f }, 24_000, CancellationToken.None);
@@ -230,7 +230,7 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
         await using var disposable = supervisor;
         await supervisor.StartAsync(CancellationToken.None);
 
-        var playback = new MacOsAudioPlayback(supervisor);
+        var playback = new AudioPlayback(supervisor);
         Assert.Equal(CapabilityStatus.Degraded, playback.Capability.Status);
 
         // Playback must be a no-throw degradation; the voice session keeps text feedback.
@@ -246,7 +246,7 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
         await supervisor.StartAsync(CancellationToken.None);
         await WaitUntilAsync(() => supervisor.Status == MacHelperSupervisorStatus.Healthy);
 
-        var ocr = new MacOsImageOcrRecognizer(supervisor);
+        var ocr = new ImageOcrRecognizer(supervisor);
         Assert.Equal(CapabilityStatus.Supported, ocr.Capability.Status);
 
         var pixels = new byte[2 * 2 * 4];
@@ -282,7 +282,7 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
         await using var disposable = supervisor;
         await supervisor.StartAsync(CancellationToken.None);
 
-        var ocr = new MacOsImageOcrRecognizer(supervisor);
+        var ocr = new ImageOcrRecognizer(supervisor);
         Assert.Equal(CapabilityStatus.Degraded, ocr.Capability.Status);
         Assert.Null(await ocr.RecognizeAsync(
             new ImageFrameBuffer(new byte[2 * 2 * 4], 2, 2),
@@ -351,7 +351,7 @@ public sealed class MacOsIpcAndAdapterContractTests : IDisposable
     public async Task LaunchAgentAutoStart_WritesUserPlistAndCanDisableWithoutElevation()
     {
         var directory = Path.Combine(_tempRoot, "LaunchAgents");
-        var service = new MacOsLaunchAgentAutoStartService(
+        var service = new LaunchAgentAutoStartService(
             "/Applications/AiAssistant.app/Contents/MacOS/AiAssistant.Host",
             "com.aiassistant.tests",
             directory);

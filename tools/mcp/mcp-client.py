@@ -5,8 +5,8 @@ Performs the Streamable-HTTP handshake, tool discovery and read-only tool calls,
 JSON-RPC error codes, SSE fallback and (optionally) unauthenticated rejection.
 
 Usage:
-    python build/mcp/mcp-client.py --token <token from the diagnostics panel>
-    python build/mcp/mcp-client.py --endpoint http://127.0.0.1:47831/mcp --accept sse --check-unauthorized
+    python tools/mcp/mcp-client.py --token <token from the diagnostics panel>
+    python tools/mcp/mcp-client.py --endpoint http://127.0.0.1:47831/mcp --accept sse --check-unauthorized
 """
 
 from __future__ import annotations

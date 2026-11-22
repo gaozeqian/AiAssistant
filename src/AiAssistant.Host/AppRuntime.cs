@@ -13,8 +13,8 @@ using AiAssistant.Platform.Linux.Desktop;
 using AiAssistant.Platform.Linux.PipeWire;
 using AiAssistant.Platform.Linux.Portal;
 using AiAssistant.Platform.Linux.X11;
-using AiAssistant.Platform.MacOS;
-using AiAssistant.Platform.MacOS.Ipc;
+using AiAssistant.Platform.macOS;
+using AiAssistant.Platform.macOS.Ipc;
 using AiAssistant.Platform.Windows;
 using AiAssistant.Processing;
 using AiAssistant.Processing.Ocr;
@@ -237,7 +237,7 @@ public sealed class AppRuntime : IAsyncDisposable
         }
         else if (OperatingSystem.IsMacOS())
         {
-            RegisterMacOS(services, clock, keyStore);
+            RegisterMacPlatform(services, clock, keyStore);
         }
         else
         {
@@ -733,14 +733,14 @@ public sealed class AppRuntime : IAsyncDisposable
             autoStart));
     }
 
-    private static void RegisterMacOS(IServiceCollection services, IClock clock, IKeyStore keyStore)
+    private static void RegisterMacPlatform(IServiceCollection services, IClock clock, IKeyStore keyStore)
     {
         var helperPath = ResolveMacHelperPath();
         IMacHelperProcessLauncher? launcher = helperPath is not null ? new SubprocessMacHelperLauncher(helperPath) : null;
         var helperOptions = new MacHelperOptions { HelperExecutablePath = helperPath };
         var processPath = Environment.ProcessPath;
         var executablePath = string.IsNullOrWhiteSpace(processPath) ? "/Applications/AiAssistant.app/Contents/MacOS/AiAssistant.Host" : processPath;
-        var autoStart = new MacOsLaunchAgentAutoStartService(executablePath);
+        var autoStart = new LaunchAgentAutoStartService(executablePath);
 
         services.AddSingleton(helperOptions);
         services.AddSingleton<IMacHelperSupervisor>(provider => new MacHelperSupervisor(
@@ -748,28 +748,28 @@ public sealed class AppRuntime : IAsyncDisposable
             helperOptions,
             provider.GetRequiredService<ILogger<MacHelperSupervisor>>()));
         services.AddSingleton<IScreenCapture>(provider =>
-            new MacOsScreenCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
+            new ScreenCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
         services.AddSingleton<IWindowActivitySource>(provider =>
-            new MacOsWindowActivitySource(
+            new WindowActivitySource(
                 provider.GetRequiredService<IMacHelperSupervisor>(),
                 clock,
                 provider.GetRequiredService<IScreenCapture>()));
         services.AddSingleton<IFileActivitySource>(provider =>
-            new MacOsFileActivitySource(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
+            new FileActivitySource(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
         services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IWindowActivitySource>());
         services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IFileActivitySource>());
         services.AddSingleton<ITextExtractor>(provider =>
-            new MacOsTextExtractor(provider.GetRequiredService<IMacHelperSupervisor>()));
+            new TextExtractor(provider.GetRequiredService<IMacHelperSupervisor>()));
         services.AddSingleton<IImageOcrRecognizer>(provider =>
-            new MacOsImageOcrRecognizer(provider.GetRequiredService<IMacHelperSupervisor>()));
+            new ImageOcrRecognizer(provider.GetRequiredService<IMacHelperSupervisor>()));
         services.AddSingleton<IAudioCapture>(provider =>
-            new MacOsAudioCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
+            new AudioCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
         services.AddSingleton<IAudioCaptureFactory>(provider =>
-            new MacOsAudioCaptureFactory(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
+            new AudioCaptureFactory(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
         services.AddSingleton<IAudioPlayback>(provider =>
-            new MacOsAudioPlayback(provider.GetRequiredService<IMacHelperSupervisor>()));
+            new AudioPlayback(provider.GetRequiredService<IMacHelperSupervisor>()));
         services.AddSingleton<IAutoStartService>(autoStart);
-        services.AddSingleton<ICapabilityProvider>(provider => new MacOsCapabilityProvider(
+        services.AddSingleton<ICapabilityProvider>(provider => new CapabilityProvider(
             provider.GetRequiredService<IScreenCapture>(),
             provider.GetRequiredService<IWindowActivitySource>(),
             provider.GetRequiredService<IFileActivitySource>(),

@@ -27,7 +27,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAssistant.Voice", "src\Ai
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAssistant.Platform.Windows", "src\AiAssistant.Platform.Windows\AiAssistant.Platform.Windows.csproj", "{DCDB19A5-EFAD-40E7-9574-C150767DAF07}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAssistant.Platform.MacOS", "src\AiAssistant.Platform.MacOS\AiAssistant.Platform.MacOS.csproj", "{B59143BC-1936-402F-ABC0-552DE91C374E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAssistant.Platform.macOS", "src\AiAssistant.Platform.macOS\AiAssistant.Platform.macOS.csproj", "{B59143BC-1936-402F-ABC0-552DE91C374E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAssistant.Platform.Linux", "src\AiAssistant.Platform.Linux\AiAssistant.Platform.Linux.csproj", "{F69C96B1-01F8-4E42-8C33-824E9D7E6660}"
 EndProject

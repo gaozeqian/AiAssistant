@@ -87,7 +87,7 @@ AiAssistant.sln
 ├── AiAssistant.Scheduler       # 三通道触发 + 任务队列 + 补偿
 ├── AiAssistant.Desktop         # Avalonia 12.1+ UI（MVVM）
 ├── AiAssistant.Platform.Windows  # Windows 平台实现
-├── AiAssistant.Platform.MacOS    # .NET IPC 客户端，对接 Swift 原生 helper (v2.4)
+├── AiAssistant.Platform.macOS    # .NET IPC 客户端，对接 Swift 原生 helper (v2.4)
 ├── AiAssistant.Platform.Linux    # Wayland/X11 + AT-SPI + Tmds.DBus portal / PipeWire
 └── native/AiAssistant.MacHelper  # Swift：ScreenCaptureKit/Vision/CoreAudio/AX/TTS (v2.4)
 ```

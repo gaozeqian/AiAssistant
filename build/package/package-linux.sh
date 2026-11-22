@@ -1,6 +1,35 @@
 #!/usr/bin/env bash
-# Builds the Linux x64 release artifacts: a portable tar.gz plus a .deb when dpkg-deb is available.
+# 构建 Linux x64 发布产物：便携 tar.gz，若存在 dpkg-deb（或 python 兜底）则额外产出 .deb。
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$REPO_ROOT" ]]; then
+  echo "错误：无法定位仓库根目录（$SCRIPT_DIR 不在 Git 工作区内）。" >&2
+  exit 1
+fi
+
+usage() {
+  cat <<'EOF'
+用法: bash build/package/package-linux.sh [选项]
+
+产出 AiAssistant-<version>-linux-x64.tar.gz 与（可用时）.deb。
+
+选项:
+  --version <版本>        指定版本，默认取 Directory.Build.props 的 VersionPrefix
+  --output <目录>         产物目录，默认 $AIASSISTANT_PACKAGE_OUTPUT 或 artifacts/packages
+  --runtime <RID>         目标运行时，默认 linux-x64
+  --framework-dependent   产出依赖框架的包（默认自包含）
+  --skip-models           不随包语音模型（仅调试，正式发布禁用）
+  -h, --help              显示本帮助
+
+退出码: 0 成功 / 1 构建或资产缺失 / 2 用法错误
+EOF
+}
+
+require_value() {
+  [[ $# -ge 2 && -n "$2" ]] || { usage >&2; exit 2; }
+}
 
 VERSION="${VERSION:-}"
 OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-artifacts/packages}"
@@ -10,17 +39,22 @@ SKIP_MODELS=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --version) VERSION="$2"; shift 2 ;;
-    --output) OUTPUT_ROOT="$2"; shift 2 ;;
-    --runtime) RUNTIME="$2"; shift 2 ;;
+    --version) require_value "$@"; VERSION="$2"; shift 2 ;;
+    --output) require_value "$@"; OUTPUT_ROOT="$2"; shift 2 ;;
+    --runtime) require_value "$@"; RUNTIME="$2"; shift 2 ;;
     --framework-dependent) FRAMEWORK_DEPENDENT=1; shift ;;
     --skip-models) SKIP_MODELS=1; shift ;;
-    *) echo "unknown argument: $1" >&2; exit 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if [[ "$OUTPUT_ROOT" = /* ]]; then
+  OUT_DIR="$OUTPUT_ROOT"
+else
+  OUT_DIR="$REPO_ROOT/$OUTPUT_ROOT"
+fi
+
 if [[ -z "$VERSION" ]]; then
   VERSION="$(sed -n 's:.*<VersionPrefix>\(.*\)</VersionPrefix>.*:\1:p' "$REPO_ROOT/Directory.Build.props" | head -1)"
 fi
@@ -35,7 +69,7 @@ if [[ "$FRAMEWORK_DEPENDENT" -eq 1 ]]; then
   SELF_CONTAINED="false"
 fi
 
-STAGE="$REPO_ROOT/$OUTPUT_ROOT/staging/$RUNTIME"
+STAGE="$OUT_DIR/staging/$RUNTIME"
 APP_DIR="$STAGE/usr/lib/aiassistant"
 
 echo "== AiAssistant Linux package =="
@@ -92,13 +126,13 @@ cp "$SCRIPT_DIR/assets/aiassistant.png" "$STAGE/usr/share/icons/hicolor/256x256/
 sed "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/linux/control.template" > "$STAGE/DEBIAN/control"
 chmod 0644 "$STAGE/DEBIAN/control"
 
-mkdir -p "$REPO_ROOT/$OUTPUT_ROOT"
-TARBALL="$REPO_ROOT/$OUTPUT_ROOT/AiAssistant-$VERSION-$RUNTIME.tar.gz"
+mkdir -p "$OUT_DIR"
+TARBALL="$OUT_DIR/AiAssistant-$VERSION-$RUNTIME.tar.gz"
 rm -f "$TARBALL"
 tar -czf "$TARBALL" --exclude=DEBIAN -C "$STAGE" .
 echo "tar.gz: $TARBALL"
 
-DEB="$REPO_ROOT/$OUTPUT_ROOT/AiAssistant-$VERSION-$RUNTIME.deb"
+DEB="$OUT_DIR/AiAssistant-$VERSION-$RUNTIME.deb"
 rm -f "$DEB"
 if command -v dpkg-deb >/dev/null 2>&1; then
   dpkg-deb --build --root-owner-group "$STAGE" "$DEB" >/dev/null
@@ -132,5 +166,5 @@ write_checksums() {
   )
 }
 
-write_checksums "$REPO_ROOT/$OUTPUT_ROOT"
+write_checksums "$OUT_DIR"
 echo "Linux package complete."

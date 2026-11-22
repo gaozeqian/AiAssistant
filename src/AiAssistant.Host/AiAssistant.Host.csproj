@@ -19,7 +19,7 @@
     <ProjectReference Include="..\AiAssistant.LocalApi\AiAssistant.LocalApi.csproj" />
     <ProjectReference Include="..\AiAssistant.Export\AiAssistant.Export.csproj" />
     <ProjectReference Include="..\AiAssistant.Platform.Windows\AiAssistant.Platform.Windows.csproj" />
-    <ProjectReference Include="..\AiAssistant.Platform.MacOS\AiAssistant.Platform.MacOS.csproj" />
+    <ProjectReference Include="..\AiAssistant.Platform.macOS\AiAssistant.Platform.macOS.csproj" />
     <ProjectReference Include="..\AiAssistant.Platform.Linux\AiAssistant.Platform.Linux.csproj" />
     <ProjectReference Include="..\AiAssistant.Desktop\AiAssistant.Desktop.csproj" />
   </ItemGroup>
@@ -28,7 +28,7 @@
     <PackageReference Include="Avalonia.Wayland" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
-  <Target Name="BundleMacOsSwiftHelper" AfterTargets="Publish" Condition="$([MSBuild]::IsOsPlatform('OSX')) And Exists('$(MacHelperBinaryPath)')">
+  <Target Name="BundleSwiftHelper" AfterTargets="Publish" Condition="$([MSBuild]::IsOsPlatform('OSX')) And Exists('$(MacHelperBinaryPath)')">
     <Copy SourceFiles="$(MacHelperBinaryPath)" DestinationFolder="$(PublishDir)" />
   </Target>
 

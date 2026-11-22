@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net.Sockets;
 
-namespace AiAssistant.Platform.MacOS.Ipc;
+namespace AiAssistant.Platform.macOS.Ipc;
 
 public sealed class MacHelperOptions
 {

@@ -11,7 +11,7 @@ macOS 的 ScreenCaptureKit、Vision、AVAudioEngine 与 Accessibility API 深度
 ## 决策
 
 1. 在 `native/AiAssistant.MacHelper` 中以原生 Swift 可执行程序封装 macOS 采集与系统 OCR/TTS 能力。
-2. `.NET` 侧 `AiAssistant.Platform.MacOS` 仅实现版本化 Unix Domain Socket IPC 客户端（含协议版本握手、一次性随机会话凭据鉴权、心跳与超时）。
+2. `.NET` 侧 `AiAssistant.Platform.macOS` 仅实现版本化 Unix Domain Socket IPC 客户端（含协议版本握手、一次性随机会话凭据鉴权、心跳与超时）。
 3. 由监督器以指数退避策略管理 Helper 进程生命周期：Helper 崩溃或 TCC 权限被撤销时，对应采集源进入 `Degraded` / `PermissionRequired`，主界面与历史时间线正常可用。
 
 ## 后果

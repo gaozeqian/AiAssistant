@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 
-namespace AiAssistant.Platform.MacOS.Ipc;
+namespace AiAssistant.Platform.macOS.Ipc;
 
 public enum MacHelperSupervisorStatus
 {

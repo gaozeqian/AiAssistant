@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AiAssistant.Platform.MacOS.Ipc;
+namespace AiAssistant.Platform.macOS.Ipc;
 
 /// <summary>
 /// Versioned local IPC wire protocol (v1) between .NET host and macOS Swift helper (ADR-0005, IMPLEMENTATION.md S3).

@@ -5,7 +5,7 @@
     <ProjectReference Include="..\..\src\AiAssistant.Capture\AiAssistant.Capture.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Storage\AiAssistant.Storage.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Platform.Windows\AiAssistant.Platform.Windows.csproj" />
-    <ProjectReference Include="..\..\src\AiAssistant.Platform.MacOS\AiAssistant.Platform.MacOS.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Platform.macOS\AiAssistant.Platform.macOS.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Platform.Linux\AiAssistant.Platform.Linux.csproj" />
   </ItemGroup>
   <ItemGroup>

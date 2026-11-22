@@ -9,7 +9,7 @@ using AiAssistant.Host;
 using AiAssistant.LocalApi;
 using AiAssistant.Models;
 using AiAssistant.Platform.Linux;
-using AiAssistant.Platform.MacOS;
+using AiAssistant.Platform.macOS;
 using AiAssistant.Platform.Windows;
 using AiAssistant.Processing;
 using AiAssistant.Scheduler;
@@ -39,7 +39,7 @@ public sealed class DependencyRuleTests
         typeof(LocalApiAssemblyMarker).Assembly,
         typeof(ExportAssemblyMarker).Assembly,
         typeof(PlatformWindowsAssemblyMarker).Assembly,
-        typeof(PlatformMacOSAssemblyMarker).Assembly,
+        typeof(PlatformAssemblyMarker).Assembly,
         typeof(PlatformLinuxAssemblyMarker).Assembly,
         typeof(DesktopAssemblyMarker).Assembly,
         typeof(HostAssemblyMarker).Assembly
@@ -85,7 +85,7 @@ public sealed class DependencyRuleTests
             "AiAssistant.Storage",
             "AiAssistant.Models",
             "AiAssistant.Platform.Windows",
-            "AiAssistant.Platform.MacOS",
+            "AiAssistant.Platform.macOS",
             "AiAssistant.Platform.Linux",
             "AiAssistant.Desktop",
             "AiAssistant.Host",
@@ -126,7 +126,7 @@ public sealed class DependencyRuleTests
                 "AiAssistant.Storage",
                 "AiAssistant.Models",
                 "AiAssistant.Platform.Windows",
-                "AiAssistant.Platform.MacOS",
+                "AiAssistant.Platform.macOS",
                 "AiAssistant.Platform.Linux",
                 "AiAssistant.Host",
                 "Microsoft.Data.Sqlite")
@@ -141,7 +141,7 @@ public sealed class DependencyRuleTests
         var platformProjects = new[]
         {
             "AiAssistant.Platform.Windows",
-            "AiAssistant.Platform.MacOS",
+            "AiAssistant.Platform.macOS",
             "AiAssistant.Platform.Linux"
         };
 

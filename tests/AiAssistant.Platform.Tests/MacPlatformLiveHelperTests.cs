@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
-using AiAssistant.Platform.MacOS;
-using AiAssistant.Platform.MacOS.Ipc;
+using AiAssistant.Platform.macOS;
+using AiAssistant.Platform.macOS.Ipc;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiAssistant.Platform.Tests;
@@ -12,14 +12,14 @@ namespace AiAssistant.Platform.Tests;
 /// Skipped by default; requires a macOS session and a built helper:
 ///   swift build -c release --disable-sandbox   (inside native/AiAssistant.MacHelper)
 ///   AIASSISTANT_MAC_HELPER_E2E=1 dotnet test tests/AiAssistant.Platform.Tests \
-///     --filter "FullyQualifiedName~MacOsLiveHelperTests"
+///     --filter "FullyQualifiedName~MacPlatformLiveHelperTests"
 /// The playback payload is digital silence so the check is inaudible.
 /// </summary>
-public sealed class MacOsLiveHelperTests : IDisposable
+public sealed class MacPlatformLiveHelperTests : IDisposable
 {
     private readonly string _tempRoot;
 
-    public MacOsLiveHelperTests()
+    public MacPlatformLiveHelperTests()
     {
         _tempRoot = Path.Combine(FindRepoRoot(), "artifacts", "test-temp", "s7", Guid.NewGuid().ToString("N")[..6]);
         Directory.CreateDirectory(_tempRoot);
@@ -50,7 +50,7 @@ public sealed class MacOsLiveHelperTests : IDisposable
 
         await using var supervisor = await StartSupervisorAsync();
 
-        var playback = new MacOsAudioPlayback(supervisor);
+        var playback = new AudioPlayback(supervisor);
         Assert.Equal(CapabilityStatus.Supported, playback.Capability.Status);
 
         // 3 s of silence at 24 kHz: exercises format setup, engine start and buffer scheduling.
@@ -101,10 +101,10 @@ public sealed class MacOsLiveHelperTests : IDisposable
 
         await using var supervisor = await StartSupervisorAsync();
         var permissions = supervisor.Permissions;
-        var screen = new MacOsScreenCapture(supervisor, new SystemClock());
-        var window = new MacOsWindowActivitySource(supervisor, new SystemClock());
-        var audio = new MacOsAudioCapture(supervisor, new SystemClock());
-        var playback = new MacOsAudioPlayback(supervisor);
+        var screen = new ScreenCapture(supervisor, new SystemClock());
+        var window = new WindowActivitySource(supervisor, new SystemClock());
+        var audio = new AudioCapture(supervisor, new SystemClock());
+        var playback = new AudioPlayback(supervisor);
 
         Assert.Equal(ExpectedScreenStatus(permissions.ScreenRecording), screen.Capability.Status);
         Assert.Equal(ExpectedWindowStatus(permissions.Accessibility), window.Capability.Status);
@@ -157,7 +157,7 @@ public sealed class MacOsLiveHelperTests : IDisposable
         var launcher = new RecordingLauncher(new SubprocessMacHelperLauncher(helperPath));
 
         await using var supervisor = await StartSupervisorAsync(launcher);
-        var playback = new MacOsAudioPlayback(supervisor);
+        var playback = new AudioPlayback(supervisor);
         await playback.PlayAsync(new float[2_400], 24_000, CancellationToken.None);
 
         Assert.Single(launcher.Instances);

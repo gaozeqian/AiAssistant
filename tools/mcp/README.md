@@ -53,7 +53,7 @@ npx --yes @modelcontextprotocol/inspector@2.16.0 --cli \
 
 ```powershell
 $env:AIASSISTANT_MCP_TOKEN = "<token>"
-pwsh build/mcp/inspector-smoke.ps1 -Endpoint http://127.0.0.1:47839/mcp
+pwsh tools/mcp/inspector-smoke.ps1 -Endpoint http://127.0.0.1:47839/mcp
 ```
 
 脚本校验握手、工具集合与 `activity_stats` 调用；需要 Node 20+ 与网络（首次下载 Inspector）。

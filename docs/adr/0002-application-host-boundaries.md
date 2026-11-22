@@ -15,7 +15,7 @@
 1. `AiAssistant.Core` 不引用任何内部项目，且不引用任何第三方 NuGet 包。
 2. `AiAssistant.Application` 只引用 `AiAssistant.Core`（仅允许基础官方扩展抽象如 `Microsoft.Extensions.AI.Abstractions`），绝不引用 `Storage`、`Models`、`Platform.*`、`Desktop`。
 3. `AiAssistant.Desktop` 只引用 `AiAssistant.Application` 与 `AiAssistant.Core`，绝不直接访问数据库、模型网关实现或平台 API。
-4. `AiAssistant.Platform.Windows`、`AiAssistant.Platform.MacOS`、`AiAssistant.Platform.Linux` 互不引用。
+4. `AiAssistant.Platform.Windows`、`AiAssistant.Platform.macOS`、`AiAssistant.Platform.Linux` 互不引用。
 5. 只有 `AiAssistant.Host` 作为唯一 Composition Root 引用全部模块并完成依赖注入与宿主生命周期管理。
 
 ## 后果

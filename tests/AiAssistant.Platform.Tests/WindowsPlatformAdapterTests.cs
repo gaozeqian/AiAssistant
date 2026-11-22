@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using AiAssistant.Application.Ports;
 using AiAssistant.Platform.Linux;
-using AiAssistant.Platform.MacOS;
+using AiAssistant.Platform.macOS;
 using AiAssistant.Platform.Windows;
 using AiAssistant.Storage.KeyStores;
 using Avalonia.Media.Imaging;
@@ -140,7 +140,7 @@ public sealed class WindowsPlatformAdapterTests : IDisposable
             keyStore,
             new WindowsAutoStartService("app.exe")).GetCapabilities();
 
-        var macCaps = new MacOsCapabilityProvider(keyStore).GetCapabilities();
+        var macCaps = new CapabilityProvider(keyStore).GetCapabilities();
         var linuxCaps = new LinuxCapabilityProvider(keyStore).GetCapabilities();
 
         Assert.NotEmpty(winCaps);

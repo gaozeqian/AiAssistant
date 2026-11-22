@@ -1,9 +1,38 @@
 #!/usr/bin/env bash
-# Creates a self-signed code-signing identity in a temporary keychain for local/macOS-runner builds.
-# Usage: create-self-signed-identity.sh <output-cert.pem> [identity-name] [keychain-path] [password]
+# 在临时钥匙串里创建自签名代码签名身份，供本地或 macOS runner 演练签名与公证。
 set -euo pipefail
 
-OUTPUT_CERT="${1:?output cert path required}"
+usage() {
+  cat <<'EOF'
+用法: bash build/package/macos/create-self-signed-identity.sh <输出证书路径> [标识名] [钥匙串路径] [密码]
+
+  <输出证书路径>   必填。导出的公钥证书（.cer/.pem），随安装包分发。
+  [标识名]         默认 "AiAssistant Self-Signed"。
+  [钥匙串路径]     默认 ~/Library/Keychains/aiassistant-sign.keychain-db。
+  [密码]           默认 "aiassistant-sign"。
+
+选项:
+  -h, --help       显示本帮助
+
+说明: 自签名身份可被 codesign 直接使用，但用户需先信任导出的证书，Gatekeeper 才会放行。
+      仅用于演练；正式发布使用真实 Developer ID。本脚本只能在 macOS 上运行。
+
+退出码: 0 成功 / 1 环境不满足 / 2 用法错误
+EOF
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help) usage; exit 0 ;;
+  esac
+done
+
+if [[ $# -lt 1 || -z "${1:-}" ]]; then
+  usage >&2
+  exit 2
+fi
+
+OUTPUT_CERT="$1"
 IDENTITY_NAME="${2:-AiAssistant Self-Signed}"
 KEYCHAIN="${3:-$HOME/Library/Keychains/aiassistant-sign.keychain-db}"
 PASSWORD="${4:-aiassistant-sign}"
@@ -31,10 +60,10 @@ security unlock-keychain -p "$PASSWORD" "$KEYCHAIN"
 security import "$WORK/identity.p12" -k "$KEYCHAIN" -P "$PASSWORD" -T /usr/bin/codesign >/dev/null
 security set-key-partition-list -S apple-tool:,apple: -s -k "$PASSWORD" "$KEYCHAIN" >/dev/null
 
-# Self-signed identities are usable by codesign even before explicit trust; users must trust the
-# exported certificate before Gatekeeper will accept the app.
+# 自签名身份无需显式信任即可被 codesign 使用；用户需先信任导出的证书，Gatekeeper 才会放行应用。
 security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"') >/dev/null
 
+mkdir -p "$(dirname "$OUTPUT_CERT")"
 cp "$WORK/cert.pem" "$OUTPUT_CERT"
 security find-identity -v -p codesigning "$KEYCHAIN" || true
 echo "identity=$IDENTITY_NAME"

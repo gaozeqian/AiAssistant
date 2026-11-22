@@ -5,14 +5,14 @@ using System.Threading.Channels;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
-using AiAssistant.Platform.MacOS.Ipc;
+using AiAssistant.Platform.macOS.Ipc;
 
-namespace AiAssistant.Platform.MacOS;
+namespace AiAssistant.Platform.macOS;
 
 /// <summary>
 /// macOS ScreenCaptureKit adapter over versioned Swift Helper IPC (ADR-0005, S3).
 /// </summary>
-public sealed class MacOsScreenCapture(IMacHelperSupervisor supervisor, IClock clock) : IScreenCapture
+public sealed class ScreenCapture(IMacHelperSupervisor supervisor, IClock clock) : IScreenCapture
 {
     public CapabilityState Capability => MacHelperCapabilityEvaluator.EvaluateHelperCapability(
         supervisor,
@@ -63,7 +63,7 @@ public sealed class MacOsScreenCapture(IMacHelperSupervisor supervisor, IClock c
 /// macOS NSWorkspace + AXUIElement foreground window adapter over Swift Helper IPC.
 /// Resilient across helper restarts: transient IPC disconnects skip ticks without terminating the capture stream.
 /// </summary>
-public sealed class MacOsWindowActivitySource(
+public sealed class WindowActivitySource(
     IMacHelperSupervisor supervisor,
     IClock clock,
     IScreenCapture? screenCapture = null,
@@ -175,7 +175,7 @@ public sealed class MacOsWindowActivitySource(
 /// macOS FSEvents whitelisted directory activity source via Swift Helper IPC with managed FileSystemWatcher fallback.
 /// Enforces strict <=200KB text/code extension limits (DESIGN.md §3.1, §3.2).
 /// </summary>
-public sealed class MacOsFileActivitySource(
+public sealed class FileActivitySource(
     IMacHelperSupervisor supervisor,
     IClock clock,
     TimeSpan? pollInterval = null) : IFileActivitySource
@@ -343,7 +343,7 @@ public sealed class MacOsFileActivitySource(
 /// macOS Accessibility-first + Vision OCR fallback text extractor via Swift Helper IPC.
 /// Helper strictly skips `AXSecureTextField` password controls.
 /// </summary>
-public sealed class MacOsTextExtractor(IMacHelperSupervisor supervisor) : ITextExtractor
+public sealed class TextExtractor(IMacHelperSupervisor supervisor) : ITextExtractor
 {
     public CapabilityState AccessibilityCapability => MacHelperCapabilityEvaluator.EvaluateHelperCapability(
         supervisor,
@@ -400,11 +400,11 @@ public sealed class MacOsTextExtractor(IMacHelperSupervisor supervisor) : ITextE
 /// macOS CoreAudio / AVAudioEngine 16kHz mono float32 capture adapter via Swift Helper IPC.
 /// Feeds the unified S4 AudioHub so multiple consumers never contend for the microphone.
 /// </summary>
-public sealed class MacOsAudioCaptureFactory(IMacHelperSupervisor supervisor, IClock clock) : IAudioCaptureFactory
+public sealed class AudioCaptureFactory(IMacHelperSupervisor supervisor, IClock clock) : IAudioCaptureFactory
 {
-    public CapabilityState Capability => new MacOsAudioCapture(supervisor, clock).Capability;
+    public CapabilityState Capability => new AudioCapture(supervisor, clock).Capability;
 
-    public IAudioCapture Create() => new MacOsAudioCapture(supervisor, clock);
+    public IAudioCapture Create() => new AudioCapture(supervisor, clock);
 }
 
 /// <summary>macOS feedback playback is deferred to the S9 helper extension; voice text feedback remains available.</summary>
@@ -412,7 +412,7 @@ public sealed class MacOsAudioCaptureFactory(IMacHelperSupervisor supervisor, IC
 /// macOS TTS feedback playback via the Swift Helper's AVAudioEngine (S7-R2).
 /// Samples stay in memory as float32 PCM; no temporary audio files are written.
 /// </summary>
-public sealed class MacOsAudioPlayback(IMacHelperSupervisor supervisor) : IAudioPlayback
+public sealed class AudioPlayback(IMacHelperSupervisor supervisor) : IAudioPlayback
 {
     private const int MaxDurationSeconds = 30;
 
@@ -452,7 +452,7 @@ public sealed class MacOsAudioPlayback(IMacHelperSupervisor supervisor) : IAudio
     }
 }
 
-public sealed class MacOsAudioCapture(
+public sealed class AudioCapture(
     IMacHelperSupervisor supervisor,
     IClock clock,
     TimeSpan? pollInterval = null) : IAudioCapture

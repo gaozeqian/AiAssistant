@@ -1,16 +1,16 @@
 using AiAssistant.Application.Imaging;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
-using AiAssistant.Platform.MacOS.Ipc;
+using AiAssistant.Platform.macOS.Ipc;
 
-namespace AiAssistant.Platform.MacOS;
+namespace AiAssistant.Platform.macOS;
 
 /// <summary>
 /// macOS Vision OCR over the Swift helper's versioned IPC (`text.extract` with PNG bytes and no
 /// Accessibility target). Powers the OCR golden-set command and any image-only extraction path,
 /// independent of the accessibility tree (S4-R2).
 /// </summary>
-public sealed class MacOsImageOcrRecognizer(IMacHelperSupervisor supervisor) : IImageOcrRecognizer
+public sealed class ImageOcrRecognizer(IMacHelperSupervisor supervisor) : IImageOcrRecognizer
 {
     public CapabilityState Capability => supervisor.Status == MacHelperSupervisorStatus.Healthy
         ? CapabilityState.Supported(CapabilityKind.Ocr, "Vision 文字识别（Swift Helper）")

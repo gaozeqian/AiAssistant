@@ -3,9 +3,9 @@ using System.Text;
 using System.Xml.Linq;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
-using AiAssistant.Platform.MacOS.Ipc;
+using AiAssistant.Platform.macOS.Ipc;
 
-namespace AiAssistant.Platform.MacOS;
+namespace AiAssistant.Platform.macOS;
 
 internal static class MacHelperCapabilityEvaluator
 {
@@ -52,7 +52,7 @@ internal static class MacHelperCapabilityEvaluator
 /// Dynamic macOS capability provider reflecting live Swift Helper supervision state, protocol compatibility,
 /// and TCC permission grants (ADR-0005, IMPLEMENTATION.md §3.5, S3).
 /// </summary>
-public sealed class MacOsCapabilityProvider : ICapabilityProvider
+public sealed class CapabilityProvider : ICapabilityProvider
 {
     private readonly IScreenCapture? _screenCapture;
     private readonly IWindowActivitySource? _windowActivitySource;
@@ -63,13 +63,13 @@ public sealed class MacOsCapabilityProvider : ICapabilityProvider
     private readonly IAutoStartService? _autoStartService;
     private readonly IMacHelperSupervisor? _supervisor;
 
-    public MacOsCapabilityProvider(IKeyStore keyStore)
+    public CapabilityProvider(IKeyStore keyStore)
     {
         ArgumentNullException.ThrowIfNull(keyStore);
         _keyStore = keyStore;
     }
 
-    public MacOsCapabilityProvider(
+    public CapabilityProvider(
         IScreenCapture screenCapture,
         IWindowActivitySource windowActivitySource,
         IFileActivitySource fileActivitySource,
@@ -145,7 +145,7 @@ public sealed class MacOsCapabilityProvider : ICapabilityProvider
 /// User-level macOS login item management via `~/Library/LaunchAgents/com.aiassistant.desktop.plist`.
 /// Disabled by default; requires zero administrator privileges.
 /// </summary>
-public sealed class MacOsLaunchAgentAutoStartService : IAutoStartService
+public sealed class LaunchAgentAutoStartService : IAutoStartService
 {
     public const string DefaultAgentLabel = "com.aiassistant.desktop";
 
@@ -153,7 +153,7 @@ public sealed class MacOsLaunchAgentAutoStartService : IAutoStartService
     private readonly string _agentLabel;
     private readonly string? _launchAgentsDirectory;
 
-    public MacOsLaunchAgentAutoStartService(
+    public LaunchAgentAutoStartService(
         string executablePath,
         string agentLabel = DefaultAgentLabel,
         string? launchAgentsDirectory = null)

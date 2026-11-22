@@ -1,8 +1,42 @@
 #!/usr/bin/env bash
-# Builds the macOS .app bundle, signs it (Developer ID + hardened runtime), optionally notarizes it,
-# and produces a distributable zip. Must run on macOS for signing/notarization; the layout can be
-# assembled on any POSIX shell with --skip-sign for CI smoke checks.
+# 构建 macOS .app bundle，签名（Developer ID + hardened runtime）、可选公证，并产出可分发的 zip / pkg。
+# 签名与公证必须在 macOS 上执行；布局装配可在任意 POSIX shell 用 --skip-sign 完成（CI 冒烟用）。
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$REPO_ROOT" ]]; then
+  echo "错误：无法定位仓库根目录（$SCRIPT_DIR 不在 Git 工作区内）。" >&2
+  exit 1
+fi
+
+usage() {
+  cat <<'EOF'
+用法: bash build/package/package-macos.sh [选项]
+
+产出 AiAssistant.app、AiAssistant-<version>-osx-arm64.zip 与（在 macOS 上）.pkg。
+
+选项:
+  --version <版本>          指定版本，默认取 Directory.Build.props 的 VersionPrefix
+  --identity <标识>         codesign 标识，默认读 $AIASSISTANT_CODESIGN_IDENTITY
+  --notary-profile <名称>   notarytool 钥匙串配置名，默认读 $AIASSISTANT_NOTARY_PROFILE
+  --output <目录>           产物目录，默认 $AIASSISTANT_PACKAGE_OUTPUT 或 artifacts/packages
+  --runtime <RID>           目标运行时，默认 osx-arm64
+  --certificate <路径>      自签名证书，随 pkg 一起分发并在 postinstall 导入
+  --keychain <路径>         签名使用的钥匙串
+  --require-sign            强制要求签名（缺标识或与 --skip-sign 同用即失败）
+  --skip-sign               跳过 codesign / 公证（仅布局装配）
+  --skip-models             不随包语音模型（仅调试，正式发布禁用）
+  --framework-dependent     产出依赖框架的包（默认自包含）
+  -h, --help                显示本帮助
+
+退出码: 0 成功 / 1 构建、签名或资产缺失 / 2 用法错误
+EOF
+}
+
+require_value() {
+  [[ $# -ge 2 && -n "$2" ]] || { usage >&2; exit 2; }
+}
 
 VERSION="${VERSION:-}"
 IDENTITY="${AIASSISTANT_CODESIGN_IDENTITY:-}"
@@ -18,23 +52,28 @@ KEYCHAIN=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --version) VERSION="$2"; shift 2 ;;
-    --identity) IDENTITY="$2"; shift 2 ;;
-    --notary-profile) NOTARY_PROFILE="$2"; shift 2 ;;
-    --output) OUTPUT_ROOT="$2"; shift 2 ;;
-    --runtime) RUNTIME="$2"; shift 2 ;;
+    --version) require_value "$@"; VERSION="$2"; shift 2 ;;
+    --identity) require_value "$@"; IDENTITY="$2"; shift 2 ;;
+    --notary-profile) require_value "$@"; NOTARY_PROFILE="$2"; shift 2 ;;
+    --output) require_value "$@"; OUTPUT_ROOT="$2"; shift 2 ;;
+    --runtime) require_value "$@"; RUNTIME="$2"; shift 2 ;;
     --skip-sign) SKIP_SIGN=1; shift ;;
     --skip-models) SKIP_MODELS=1; shift ;;
     --require-sign) REQUIRE_SIGN=1; shift ;;
-    --certificate) CERTIFICATE_PATH="$2"; shift 2 ;;
-    --keychain) KEYCHAIN="$2"; shift 2 ;;
+    --certificate) require_value "$@"; CERTIFICATE_PATH="$2"; shift 2 ;;
+    --keychain) require_value "$@"; KEYCHAIN="$2"; shift 2 ;;
     --framework-dependent) FRAMEWORK_DEPENDENT=1; shift ;;
-    *) echo "unknown argument: $1" >&2; exit 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if [[ "$OUTPUT_ROOT" = /* ]]; then
+  OUT_DIR="$OUTPUT_ROOT"
+else
+  OUT_DIR="$REPO_ROOT/$OUTPUT_ROOT"
+fi
+
 if [[ -z "$VERSION" ]]; then
   VERSION="$(sed -n 's:.*<VersionPrefix>\(.*\)</VersionPrefix>.*:\1:p' "$REPO_ROOT/Directory.Build.props" | head -1)"
 fi
@@ -58,7 +97,7 @@ if [[ "$REQUIRE_SIGN" -eq 1 ]]; then
   fi
 fi
 
-STAGE="$REPO_ROOT/$OUTPUT_ROOT/staging/$RUNTIME"
+STAGE="$OUT_DIR/staging/$RUNTIME"
 APP="$STAGE/AiAssistant.app"
 CONTENTS="$APP/Contents"
 SELF_CONTAINED="true"
@@ -154,8 +193,8 @@ else
   echo "skipping codesign/notarization (--skip-sign)"
 fi
 
-mkdir -p "$REPO_ROOT/$OUTPUT_ROOT"
-ZIP_PATH="$REPO_ROOT/$OUTPUT_ROOT/AiAssistant-$VERSION-$RUNTIME.zip"
+mkdir -p "$OUT_DIR"
+ZIP_PATH="$OUT_DIR/AiAssistant-$VERSION-$RUNTIME.zip"
 rm -f "$ZIP_PATH"
 if command -v ditto >/dev/null 2>&1; then
   ditto -c -k --keepParent "$APP" "$ZIP_PATH"
@@ -170,7 +209,7 @@ if [[ -f "$ZIP_PATH" ]]; then
   echo "zip: $ZIP_PATH"
 fi
 
-PKG_PATH="$REPO_ROOT/$OUTPUT_ROOT/AiAssistant-$VERSION-$RUNTIME.pkg"
+PKG_PATH="$OUT_DIR/AiAssistant-$VERSION-$RUNTIME.pkg"
 if [[ "$(uname -s)" == "Darwin" ]]; then
   PKG_ROOT="$STAGE/pkgroot"
   PKG_SCRIPTS="$STAGE/pkgscripts"
@@ -223,5 +262,5 @@ write_checksums() {
   )
 }
 
-write_checksums "$REPO_ROOT/$OUTPUT_ROOT"
+write_checksums "$OUT_DIR"
 echo "macOS package complete."
