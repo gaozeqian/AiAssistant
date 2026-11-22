@@ -22,7 +22,7 @@
 [CmdletBinding()]
 param(
     [string]$Version = "",
-    [string]$OutputRoot = "artifacts/packages",
+    [string]$OutputRoot = "artifacts/package",
     [string]$SignThumbprint = $env:AIASSISTANT_SIGN_CERT_THUMBPRINT,
     [string]$TimestampUrl = $env:AIASSISTANT_TIMESTAMP_URL,
     [string]$VerifyRootPath = $env:AIASSISTANT_SIGN_ROOT_CER,
@@ -33,7 +33,16 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$repoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
+if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+    throw "Cannot resolve repository root: run this script from a Git working tree."
+}
+$repoRoot = $repoRoot.Trim()
+$artifactsRoot = if ([string]::IsNullOrWhiteSpace($env:AIASSISTANT_ARTIFACTS_ROOT)) {
+    Join-Path $repoRoot "artifacts"
+} else {
+    $env:AIASSISTANT_ARTIFACTS_ROOT
+}
 $runtime = "win-x64"
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
@@ -51,8 +60,8 @@ if ([string]::IsNullOrWhiteSpace($TimestampUrl)) {
     $TimestampUrl = "http://timestamp.digicert.com"
 }
 
-$outputDir = Join-Path $repoRoot $OutputRoot
-$stageDir = Join-Path $outputDir "staging\$runtime"
+$outputDir = if ([System.IO.Path]::IsPathRooted($OutputRoot)) { $OutputRoot } else { Join-Path $repoRoot $OutputRoot }
+$stageDir = Join-Path $artifactsRoot "build\staging\$runtime"
 $selfContained = -not $FrameworkDependent
 
 function Find-SdkTool {
@@ -107,7 +116,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Local model assets ship with the installer; only the chat/embedding models stay external.
-$modelBundleSource = Join-Path $repoRoot "artifacts/models/bundle"
+$modelBundleSource = Join-Path $artifactsRoot "cache\models\bundle"
 $modelBundleTarget = Join-Path $stageDir "models"
 if ($SkipModelBundle) {
     Write-Warning "Model bundle skipped; the installer will not include wake-word/ASR/TTS assets."

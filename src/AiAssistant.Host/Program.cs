@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using AiAssistant.Application.UseCases;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Host.Benchmarks;
 using AiAssistant.Platform.Linux.Desktop;
 using Avalonia;
@@ -603,7 +604,7 @@ public static class Program
     private static string ResolveOutputDirectory(string[] args, string defaultFolder) =>
         TryGetOption(args, "--output", out var value)
             ? Path.GetFullPath(value)
-            : Path.GetFullPath(Path.Combine("artifacts", defaultFolder));
+            : ArtifactPaths.Resolve("evidence", defaultFolder);
 
     private static string? ReadSecretFromConsole()
     {
@@ -648,7 +649,7 @@ public static class Program
             return Path.GetFullPath(value);
         }
 
-        return Path.GetFullPath(Path.Combine("artifacts", "golden", prefix));
+        return ArtifactPaths.Resolve("evidence", "golden", prefix);
     }
 
     private static string ResolveBenchmarkOutput(string[] args, string prefix)
@@ -658,10 +659,10 @@ public static class Program
             return Path.GetFullPath(value);
         }
 
-        return Path.GetFullPath(Path.Combine(
-            "artifacts",
+        return ArtifactPaths.Resolve(
+            "evidence",
             "benchmarks",
-            $"{prefix}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.md"));
+            $"{prefix}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.md");
     }
 
     /// <summary>Arguments that run headless and must never touch the GUI single-instance socket.</summary>

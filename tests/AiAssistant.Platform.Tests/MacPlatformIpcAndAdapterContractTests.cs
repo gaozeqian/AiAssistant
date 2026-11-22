@@ -1,6 +1,7 @@
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using AiAssistant.Application.Ports;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Platform.macOS;
@@ -17,7 +18,7 @@ public sealed class MacPlatformIpcAndAdapterContractTests : IDisposable
     public MacPlatformIpcAndAdapterContractTests()
     {
         // AF_UNIX paths must stay short on every OS; artifacts is already the repo-local test scratch area.
-        _tempRoot = Path.Combine(FindRepoRoot(), "artifacts", "test-temp", "s3", Guid.NewGuid().ToString("N")[..6]);
+        _tempRoot = Path.Combine(ArtifactPaths.Resolve(FindRepoRoot(), "tmp", "s3"), Guid.NewGuid().ToString("N")[..6]);
         Directory.CreateDirectory(_tempRoot);
     }
 

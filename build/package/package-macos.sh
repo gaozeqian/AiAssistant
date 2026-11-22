@@ -20,7 +20,7 @@ usage() {
   --version <版本>          指定版本，默认取 Directory.Build.props 的 VersionPrefix
   --identity <标识>         codesign 标识，默认读 $AIASSISTANT_CODESIGN_IDENTITY
   --notary-profile <名称>   notarytool 钥匙串配置名，默认读 $AIASSISTANT_NOTARY_PROFILE
-  --output <目录>           产物目录，默认 $AIASSISTANT_PACKAGE_OUTPUT 或 artifacts/packages
+  --output <目录>           产物目录，默认 $AIASSISTANT_PACKAGE_OUTPUT 或 artifacts/package
   --runtime <RID>           目标运行时，默认 osx-arm64
   --certificate <路径>      自签名证书，随 pkg 一起分发并在 postinstall 导入
   --keychain <路径>         签名使用的钥匙串
@@ -41,7 +41,7 @@ require_value() {
 VERSION="${VERSION:-}"
 IDENTITY="${AIASSISTANT_CODESIGN_IDENTITY:-}"
 NOTARY_PROFILE="${AIASSISTANT_NOTARY_PROFILE:-}"
-OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-artifacts/packages}"
+OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-artifacts/package}"
 SKIP_SIGN=0
 SKIP_MODELS=0
 REQUIRE_SIGN=0
@@ -68,6 +68,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+ARTIFACTS_ROOT="${AIASSISTANT_ARTIFACTS_ROOT:-$REPO_ROOT/artifacts}"
 if [[ "$OUTPUT_ROOT" = /* ]]; then
   OUT_DIR="$OUTPUT_ROOT"
 else
@@ -97,7 +98,7 @@ if [[ "$REQUIRE_SIGN" -eq 1 ]]; then
   fi
 fi
 
-STAGE="$OUT_DIR/staging/$RUNTIME"
+STAGE="$ARTIFACTS_ROOT/build/staging/$RUNTIME"
 APP="$STAGE/AiAssistant.app"
 CONTENTS="$APP/Contents"
 SELF_CONTAINED="true"
@@ -130,7 +131,7 @@ fi
 if [[ "$SKIP_MODELS" -eq 1 ]]; then
   echo "warning: --skip-models set; the app will not include voice model assets" >&2
 else
-  MODEL_BUNDLE="$REPO_ROOT/artifacts/models/bundle"
+  MODEL_BUNDLE="$ARTIFACTS_ROOT/cache/models/bundle"
   if [[ ! -d "$MODEL_BUNDLE" ]]; then
     echo "model bundle not found: $MODEL_BUNDLE (run build/models/stage-bundle.sh, or pass --skip-models)" >&2
     exit 1

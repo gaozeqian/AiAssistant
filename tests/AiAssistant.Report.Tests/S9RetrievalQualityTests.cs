@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using AiAssistant.Application.Ports;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Models;
@@ -183,7 +184,7 @@ public sealed class S9RetrievalQualityTests
                 return;
             }
 
-            var outputDirectory = Path.Combine(directory.FullName, "artifacts", "benchmarks");
+            var outputDirectory = ArtifactPaths.Resolve(directory.FullName, "evidence", "benchmarks");
             Directory.CreateDirectory(outputDirectory);
             await File.WriteAllTextAsync(
                 Path.Combine(outputDirectory, "retrieval-benchmark.md"),

@@ -17,7 +17,7 @@ usage() {
 
 选项:
   --version <版本>        指定版本，默认取 Directory.Build.props 的 VersionPrefix
-  --output <目录>         产物目录，默认 $AIASSISTANT_PACKAGE_OUTPUT 或 artifacts/packages
+  --output <目录>         产物目录，默认 $AIASSISTANT_PACKAGE_OUTPUT 或 artifacts/package
   --runtime <RID>         目标运行时，默认 linux-x64
   --framework-dependent   产出依赖框架的包（默认自包含）
   --skip-models           不随包语音模型（仅调试，正式发布禁用）
@@ -32,7 +32,7 @@ require_value() {
 }
 
 VERSION="${VERSION:-}"
-OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-artifacts/packages}"
+OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-artifacts/package}"
 RUNTIME="linux-x64"
 FRAMEWORK_DEPENDENT=0
 SKIP_MODELS=0
@@ -49,6 +49,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+ARTIFACTS_ROOT="${AIASSISTANT_ARTIFACTS_ROOT:-$REPO_ROOT/artifacts}"
 if [[ "$OUTPUT_ROOT" = /* ]]; then
   OUT_DIR="$OUTPUT_ROOT"
 else
@@ -69,7 +70,7 @@ if [[ "$FRAMEWORK_DEPENDENT" -eq 1 ]]; then
   SELF_CONTAINED="false"
 fi
 
-STAGE="$OUT_DIR/staging/$RUNTIME"
+STAGE="$ARTIFACTS_ROOT/build/staging/$RUNTIME"
 APP_DIR="$STAGE/usr/lib/aiassistant"
 
 echo "== AiAssistant Linux package =="
@@ -93,7 +94,7 @@ dotnet publish "$REPO_ROOT/src/AiAssistant.Host/AiAssistant.Host.csproj" \
 if [[ "$SKIP_MODELS" -eq 1 ]]; then
   echo "warning: --skip-models set; the package will not include voice model assets" >&2
 else
-  MODEL_BUNDLE="$REPO_ROOT/artifacts/models/bundle"
+  MODEL_BUNDLE="$ARTIFACTS_ROOT/cache/models/bundle"
   if [[ ! -d "$MODEL_BUNDLE" ]]; then
     echo "model bundle not found: $MODEL_BUNDLE (run build/models/stage-bundle.sh, or pass --skip-models)" >&2
     exit 1

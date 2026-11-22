@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Application.Policies;
 using AiAssistant.Application.Ports;
 using AiAssistant.Capture;
@@ -28,8 +29,19 @@ public sealed class S9RealTimeSoakTests : IDisposable
 
     public S9RealTimeSoakTests()
     {
-        _tempRoot = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"));
+        _tempRoot = Path.Combine(ArtifactPaths.Resolve(FindRepoRoot(), "tmp", "soak-real"), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempRoot);
+    }
+
+    private static string FindRepoRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "AiAssistant.sln")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("Repository root not found.");
     }
 
     public void Dispose()
@@ -302,8 +314,7 @@ public sealed class S9RealTimeSoakTests : IDisposable
 
     private static async Task WriteReportAsync(RealTimeSoakReport report, CancellationToken ct)
     {
-        var directory = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "artifacts", "soak");
-        directory = Path.GetFullPath(directory);
+        var directory = ArtifactPaths.Resolve(FindRepoRoot(), "evidence", "soak");
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(
             Path.Combine(directory, $"soak-real-{report.Minutes}m.md"),

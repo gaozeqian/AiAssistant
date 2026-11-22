@@ -1,16 +1,25 @@
 param(
     [Parameter(Mandatory = $true)][string]$Version,
     [Parameter(Mandatory = $true)][string]$CertificatePath,
-    [string]$OutputDirectory = "artifacts/packages",
+    [string]$OutputDirectory = "artifacts/package",
     [string]$SignThumbprint = $env:AIASSISTANT_SIGN_CERT_THUMBPRINT,
     [switch]$SkipSigning,
     [switch]$SkipModelBundle
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$outputRoot = Join-Path $repoRoot $OutputDirectory
-$stage = Join-Path $outputRoot "staging\msi"
+$repoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
+if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+    throw "Cannot resolve repository root: run this script from a Git working tree."
+}
+$repoRoot = $repoRoot.Trim()
+$artifactsRoot = if ([string]::IsNullOrWhiteSpace($env:AIASSISTANT_ARTIFACTS_ROOT)) {
+    Join-Path $repoRoot "artifacts"
+} else {
+    $env:AIASSISTANT_ARTIFACTS_ROOT
+}
+$outputRoot = if ([System.IO.Path]::IsPathRooted($OutputDirectory)) { $OutputDirectory } else { Join-Path $repoRoot $OutputDirectory }
+$stage = Join-Path $artifactsRoot "build\staging\msi"
 $msiPath = Join-Path $outputRoot "AiAssistant-$Version-win-x64.msi"
 $wxs = Join-Path $repoRoot "build\package\windows\Package.msi.wxs"
 
@@ -35,7 +44,7 @@ Copy-Item $CertificatePath (Join-Path $stage "AiAssistant.cer") -Force
 Copy-Item (Join-Path $repoRoot "build\package\assets\aiassistant.ico") (Join-Path $stage "aiassistant.ico") -Force
 
 # Local model assets ship with the installer; only the chat/embedding models stay external.
-$modelBundleSource = Join-Path $repoRoot "artifacts/models/bundle"
+$modelBundleSource = Join-Path $artifactsRoot "cache\models\bundle"
 if ($SkipModelBundle) {
     Write-Warning "Model bundle skipped; the installer will not include wake-word/ASR/TTS assets."
 }

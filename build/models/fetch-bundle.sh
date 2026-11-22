@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 下载随安装包分发的 sherpa-onnx 官方模型资产，并汇总到 artifacts/models/bundle。
+# 下载随安装包分发的 sherpa-onnx 官方模型资产，并汇总到 artifacts/cache/models/bundle。
 # 只有对话与 Embedding 模型保持外置。
 #
 # 资产（上游均为 Apache-2.0 或 MIT）：
@@ -20,8 +20,8 @@ usage() {
   cat <<'EOF'
 用法: bash build/models/fetch-bundle.sh [选项]
 
-下载并展开 sherpa-onnx 模型资产到 artifacts/models/，然后调用 stage-bundle.sh 汇总随包载荷。
-已存在的压缩包会复用（缓存在 artifacts/models/downloads）。
+下载并展开 sherpa-onnx 模型资产到 artifacts/cache/models/，然后调用 stage-bundle.sh 汇总随包载荷。
+已存在的压缩包会复用（缓存在 artifacts/cache/models/downloads）。
 
 选项:
   --with-rapidocr   透传给 stage-bundle.sh：额外打包 RapidOCR 模型
@@ -47,7 +47,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-MODELS="$REPO_ROOT/artifacts/models"
+ARTIFACTS_ROOT="${AIASSISTANT_ARTIFACTS_ROOT:-$REPO_ROOT/artifacts}"
+MODELS="$ARTIFACTS_ROOT/cache/models"
 CACHE="$MODELS/downloads"
 REPO="k2-fsa/sherpa-onnx"
 

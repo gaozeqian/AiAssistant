@@ -5,7 +5,7 @@ Reads the NuGet restore graph (`obj/project.assets.json`) instead of shelling ou
 CycloneDX tool, so SBOM generation works in air-gapped and low-privilege environments.
 
 Usage:
-    python build/sbom/generate-sbom.py                       # artifacts/sbom/bom.json
+    python build/sbom/generate-sbom.py                       # artifacts/build/sbom/bom.json
     python build/sbom/generate-sbom.py --verify              # fail on malformed output
     python build/sbom/generate-sbom.py --check-manifest      # every CPM package documented
 """
@@ -23,7 +23,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 NAMESPACE = uuid.UUID("6f9619ff-8b86-d011-b42d-00c04fc964ff")
-DEFAULT_OUTPUT = Path("artifacts/sbom/bom.json")
+ARTIFACTS_ROOT = Path(os.environ.get("AIASSISTANT_ARTIFACTS_ROOT", "artifacts"))
+DEFAULT_OUTPUT = ARTIFACTS_ROOT / "build" / "sbom" / "bom.json"
 
 
 def read_version(repo: Path) -> str:
@@ -38,7 +39,7 @@ def collect_assets(repo: Path):
     direct: set[str] = set()
 
     for assets_path in repo.glob("**/obj/project.assets.json"):
-        if "artifacts" in assets_path.parts:
+        if ARTIFACTS_ROOT.name in assets_path.parts:
             continue
         try:
             data = json.loads(assets_path.read_text(encoding="utf-8"))

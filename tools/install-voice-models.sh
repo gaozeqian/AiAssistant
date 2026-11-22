@@ -14,7 +14,7 @@ usage() {
   cat <<'EOF'
 用法: bash tools/install-voice-models.sh [目标数据目录] [选项]
 
-把 artifacts/models 下已下载的 KWS / Paraformer / MeloTTS 资产复制到
+把 artifacts/cache/models 下已下载的 KWS / Paraformer / MeloTTS 资产复制到
 <目标数据目录>/models/sherpa，供本机 GUI 直接使用。
 
   [目标数据目录]   默认 $AIASSISTANT_DATA_DIRECTORY，否则 ~/.local/share/AiAssistant
@@ -41,9 +41,11 @@ for arg in "$@"; do
   esac
 done
 
-KWS_SRC="$REPO_ROOT/artifacts/models/sherpa-kws/kws"
-ASR_SRC="$REPO_ROOT/artifacts/models/sherpa-onnx-paraformer-zh-small-2024-03-09"
-TTS_SRC="$REPO_ROOT/artifacts/models/sherpa-tts"
+ARTIFACTS_ROOT="${AIASSISTANT_ARTIFACTS_ROOT:-$REPO_ROOT/artifacts}"
+MODELS="$ARTIFACTS_ROOT/cache/models"
+KWS_SRC="$MODELS/sherpa-kws/kws"
+ASR_SRC="$MODELS/sherpa-onnx-paraformer-zh-small-2024-03-09"
+TTS_SRC="$MODELS/sherpa-tts"
 
 for path in "$KWS_SRC" "$ASR_SRC"; do
   [[ -d "$path" ]] || { echo "缺少模型资产目录：$path（请先下载 sherpa-onnx KWS / Paraformer 模型）" >&2; exit 1; }

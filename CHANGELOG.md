@@ -24,7 +24,7 @@
 
 ### Changed
 
-- 随包 TTS 由 `vits-zh-aishell3` 更换为 MeloTTS（MIT）；旧权重归档至 `artifacts/models/_retired/`，不再参与打包。
+- 随包 TTS 由 `vits-zh-aishell3` 更换为 MeloTTS（MIT）；旧权重归档至 `artifacts/evidence/retired-models/`，不再参与打包。
 - Windows 交付格式收敛为 `zip` 与 `MSI`，MSIX 打包链路下线。
 
 ### Security

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Desktop.Views;
 using Avalonia;
@@ -120,7 +121,7 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
                 var outputRoot = Environment.GetEnvironmentVariable("AIASSISTANT_UI_E2E_OUTPUT");
                 if (string.IsNullOrWhiteSpace(outputRoot))
                 {
-                    outputRoot = Path.Combine(Environment.CurrentDirectory, "artifacts", "e2e");
+                    outputRoot = ArtifactPaths.Resolve("evidence", "e2e");
                 }
 
                 _ = UiE2ERunner.RunAsync(

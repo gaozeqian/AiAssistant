@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Platform.macOS;
@@ -21,7 +22,7 @@ public sealed class MacPlatformLiveHelperTests : IDisposable
 
     public MacPlatformLiveHelperTests()
     {
-        _tempRoot = Path.Combine(FindRepoRoot(), "artifacts", "test-temp", "s7", Guid.NewGuid().ToString("N")[..6]);
+        _tempRoot = Path.Combine(ArtifactPaths.Resolve(FindRepoRoot(), "tmp", "s7"), Guid.NewGuid().ToString("N")[..6]);
         Directory.CreateDirectory(_tempRoot);
     }
 

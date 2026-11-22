@@ -7,7 +7,7 @@
 | 路径 | 职责 |
 |---|---|
 | `models/fetch-bundle.sh` | 下载并展开 sherpa-onnx 模型资产 |
-| `models/stage-bundle.sh` | 汇总随包模型载荷到 `artifacts/models/bundle` |
+| `models/stage-bundle.sh` | 汇总随包模型载荷到 `artifacts/cache/models/bundle` |
 | `package/package-windows.ps1` | Windows 自包含 zip（可选签名） |
 | `package/package-windows-msi.ps1` | Windows MSI（WiX，可选签名） |
 | `package/package-macos.sh` | macOS `.app` / `.zip` / `.pkg`（codesign + 可选公证） |

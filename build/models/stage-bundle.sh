@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# 汇总随安装包分发的模型载荷（默认 artifacts/models/bundle）。
+# 汇总随安装包分发的模型载荷（默认 artifacts/cache/models/bundle）。
 # 只有对话与 Embedding 模型保持外置，本机语音栈随包。
 #
 # 期望的源布局（全部 gitignore，每台机器下载一次）：
-#   artifacts/models/sherpa-kws/kws/{encoder,decoder,joiner}.onnx, tokens.txt, keywords.txt
-#   artifacts/models/sherpa-onnx-paraformer-zh-small-2024-03-09/model.int8.onnx, tokens.txt
-#   artifacts/models/sherpa-tts/{model.onnx,tokens.txt,lexicon.txt,*.fst,dict/}  (MeloTTS, MIT)
-#   artifacts/models/sherpa-vad/silero_vad.onnx
+#   artifacts/cache/models/sherpa-kws/kws/{encoder,decoder,joiner}.onnx, tokens.txt, keywords.txt
+#   artifacts/cache/models/sherpa-onnx-paraformer-zh-small-2024-03-09/model.int8.onnx, tokens.txt
+#   artifacts/cache/models/sherpa-tts/{model.onnx,tokens.txt,lexicon.txt,*.fst,dict/}  (MeloTTS, MIT)
+#   artifacts/cache/models/sherpa-vad/silero_vad.onnx
 # 可选：
-#   artifacts/models/rapidocr/{ch_PP-OCRv4_det_infer.onnx,ch_PP-OCRv4_rec_infer.onnx,ppocr_keys_v1.txt}
-#   artifacts/models/whisper/ggml-small.bin
+#   artifacts/cache/models/rapidocr/{ch_PP-OCRv4_det_infer.onnx,ch_PP-OCRv4_rec_infer.onnx,ppocr_keys_v1.txt}
+#   artifacts/cache/models/whisper/ggml-small.bin
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,7 +23,7 @@ usage() {
   cat <<'EOF'
 用法: bash build/models/stage-bundle.sh [选项]
 
-把本机语音模型汇总到 artifacts/models/bundle，供三个平台的打包脚本复制进安装包。
+把本机语音模型汇总到 artifacts/cache/models/bundle，供三个平台的打包脚本复制进安装包。
 
 选项:
   --with-rapidocr   额外打包 RapidOCR 模型（Linux OCR 兜底）
@@ -38,7 +38,8 @@ EOF
 log() { printf '[stage-bundle] %s\n' "$*"; }
 die() { printf '[stage-bundle] 错误：%s\n' "$*" >&2; exit 1; }
 
-MODELS="$REPO_ROOT/artifacts/models"
+ARTIFACTS_ROOT="${AIASSISTANT_ARTIFACTS_ROOT:-$REPO_ROOT/artifacts}"
+MODELS="$ARTIFACTS_ROOT/cache/models"
 BUNDLE="$MODELS/bundle"
 WITH_RAPIDOCR=0
 WITH_WHISPER=0

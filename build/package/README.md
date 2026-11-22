@@ -1,6 +1,6 @@
 # 发布打包
 
-跨平台发布脚本，产物统一落在 `artifacts/packages/`（已被 `.gitignore` 忽略）。
+跨平台发布脚本，产物统一落在 `artifacts/package/`（已被 `.gitignore` 忽略）。
 
 ## 模型载荷（三平台共用）
 
@@ -12,7 +12,7 @@ bash build/models/stage-bundle.sh
 bash build/models/stage-bundle.sh --with-rapidocr --with-whisper
 ```
 
-- `stage-bundle.sh` 从 `artifacts/models/sherpa-kws/kws`、`sherpa-onnx-paraformer-zh-small-2024-03-09`、`sherpa-tts`、`sherpa-vad` 汇总到 `artifacts/models/bundle`；缺 KWS/ASR/TTS/VAD 任一项直接失败。MeloTTS 还要求 `sherpa-tts/dict/` 与 4 个 `*.fst`，缺失会导致数字、电话与多音字读错，因此一并纳入必检项。
+- `stage-bundle.sh` 从 `artifacts/cache/models/sherpa-kws/kws`、`sherpa-onnx-paraformer-zh-small-2024-03-09`、`sherpa-tts`、`sherpa-vad` 汇总到 `artifacts/cache/models/bundle`；缺 KWS/ASR/TTS/VAD 任一项直接失败。MeloTTS 还要求 `sherpa-tts/dict/` 与 4 个 `*.fst`，缺失会导致数字、电话与多音字读错，因此一并纳入必检项。
 - 三个平台的打包脚本都会把 bundle 复制到应用目录：Windows `models\`、macOS `AiAssistant.app/Contents/MacOS/models`、Linux `/usr/lib/aiassistant/models`。
 - 应用解析顺序：`AIASSISTANT_*_MODEL_DIR` → `<数据目录>/models/...` → `<应用目录>/models/...`，用户可用数据目录覆盖随包模型。
 - 法务文件随包分发：`LICENSE`、`EULA.md`、`THIRD-PARTY-NOTICES.md` 与 `THIRD-PARTY-NOTICES-ONNXRUNTIME.txt`；Windows 安装目录根、macOS `AiAssistant.app/Contents/Resources/`、Linux `/usr/lib/aiassistant/` 与 `/usr/share/doc/aiassistant/`。任一文件缺失时打包脚本都会直接失败。

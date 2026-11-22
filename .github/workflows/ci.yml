@@ -51,7 +51,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: soak-report-${{ matrix.rid }}
-          path: artifacts/soak/*.md
+          path: artifacts/evidence/soak/*.md
           if-no-files-found: ignore
 
       - name: Upload benchmark reports
@@ -59,7 +59,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-reports-${{ matrix.rid }}
-          path: artifacts/benchmarks/*.md
+          path: artifacts/evidence/benchmarks/*.md
           if-no-files-found: ignore
 
       - name: Build & Smoke-Test Swift Helper (macOS arm64)
@@ -70,15 +70,15 @@ jobs:
           .build/release/aiassistant-mac-helper --smoke-check
 
       - name: Verify RID Native Asset Packaging (${{ matrix.rid }})
-        run: dotnet publish src/AiAssistant.Host/AiAssistant.Host.csproj -c Release -r ${{ matrix.rid }} --self-contained false -o artifacts/publish/${{ matrix.rid }}
+        run: dotnet publish src/AiAssistant.Host/AiAssistant.Host.csproj -c Release -r ${{ matrix.rid }} --self-contained false -o artifacts/build/publish/${{ matrix.rid }}
 
       - name: Verify Swift Helper Is Bundled (macOS arm64)
         if: matrix.rid == 'osx-arm64'
-        run: test -x artifacts/publish/osx-arm64/aiassistant-mac-helper
+        run: test -x artifacts/build/publish/osx-arm64/aiassistant-mac-helper
 
       - name: Verify Linux Portal Adapter Is Bundled (linux-x64)
         if: matrix.rid == 'linux-x64'
-        run: test -f artifacts/publish/linux-x64/Tmds.DBus.Protocol.dll
+        run: test -f artifacts/build/publish/linux-x64/Tmds.DBus.Protocol.dll
 
   package:
     name: Package (${{ matrix.rid }})
@@ -127,10 +127,10 @@ jobs:
         with:
           name: package-${{ matrix.rid }}
           path: |
-            artifacts/packages/*.zip
-            artifacts/packages/*.tar.gz
-            artifacts/packages/*.deb
-            artifacts/packages/SHA256SUMS
+            artifacts/package/*.zip
+            artifacts/package/*.tar.gz
+            artifacts/package/*.deb
+            artifacts/package/SHA256SUMS
           if-no-files-found: error
 
   sbom-and-licenses:
@@ -154,4 +154,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sbom-cyclonedx
-          path: artifacts/sbom/bom.json
+          path: artifacts/build/sbom/bom.json

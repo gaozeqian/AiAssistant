@@ -41,7 +41,7 @@ jobs:
             -CertStoreLocation Cert:\CurrentUser\My `
             -KeyExportPolicy Exportable `
             -NotAfter (Get-Date).AddYears(1)
-          $cer = Join-Path $env:GITHUB_WORKSPACE "artifacts/packages/AiAssistant-$version-win-x64.cer"
+          $cer = Join-Path $env:GITHUB_WORKSPACE "artifacts/package/AiAssistant-$version-win-x64.cer"
           New-Item -ItemType Directory -Force (Split-Path $cer) | Out-Null
           Export-Certificate -Cert $cert -FilePath $cer | Out-Null
           certutil -user -addstore -f Root $cer | Out-Null
@@ -64,16 +64,16 @@ jobs:
         run: |
           ./build/package/package-windows-msi.ps1 `
             -Version $env:APP_VERSION `
-            -CertificatePath "artifacts/packages/AiAssistant-$($env:APP_VERSION.TrimStart('v'))-win-x64.cer" `
+            -CertificatePath "artifacts/package/AiAssistant-$($env:APP_VERSION.TrimStart('v'))-win-x64.cer" `
             -SignThumbprint $env:AIASSISTANT_SIGN_CERT_THUMBPRINT
 
       - uses: actions/upload-artifact@v4
         with:
           name: release-win-x64
           path: |
-            artifacts/packages/*.zip
-            artifacts/packages/*.msi
-            artifacts/packages/*.cer
+            artifacts/package/*.zip
+            artifacts/package/*.msi
+            artifacts/package/*.cer
           if-no-files-found: error
 
   macos:
@@ -97,9 +97,9 @@ jobs:
       - name: Create self-signed signing identity
         run: |
           version="${APP_VERSION#v}"
-          mkdir -p artifacts/packages
+          mkdir -p artifacts/package
           bash build/package/macos/create-self-signed-identity.sh \
-            "$GITHUB_WORKSPACE/artifacts/packages/AiAssistant-$version-osx-arm64.cer" \
+            "$GITHUB_WORKSPACE/artifacts/package/AiAssistant-$version-osx-arm64.cer" \
             "AiAssistant Self-Signed"
 
       - name: Fetch bundled voice models
@@ -115,14 +115,14 @@ jobs:
           bash build/package/package-macos.sh \
             --version "$APP_VERSION" \
             --require-sign \
-            --certificate "artifacts/packages/AiAssistant-$version-osx-arm64.cer"
+            --certificate "artifacts/package/AiAssistant-$version-osx-arm64.cer"
 
       - uses: actions/upload-artifact@v4
         with:
           name: release-osx-arm64
           path: |
-            artifacts/packages/*.pkg
-            artifacts/packages/*.cer
+            artifacts/package/*.pkg
+            artifacts/package/*.cer
           if-no-files-found: error
 
   linux:
@@ -150,7 +150,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: release-linux-x64
-          path: artifacts/packages/*.deb
+          path: artifacts/package/*.deb
           if-no-files-found: error
 
   publish:
@@ -181,7 +181,7 @@ jobs:
 
       - name: Stage SBOM and checksums
         run: |
-          cp artifacts/sbom/bom.json dist/bom.json
+          cp artifacts/build/sbom/bom.json dist/bom.json
           cd dist
           find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' | sort | while read -r file; do
             sha256sum "$file"

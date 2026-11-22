@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Application.Policies;
 using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
@@ -504,7 +505,7 @@ public sealed class S9MultiDaySoakTests : IDisposable
                     return;
                 }
 
-                var directory = Path.Combine(root, "artifacts", "soak");
+                var directory = ArtifactPaths.Resolve(root, "evidence", "soak");
                 Directory.CreateDirectory(directory);
                 await File.WriteAllTextAsync(
                     Path.Combine(directory, $"soak-{report.SimulatedDays}d.md"),
