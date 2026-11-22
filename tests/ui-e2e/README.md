@@ -69,3 +69,24 @@ Avalonia 的 macOS 辅助功能桥只暴露窗口、`TextBlock`（`kAXValue`）�
 `tests/AiAssistant.Platform.Tests/DesktopViewModelTests.cs` 中的 `FullWindow_*` 场景在
 Avalonia.Headless 内驱动真实 `MainWindow`（真实指针点击/键盘/文本输入），平台端口用 fake，
 是当前稳定可跑的「带 UI」端到端自动化。
+
+## 真实平台自驱动（Linux / 任意带显示环境，`--ui-e2e`）
+
+Linux 的 GNOME Wayland 会拦截 XTest 外部输入注入，且 Avalonia 不向 AT-SPI 暴露控件树，
+因此提供**进程内自驱动**的真实 UI 端到端模式：应用自己启动真实 Avalonia 窗口（原生
+Wayland 或 X11 后端、真实 Skia 渲染、真实主题与托盘），在 UI 线程上按脚本切换 7 个页面并
+执行暂停/恢复、语音启停、两步删除、诊断刷新、主题切换，每步用 `RenderTargetBitmap` 输出
+PNG，最后写出通过/失败报告并退出。
+
+```bash
+AIASSISTANT_DATA_DIRECTORY=/tmp/aia-ui-e2e \
+AIASSISTANT_MODELS_CONFIG=/path/to/models.json \
+AIASSISTANT_SHERPA_MODEL_DIR=/path/to/sherpa \
+  AiAssistant.Host --ui-e2e
+# 退出码 0 全部通过；1 有失败步骤；报告与截图写入 artifacts/e2e/ui-<时间>/
+```
+
+- 输出目录可用 `AIASSISTANT_UI_E2E_OUTPUT` 覆盖；语音模型/KWS 资产缺失时该步标记为跳过而非失败。
+- 已知：真实桌面退出时异步服务释放可能阻塞，运行器写报告后会在 5 秒内确定性 `Environment.Exit`。
+- 2026-11-22 在 Ubuntu 26.04 + GNOME Wayland 实测 11/11 通过（含真实窗口标题、暂停横幅、
+  语音「Wake word ready」、诊断页 10 项能力、主题切换），截图见当次 `artifacts/e2e/` 目录。

@@ -69,11 +69,17 @@ public static class Program
                     return exitCode;
                 }
 
-                // UI E2E 钩子：`open -a AiAssistant.app --args --show-window --data-directory <dir>`
-                // 让 tray-only 应用直接显示主窗口并隔离数据目录，供外部 AX 驱动测试。
+                // UI E2E 钩子：`--show-window` 让 tray-only 应用直接显示主窗口并隔离数据目录，
+                // 供外部 AX 驱动测试；`--ui-e2e` 额外启用内置真实 UI 自驱动流程（真实窗口 + 真实渲染）。
                 if (args.Contains("--show-window", StringComparer.OrdinalIgnoreCase))
                 {
                     Environment.SetEnvironmentVariable("AIASSISTANT_UI_E2E_SHOW", "1");
+                }
+
+                if (args.Contains("--ui-e2e", StringComparer.OrdinalIgnoreCase))
+                {
+                    Environment.SetEnvironmentVariable("AIASSISTANT_UI_E2E_SHOW", "1");
+                    Environment.SetEnvironmentVariable("AIASSISTANT_UI_E2E", "1");
                 }
 
                 if (TryGetOption(args, "--data-directory", out var dataDirectory))

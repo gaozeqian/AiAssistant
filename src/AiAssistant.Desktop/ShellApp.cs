@@ -60,11 +60,16 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             shell.ThemeVariantChanged += variant => RequestedThemeVariant = variant;
 
             // UI E2E hook: the app normally starts as a tray-only agent; this shows the window
-            // immediately so an external AX driver can exercise the real window without a tray click.
-            if (string.Equals(
-                    Environment.GetEnvironmentVariable("AIASSISTANT_UI_E2E_SHOW"),
-                    "1",
-                    StringComparison.Ordinal))
+            // immediately so an external driver (or the in-app runner below) can exercise the real window.
+            var showWindow = string.Equals(
+                Environment.GetEnvironmentVariable("AIASSISTANT_UI_E2E_SHOW"),
+                "1",
+                StringComparison.Ordinal);
+            var runUiE2E = string.Equals(
+                Environment.GetEnvironmentVariable("AIASSISTANT_UI_E2E"),
+                "1",
+                StringComparison.Ordinal);
+            if (showWindow || runUiE2E)
             {
                 window.Show();
             }
@@ -76,7 +81,22 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
                 Dispose();
                 shell.Dispose();
             };
-            _ = InitializeShellSafelyAsync(shell);
+            var initialization = InitializeShellSafelyAsync(shell);
+            if (runUiE2E)
+            {
+                var outputRoot = Environment.GetEnvironmentVariable("AIASSISTANT_UI_E2E_OUTPUT");
+                if (string.IsNullOrWhiteSpace(outputRoot))
+                {
+                    outputRoot = Path.Combine(Environment.CurrentDirectory, "artifacts", "e2e");
+                }
+
+                _ = UiE2ERunner.RunAsync(
+                    window,
+                    shell,
+                    initialization,
+                    desktop.Shutdown,
+                    Path.GetFullPath(outputRoot));
+            }
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -156,15 +176,17 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
         return d;
     }
 
-    private static async Task InitializeShellSafelyAsync(ShellViewModel shell)
+    private static async Task<Exception?> InitializeShellSafelyAsync(ShellViewModel shell)
     {
         try
         {
             await shell.InitializeAsync();
+            return null;
         }
         catch (Exception ex)
         {
             Trace.TraceError("Desktop shell initialization failed ({0}).", ex.GetType().Name);
+            return ex;
         }
     }
 
