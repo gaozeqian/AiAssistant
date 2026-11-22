@@ -37,6 +37,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string _baseUrl = "http://127.0.0.1:11434";
     private string _chatModel = string.Empty;
     private string _embeddingModel = string.Empty;
+    private ModelTierOption _selectedTier = new("LocalOffline", "本机 Ollama");
     private string _modelConfigStatus = "保存后需重启应用生效。";
 
     public DiagnosticsViewModel(
@@ -57,6 +58,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
             _baseUrl = view.BaseUrl;
             _chatModel = view.ChatModel;
             _embeddingModel = view.EmbeddingModel;
+            _selectedTier = TierOptions.First(option => option.Value == view.Tier);
         }
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
@@ -200,6 +202,25 @@ public sealed class DiagnosticsViewModel : ObservableObject
         get => _embeddingModel;
         set => SetProperty(ref _embeddingModel, value);
     }
+
+    public ModelTierOption SelectedTier
+    {
+        get => _selectedTier;
+        set
+        {
+            if (SetProperty(ref _selectedTier, value) && value.Value != "LocalOffline" && string.IsNullOrWhiteSpace(BaseUrl))
+            {
+                BaseUrl = "https://";
+            }
+        }
+    }
+
+    public IReadOnlyList<ModelTierOption> TierOptions { get; } =
+    [
+        new("LocalOffline", "本机 Ollama"),
+        new("CorporateIntranet", "企业内网"),
+        new("PublicCloud", "公网 API")
+    ];
 
     public string ModelConfigStatus
     {
@@ -365,7 +386,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
         try
         {
             await _modelConfiguration.SaveAsync(
-                new ModelConfigurationView(BaseUrl, ChatModel, EmbeddingModel),
+                new ModelConfigurationView(BaseUrl, ChatModel, EmbeddingModel, SelectedTier.Value),
                 CancellationToken.None);
             ModelConfigStatus = "已保存到 models.json；重启应用后生效。";
         }
@@ -582,3 +603,5 @@ public sealed class DiagnosticLogItem(DiagnosticLogEntry entry)
     public string CategoryText => entry.Category;
     public string MessageText => entry.SanitizedMessage;
 }
+
+public sealed record ModelTierOption(string Value, string Label);

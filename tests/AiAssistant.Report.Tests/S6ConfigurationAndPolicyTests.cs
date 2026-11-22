@@ -272,7 +272,7 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
 
         Assert.Equal("old-chat", admin.Current.ChatModel);
         await admin.SaveAsync(
-            new ModelConfigurationView("http://127.0.0.1:11434", "gemma4:12b-mlx", "embeddinggemma-2:740m"),
+            new ModelConfigurationView("http://127.0.0.1:11434", "gemma4:12b-mlx", "embeddinggemma-2:740m", "LocalOffline"),
             CancellationToken.None);
 
         var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
@@ -285,17 +285,40 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
     }
 
     [Fact]
-    public async Task ModelConfigurationAdmin_RejectsNonLoopbackBaseUrl()
+    public async Task ModelConfigurationAdmin_RejectsRemoteUrlForLocalOffline_ButAllowsRemoteTiers()
     {
         var path = Path.Combine(_tempRoot, "models.json");
+        await File.WriteAllTextAsync(path, """
+            {
+              "schemaVersion": 1,
+              "policy": { "defaultTier": "LocalOffline" },
+              "endpoints": [
+                { "tier": "LocalOffline", "provider": "ollama", "baseUrl": "http://127.0.0.1:11434", "chatModel": "gemma4:12b", "embeddingModel": "embeddinggemma-2:740m" }
+              ]
+            }
+            """);
         var configuration = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
             .LoadAsync(path, CancellationToken.None);
         var admin = new ModelConfigurationAdmin(path, configuration);
 
+        // LocalOffline must stay loopback.
         await Assert.ThrowsAsync<ModelConfigurationException>(() =>
             admin.SaveAsync(
-                new ModelConfigurationView("https://api.example.com/v1", "c", "e"),
+                new ModelConfigurationView("https://api.example.com/v1", "c", "e", "LocalOffline"),
                 CancellationToken.None));
+
+        // CorporateIntranet accepts a remote URL and marks allowRemoteEndpoint.
+        await admin.SaveAsync(
+            new ModelConfigurationView("https://llm.corp.example/v1", "corp-chat", "corp-embed", "CorporateIntranet"),
+            CancellationToken.None);
+        var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+        var corp = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.CorporateIntranet);
+        Assert.Equal("corp-chat", corp.ChatModel);
+        Assert.True(corp.AllowRemoteEndpoint);
+        Assert.Equal(ModelProviderKind.OpenAiCompatible, corp.Provider);
+        // LocalOffline safety fallback is preserved.
+        Assert.Contains(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.LocalOffline);
     }
 
     private sealed class FakeSecretResolver(IReadOnlyDictionary<string, string> values) : IModelSecretResolver    {

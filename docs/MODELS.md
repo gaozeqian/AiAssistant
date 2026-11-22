@@ -59,11 +59,12 @@ bash build/install-voice-models.sh /path/to/data-directory
 
 诊断页「本机模型网关」卡片内可直接编辑本机模型的：
 
+- **模型来源**：本机 Ollama / 企业内网 / 公网 API
 - 对话模型名（例如 `gemma4:12b-mlx`）
 - Embedding 模型名（例如 `embeddinggemma-2:740m`）
-- Base URL（默认 `http://127.0.0.1:11434`，仅允许 loopback）
+- Base URL（本机默认 `http://127.0.0.1:11434`；外部模型可填远程地址）
 
-点「保存模型配置」写入数据目录的 `models.json`（只改 LocalOffline 端点，保留企业内网/公网端点与策略）。保存后**重启应用生效**。
+点「保存模型配置」写入数据目录的 `models.json`。本机（LocalOffline）端点必须使用 loopback；选择「企业内网」或「公网 API」时允许远程地址并自动标记 `allowRemoteEndpoint`，且**始终保留 LocalOffline 兜底端点**。公网层受 `AllowPublicCloud` 策略与运行期同意门禁约束。保存后**重启应用生效**。
 
 ## 3. 完整流程 UI 测试
 

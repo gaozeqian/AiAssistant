@@ -5,9 +5,9 @@ using AiAssistant.Core.Domain;
 namespace AiAssistant.Models;
 
 /// <summary>
-/// Reads the current LocalOffline model settings for the UI and persists edits back to models.json.
-/// Only the LocalOffline endpoint's baseUrl / chatModel / embeddingModel are editable from the UI;
-/// policy and any intranet/public endpoints are preserved untouched.
+/// Reads the current model endpoint settings for the UI and persists edits back to models.json.
+/// The UI edits one endpoint at a time, selected by tier: LocalOffline (loopback only),
+/// CorporateIntranet, or PublicCloud. Policy and any endpoints not being edited are preserved.
 /// </summary>
 public sealed class ModelConfigurationAdmin(
     string modelsConfigPath,
@@ -27,20 +27,17 @@ public sealed class ModelConfigurationAdmin(
     {
         get
         {
-            ModelEndpointSettings endpoint = current.Endpoints[0];
+            var endpoint = current.Endpoints[0];
             for (var i = 0; i < current.Endpoints.Count; i++)
             {
-                if (current.Endpoints[i].Tier == ModelEndpointTier.LocalOffline)
+                if (current.Endpoints[i].Tier == current.Policy.DefaultTier)
                 {
                     endpoint = current.Endpoints[i];
                     break;
                 }
             }
 
-            return new ModelConfigurationView(
-                endpoint.BaseAddress.ToString(),
-                endpoint.ChatModel,
-                endpoint.EmbeddingModel);
+            return ToView(endpoint);
         }
     }
 
@@ -58,42 +55,64 @@ public sealed class ModelConfigurationAdmin(
             throw new ModelConfigurationException("Embedding 模型名不能为空。");
         }
 
+        var tier = ParseTier(update.Tier);
         if (!Uri.TryCreate(update.BaseUrl, UriKind.Absolute, out var baseUri) ||
             baseUri.Scheme is not ("http" or "https"))
         {
             throw new ModelConfigurationException("Base URL 必须是 http/https 地址。");
         }
 
-        if (baseUri.IsLoopback is false)
+        if (tier == ModelEndpointTier.LocalOffline && !baseUri.IsLoopback)
         {
-            throw new ModelConfigurationException("本机模型端点必须使用 loopback 地址（如 http://127.0.0.1:11434）。");
+            throw new ModelConfigurationException(
+                "本机模型（LocalOffline）必须使用 loopback 地址；要配置外部模型请选择「企业内网」或「公网 API」。");
         }
+
+        var remoteAllowed = tier != ModelEndpointTier.LocalOffline;
+        var provider = remoteAllowed ? "openai" : "ollama";
 
         var document = await LoadDocumentAsync(ct);
         var endpoints = new List<ModelEndpointDocument>(document.Endpoints);
-        var localIndex = endpoints.FindIndex(item => item.Tier == "LocalOffline");
-        ModelEndpointDocument endpoint;
-        if (localIndex < 0)
+        var tierName = tier.ToString();
+        var index = endpoints.FindIndex(item => item.Tier == tierName);
+        var endpoint = index < 0 ? new ModelEndpointDocument() : endpoints[index];
+        var updated = endpoint with
         {
-            endpoint = new ModelEndpointDocument();
-            endpoints.Insert(0, endpoint);
+            Tier = tierName,
+            Provider = provider,
+            BaseUrl = baseUri.ToString().TrimEnd('/'),
+            ChatModel = update.ChatModel.Trim(),
+            EmbeddingModel = update.EmbeddingModel.Trim(),
+            AllowRemoteEndpoint = remoteAllowed || endpoint.AllowRemoteEndpoint
+        };
+
+        if (index < 0)
+        {
+            endpoints.Insert(0, updated);
         }
         else
         {
-            endpoint = endpoints[localIndex];
+            endpoints[index] = updated;
         }
-
-        endpoints[localIndex < 0 ? 0 : localIndex] = endpoint with
-        {
-            Tier = "LocalOffline",
-            Provider = "ollama",
-            BaseUrl = baseUri.ToString().TrimEnd('/'),
-            ChatModel = update.ChatModel.Trim(),
-            EmbeddingModel = update.EmbeddingModel.Trim()
-        };
 
         await SaveDocumentAsync(document with { Endpoints = endpoints }, ct);
     }
+
+    private static ModelEndpointTier ParseTier(string tier) =>
+        tier switch
+        {
+            "LocalOffline" => ModelEndpointTier.LocalOffline,
+            "CorporateIntranet" => ModelEndpointTier.CorporateIntranet,
+            "PublicCloud" => ModelEndpointTier.PublicCloud,
+            _ => throw new ModelConfigurationException($"未知模型来源 '{tier}'。")
+        };
+
+    private static ModelConfigurationView ToView(ModelEndpointSettings endpoint) =>
+        new(
+            endpoint.BaseAddress.ToString(),
+            endpoint.ChatModel,
+            endpoint.EmbeddingModel,
+            endpoint.Tier.ToString());
 
     private async Task<ModelsFileDocument> LoadDocumentAsync(CancellationToken ct)
     {
