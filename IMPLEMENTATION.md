@@ -505,11 +505,11 @@ ADR 只记录会影响后续替换、数据兼容、安全边界或运维的决�
 - [x] S4.3：sherpa-onnx 中文 Paraformer ASR、Silero VAD、pyannote 说话人分离适配器与模型缺失降级测试。
 - [x] S4-R3：Whisper.net 批处理 ASR 适配器（`AIASSISTANT_ASR_ENGINE=whisper`、缺模型明确降级、发布按 RID 裁剪原生库），默认仍为 sherpa-onnx。
 - [x] S4-R2：Linux RapidOCR PP-OCRv4 图像 OCR 兜底（`IImageOcrRecognizer`、缺模型降级、复用 sherpa 原生 ORT 1.28.2）。
-- [ ] S4-R：外挂中文语音（Paraformer/VAD/说话人）、RapidOCR 与 Whisper 模型资产，完成识别质量黄金集评测（`--benchmark-asr` / `--benchmark-ocr` / `--benchmark-kws` 与 CER 报告已就绪；macOS 基线：合成 ASR 12.45%、真人 AISHELL-1 6.34%、Whisper 17.13%、OCR 0.00%、KWS 唤醒率 92.3% 且真人 60 分钟零误唤醒；噪声/口音、Linux RapidOCR、更大 Whisper 模型待补）。
+- [ ] S4-R：外挂中文语音（Paraformer/VAD/说话人）、RapidOCR 与 Whisper 模型资产，完成识别质量黄金集评测（`--benchmark-asr` / `--benchmark-ocr` / `--benchmark-kws` 与 CER 报告已就绪；macOS 基线：合成 ASR 12.45%、真人 AISHELL-1 6.34%、Whisper 17.13%、OCR 0.00%、KWS 唤醒率 92.3% 且真人 60 分钟零误唤醒；**Linux RapidOCR 基线已跑 30.81%（2026-11-22，12 张合成截图）**、Linux sherpa ASR/KWS 引擎加载冒烟通过；噪声/口音、更大 Whisper 模型待补）。
 - [x] S5.1：Microsoft.Extensions.AI 本机网关、Ollama/LM Studio 适配、loopback 策略、超时/脱敏/审计装饰器与能力探测。
 - [x] S5.2：事件向量索引、活动分段、map-reduce、结构化 JSON 校验重试、版本化加密日报与站会 Markdown。
 - [x] S5.3：单消费者三通道调度、启动补偿、幂等/失败保留、日报/站会面板、强制重生成与 Markdown 导出。
-- [ ] S5-R1：对目标候选对话模型分别运行 `--benchmark-model`，按质量/延迟/内存确定默认轻量档与质量档（`gemma4:12b` 已实测成功率 100%、JSON 100%、热态 4.6s）。
+- [ ] S5-R1：对目标候选对话模型分别运行 `--benchmark-model`，按质量/延迟/内存确定默认轻量档与质量档（`gemma4:12b` 已实测 100%/100%/4.6s；局域网 `gemma4:12b-mlx` 已实测 67%/100%/17.4s，语义标签用例偶发空响应）。
 - [ ] S5-R2：日报三通道多日调度浸泡（跨午夜、休眠唤醒、模型离线、重复触发），并入 S9-R2 一起执行。
 - [x] S6.1：版本化 `models.json`、加密端点密钥、mTLS/企业 CA/代理与三档端点装配。
 - [x] S6.2：Host 外层策略锁定、公网显式同意、三档路由与内网→本机回退、最小化/脱敏/残留检测三闸。
