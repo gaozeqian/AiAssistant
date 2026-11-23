@@ -210,11 +210,21 @@ public sealed class OsProtectedKeyStore : IKeyStore, IDisposable
 
             var generated = RandomNumberGenerator.GetBytes(32);
             var hex = Convert.ToHexStringLower(generated);
-            var add = RunProcess("/usr/bin/security", ["add-generic-password", "-U", "-s", "AiAssistant", "-a", account, "-w", hex]);
+            // 不加 -U：并发创建时保持先写者胜出，避免覆盖他方 KEK，
+            // 否则已用旧 KEK 封装的 envelope 会出现认证标签不匹配。
+            var add = RunProcess("/usr/bin/security", ["add-generic-password", "-s", "AiAssistant", "-a", account, "-w", hex]);
             if (add.ExitCode == 0)
             {
                 kek = generated;
                 return true;
+            }
+
+            // 另一进程可能已在 find 与 add 之间创建；回读现有 KEK，保证双方收敛到同一值。
+            var reread = RunProcess("/usr/bin/security", ["find-generic-password", "-s", "AiAssistant", "-a", account, "-w"]);
+            if (reread.ExitCode == 0 && !string.IsNullOrWhiteSpace(reread.StdOut))
+            {
+                kek = Convert.FromHexString(reread.StdOut.Trim());
+                return kek.Length == 32;
             }
         }
         catch (Exception ex)
