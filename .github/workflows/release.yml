@@ -92,9 +92,9 @@ jobs:
       - name: Build and sign portable zip
         shell: pwsh
         run: |
-          # 显式数组：if 语句会展开单元素数组，导致 @dev splat 退化为逐字符传参。
-          $dev = @()
-          if ($env:DEV_SELF_SIGNED -eq 'true') { $dev = @('-DevSelfSigned') }
+          # 命名参数用哈希表 splat；数组 splat 只按位置传参，开关不会生效。
+          $dev = @{}
+          if ($env:DEV_SELF_SIGNED -eq 'true') { $dev['DevSelfSigned'] = $true }
           ./build/package/package-windows.ps1 -Version $env:APP_VERSION -RequireSigning @dev
 
       - name: Build and sign MSI from shared payload
@@ -103,8 +103,11 @@ jobs:
           $version = $env:APP_VERSION.TrimStart('v')
           $certName = if ($env:DEV_SELF_SIGNED -eq 'true') { "AiAssistant-$version-windows-x64-dev.cer" } else { "AiAssistant-$version-windows-x64.cer" }
           $cert = "artifacts/dist/$version/$certName"
-          $dev = @()
-          if ($env:DEV_SELF_SIGNED -eq 'true') { $dev = @('-DevSelfSigned', '-CertificatePath', $cert) }
+          $dev = @{}
+          if ($env:DEV_SELF_SIGNED -eq 'true') {
+            $dev['DevSelfSigned'] = $true
+            $dev['CertificatePath'] = $cert
+          }
           ./build/package/package-windows-msi.ps1 `
             -Version $env:APP_VERSION `
             -SignThumbprint $env:AIASSISTANT_SIGN_CERT_THUMBPRINT @dev

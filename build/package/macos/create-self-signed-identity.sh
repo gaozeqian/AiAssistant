@@ -45,12 +45,24 @@ fi
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-# OpenSSL 3 默认用 AES/PBKDF2/SHA-256 导出 PKCS#12，macOS security import 会报
-# "MAC verification failed"；-legacy 恢复 3DES/SHA-1，LibreSSL 默认即兼容。
-PKCS12_LEGACY=()
-if openssl version 2>/dev/null | grep -q '^OpenSSL 3'; then
-  PKCS12_LEGACY=(-legacy)
+# macOS security import 只接受传统 PKCS#12（SHA-1 MAC + 3DES/RC2 PBE）；
+# OpenSSL 3 默认的 AES/PBKDF2/SHA-256 会报 "MAC verification failed"。
+# 按能力探测追加兼容参数，兼容 OpenSSL 3 与 LibreSSL/macOS 自带 openssl。
+PKCS12_HELP="$(openssl pkcs12 -help 2>&1 || true)"
+PKCS12_OPTS=()
+if printf '%s\n' "$PKCS12_HELP" | grep -q -- '-legacy'; then
+  PKCS12_OPTS+=(-legacy)
 fi
+if printf '%s\n' "$PKCS12_HELP" | grep -q -- '-certpbe'; then
+  PKCS12_OPTS+=(-certpbe PBE-SHA1-3DES)
+fi
+if printf '%s\n' "$PKCS12_HELP" | grep -q -- '-keypbe'; then
+  PKCS12_OPTS+=(-keypbe PBE-SHA1-3DES)
+fi
+if printf '%s\n' "$PKCS12_HELP" | grep -q -- '-macalg'; then
+  PKCS12_OPTS+=(-macalg SHA1)
+fi
+echo "openssl: $(openssl version 2>&1)"
 
 openssl req -x509 -newkey rsa:2048 -nodes \
   -keyout "$WORK/key.pem" -out "$WORK/cert.pem" -days 365 \
@@ -60,8 +72,8 @@ openssl req -x509 -newkey rsa:2048 -nodes \
   -addext "extendedKeyUsage=codeSigning" >/dev/null 2>&1
 
 openssl pkcs12 -export -out "$WORK/identity.p12" \
-  ${PKCS12_LEGACY[@]+"${PKCS12_LEGACY[@]}"} \
-  -inkey "$WORK/key.pem" -in "$WORK/cert.pem" -passout "pass:$PASSWORD" >/dev/null 2>&1
+  ${PKCS12_OPTS[@]+"${PKCS12_OPTS[@]}"} \
+  -inkey "$WORK/key.pem" -in "$WORK/cert.pem" -passout "pass:$PASSWORD"
 
 security create-keychain -p "$PASSWORD" "$KEYCHAIN" 2>/dev/null || true
 security unlock-keychain -p "$PASSWORD" "$KEYCHAIN"
