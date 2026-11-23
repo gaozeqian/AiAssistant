@@ -167,7 +167,20 @@ if (-not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
         }
     }
 
+    $expectedThumbprint = $SignThumbprint.Trim()
     foreach ($binary in $binaries) {
+        if ($DevSelfSigned) {
+            # 自签名根未写入信任库，signtool verify /r 仍会因链不受信而失败；
+            # 开发模式下改为核对签名者指纹，确保每个二进制都由本次证书签名。
+            $signature = Get-AuthenticodeSignature -FilePath $binary.FullName
+            if ($null -eq $signature.SignerCertificate -or
+                $signature.SignerCertificate.Thumbprint -ne $expectedThumbprint) {
+                throw "Signature verification failed for $($binary.FullName): signer certificate mismatch."
+            }
+
+            continue
+        }
+
         if ([string]::IsNullOrWhiteSpace($VerifyRootPath)) {
             & $signtool verify /pa $binary.FullName | Out-Null
         }

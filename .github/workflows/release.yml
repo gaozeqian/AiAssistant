@@ -63,9 +63,8 @@ jobs:
           New-Item -ItemType Directory -Force (Split-Path $cer) | Out-Null
           Export-Certificate -Cert $cert -FilePath $cer | Out-Null
           # 不向 runner 信任库写入：headless runner 的 Root 导入会弹出不可见确认框并永久阻塞。
-          # 签名按 CurrentUser\My 指纹查找；校验用 /r 指定根证书文件，无需信任库。
+          # 签名按 CurrentUser\My 指纹查找；开发模式校验核对签名者指纹（见 package-windows.ps1）。
           "AIASSISTANT_SIGN_CERT_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
-          "AIASSISTANT_SIGN_ROOT_CER=$cer" >> $env:GITHUB_ENV
 
       - name: Verify production signing identity (non-dev)
         if: env.DEV_SELF_SIGNED != 'true'
