@@ -265,6 +265,12 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Flatten downloaded artifacts
+        run: |
+          # download-artifact 保留上传时的 artifacts/dist/<version>/ 层级；
+          # 校验和与 release files 只处理顶层，需先把分发包拷平。
+          find dist -mindepth 2 -type f -exec cp -v {} dist/ \;
+
       - name: Normalize version
         id: version
         run: echo "value=${APP_VERSION#v}" >> "$GITHUB_OUTPUT"
