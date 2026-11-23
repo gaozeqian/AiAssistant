@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AiAssistant.Desktop.ViewModels"
+             xmlns:automation="using:Avalonia.Automation"
+             x:Class="AiAssistant.Desktop.Views.Tabs.VoiceTabView"
+             x:DataType="vm:ShellViewModel">
+  <Grid DataContext="{Binding Voice}" x:DataType="vm:VoiceControlViewModel"
+        ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" Margin="0,12,0,0">
+    <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,12">
+      <StackPanel Spacing="14">
+        <TextBlock Text="本地语音命令" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding StatusText}" FontSize="15" Foreground="{DynamicResource AccentBrush}" />
+        <TextBlock Text="唤醒词：你好时光。唤醒后 8 秒内说出固定命令，命令音频默认仅驻留内存。"
+                   TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+        <WrapPanel>
+          <Button Classes="primary" Content="{Binding ToggleButtonText}" Command="{Binding ToggleCommand}" Margin="0,0,8,8" />
+        </WrapPanel>
+        <CheckBox Content="记录命令音频（加密留存，可自动清理）"
+                  IsChecked="{Binding RecordsCommandAudio, Mode=OneWay}"
+                  Command="{Binding ToggleCommandAudioCommand}"
+                  automation:AutomationProperties.Name="记录命令音频" />
+        <TextBlock Text="{Binding CommandAudioStatus}" TextWrapping="Wrap" FontSize="12"
+                   Foreground="{DynamicResource MutedBrush}" />
+        <TextBlock Text="{Binding CapabilityText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+        <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Foreground="{DynamicResource DangerForegroundBrush}" IsVisible="{Binding HasError}" />
+      </StackPanel>
+    </Border>
+    <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,12">
+      <StackPanel Spacing="14">
+        <TextBlock Text="最近一次交互" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="识别文本" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding LastTranscript}" TextWrapping="Wrap" />
+        <TextBlock Text="反馈" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding LastFeedback}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+        <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
+          <TextBlock Text="固定命令：生成日报、暂停采集、恢复采集、打开时间线、打开日报；以“问一下”开头可对近 7 天本地证据提问，回答与检索面板共用同一证据用例。退出应用需要二次确认。"
+                     TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
+        </Border>
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

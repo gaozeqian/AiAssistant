@@ -209,8 +209,13 @@ public sealed class RedactingModelGateway(IModelGateway inner, ITextRedactor red
     public Task<ModelCapabilitySnapshot> ProbeAsync(CancellationToken ct) => inner.ProbeAsync(ct);
 }
 
-public sealed class AuditedModelGateway(IModelGateway inner, IModelAuditSink auditSink) : IModelGateway
+public sealed class AuditedModelGateway(
+    IModelGateway inner,
+    IModelAuditSink auditSink,
+    IClock? clock = null) : IModelGateway
 {
+    private readonly IClock _clock = clock ?? new SystemClock();
+
     public CapabilityState Capability => inner.Capability;
     public string ChatModelId => inner.ChatModelId;
     public string EmbeddingModelId => inner.EmbeddingModelId;
@@ -222,7 +227,7 @@ public sealed class AuditedModelGateway(IModelGateway inner, IModelAuditSink aud
         {
             var result = await inner.CompleteAsync(request, ct);
             auditSink.Record(new ModelAuditEntry(
-                TimeProvider.System.GetUtcNow(),
+                _clock.UtcNow,
                 request.Purpose,
                 result.Tier,
                 result.ModelId,
@@ -237,7 +242,7 @@ public sealed class AuditedModelGateway(IModelGateway inner, IModelAuditSink aud
         catch (Exception ex)
         {
             auditSink.Record(new ModelAuditEntry(
-                TimeProvider.System.GetUtcNow(),
+                _clock.UtcNow,
                 request.Purpose,
                 request.Tier,
                 inner.ChatModelId,
@@ -258,7 +263,7 @@ public sealed class AuditedModelGateway(IModelGateway inner, IModelAuditSink aud
         {
             var result = await inner.EmbedAsync(request, ct);
             auditSink.Record(new ModelAuditEntry(
-                TimeProvider.System.GetUtcNow(),
+                _clock.UtcNow,
                 request.Purpose,
                 request.Tier,
                 result.ModelId,
@@ -273,7 +278,7 @@ public sealed class AuditedModelGateway(IModelGateway inner, IModelAuditSink aud
         catch (Exception ex)
         {
             auditSink.Record(new ModelAuditEntry(
-                TimeProvider.System.GetUtcNow(),
+                _clock.UtcNow,
                 request.Purpose,
                 request.Tier,
                 inner.EmbeddingModelId,

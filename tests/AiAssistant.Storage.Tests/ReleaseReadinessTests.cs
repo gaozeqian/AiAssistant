@@ -8,17 +8,19 @@ using AiAssistant.Core.ValueObjects;
 using AiAssistant.Storage.KeyStores;
 using AiAssistant.Storage.Media;
 using AiAssistant.Storage.Sqlite;
+using AiAssistant.Testing.Common;
 
 namespace AiAssistant.Storage.Tests;
 
 /// <summary>S9 release gates: forward migration, user-initiated deletion and key-loss fault injection.</summary>
+[Trait("Category", "Unit")]
 public sealed class ReleaseReadinessTests : IDisposable
 {
     private readonly string _tempRoot;
 
     public ReleaseReadinessTests()
     {
-        _tempRoot = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"));
+        _tempRoot = TempArtifactDirectory.CreatePath("storage");
         Directory.CreateDirectory(_tempRoot);
     }
 

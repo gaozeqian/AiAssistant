@@ -5,16 +5,16 @@
 ## 1. 启动服务
 
 ```bash
-AIASSISTANT_DATA_DIRECTORY=artifacts/mcp-inspector/data \
+AIASSISTANT_DATA_DIRECTORY=artifacts/tmp/mcp-inspector/data \
 AIASSISTANT_MCP_ENABLED=true \
 AIASSISTANT_MCP_PORT=47839 \
-AiAssistant.Host --mcp-serve
+dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj -- --mcp-serve
 ```
 
 另开终端取令牌（值只写不读，但 `--mcp-token` 是显式的本地操作）：
 
 ```bash
-AIASSISTANT_DATA_DIRECTORY=artifacts/mcp-inspector/data AiAssistant.Host --mcp-token
+AIASSISTANT_DATA_DIRECTORY=artifacts/tmp/mcp-inspector/data dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj -- --mcp-token
 ```
 
 ## 2. MCP Inspector CLI

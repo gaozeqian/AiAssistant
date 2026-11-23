@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>false</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <OutputType>Library</OutputType>
+    <UseMicrosoftTestingPlatformRunner>false</UseMicrosoftTestingPlatformRunner>
+    <Description>Shared deterministic test infrastructure: fake clock, artifact temp directories, environment scopes.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AiAssistant.Application\AiAssistant.Application.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Core\AiAssistant.Core.csproj" />
+  </ItemGroup>
+
+</Project>

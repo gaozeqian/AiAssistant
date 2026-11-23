@@ -7,9 +7,6 @@
     <ProjectReference Include="..\..\src\AiAssistant.Platform.Windows\AiAssistant.Platform.Windows.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Platform.macOS\AiAssistant.Platform.macOS.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Platform.Linux\AiAssistant.Platform.Linux.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Avalonia.Headless" />
-    <ProjectReference Include="..\..\src\AiAssistant.Desktop\AiAssistant.Desktop.csproj" />
+    <ProjectReference Include="..\AiAssistant.Testing.Common\AiAssistant.Testing.Common.csproj" />
   </ItemGroup>
 </Project>

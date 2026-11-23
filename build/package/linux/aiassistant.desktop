@@ -9,4 +9,4 @@ Icon=aiassistant
 Terminal=false
 Categories=Utility;Office;
 Keywords=activity;timeline;privacy;ai;
-StartupWMClass=AiAssistant.Host
+StartupWMClass=aiassistant

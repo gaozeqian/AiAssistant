@@ -121,7 +121,7 @@ if [[ "$WITH_WHISPER" -eq 1 ]]; then
 fi
 
 if find "$BUNDLE" -iname '*aishell3*' | grep -q .; then
-  die "拒绝打包：bundle 中出现已退役的 AISHELL-3 权重（许可证不明，见 docs/compliance/model-assets.md）"
+  die "拒绝打包：bundle 中出现已退役的 AISHELL-3 权重（许可证不明，见 docs/release/compliance.md）"
 fi
 
 log "模型包已就绪：$BUNDLE ($(du -sh "$BUNDLE" | cut -f1))"

@@ -14,9 +14,10 @@ AiAssistant 是**专有闭源**项目，本文件面向获得授权的内部开�
 
 ```bash
 dotnet tool restore
-dotnet restore
-dotnet build -c Release
-dotnet test -c Release --no-build
+dotnet restore AiAssistant.sln
+dotnet build AiAssistant.sln -c Release --warnaserror
+dotnet format AiAssistant.sln --verify-no-changes
+dotnet test --solution AiAssistant.sln -c Release
 ```
 
 ## 2. 目录职责
@@ -45,7 +46,7 @@ dotnet test -c Release --no-build
 
 - 目标框架 `net10.0`、`Nullable` 开启、警告视为错误（`Directory.Build.props` 已集中设定）。
 - 包版本只在 `Directory.Packages.props` 维护（中央包管理），子工程不得写 `Version=`。
-- 依赖只允许 MIT / Apache-2.0 / BSD-2-Clause / BSD-3-Clause；引入新依赖需同步 `docs/compliance/dependency-manifest.md`。
+- 依赖只允许 MIT / Apache-2.0 / BSD-2-Clause / BSD-3-Clause；引入新依赖需同步 [合规文档](docs/release/compliance.md)。
 - 环境变量只通过 `AiAssistant.Core.Configuration.EnvironmentNames` 常量引用，不在代码里写字面量。
 - 平台名称在文档与注释中统一写作 `macOS`；`OperatingSystem.IsMacOS()` 与 Apple bundle 的 `Contents/MacOS` 属于不可改标识。
 - 产物路径只通过 `ArtifactPaths` 解析，不在代码里拼接 `"artifacts"`。
@@ -61,28 +62,32 @@ dotnet test -c Release --no-build
 ## 6. 文档约定
 
 - 入口唯一：`README.md`（仓库）与 `docs/README.md`（全部文档索引）。新增文档必须挂到索引，从索引 ≤2 跳可达。
-- 每篇文档带四段头信息：状态（living / snapshot / archived）、最后更新、适用版本、维护触发条件。
-- 单一事实源：同一事实（端口、默认模型、路径、门禁状态）只在一处定义，其余用相对链接引用。主题与权威文档的对应关系见 `docs/guides/conventions.md`。
-- 哪类信息写哪里：
+- 每篇文档带四段头信息：状态、最后更新、适用版本、维护触发条件。
+- 单一事实源：同一事实（端口、默认模型、路径、门禁状态）只在一处定义，其余用相对链接引用。
+- 信息归属：
 
-  | 信息 | 写到哪里 | 何时必须更新 |
-  |---|---|---|
-  | 当前阶段状态与门禁 | `docs/status/status.md` | 每次阶段验收后 |
-  | 实施日志 | `docs/status/log.md` | 每个合并的提交批次 |
-  | 遗留项与执行顺序 | `docs/status/backlog.md` | 新增或关闭遗留项时 |
-  | 架构取舍 | `docs/adr/NNNN-*.md` | 决策发生时 |
-  | 目录与文档规范、豁免 | `docs/guides/conventions.md` | 规范变更或新增豁免时 |
-  | CLI 参数 / 环境变量 / 配置键 | `docs/reference/*.md` | 增删参数或改默认值时 |
+  | 信息 | 权威文档 |
+  |---|---|
+  | 架构与依赖 | `docs/architecture/overview.md` + `docs/adr/` |
+  | 目录、产物与命名 | `docs/development/conventions-and-artifacts.md` |
+  | 测试、Trait、黄金集 | `docs/development/testing-and-benchmarks.md` |
+  | CLI / 环境变量 / 配置 | `docs/reference/*.md` |
+  | 安全、合规、发布与路线 | `docs/release/*.md` |
 
 - 中文正文、英文标识符与命令；平台名称写 `macOS`；相对链接一律相对当前文件。
 
 ## 7. 提交前自检
 
 ```bash
-bash tools/audit-conventions.sh    # 规范审计，必须全绿
-dotnet build -c Release            # 0 warning / 0 error
-dotnet test -c Release --no-build
+dotnet build AiAssistant.sln -c Release --warnaserror
+dotnet format AiAssistant.sln --verify-no-changes
+dotnet test --solution AiAssistant.sln -c Release
+bash tools/audit-conventions.sh
+python3 -B build/sbom/generate-sbom.py --verify --check-manifest
+git status --ignored --porcelain   # 源码树零逃逸产物
 ```
+
+测试工程拓扑、Trait 过滤与受限环境 Skip 规则见 [测试与评测](docs/development/testing-and-benchmarks.md)。
 
 新增或修改打包相关脚本时，额外跑：
 

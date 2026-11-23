@@ -34,9 +34,10 @@ public sealed class SplitChatEmbeddingGateway(
 }
 
 /// <summary>Explicit runtime consent for public-cloud use; configuration alone is never sufficient.</summary>
-public sealed class PublicCloudConsentGate
+public sealed class PublicCloudConsentGate(IClock? clock = null)
 {
     private readonly Lock _sync = new();
+    private readonly IClock _clock = clock ?? new SystemClock();
     private string? _confirmation;
     private DateTimeOffset? _confirmedAtUtc;
 
@@ -68,7 +69,7 @@ public sealed class PublicCloudConsentGate
         lock (_sync)
         {
             _confirmation = confirmation;
-            _confirmedAtUtc = TimeProvider.System.GetUtcNow();
+            _confirmedAtUtc = _clock.UtcNow;
         }
     }
 

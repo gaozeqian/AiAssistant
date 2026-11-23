@@ -87,17 +87,20 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
     private readonly IReadOnlyList<ModelEndpointSettings> _endpoints;
     private readonly ModelCapabilityCache _cache;
     private readonly ILogger<ModelCapabilityProber> _logger;
+    private readonly IClock _clock;
     private readonly Dictionary<ModelEndpointTier, HttpClient> _clients = [];
 
     public ModelCapabilityProber(
         IReadOnlyList<ModelEndpointSettings> endpoints,
         ModelCapabilityCache cache,
         ILogger<ModelCapabilityProber> logger,
-        Func<ModelEndpointSettings, HttpClient>? clientFactory = null)
+        Func<ModelEndpointSettings, HttpClient>? clientFactory = null,
+        IClock? clock = null)
     {
         _endpoints = endpoints;
         _cache = cache;
         _logger = logger;
+        _clock = clock ?? new SystemClock();
         foreach (var endpoint in endpoints)
         {
             _clients[endpoint.Tier] = (clientFactory ?? ModelHttpClientFactory.Create)(endpoint);
@@ -115,7 +118,7 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
                 item.Tier == endpoint.Tier &&
                 item.ChatModel == endpoint.ChatModel &&
                 string.Equals(item.BaseUrl, endpoint.BaseAddress.ToString(), StringComparison.OrdinalIgnoreCase) &&
-                TimeProvider.System.GetUtcNow() - item.ProbedAtUtc < CacheTtl);
+                _clock.UtcNow - item.ProbedAtUtc < CacheTtl);
             if (existing is not null)
             {
                 results.Add(existing);
@@ -178,7 +181,7 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
             structured,
             tools,
             diagnostic,
-            TimeProvider.System.GetUtcNow());
+            _clock.UtcNow);
     }
 
     private static async Task<bool> TryChatAsync(HttpClient client, ModelEndpointSettings endpoint, CancellationToken ct)

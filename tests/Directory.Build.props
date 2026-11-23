@@ -7,11 +7,12 @@
     <OutputType>Exe</OutputType>
     <!-- xunit.v3 生成独立可执行测试宿主；MTP 由 global.json 的 test.runner 选中，不再走 VSTest。 -->
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
-    <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --config-file $([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)../testconfig.json'))</TestingPlatformCommandLineArguments>
-    <NoWarn>$(NoWarn);CA1707;CA1001;CA1861;CA2000;CA1812;CA1859</NoWarn>
+    <!-- 配置路径由 MSBuild 绝对化；结果目录写在 config 内并相对 config 文件解析。 -->
+    <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --config-file $([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)testconfig.json'))</TestingPlatformCommandLineArguments>
+    <NoWarn>$(NoWarn);CA1707;CA1861;CA1812;CA1859</NoWarn>
   </PropertyGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'AiAssistant.Testing.Common'">
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage">
       <PrivateAssets>all</PrivateAssets>
@@ -19,7 +20,7 @@
     </PackageReference>
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'AiAssistant.Testing.Common'">
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

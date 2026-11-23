@@ -1,6 +1,0 @@
-{
-  "platformOptions": {
-    "resultDirectory": "./artifacts/test-results",
-    "exitProcessOnUnhandledException": true
-  }
-}

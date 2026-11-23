@@ -71,8 +71,12 @@ public sealed class SherpaVoiceOptions
         File.Exists(TtsTokensPath) &&
         File.Exists(TtsLexiconPath);
 
-    private string Resolve(string fileName) =>
-        string.IsNullOrWhiteSpace(ModelDirectory) ? string.Empty : Path.Combine(ModelDirectory, fileName);
+    private string Resolve(string relativePath) =>
+        string.IsNullOrWhiteSpace(ModelDirectory)
+            ? string.Empty
+            : Path.Combine(
+                ModelDirectory,
+                relativePath.Replace('/', Path.DirectorySeparatorChar));
 }
 
 public sealed class SherpaOnnxWakeWordDetector : IWakeWordDetector

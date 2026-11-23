@@ -13,6 +13,11 @@ let package = Package(
         .executableTarget(
             name: "MacHelper",
             path: "Sources/MacHelper"
+        ),
+        .testTarget(
+            name: "MacHelperTests",
+            dependencies: ["MacHelper"],
+            path: "Tests/MacHelperTests"
         )
     ]
 )

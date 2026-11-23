@@ -40,13 +40,34 @@ public sealed class AppRuntime : IAsyncDisposable
 {
     private readonly ServiceProvider _services;
     private readonly string _dataDirectory;
+    private readonly Lazy<RuntimeServices> _runtimeServices;
     private bool _started;
 
     private AppRuntime(ServiceProvider services, string dataDirectory)
     {
         _services = services;
         _dataDirectory = dataDirectory;
+        _runtimeServices = new Lazy<RuntimeServices>(() => new RuntimeServices(
+            services.GetRequiredService<IClock>(),
+            services.GetRequiredService<ILocalMcpControl>(),
+            services.GetRequiredService<IDatabaseMaintenanceService>(),
+            services.GetRequiredService<IDataDeletionService>(),
+            services.GetRequiredService<ModelBenchmarkRunner>(),
+            services.GetRequiredService<IModelGateway>(),
+            services.GetRequiredService<EventEmbeddingIndexer>(),
+            services.GetRequiredService<IModelSecretAdmin>(),
+            services.GetRequiredService<RangeReportUseCase>(),
+            services.GetRequiredService<EvidenceSearchUseCase>(),
+            services.GetRequiredService<IAsrEngine>(),
+            services.GetRequiredService<IWakeWordDetector>(),
+            services.GetRequiredService<IModelCapabilityProber>(),
+            services.GetService<IMacHelperSupervisor>(),
+            services.GetService<ICapabilityProvider>(),
+            services.GetService<IImageOcrRecognizer>()));
     }
+
+    /// <summary>Typed service graph resolved once; the only public surface the CLI needs.</summary>
+    public RuntimeServices Services => _runtimeServices.Value;
 
     public int RecoveredJobCount { get; private set; }
 
@@ -55,57 +76,22 @@ public sealed class AppRuntime : IAsyncDisposable
 
     public LinuxDisplayBackendState? LinuxBackendState { get; private set; }
 
-    public ILocalMcpControl McpControl => _services.GetRequiredService<ILocalMcpControl>();
-
-    public IDatabaseMaintenanceService DatabaseMaintenance =>
-        _services.GetRequiredService<IDatabaseMaintenanceService>();
-
-    public IDataDeletionService DataDeletion => _services.GetRequiredService<IDataDeletionService>();
-
-    public ModelBenchmarkRunner ModelBenchmark => _services.GetRequiredService<ModelBenchmarkRunner>();
-
-    public IModelGateway ModelGateway => _services.GetRequiredService<IModelGateway>();
-
-    public EventEmbeddingIndexer EmbeddingIndexer => _services.GetRequiredService<EventEmbeddingIndexer>();
-
-    public IModelSecretAdmin ModelSecretAdmin => _services.GetRequiredService<IModelSecretAdmin>();
-
-    public RangeReportUseCase RangeReport => _services.GetRequiredService<RangeReportUseCase>();
-
-    public EvidenceSearchUseCase EvidenceSearch => _services.GetRequiredService<EvidenceSearchUseCase>();
-
-    /// <summary>Present only on macOS; used by --doctor to report helper health and TCC state.</summary>
-    public IMacHelperSupervisor? MacHelperSupervisor => _services.GetService<IMacHelperSupervisor>();
-
-    public ICapabilityProvider? Capabilities => _services.GetService<ICapabilityProvider>();
-
     /// <summary>
     /// True only when the platform reports a working system tray. Linux GNOME reports Degraded
     /// (needs StatusNotifierItem/AppIndicator), so there the window close must exit instead of hide.
     /// </summary>
-    public bool IsSystemTraySupported => Capabilities?.GetCapabilities()
+    public bool IsSystemTraySupported => Services.Capabilities?.GetCapabilities()
         .Any(capability => capability.Kind == CapabilityKind.SystemTray &&
                            capability.Status == CapabilityStatus.Supported) == true;
-
-    public IAsrEngine AsrEngine => _services.GetRequiredService<IAsrEngine>();
-
-    /// <summary>Streaming wake-word detector used by the KWS golden-set command.</summary>
-    public IWakeWordDetector WakeWordDetector => _services.GetRequiredService<IWakeWordDetector>();
-
-    /// <summary>Only registered where a managed image OCR adapter exists (Linux RapidOCR).</summary>
-    public IImageOcrRecognizer? OcrRecognizer => _services.GetService<IImageOcrRecognizer>();
 
     /// <summary>Starts the macOS Swift helper for commands that need it without starting capture.</summary>
     public async Task StartMacHelperAsync(CancellationToken ct)
     {
-        if (MacHelperSupervisor is { } supervisor)
+        if (Services.MacHelperSupervisor is { } supervisor)
         {
             await supervisor.StartAsync(ct);
         }
     }
-
-    public IModelCapabilityProber ModelCapabilityProber =>
-        _services.GetRequiredService<IModelCapabilityProber>();
 
     public static async Task<AppRuntime> CreateAsync(CancellationToken ct = default)
     {
@@ -178,7 +164,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IVectorIndex>(new HybridSqliteVectorIndex(connectionFactory));
         services.AddSingleton(secretStore);
         services.AddSingleton(modelsConfiguration);
-        DomainRegistrations.RegisterReports(services, modelsConfiguration, dataDirectory);
+        DomainRegistrations.RegisterReports(services, modelsConfiguration, dataDirectory, clock);
         services.AddSingleton(new CapturePipelineOptions { WhitelistedDirectories = whitelist });
         services.AddSingleton<PrivacyBlacklistPolicy>();
         if (linuxBackendState is not null)
@@ -395,17 +381,20 @@ public sealed class AppRuntime : IAsyncDisposable
                 _services.GetRequiredService<ILocalMcpControl>(),
                 Path.Combine(_dataDirectory, "reports"),
                 _services.GetRequiredService<IModelSecretAdmin>(),
-                _services.GetRequiredService<IModelConfigurationAdmin>()),
+                _services.GetRequiredService<IModelConfigurationAdmin>(),
+                Services.Clock),
             new ReportsViewModel(
                 _services.GetRequiredService<ReportUseCase>(),
-                Path.Combine(_dataDirectory, "reports")),
+                Path.Combine(_dataDirectory, "reports"),
+                Services.Clock),
             new VoiceControlViewModel(_services.GetRequiredService<IVoiceSession>()),
             _services.GetRequiredService<VoiceNavigationHub>(),
             new SearchViewModel(
                 _services.GetRequiredService<EvidenceSearchUseCase>(),
                 _services.GetRequiredService<RangeReportUseCase>(),
-                Path.Combine(_dataDirectory, "reports")),
-            new DataManagementViewModel(_services.GetRequiredService<IDataDeletionService>()));
+                Path.Combine(_dataDirectory, "reports"),
+                Services.Clock),
+            new DataManagementViewModel(_services.GetRequiredService<IDataDeletionService>(), Services.Clock));
 
     public async ValueTask DisposeAsync()
     {

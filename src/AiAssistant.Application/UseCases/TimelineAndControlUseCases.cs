@@ -102,12 +102,14 @@ public sealed class DiagnosticsUseCase(
     IDiagnosticLogReader? logReader = null,
     IModelGateway? modelGateway = null,
     IModelAuditSink? modelAuditSink = null,
-    IModelCapabilityProber? modelCapabilityProber = null)
+    IModelCapabilityProber? modelCapabilityProber = null,
+    IClock? clock = null)
 {
     private static readonly JsonSerializerOptions PreviewJsonOptions = new()
     {
         WriteIndented = true
     };
+    private readonly IClock _clock = clock ?? new SystemClock();
 
     public async Task<SystemDiagnosticsSnapshot> GetSnapshotAsync(CancellationToken ct = default)
     {
@@ -172,7 +174,7 @@ public sealed class DiagnosticsUseCase(
         var snapshot = await GetSnapshotAsync(ct);
         var payload = new
         {
-            exportedAtUtc = TimeProvider.System.GetUtcNow(),
+            exportedAtUtc = _clock.UtcNow,
             platform = snapshot.PlatformName,
             schemaVersion = snapshot.DatabaseHealth.SchemaVersion.Number,
             database = new

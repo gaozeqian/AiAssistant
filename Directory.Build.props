@@ -14,6 +14,9 @@
     <UseArtifactsOutput>true</UseArtifactsOutput>
     <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
 
+    <!-- 发布态唯一输出：artifacts/publish/<rid>/。打包脚本以此为共享载荷，避免重复 publish。 -->
+    <PublishDir Condition="'$(RuntimeIdentifier)' != '' and '$(PublishDir)' == ''">$(ArtifactsPath)/publish/$(RuntimeIdentifier)/</PublishDir>
+
     <!-- 供应链：审计全部（直接 + 传递）依赖的已知漏洞，NuGetAuditMode=all 为 net10.0 官方默认值。 -->
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>

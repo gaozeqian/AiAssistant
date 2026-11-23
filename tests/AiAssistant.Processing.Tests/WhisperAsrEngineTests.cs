@@ -2,20 +2,18 @@ using AiAssistant.Application.Ports;
 using AiAssistant.Core.Configuration;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Processing;
+using AiAssistant.Testing.Common;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiAssistant.Processing.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class WhisperAsrEngineTests
 {
     [Fact]
     public async Task MissingModel_ReportsPermissionRequired_AndSkipsTranscription()
     {
-        var modelPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "test-temp",
-            Guid.NewGuid().ToString("N"),
-            "ggml-small.bin");
+        var modelPath = Path.Combine(TempArtifactDirectory.CreatePath("whisper"), "ggml-small.bin");
         await using var engine = new WhisperAsrEngine(
             new WhisperAsrOptions { ModelPath = modelPath },
             NullLogger<WhisperAsrEngine>.Instance);
@@ -34,10 +32,7 @@ public sealed class WhisperAsrEngineTests
     [Fact]
     public async Task Non16kAudio_ReturnsEmptyWithoutTouchingModel()
     {
-        var modelDirectory = Path.Combine(
-            AppContext.BaseDirectory,
-            "test-temp",
-            Guid.NewGuid().ToString("N"));
+        var modelDirectory = TempArtifactDirectory.CreatePath("processing");
         Directory.CreateDirectory(modelDirectory);
         var modelPath = Path.Combine(modelDirectory, "ggml-small.bin");
         await File.WriteAllBytesAsync(modelPath, new byte[8]);

@@ -10,4 +10,7 @@
     <ProjectReference Include="..\..\src\AiAssistant.LocalApi\AiAssistant.LocalApi.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Export\AiAssistant.Export.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AiAssistant.Testing.Common\AiAssistant.Testing.Common.csproj" />
+  </ItemGroup>
 </Project>

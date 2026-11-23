@@ -71,8 +71,10 @@ public sealed record ModelBenchmarkReport(
 /// <summary>Fixed synthetic Chinese benchmark set; no personal activity data is included.</summary>
 public sealed class ModelBenchmarkRunner(
     IModelGateway model,
-    ModelEndpointTier tier = ModelEndpointTier.LocalOffline)
+    ModelEndpointTier tier = ModelEndpointTier.LocalOffline,
+    IClock? clock = null)
 {
+    private readonly IClock _clock = clock ?? new SystemClock();
     public static IReadOnlyList<ModelBenchmarkCase> Cases { get; } =
     [
         new(
@@ -139,7 +141,7 @@ public sealed class ModelBenchmarkRunner(
         var averageLatency = results.Count == 0 ? 0 : (long)results.Average(item => item.DurationMilliseconds);
         return new ModelBenchmarkReport(
             modelId,
-            TimeProvider.System.GetUtcNow(),
+            _clock.UtcNow,
             results,
             successRate,
             jsonRate,

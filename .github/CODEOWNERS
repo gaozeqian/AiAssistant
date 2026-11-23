@@ -5,7 +5,7 @@
 /LICENSE @gaozeqian
 /EULA.md @gaozeqian
 /THIRD-PARTY-NOTICES.md @gaozeqian
-/docs/compliance/ @gaozeqian
+/docs/release/ @gaozeqian
 
 # 构建与发布流水线。
 /build/ @gaozeqian

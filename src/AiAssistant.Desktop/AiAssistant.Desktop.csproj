@@ -19,8 +19,4 @@
                       LogicalName="AiAssistant.Desktop.Assets.aiassistant.png"
                       Link="Assets/aiassistant.png" />
   </ItemGroup>
-  <ItemGroup>
-    <!-- UI 自驱动 E2E 只由工具宿主编译。 -->
-    <Compile Remove="UiE2ERunner.cs" />
-  </ItemGroup>
 </Project>

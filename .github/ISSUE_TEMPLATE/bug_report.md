@@ -18,14 +18,14 @@ assignees: []
 
 ## 环境
 
-- 版本（`AiAssistant.Host --version`）：
+- 版本（`AiAssistant --version`）：
 - 平台：`win-x64` / `osx-arm64` / `linux-x64`
 - 安装方式：安装包 / 本地构建
 - 相关数据目录内容规模（如与性能或检索有关）：
 
 ## 证据
 
-<!-- 日志片段、截图路径（artifacts/evidence/ 下）、复现用最小输入。请勿粘贴真实用户数据或密钥。 -->
+<!-- 日志片段、截图路径（artifacts/test-results/ 下）、复现用最小输入。请勿粘贴真实用户数据或密钥。 -->
 
 ## 影响面
 

@@ -17,7 +17,9 @@ usage() {
 把 artifacts/cache/models 下已下载的 KWS / Paraformer / MeloTTS 资产复制到
 <目标数据目录>/models/sherpa，供本机 GUI 直接使用。
 
-  [目标数据目录]   默认 $AIASSISTANT_DATA_DIRECTORY，否则 ~/.local/share/AiAssistant
+  [目标数据目录]   默认 $AIASSISTANT_DATA_DIRECTORY；否则按 OS 解析：
+                   macOS  ~/Library/Application Support/AiAssistant
+                   Linux  ${XDG_DATA_HOME:-$HOME/.local/share}/AiAssistant
 
 选项:
   --dry-run        只打印将要复制的文件，不写入
@@ -51,7 +53,18 @@ for path in "$KWS_SRC" "$ASR_SRC"; do
   [[ -d "$path" ]] || { echo "缺少模型资产目录：$path（请先下载 sherpa-onnx KWS / Paraformer 模型）" >&2; exit 1; }
 done
 
-DEST="${DEST_ROOT:-${AIASSISTANT_DATA_DIRECTORY:-$HOME/.local/share/AiAssistant}}/models/sherpa"
+default_data_root() {
+  case "$(uname -s)" in
+    Darwin)
+      printf '%s\n' "$HOME/Library/Application Support/AiAssistant"
+      ;;
+    *)
+      printf '%s\n' "${XDG_DATA_HOME:-$HOME/.local/share}/AiAssistant"
+      ;;
+  esac
+}
+
+DEST="${DEST_ROOT:-${AIASSISTANT_DATA_DIRECTORY:-$(default_data_root)}}/models/sherpa"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "dry-run：将安装到 $DEST"

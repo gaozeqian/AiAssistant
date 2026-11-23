@@ -12,6 +12,9 @@
 - 测试栈：`xunit.v3` + Microsoft.Testing.Platform 原生运行器，根除 VSTest 回环 Socket 崩溃；全量测试在本机原生通过。
 - 安全：本地 MCP 服务新增 `Origin` / `Host` 白名单校验、`MCP-Protocol-Version` 协商，并将鉴权严格前置于限流之前。
 - 架构门禁：16 模块依赖矩阵、生产程序集禁引测试/基准类型、生产代码禁直接调用系统时钟的自动化断言。
+- 测试基建：新增 `AiAssistant.Testing.Common`（FakeClock、TempArtifactDirectory、ProcessEnvironmentScope、AsyncAssert），测试工程按模块拆为 15 个，新增 Desktop/Host/Application/Models/LocalApi/Soak 测试工程。
+- 测试分层：统一 `Category` / `OS` Trait，受限环境用例改为 xunit.v3 显式 Skip；CI 输出 Cobertura 覆盖率到 `artifacts/test-results/coverage/`。
+- 原生测试：`native/AiAssistant.MacHelper` 新增 `MacHelperTests`（IPC、权限快照、音频参数、固定时间比较）。
 
 ### Changed
 
@@ -20,12 +23,21 @@
 - 三平台交付矩阵四处文档/CI 对齐：Windows `.zip` + `.msi`、macOS `.pkg` + `.zip`、Linux `.tar.gz` + `.deb`。
 - 自签名根证书导入仅在显式 `--dev-self-signed` 模式下发生，正式 CA / Developer ID 路径物理隔离。
 - CI 补齐最小权限、并发控制、作业超时、Action SHA 锁定与格式/ShellCheck 检查。
+- 产物布局收口为 `artifacts/{bin,obj,publish,staging,dist,cache,test-results,tmp}`；SwiftPM scratch 与测试临时目录全部移出源码树。
+- 发布态二进制统一为 `AiAssistant.exe` / `AiAssistant` / `aiassistant`；安装包改为 Windows/MSI 共享载荷、macOS `macos-arm64` 命名、Linux Debian Policy 命名与顶层目录便携包；开发自签名产物统一 `-dev`。
+- 组合根：CLI 拆为独立 `ICliCommand`（`Program.cs` ≤150 行），`RuntimeServices` 类型化服务图，`DesktopLaunchContext` 不可变启动上下文。
+- UI 拆分：`MainWindow.axaml` 拆为共享样式 + 7 个 Tab UserControl；Diagnostics/Timeline ViewModel 抽出无状态映射，单文件 ≤350 行。
+- 重型模块拆分：MCP 传输/鉴权/生命周期、采集样本处理/控制审计、macOS 采集适配器、语音音频/反馈/日志、PipeWire 回调、Application 端口与 Swift 原生能力按职责拆分。
+- 文档从 44 篇收敛为 25 篇：架构合并为 `overview.md`，开发规范与测试聚合，发布/安全/合规/路线图重写；删除归档、空壳索引与手工状态抄写。
 
 ### Fixed
 
 - `ModelHttpClientFactory` 中客户端证书与企业 CA 句柄随 Handler 释放，消除长期存活闭包导致的资源泄漏。
 - 清理重复图标资产、UTF-8 BOM、阶段代号测试命名与 GNU 专属脚本命令。
 - 治理全部静默 catch（统一脱敏日志）、收敛 21 个内部实现类型为 internal sealed、拆分 7 个上帝类为职责清晰的组件。
+- 测试中所有 `if (!环境) return;` 改为显式 `Assert.Skip`；测试临时文件不再写入 `AppContext.BaseDirectory/test-temp` 或硬编码 `/tmp`。
+- 修复 macOS Helper socket 回退共享 `/tmp` 的问题；Linux 语音模型安装路径按 XDG 规范解析。
+- 修复 `PngCodec`/TTS 路径分隔符在 Windows 上的跨平台差异。
 
 ## [0.1.0] - 2026-11-22
 
@@ -45,7 +57,7 @@
 
 ### Changed
 
-- 随包 TTS 由 `vits-zh-aishell3` 更换为 MeloTTS（MIT）；旧权重归档至 `artifacts/evidence/retired-models/`，不再参与打包。
+- 随包 TTS 由 `vits-zh-aishell3` 更换为 MeloTTS（MIT）；旧权重归档至 `artifacts/test-results/retired-models/`，不再参与打包。
 - Windows 交付格式收敛为 `zip` 与 `MSI`，MSIX 打包链路下线。
 
 ### Security

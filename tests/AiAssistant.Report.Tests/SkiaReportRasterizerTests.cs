@@ -6,6 +6,7 @@ using SkiaSharp;
 namespace AiAssistant.Report.Tests;
 
 /// <summary>PNG/PDF rasterization uses the SkiaSharp build already shipped with Avalonia.</summary>
+[Trait("Category", "Unit")]
 public sealed class SkiaReportRasterizerTests
 {
     [Fact]

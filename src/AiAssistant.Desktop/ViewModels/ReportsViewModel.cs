@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
 using AiAssistant.Core.Domain;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -13,7 +14,8 @@ public sealed class ReportsViewModel : ObservableObject
 {
     private readonly ReportUseCase _reports;
     private readonly string _exportDirectory;
-    private DateTimeOffset? _selectedDate = TimeProvider.System.GetLocalNow().Date;
+    private readonly IClock _clock;
+    private DateTimeOffset? _selectedDate;
     private ReportVersionItem? _selectedVersion;
     private string _markdown = string.Empty;
     private string _standupText = "尚无站会数据";
@@ -21,10 +23,12 @@ public sealed class ReportsViewModel : ObservableObject
     private string _errorMessage = string.Empty;
     private bool _isBusy;
 
-    public ReportsViewModel(ReportUseCase reports, string exportDirectory)
+    public ReportsViewModel(ReportUseCase reports, string exportDirectory, IClock? clock = null)
     {
         _reports = reports ?? throw new ArgumentNullException(nameof(reports));
         _exportDirectory = exportDirectory ?? throw new ArgumentNullException(nameof(exportDirectory));
+        _clock = clock ?? new SystemClock();
+        _selectedDate = _clock.LocalNow.Date;
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GenerateCommand = new AsyncRelayCommand(() => GenerateAsync(forceOverwrite: false));
         RegenerateCommand = new AsyncRelayCommand(() => GenerateAsync(forceOverwrite: true));

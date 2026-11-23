@@ -14,13 +14,13 @@ usage() {
   cat <<'EOF'
 用法: bash build/package/package-macos.sh [选项]
 
-产出 AiAssistant.app、AiAssistant-<version>-osx-arm64.zip 与（在 macOS 上）.pkg。
+产出 AiAssistant.app、AiAssistant-<version>-macos-arm64.app.zip 与（在 macOS 上）.pkg。
 
 选项:
   --version <版本>          指定版本，默认取 Directory.Build.props 的 VersionPrefix
   --identity <标识>         codesign 标识，默认读 $AIASSISTANT_CODESIGN_IDENTITY
   --notary-profile <名称>   notarytool 钥匙串配置名，默认读 $AIASSISTANT_NOTARY_PROFILE
-  --output <目录>           产物目录，默认 $AIASSISTANT_PACKAGE_OUTPUT 或 artifacts/package
+  --output <目录>           分发目录，默认 $AIASSISTANT_PACKAGE_OUTPUT 或 artifacts/dist/<version>
   --runtime <RID>           目标运行时，默认 osx-arm64
   --certificate <路径>      自签名证书（仅开发模式，需与 --dev-self-signed 同用）
   --dev-self-signed         显式启用开发自签名模式：postinstall 导入证书到系统信任库
@@ -42,7 +42,7 @@ require_value() {
 VERSION="${VERSION:-}"
 IDENTITY="${AIASSISTANT_CODESIGN_IDENTITY:-}"
 NOTARY_PROFILE="${AIASSISTANT_NOTARY_PROFILE:-}"
-OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-artifacts/package}"
+OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-}"
 SKIP_SIGN=0
 SKIP_MODELS=0
 REQUIRE_SIGN=0
@@ -72,11 +72,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 ARTIFACTS_ROOT="${AIASSISTANT_ARTIFACTS_ROOT:-$REPO_ROOT/artifacts}"
-if [[ "$OUTPUT_ROOT" = /* ]]; then
-  OUT_DIR="$OUTPUT_ROOT"
-else
-  OUT_DIR="$REPO_ROOT/$OUTPUT_ROOT"
-fi
 
 if [[ -z "$VERSION" ]]; then
   VERSION="$(sed -n 's:.*<VersionPrefix>\(.*\)</VersionPrefix>.*:\1:p' "$REPO_ROOT/Directory.Build.props" | head -1)"
@@ -85,6 +80,14 @@ VERSION="${VERSION#v}"
 if [[ -z "$VERSION" ]]; then
   echo "unable to determine version; pass --version" >&2
   exit 1
+fi
+
+if [[ -z "$OUTPUT_ROOT" ]]; then
+  OUT_DIR="$ARTIFACTS_ROOT/dist/$VERSION"
+elif [[ "$OUTPUT_ROOT" = /* ]]; then
+  OUT_DIR="$OUTPUT_ROOT"
+else
+  OUT_DIR="$REPO_ROOT/$OUTPUT_ROOT"
 fi
 
 if [[ -n "$CERTIFICATE_PATH" && "$DEV_SELF_SIGNED" -ne 1 ]]; then
@@ -110,7 +113,7 @@ if [[ "$REQUIRE_SIGN" -eq 1 ]]; then
   fi
 fi
 
-STAGE="$ARTIFACTS_ROOT/build/staging/$RUNTIME"
+STAGE="$ARTIFACTS_ROOT/staging/$RUNTIME-app"
 APP="$STAGE/AiAssistant.app"
 CONTENTS="$APP/Contents"
 SELF_CONTAINED="true"
@@ -130,7 +133,7 @@ dotnet publish "$REPO_ROOT/src/AiAssistant.Host/AiAssistant.Host.csproj" \
   -tl:off -v:m \
   -o "$CONTENTS/MacOS"
 
-HELPER="$REPO_ROOT/native/AiAssistant.MacHelper/.build/release/aiassistant-mac-helper"
+HELPER="$ARTIFACTS_ROOT/obj/native/mac-helper/release/aiassistant-mac-helper"
 if [[ -x "$HELPER" ]]; then
   cp "$HELPER" "$CONTENTS/MacOS/aiassistant-mac-helper"
   chmod +x "$CONTENTS/MacOS/aiassistant-mac-helper"
@@ -162,7 +165,7 @@ fi
 bash "$SCRIPT_DIR/legal-files.sh" "$CONTENTS/Resources"
 
 sed "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/macos/Info.plist.template" > "$CONTENTS/Info.plist"
-chmod +x "$CONTENTS/MacOS/AiAssistant.Host"
+chmod +x "$CONTENTS/MacOS/AiAssistant"
 
 # Build a .icns when Apple tooling is available; otherwise ship the PNG for reference.
 if command -v iconutil >/dev/null 2>&1 && command -v sips >/dev/null 2>&1; then
@@ -207,7 +210,15 @@ else
 fi
 
 mkdir -p "$OUT_DIR"
-ZIP_PATH="$OUT_DIR/AiAssistant-$VERSION-$RUNTIME.zip"
+PLATFORM="macos-arm64"
+if [[ "$RUNTIME" != "osx-arm64" ]]; then
+  PLATFORM="$RUNTIME"
+fi
+SUFFIX=""
+if [[ "$DEV_SELF_SIGNED" -eq 1 ]]; then
+  SUFFIX="-dev"
+fi
+ZIP_PATH="$OUT_DIR/AiAssistant-$VERSION-$PLATFORM$SUFFIX.app.zip"
 rm -f "$ZIP_PATH"
 if command -v ditto >/dev/null 2>&1; then
   ditto -c -k --keepParent "$APP" "$ZIP_PATH"
@@ -222,7 +233,7 @@ if [[ -f "$ZIP_PATH" ]]; then
   echo "zip: $ZIP_PATH"
 fi
 
-PKG_PATH="$OUT_DIR/AiAssistant-$VERSION-$RUNTIME.pkg"
+PKG_PATH="$OUT_DIR/AiAssistant-$VERSION-$PLATFORM$SUFFIX.pkg"
 if [[ "$(uname -s)" == "Darwin" ]]; then
   PKG_ROOT="$STAGE/pkgroot"
   PKG_SCRIPTS="$STAGE/pkgscripts"
@@ -254,26 +265,5 @@ else
   echo "warning: pkgbuild is macOS-only; skipping .pkg" >&2
 fi
 
-write_checksums() {
-  local directory="$1"
-  (
-    cd "$directory" || return 1
-    : > SHA256SUMS
-    for file in *.zip *.tar.gz *.deb *.dmg *.pkg; do
-      [ -f "$file" ] || continue
-      if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$file" >> SHA256SUMS
-      else
-        shasum -a 256 "$file" >> SHA256SUMS
-      fi
-    done
-    if [ -s SHA256SUMS ]; then
-      echo "checksums: $directory/SHA256SUMS"
-    else
-      rm -f SHA256SUMS
-    fi
-  )
-}
-
-write_checksums "$OUT_DIR"
+bash "$SCRIPT_DIR/checksums.sh" "$OUT_DIR" "$VERSION"
 echo "macOS package complete."

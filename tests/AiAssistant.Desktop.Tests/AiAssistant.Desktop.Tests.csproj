@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AiAssistant.Core\AiAssistant.Core.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Application\AiAssistant.Application.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Capture\AiAssistant.Capture.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Storage\AiAssistant.Storage.csproj" />
+    <ProjectReference Include="..\..\src\AiAssistant.Desktop\AiAssistant.Desktop.csproj" />
+    <ProjectReference Include="..\AiAssistant.Testing.Common\AiAssistant.Testing.Common.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" />
+  </ItemGroup>
+</Project>

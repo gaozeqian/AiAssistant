@@ -199,7 +199,7 @@ public sealed class HybridSqliteVectorIndex(EncryptedSqliteConnectionFactory con
         cmd.Transaction = tx;
         cmd.CommandText = """
             INSERT INTO vector_index_meta(index_name, model_id, model_version, dimensions, backend, updated_at_utc)
-            VALUES ($name, $modelId, $version, $dims, $backend, $now)
+            VALUES ($name, $modelId, $version, $dims, $backend, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
             ON CONFLICT(index_name) DO UPDATE SET
                 model_id = excluded.model_id,
                 model_version = excluded.model_version,
@@ -212,7 +212,6 @@ public sealed class HybridSqliteVectorIndex(EncryptedSqliteConnectionFactory con
         cmd.Parameters.AddWithValue("$version", model.ModelVersion);
         cmd.Parameters.AddWithValue("$dims", model.Dimensions);
         cmd.Parameters.AddWithValue("$backend", backend);
-        cmd.Parameters.AddWithValue("$now", TimeProvider.System.GetUtcNow().ToString("O"));
         await cmd.ExecuteNonQueryAsync(ct);
     }
 

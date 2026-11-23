@@ -7,7 +7,7 @@
   <!-- .NET SDK 的 artifacts 布局把中间产物放到 artifacts/obj/<Project>/<pivot>。
        审计与 SBOM 生成器据此收敛路径，源码树下不再出现 bin/、obj/。 -->
   <PropertyGroup>
-    <ArtifactsObjRoot Condition="'$(ArtifactsObjRoot)' == ''">$(ArtifactsPath)obj/</ArtifactsObjRoot>
+    <ArtifactsObjRoot Condition="'$(ArtifactsObjRoot)' == ''">$(ArtifactsPath)/obj/</ArtifactsObjRoot>
   </PropertyGroup>
 
   <!-- 原生资产按 RID 隔离：只保留当前 RID 需要的运行库，避免跨 RID 二进制混入包体。 -->
@@ -29,8 +29,8 @@
           AfterTargets="Publish"
           Condition="'$(RuntimeIdentifier)' != '' and '$(PublishDir)' != ''">
     <PropertyGroup>
-      <_AiAssistantManifestDir>$([MSBuild]::EnsureTrailingSlash('$(ArtifactsPath)'))evidence/publish/</_AiAssistantManifestDir>
-      <_AiAssistantManifestFile>$(_AiAssistantManifestDir)$(MSBuildProjectName)-$(RuntimeIdentifier).txt</_AiAssistantManifestFile>
+      <_AiAssistantManifestDir>$([MSBuild]::EnsureTrailingSlash('$(ArtifactsPath)'))publish/$(RuntimeIdentifier)/</_AiAssistantManifestDir>
+      <_AiAssistantManifestFile>$(_AiAssistantManifestDir)publish-manifest.txt</_AiAssistantManifestFile>
     </PropertyGroup>
     <MakeDir Directories="$(_AiAssistantManifestDir)" />
     <WriteLinesToFile File="$(_AiAssistantManifestFile)"

@@ -4,7 +4,7 @@
 #
 # 匹配键：
 #   - Wayland: ShellApp 的 app_id = "aiassistant"（必须与 <file>.desktop 同名）
-#   - X11:     StartupWMClass = AiAssistant.Host（Avalonia 为该二进制设置的 WM_CLASS）
+#   - X11:     StartupWMClass = aiassistant（Avalonia 为该二进制设置的 WM_CLASS）
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +18,7 @@ usage() {
   cat <<'EOF'
 用法: bash tools/install-desktop-entry.sh [可执行文件路径] [选项]
 
-  [可执行文件路径]  默认 src/AiAssistant.Host/bin/Release/net10.0/AiAssistant.Host
+  [可执行文件路径]  默认 artifacts/publish/linux-x64/aiassistant
 
 选项:
   --dry-run         只打印将写入的路径与内容，不落盘
@@ -42,11 +42,11 @@ for arg in "$@"; do
   esac
 done
 
-BINARY="${BINARY:-$REPO_ROOT/src/AiAssistant.Host/bin/Release/net10.0/AiAssistant.Host}"
+BINARY="${BINARY:-$REPO_ROOT/artifacts/publish/linux-x64/aiassistant}"
 
 if [[ ! -x "$BINARY" ]]; then
   echo "binary not executable: $BINARY" >&2
-  echo "build first: dotnet build src/AiAssistant.Host/AiAssistant.Host.csproj -c Release" >&2
+  echo "publish first: bash build/package/package-linux.sh --skip-models" >&2
   exit 1
 fi
 
@@ -82,7 +82,7 @@ Icon=aiassistant
 Terminal=false
 Categories=Utility;Office;
 Keywords=activity;timeline;privacy;ai;
-StartupWMClass=AiAssistant.Host
+StartupWMClass=aiassistant
 StartupNotify=true
 EOF
 chmod 0644 "$APPS/aiassistant.desktop"

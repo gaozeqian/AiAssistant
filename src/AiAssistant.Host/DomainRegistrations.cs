@@ -155,11 +155,12 @@ internal static class DomainRegistrations
     internal static void RegisterReports(
         IServiceCollection services,
         ModelsConfiguration configuration,
-        string dataDirectory)
+        string dataDirectory,
+        IClock clock)
     {
         var auditSink = new InMemoryModelAuditSink();
         var redactor = new SensitiveDataRedactor();
-        var consent = new PublicCloudConsentGate();
+        var consent = new PublicCloudConsentGate(clock);
         services.AddSingleton(configuration.Policy);
         services.AddSingleton(consent);
         services.AddSingleton<IModelAuditSink>(auditSink);
@@ -196,7 +197,8 @@ internal static class DomainRegistrations
                 new ThreeGateModelGateway(chatRouter, redactor),
                 configuration.Policy,
                 consent),
-            auditSink);
+            auditSink,
+            clock);
 
         // Embedding may target an independent endpoint (different tier/address/model). When no
         // dedicated embedding endpoint is configured, reuse the default tier's endpoint.
@@ -224,7 +226,8 @@ internal static class DomainRegistrations
                 new ThreeGateModelGateway(embeddingEndpointGateway, redactor),
                 configuration.Policy,
                 consent),
-            auditSink);
+            auditSink,
+            clock);
 
         var gateway = new SplitChatEmbeddingGateway(chatGateway, embeddingGateway, embeddingEndpoint.Tier);
         services.AddSingleton(gateway);
@@ -248,7 +251,8 @@ internal static class DomainRegistrations
         services.AddSingleton<IModelCapabilityProber>(new ModelCapabilityProber(
             probeEndpoints,
             capabilityCache,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<ModelCapabilityProber>.Instance));
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ModelCapabilityProber>.Instance,
+            clock: clock));
 
         services.AddSingleton<IReportRepository, SqliteReportRepository>();
         services.AddSingleton(new ReportGenerationOptions { DefaultTier = configuration.Policy.DefaultTier });
@@ -267,7 +271,8 @@ internal static class DomainRegistrations
             documentStyle));
         services.AddSingleton(provider => new ModelBenchmarkRunner(
             provider.GetRequiredService<IModelGateway>(),
-            configuration.Policy.DefaultTier));
+            configuration.Policy.DefaultTier,
+            clock));
 
         var scheduleTime = TimeOnly.TryParse(
             Environment.GetEnvironmentVariable(EnvironmentNames.ReportTime),

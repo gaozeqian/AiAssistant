@@ -3,10 +3,12 @@ using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Processing;
+using AiAssistant.Testing.Common;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiAssistant.Processing.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class ProcessingPipelineTests
 {
     private static readonly DateTimeOffset BaseUtc = new(2026, 11, 20, 8, 0, 0, TimeSpan.Zero);
@@ -113,7 +115,7 @@ public sealed class ProcessingPipelineTests
     {
         var options = new SherpaOnnxOptions
         {
-            ModelDirectory = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"))
+            ModelDirectory = TempArtifactDirectory.CreatePath("processing")
         };
         await using var asr = new SherpaOnnxAsrEngine(options, NullLogger<SherpaOnnxAsrEngine>.Instance);
         using var vad = new SherpaOnnxVadSegmenter(options, NullLogger<SherpaOnnxVadSegmenter>.Instance);
@@ -197,6 +199,7 @@ public sealed class ProcessingPipelineTests
     }
 }
 
+[Trait("Category", "Unit")]
 public sealed class AudioHubTests
 {
     private static readonly DateTimeOffset BaseUtc = new(2026, 11, 20, 9, 0, 0, TimeSpan.Zero);

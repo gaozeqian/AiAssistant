@@ -135,7 +135,8 @@ internal static class PlatformRegistrations
         services.AddSingleton(pipeWireOptions);
         services.AddSingleton(provider => new PipeWireScreenCastStream(
             provider.GetRequiredService<ILogger<PipeWireScreenCastStream>>(),
-            pipeWireOptions.MinFrameInterval));
+            pipeWireOptions.MinFrameInterval,
+            clock));
         services.AddSingleton(provider => new WaylandScreenCapture(
             provider.GetRequiredService<IXdgPortalClient>(),
             provider.GetRequiredService<XdgPortalSessionManager>(),

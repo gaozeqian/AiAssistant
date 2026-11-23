@@ -7,7 +7,7 @@ air-gapped and low-privilege environments. Also records the Swift macOS helper
 and the bundled local model assets (ML-BOM) as first-class components.
 
 Usage:
-    python3 build/sbom/generate-sbom.py                       # artifacts/build/sbom/bom.json
+    python3 build/sbom/generate-sbom.py                       # artifacts/dist/<version>/AiAssistant-<version>-sbom.cdx.json
     python3 build/sbom/generate-sbom.py --verify              # + structural/license checks
     python3 build/sbom/generate-sbom.py --check-manifest      # + CPM manifest coverage
     python3 build/sbom/generate-sbom.py --dry-run             # print summary, write nothing
@@ -44,7 +44,7 @@ LICENSE_OVERRIDES: dict[str, tuple[str, str]] = {
     "whisper.net": ("MIT", "LICENSE starts with 'MIT License'"),
 }
 
-# Bundled models are declared in docs/compliance/model-assets.md (single source of truth).
+# Bundled models are declared in docs/release/compliance.md (single source of truth).
 MODEL_ASSETS: tuple[tuple[str, str, str, str], ...] = (
     ("sherpa-kws-wenetspeech-3.3M", "2024-01-01", "Apache-2.0", "Sherpa ONNX KWS wake-word model"),
     ("sherpa-paraformer-zh-small-int8", "2024-03-09", "Apache-2.0", "Sherpa ONNX Paraformer ASR model"),
@@ -319,7 +319,7 @@ def verify(bom: dict, missing_licenses: list[str]) -> list[str]:
 
 def check_manifest(repo: Path) -> list[str]:
     props = (repo / "Directory.Packages.props").read_text(encoding="utf-8")
-    manifest = (repo / "docs/compliance/dependency-manifest.md").read_text(encoding="utf-8")
+    manifest = (repo / "docs/release/compliance.md").read_text(encoding="utf-8")
     declared = re.findall(r'PackageVersion Include="([^"]+)"', props)
     return [name for name in declared if f"`{name}`" not in manifest]
 
@@ -327,7 +327,7 @@ def check_manifest(repo: Path) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repo", default=None, help="repository root (default: git rev-parse --show-toplevel)")
-    parser.add_argument("--output", default=None, help="output path (default: artifacts/build/sbom/bom.json)")
+    parser.add_argument("--output", default=None, help="output path (default: artifacts/dist/<version>/AiAssistant-<version>-sbom.cdx.json)")
     parser.add_argument("--version", default="", help="product version (default: VersionPrefix)")
     parser.add_argument("--verify", action="store_true", help="verify structure and license whitelist")
     parser.add_argument("--check-manifest", action="store_true", help="verify CPM packages are documented")
@@ -337,7 +337,11 @@ def main() -> int:
     repo = find_repo_root(args.repo)
     art_root = artifacts_root(repo)
     version = args.version or read_version(repo)
-    output = Path(args.output) if args.output else art_root / "build" / "sbom" / "bom.json"
+    output = (
+        Path(args.output)
+        if args.output
+        else art_root / "dist" / version / f"AiAssistant-{version}-sbom.cdx.json"
+    )
     if not output.is_absolute():
         output = repo / output
 

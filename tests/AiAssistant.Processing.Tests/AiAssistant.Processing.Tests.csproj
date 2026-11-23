@@ -5,4 +5,7 @@
     <ProjectReference Include="..\..\src\AiAssistant.Processing\AiAssistant.Processing.csproj" />
     <ProjectReference Include="..\..\tools\AiAssistant.Diagnostics.Host\AiAssistant.Diagnostics.Host.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AiAssistant.Testing.Common\AiAssistant.Testing.Common.csproj" />
+  </ItemGroup>
 </Project>

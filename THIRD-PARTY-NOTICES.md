@@ -3,8 +3,8 @@
 本产品（AiAssistant）为专有软件，其自身代码与资源的许可条款见产品 `LICENSE` 与最终用户许可协议（EULA）。本文件仅列出随安装包分发的第三方模型、语音引擎及其许可证，不改变产品本身的专有许可。
 
 - 适用版本：0.1.0
-- 生成日期：2026-11-22
-- 覆盖范围：随包语音模型与语音引擎（`models/sherpa/**`、sherpa-onnx 原生库、ONNX Runtime）。其余 .NET / NuGet 依赖的许可清单见 `docs/compliance/dependency-manifest.md`。
+- 生成日期：2026-11-23
+- 覆盖范围：随包语音模型与语音引擎（`models/sherpa/**`、sherpa-onnx 原生库、ONNX Runtime）。其余 .NET / NuGet 依赖的许可清单见 `docs/release/compliance.md`。
 
 ## 1. 组件清单与归属
 
@@ -322,7 +322,7 @@ SOFTWARE.
 ## 3. 其他说明
 
 - 本文件随安装包分发；源码仓库内路径为 `THIRD-PARTY-NOTICES.md`。Windows 位于安装目录、macOS 位于 `AiAssistant.app/Contents/Resources/`、Linux 位于 `/usr/lib/aiassistant/`。
-- 模型资产与依赖许可的核查证据见 `docs/compliance/model-assets.md` 与 `docs/compliance/dependency-manifest.md`。
+- 模型资产与依赖许可的核查证据见 `docs/release/compliance.md`。
 - ONNX Runtime 自身还携带一份 `ThirdPartyNotices.txt`，列出其内置组件的许可；再分发 ONNX Runtime 时应同时保留该文件（NuGet 包 `Microsoft.ML.OnnxRuntime.Managed` 内提供）。
 - 若后续替换或升级任何随包模型，必须同步更新本文件的组件表与许可证全文，并重新核对上游许可字段。
 

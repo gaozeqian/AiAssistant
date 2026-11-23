@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AiAssistant.Desktop.ViewModels"
+             xmlns:automation="using:Avalonia.Automation"
+             x:Class="AiAssistant.Desktop.Views.Tabs.DataExportTabView"
+             x:DataType="vm:ShellViewModel">
+  <Grid DataContext="{Binding Data}" x:DataType="vm:DataManagementViewModel"
+        ColumnDefinitions="*,*" Margin="0,12,0,0">
+    <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,0">
+      <StackPanel Spacing="14">
+        <TextBlock Text="删除本地数据" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding RetentionNotice}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+        <DatePicker SelectedDate="{Binding SelectedDate}" Initialized="OnDatePickerInitialized" />
+        <WrapPanel>
+          <Button Classes="secondary" Content="{Binding DeleteDateButtonText}"
+                  Command="{Binding DeleteDateCommand}" Margin="0,0,8,8"
+                  automation:AutomationProperties.Name="{Binding DeleteDateButtonText}" />
+          <Button Classes="secondary" Content="{Binding DeleteAllButtonText}"
+                  Command="{Binding DeleteAllCommand}" Margin="0,0,8,8"
+                  automation:AutomationProperties.Name="{Binding DeleteAllButtonText}" />
+          <Button Classes="secondary" Content="取消" Command="{Binding CancelPendingCommand}"
+                  IsVisible="{Binding HasPending}" Margin="0,0,8,8" />
+        </WrapPanel>
+        <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPending}">
+          <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
+        </Border>
+        <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+        <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
+                   IsVisible="{Binding HasError}" />
+      </StackPanel>
+    </Border>
+    <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,0">
+      <StackPanel Spacing="14">
+        <TextBlock Text="导出与保留" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding ExportNotice}" TextWrapping="Wrap" />
+        <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
+          <TextBlock Text="所有导出均在本机生成，不经过云端。删除数据前请先导出需要保留的日报与问答。"
+                     TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
+        </Border>
+        <TextBlock Text="键盘快捷键：Ctrl+D1…D7 切换页面，Ctrl+F 打开检索，F5 刷新当前页。"
+                   TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

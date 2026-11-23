@@ -1,48 +1,46 @@
-# AiAssistant 仓库忽略规则（精简版：只保留本仓实际会产生的文件）
-# 反例：不要恢复 VS6 / Silverlight / LightSwitch / BizTalk / Bower / StyleCop 等历史模板规则。
+# AiAssistant 仓库忽略规则（精确锚定：只忽略本仓已知产物，避免宽规则掩盖源码树污染）
 
-# 统一产物布局：所有构建、发布、SBOM、证据、模型缓存都落在 artifacts/。
-artifacts/
-.artifacts/
+# 唯一产物根。任何构建、发布、SBOM、测试证据、模型缓存都落在 artifacts/。
+/artifacts/
+/.artifacts/
 
-# 历史布局残留（迁移前的工作树可能仍有 bin/、obj/）。
-**/[Bb]in/
-**/[Oo]bj/
-[Dd]ebug/
-[Rr]elease/
+# 历史 SwiftPM 布局（迁移期保险；正常构建已重定向到 artifacts/obj/native/mac-helper）。
+/native/AiAssistant.MacHelper/.build/
+/native/AiAssistant.MacHelper/.swiftpm/
+/.swiftpm/
 
-# .NET / NuGet
-project.lock.json
-project.fragment.lock.json
-TestResults/
+# .NET 测试与诊断文件（不按 bin/obj 宽匹配，源码树出现编译输出应被审计发现）。
+/TestResults/
 *.trx
 *.binlog
-MSBuild_Logs/
+/MSBuild_Logs/
 *.nupkg
 *.snupkg
 *.coverage
 *.coveragexml
-coverage*.json
-coverage*.xml
-coverage*.info
 
-# 原生与脚本工具链
-.build/
-native/**/.build/
-.swiftpm/
-__pycache__/
+# Python 缓存：按仓库目录锚定，避免 build/、tools/ 下残留 __pycache__。
+/build/**/__pycache__/
+/tools/**/__pycache__/
+/tests/**/__pycache__/
+/src/**/__pycache__/
+/native/**/__pycache__/
+/.venv/
 *.py[cod]
-.venv/
-node_modules/
 
-# IDE / 编辑器
-.vs/
-.idea/
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+# 本地工具链目录。
+/tools/**/node_modules/
+/.workbuddy/
+/.workbuddy-ai/
+
+# IDE / 编辑器。
+/.vs/
+/.idea/
+/.vscode/*
+!/.vscode/settings.json
+!/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/extensions.json
 *.user
 *.suo
 *.userosscache
@@ -51,7 +49,7 @@ node_modules/
 Thumbs.db
 *~
 
-# 安装包与密钥材料（仅产物；源码资产 PNG/ICO 仍然入库）
+# 安装包与密钥材料（仅产物；源码资产 PNG/ICO 仍然入库）。
 *.msi
 *.msix
 *.msixbundle
@@ -64,12 +62,8 @@ Thumbs.db
 *.pem
 *.env
 
-# 本地 AI 工作区状态（docs/status/ 下的文档才是随仓库交接的单一事实源）
-.workbuddy/
-.workbuddy-ai/
-
 # 本机语音与 OCR 模型资产永不入库；汇总/打包它们的脚本要入库。
-models/
+/models/
 !build/models/
 !build/models/*.sh
 *.onnx

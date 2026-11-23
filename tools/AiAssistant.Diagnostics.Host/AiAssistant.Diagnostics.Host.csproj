@@ -8,15 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="../../src/AiAssistant.Processing/Benchmarks/**/*.cs" Link="Benchmarks/%(Filename)%(Extension)" />
-    <Compile Include="../../src/AiAssistant.Host/Benchmarks/**/*.cs" Link="HostBenchmarks/%(Filename)%(Extension)" />
-    <Compile Include="../../src/AiAssistant.Desktop/UiE2ERunner.cs" Link="UiE2ERunner.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="../../src/AiAssistant.Processing/Resources/TSCharacters.txt"
-                      LogicalName="AiAssistant.Processing.Benchmarks.TSCharacters.txt"
-                      Link="Resources/TSCharacters.txt" />
+    <!-- 基准/评测与 UI 自驱动源码物理归属本工具宿主，产品程序集不再链接或排除它们。 -->
+    <EmbeddedResource Include="Resources/TSCharacters.txt"
+                      LogicalName="AiAssistant.Processing.Benchmarks.TSCharacters.txt" />
   </ItemGroup>
 
   <ItemGroup>
@@ -33,6 +27,7 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
   </ItemGroup>
 
   <!-- 基准源码以链接方式编译进本程序集；内部 DTO 仅对对应单测工程可见。 -->

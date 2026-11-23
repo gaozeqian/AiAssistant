@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# 构建 Linux x64 发布产物：便携 tar.gz，若存在 dpkg-deb（或 python 兜底）则额外产出 .deb。
+# 构建 Linux x64 分发包：aiassistant-<ver>-linux-x64.tar.gz 与 aiassistant_<ver>_amd64.deb。
+# 发布态可执行文件统一命名为 aiassistant；便携包包含顶层目录，避免 Tarbomb。
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,11 +14,13 @@ usage() {
   cat <<'EOF'
 用法: bash build/package/package-linux.sh [选项]
 
-产出 AiAssistant-<version>-linux-x64.tar.gz 与（可用时）.deb。
+产出:
+  artifacts/dist/<version>/aiassistant-<version>-linux-x64.tar.gz
+  artifacts/dist/<version>/aiassistant_<version>_amd64.deb
 
 选项:
   --version <版本>        指定版本，默认取 Directory.Build.props 的 VersionPrefix
-  --output <目录>         产物目录，默认 $AIASSISTANT_PACKAGE_OUTPUT 或 artifacts/package
+  --output <目录>         分发目录，默认 artifacts/dist/<version>
   --runtime <RID>         目标运行时，默认 linux-x64
   --framework-dependent   产出依赖框架的包（默认自包含）
   --skip-models           不随包语音模型（仅调试，正式发布禁用）
@@ -32,7 +35,7 @@ require_value() {
 }
 
 VERSION="${VERSION:-}"
-OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-artifacts/package}"
+OUTPUT_ROOT="${AIASSISTANT_PACKAGE_OUTPUT:-}"
 RUNTIME="linux-x64"
 FRAMEWORK_DEPENDENT=0
 SKIP_MODELS=0
@@ -50,12 +53,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 ARTIFACTS_ROOT="${AIASSISTANT_ARTIFACTS_ROOT:-$REPO_ROOT/artifacts}"
-if [[ "$OUTPUT_ROOT" = /* ]]; then
-  OUT_DIR="$OUTPUT_ROOT"
-else
-  OUT_DIR="$REPO_ROOT/$OUTPUT_ROOT"
-fi
-
 if [[ -z "$VERSION" ]]; then
   VERSION="$(sed -n 's:.*<VersionPrefix>\(.*\)</VersionPrefix>.*:\1:p' "$REPO_ROOT/Directory.Build.props" | head -1)"
 fi
@@ -65,32 +62,38 @@ if [[ -z "$VERSION" ]]; then
   exit 1
 fi
 
+if [[ -z "$OUTPUT_ROOT" ]]; then
+  DIST_DIR="$ARTIFACTS_ROOT/dist/$VERSION"
+elif [[ "$OUTPUT_ROOT" = /* ]]; then
+  DIST_DIR="$OUTPUT_ROOT"
+else
+  DIST_DIR="$REPO_ROOT/$OUTPUT_ROOT"
+fi
+
 SELF_CONTAINED="true"
 if [[ "$FRAMEWORK_DEPENDENT" -eq 1 ]]; then
   SELF_CONTAINED="false"
 fi
 
-STAGE="$ARTIFACTS_ROOT/build/staging/$RUNTIME"
-APP_DIR="$STAGE/usr/lib/aiassistant"
+PUBLISH_DIR="$ARTIFACTS_ROOT/publish/$RUNTIME"
+PORTABLE_NAME="aiassistant-$VERSION-$RUNTIME"
+PORTABLE_ROOT="$ARTIFACTS_ROOT/staging/$RUNTIME-portable/$PORTABLE_NAME"
+DEB_STAGE="$ARTIFACTS_ROOT/staging/$RUNTIME-deb"
+APP_DIR="$DEB_STAGE/usr/lib/aiassistant"
 
 echo "== AiAssistant Linux package =="
-echo "version=$VERSION runtime=$RUNTIME selfContained=$SELF_CONTAINED"
+echo "version=$VERSION runtime=$RUNTIME selfContained=$SELF_CONTAINED dist=$DIST_DIR"
 
-rm -rf "$STAGE"
-mkdir -p "$APP_DIR" \
-  "$STAGE/usr/bin" \
-  "$STAGE/usr/share/applications" \
-  "$STAGE/usr/share/icons/hicolor/256x256/apps" \
-  "$STAGE/DEBIAN"
+rm -rf "$PUBLISH_DIR" "$PORTABLE_ROOT" "$DEB_STAGE"
+mkdir -p "$PUBLISH_DIR"
 
 dotnet publish "$REPO_ROOT/src/AiAssistant.Host/AiAssistant.Host.csproj" \
   -c Release -r "$RUNTIME" --self-contained "$SELF_CONTAINED" \
   -p:Version="$VERSION" -p:InformationalVersion="$VERSION" \
   -tl:off -v:m \
-  -o "$APP_DIR"
+  -o "$PUBLISH_DIR"
 
 # Local model assets ship beside the executable (/usr/lib/aiassistant/models).
-# Only the chat/embedding models stay external.
 if [[ "$SKIP_MODELS" -eq 1 ]]; then
   echo "warning: --skip-models set; the package will not include voice model assets" >&2
 else
@@ -100,72 +103,68 @@ else
     exit 1
   fi
 
-  cp -R "$MODEL_BUNDLE" "$APP_DIR/models"
+  cp -R "$MODEL_BUNDLE" "$PUBLISH_DIR/models"
   for required in "sherpa/kws/encoder.onnx" "sherpa/model.int8.onnx" "sherpa/silero_vad.onnx" "sherpa/tts/model.onnx"; do
-    if [[ ! -f "$APP_DIR/models/$required" ]]; then
+    if [[ ! -f "$PUBLISH_DIR/models/$required" ]]; then
       echo "bundled model missing: $required" >&2
       exit 1
     fi
   done
-  echo "bundled models: $(du -sh "$APP_DIR/models" | cut -f1)"
+  echo "bundled models: $(du -sh "$PUBLISH_DIR/models" | cut -f1)"
 fi
 
-bash "$SCRIPT_DIR/legal-files.sh" "$APP_DIR"
-mkdir -p "$STAGE/usr/share/doc/aiassistant"
-cp "$APP_DIR/LICENSE" "$APP_DIR/EULA.md" "$APP_DIR/THIRD-PARTY-NOTICES.md" \
-   "$APP_DIR/THIRD-PARTY-NOTICES-ONNXRUNTIME.txt" "$STAGE/usr/share/doc/aiassistant/"
+bash "$SCRIPT_DIR/legal-files.sh" "$PUBLISH_DIR"
 
-cat > "$STAGE/usr/bin/aiassistant" <<'LAUNCHER'
-#!/bin/sh
-exec /usr/lib/aiassistant/AiAssistant.Host "$@"
-LAUNCHER
-chmod +x "$STAGE/usr/bin/aiassistant"
-chmod +x "$APP_DIR/AiAssistant.Host"
+# ---- Portable tar.gz with a single top-level directory ----
+mkdir -p "$PORTABLE_ROOT"
+cp -R "$PUBLISH_DIR/." "$PORTABLE_ROOT/"
+if [[ -f "$PORTABLE_ROOT/AiAssistant" ]]; then
+  mv "$PORTABLE_ROOT/AiAssistant" "$PORTABLE_ROOT/aiassistant"
+fi
+chmod +x "$PORTABLE_ROOT/aiassistant" 2>/dev/null || true
 
-cp "$SCRIPT_DIR/linux/aiassistant.desktop" "$STAGE/usr/share/applications/aiassistant.desktop"
-cp "$SCRIPT_DIR/assets/aiassistant.png" "$STAGE/usr/share/icons/hicolor/256x256/apps/aiassistant.png"
-sed "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/linux/control.template" > "$STAGE/DEBIAN/control"
-chmod 0644 "$STAGE/DEBIAN/control"
-
-mkdir -p "$OUT_DIR"
-TARBALL="$OUT_DIR/AiAssistant-$VERSION-$RUNTIME.tar.gz"
+mkdir -p "$DIST_DIR"
+TARBALL="$DIST_DIR/$PORTABLE_NAME.tar.gz"
 rm -f "$TARBALL"
-tar -czf "$TARBALL" --exclude=DEBIAN -C "$STAGE" .
+tar -czf "$TARBALL" -C "$(dirname "$PORTABLE_ROOT")" "$PORTABLE_NAME"
 echo "tar.gz: $TARBALL"
 
-DEB="$OUT_DIR/AiAssistant-$VERSION-$RUNTIME.deb"
+# ---- Debian package ----
+mkdir -p "$APP_DIR" \
+  "$DEB_STAGE/usr/bin" \
+  "$DEB_STAGE/usr/share/applications" \
+  "$DEB_STAGE/usr/share/icons/hicolor/256x256/apps" \
+  "$DEB_STAGE/DEBIAN"
+cp -R "$PUBLISH_DIR/." "$APP_DIR/"
+if [[ -f "$APP_DIR/AiAssistant" ]]; then
+  mv "$APP_DIR/AiAssistant" "$APP_DIR/aiassistant"
+fi
+chmod +x "$APP_DIR/aiassistant" 2>/dev/null || true
+
+mkdir -p "$DEB_STAGE/usr/share/doc/aiassistant"
+cp "$APP_DIR/LICENSE" "$APP_DIR/EULA.md" "$APP_DIR/THIRD-PARTY-NOTICES.md" \
+   "$APP_DIR/THIRD-PARTY-NOTICES-ONNXRUNTIME.txt" "$DEB_STAGE/usr/share/doc/aiassistant/"
+
+# Relative symlink: no hardcoded /usr/lib path in the launcher.
+ln -sf ../lib/aiassistant/aiassistant "$DEB_STAGE/usr/bin/aiassistant"
+
+cp "$SCRIPT_DIR/linux/aiassistant.desktop" "$DEB_STAGE/usr/share/applications/aiassistant.desktop"
+cp "$SCRIPT_DIR/assets/aiassistant.png" "$DEB_STAGE/usr/share/icons/hicolor/256x256/apps/aiassistant.png"
+sed "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/linux/control.template" > "$DEB_STAGE/DEBIAN/control"
+chmod 0644 "$DEB_STAGE/DEBIAN/control"
+
+DEB="$DIST_DIR/aiassistant_${VERSION}_amd64.deb"
 rm -f "$DEB"
 if command -v dpkg-deb >/dev/null 2>&1; then
-  dpkg-deb --build --root-owner-group "$STAGE" "$DEB" >/dev/null
+  dpkg-deb --build --root-owner-group "$DEB_STAGE" "$DEB" >/dev/null
   echo "deb: $DEB"
 elif command -v python3 >/dev/null 2>&1; then
-  python3 "$SCRIPT_DIR/deb/build-deb.py" "$STAGE" "$DEB"
+  PYTHONDONTWRITEBYTECODE=1 python3 "$SCRIPT_DIR/deb/build-deb.py" "$DEB_STAGE" "$DEB"
 elif command -v python >/dev/null 2>&1; then
-  python "$SCRIPT_DIR/deb/build-deb.py" "$STAGE" "$DEB"
+  PYTHONDONTWRITEBYTECODE=1 python "$SCRIPT_DIR/deb/build-deb.py" "$DEB_STAGE" "$DEB"
 else
   echo "warning: neither dpkg-deb nor python found; skipping .deb" >&2
 fi
 
-write_checksums() {
-  local directory="$1"
-  (
-    cd "$directory" || return 1
-    : > SHA256SUMS
-    for file in *.tar.gz *.deb *.zip; do
-      [ -f "$file" ] || continue
-      if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$file" >> SHA256SUMS
-      else
-        shasum -a 256 "$file" >> SHA256SUMS
-      fi
-    done
-    if [ -s SHA256SUMS ]; then
-      echo "checksums: $directory/SHA256SUMS"
-    else
-      rm -f SHA256SUMS
-    fi
-  )
-}
-
-write_checksums "$OUT_DIR"
+bash "$SCRIPT_DIR/checksums.sh" "$DIST_DIR" "$VERSION"
 echo "Linux package complete."

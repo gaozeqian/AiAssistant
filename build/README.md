@@ -8,10 +8,12 @@
 |---|---|
 | `models/fetch-bundle.sh` | 下载并展开 sherpa-onnx 模型资产 |
 | `models/stage-bundle.sh` | 汇总随包模型载荷到 `artifacts/cache/models/bundle` |
-| `package/package-windows.ps1` | Windows 自包含 zip（可选签名） |
-| `package/package-windows-msi.ps1` | Windows MSI（WiX，可选签名） |
+| `package/package-windows.ps1` | Windows 便携 zip；发布一次共享载荷（可选签名） |
+| `package/package-windows-msi.ps1` | Windows MSI（复用 publish 载荷，可选签名） |
 | `package/package-macos.sh` | macOS `.app` / `.zip` / `.pkg`（codesign + 可选公证） |
-| `package/package-linux.sh` | Linux `tar.gz` / `.deb` |
+| `package/package-linux.sh` | Linux 顶层目录 `tar.gz` / Debian Policy `.deb` |
+| `package/checksums.sh` / `.ps1` | 单包 `.sha256` 与汇总校验文件 |
+| `native/mac-helper.sh` | Swift Helper 构建/测试/smoke，scratch 固定到 artifacts/obj |
 | `package/legal-files.sh` / `.ps1` | 四个法务文件随包（缺失即失败） |
 | `package/macos/create-self-signed-identity.sh` | 演练用自签名身份 |
 | `package/assets/` | 图标与图标生成脚本 |
@@ -41,4 +43,4 @@ fi
 
 ## 产物
 
-构建与打包产物一律落在 `artifacts/`（不入库）。目录分层与保留策略见 [docs/guides/artifacts.md](../docs/guides/artifacts.md)。
+构建与打包产物一律落在 `artifacts/`（不入库）。目录分层与保留策略见 [docs/development/conventions-and-artifacts.md](../docs/development/conventions-and-artifacts.md)。

@@ -1,9 +1,11 @@
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Processing.Benchmarks;
+using AiAssistant.Testing.Common;
 
 namespace AiAssistant.Processing.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class KwsBenchmarkTests
 {
     [Fact]
@@ -60,7 +62,7 @@ public sealed class KwsBenchmarkTests
 
         var markdown = KwsBenchmarkEvaluator.BuildReport(
             "sherpa-onnx KWS (fake)",
-            "/tmp/golden/kws",
+            "artifacts/test-results/golden/kws",
             summary,
             ["negative: not provided"],
             new DateTimeOffset(2026, 11, 21, 18, 30, 0, TimeSpan.FromHours(8)));

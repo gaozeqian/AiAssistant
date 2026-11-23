@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using AiAssistant.Core.Configuration;
+using AiAssistant.Desktop;
 using AiAssistant.Platform.Linux.Desktop;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -13,6 +14,9 @@ namespace AiAssistant.Host;
 /// </summary>
 internal static class CliSupport
 {
+    internal static bool HasOption(string[] args, string name) =>
+        Array.Exists(args, argument => string.Equals(argument, name, StringComparison.OrdinalIgnoreCase));
+
     internal static bool TryGetOption(string[] args, string name, out string value)
     {
         for (var i = 0; i < args.Length; i++)
@@ -60,13 +64,6 @@ internal static class CliSupport
 
         Models:
           --benchmark-model [--output <p>]   Run the fixed chat benchmark
-          --benchmark-retrieval [--output <p>] Run the retrieval quality benchmark
-          --benchmark-asr [--samples <dir>] [--output <p>]
-                                             Run the Chinese ASR golden set (wav + txt) and report CER
-          --benchmark-ocr [--samples <dir>] [--output <p>]
-                                             Run the OCR golden set (png + txt); Linux RapidOCR only
-          --benchmark-kws [--samples <dir>] [--output <p>]
-                                             Run the wake-word golden set (positive/negative wav)
           --probe-model                      Print endpoint capabilities
           --import-model-secret <name>       Read a secret from stdin and store it encrypted
           --list-model-secrets               List secret names (values are never shown)
@@ -75,6 +72,9 @@ internal static class CliSupport
         Local MCP:
           --mcp-serve                        Run the read-only MCP endpoint headlessly
           --mcp-token                        Print the local bearer token
+
+        Developer-only (not shipped): tools/AiAssistant.Diagnostics.Host
+          --benchmark-retrieval / --benchmark-asr / --benchmark-ocr / --benchmark-kws / --ui-e2e
         """;
 
     internal static DateOnly ParseDateOption(string[] args, string name, DateOnly fallback)
@@ -107,7 +107,7 @@ internal static class CliSupport
     internal static string ResolveOutputDirectory(string[] args, string defaultFolder) =>
         TryGetOption(args, "--output", out var value)
             ? Path.GetFullPath(value)
-            : ArtifactPaths.Resolve("evidence", defaultFolder);
+            : ArtifactPaths.Resolve("test-results", "reports", defaultFolder);
 
     internal static string? ReadSecretFromConsole()
     {
@@ -145,17 +145,7 @@ internal static class CliSupport
         return builder.ToString();
     }
 
-    internal static string ResolveSamplesDirectory(string[] args, string prefix)
-    {
-        if (TryGetOption(args, "--samples", out var value))
-        {
-            return Path.GetFullPath(value);
-        }
-
-        return ArtifactPaths.Resolve("evidence", "golden", prefix);
-    }
-
-    internal static string ResolveBenchmarkOutput(string[] args, string prefix)
+    internal static string ResolveBenchmarkOutput(string[] args, string prefix, Application.Ports.IClock clock)
     {
         if (TryGetOption(args, "--output", out var value))
         {
@@ -163,9 +153,9 @@ internal static class CliSupport
         }
 
         return ArtifactPaths.Resolve(
-            "evidence",
+            "test-results",
             "benchmarks",
-            $"{prefix}-{TimeProvider.System.GetUtcNow():yyyyMMdd-HHmmss}.md");
+            $"{prefix}-{clock.UtcNow:yyyyMMdd-HHmmss}.md");
     }
 
     /// <summary>Arguments that run headless and must never touch the GUI single-instance socket.</summary>
@@ -181,19 +171,22 @@ internal static class CliSupport
         !args.Any(argument => HeadlessArgumentPrefixes.Any(prefix =>
             argument.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)));
 
-    internal static int StartLinuxDesktop(LinuxDisplayBackendState backendState, string[] args)
+    internal static int StartLinuxDesktop(
+        LinuxDisplayBackendState backendState,
+        string[] args,
+        DesktopLaunchContext context)
     {
         var lifetime = new ClassicDesktopStyleApplicationLifetime { Args = args };
         try
         {
-            BuildAvaloniaApp(backendState.Decision.Backend).SetupWithLifetime(lifetime);
+            BuildAvaloniaApp(context, backendState.Decision.Backend).SetupWithLifetime(lifetime);
         }
         catch (Exception ex) when (backendState.TryMarkInitializationFallback(ex.GetType().Name))
         {
             lifetime.Dispose();
             Console.Error.WriteLine($"Native Wayland initialization failed ({ex.GetType().Name}); retrying with X11/XWayland.");
             lifetime = new ClassicDesktopStyleApplicationLifetime { Args = args };
-            BuildAvaloniaApp(LinuxDisplayBackendKind.X11).SetupWithLifetime(lifetime);
+            BuildAvaloniaApp(context, LinuxDisplayBackendKind.X11).SetupWithLifetime(lifetime);
         }
 
         try
@@ -206,9 +199,11 @@ internal static class CliSupport
         }
     }
 
-    public static AppBuilder BuildAvaloniaApp(LinuxDisplayBackendKind? linuxBackend)
+    public static AppBuilder BuildAvaloniaApp(
+        DesktopLaunchContext context,
+        LinuxDisplayBackendKind? linuxBackend)
     {
-        var builder = AppBuilder.Configure<Desktop.ShellApp>()
+        var builder = AppBuilder.Configure(() => new ShellApp(context))
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace();

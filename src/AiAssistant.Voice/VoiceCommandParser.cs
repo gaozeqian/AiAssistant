@@ -30,7 +30,7 @@ public sealed record ParsedVoiceCommand(
 
 internal sealed class VoiceCommandParser
 {
-    public static ParsedVoiceCommand Parse(string? transcript)
+    public static ParsedVoiceCommand Parse(string? transcript, IClock? clock = null)
     {
         var raw = transcript?.Trim() ?? string.Empty;
         var normalized = new string(raw.Where(ch => !char.IsWhiteSpace(ch) && !char.IsPunctuation(ch)).ToArray());
@@ -69,7 +69,12 @@ internal sealed class VoiceCommandParser
                 raw,
                 "正在生成今天的日报。",
                 false,
-                JsonSerializer.Serialize(new { date = DateOnly.FromDateTime(TimeProvider.System.GetLocalNow().LocalDateTime.Date).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }));
+                JsonSerializer.Serialize(new
+                {
+                    date = DateOnly
+                        .FromDateTime((clock ?? new SystemClock()).LocalNow.LocalDateTime.Date)
+                        .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                }));
         }
 
         if (normalized.Contains("暂停", StringComparison.Ordinal) &&

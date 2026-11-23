@@ -1,0 +1,211 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AiAssistant.Desktop.ViewModels"
+             xmlns:automation="using:Avalonia.Automation"
+             x:Class="AiAssistant.Desktop.Views.Tabs.DiagnosticsTabView"
+             x:DataType="vm:ShellViewModel">
+  <ScrollViewer DataContext="{Binding Diagnostics}" x:DataType="vm:DiagnosticsViewModel" Margin="0,12,0,0">
+    <StackPanel Spacing="12">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+        <StackPanel>
+          <TextBlock Text="系统健康与能力矩阵" FontSize="18" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding PlatformName}" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
+        </StackPanel>
+        <Button Grid.Column="1" Classes="secondary" Content="生成脱敏导出预览" Command="{Binding GeneratePreviewCommand}" Margin="0,0,8,0" />
+        <Button Grid.Column="2" Classes="secondary" Content="确认导出" Command="{Binding ExportPreviewCommand}" Margin="0,0,8,0" />
+        <Button Grid.Column="3" Classes="primary" Content="重新检查" Command="{Binding RefreshCommand}"
+                automation:AutomationProperties.Name="重新检查平台能力" />
+      </Grid>
+      <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" />
+      <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="14" IsVisible="{Binding HasError}">
+        <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
+      </Border>
+      <Grid ColumnDefinitions="*,*,*">
+        <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,6,0">
+          <StackPanel Spacing="7">
+            <TextBlock Text="加密数据库" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding DatabaseText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="6,0,6,0">
+          <StackPanel Spacing="7">
+            <TextBlock Text="采集管道" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding PipelineText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="6,0,0,0">
+          <StackPanel Spacing="7">
+            <TextBlock Text="媒体保留清理" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding RetentionText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+          </StackPanel>
+        </Border>
+      </Grid>
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
+        <StackPanel Spacing="7">
+          <TextBlock Text="本机模型网关" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding ModelText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+          <TextBlock Text="{Binding ModelEndpointsText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding ModelConfig.HasModelConfiguration}">
+            <StackPanel Spacing="8">
+              <TextBlock Text="模型配置" FontWeight="SemiBold" />
+              <TextBlock Text="对话与向量模型可独立配置端点（本机/内网/公网），保存后重启应用生效。" FontSize="12"
+                         Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+
+              <TextBlock Text="对话模型" FontWeight="SemiBold" />
+              <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                <TextBlock Text="模型来源" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding ModelConfig.TierOptions}" SelectedItem="{Binding ModelConfig.ChatTier}"
+                          HorizontalAlignment="Stretch" Margin="0,0,0,6">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Label}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Grid.Row="1" Text="模型名" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ModelConfig.ChatModel}" PlaceholderText="例如 gemma4:12b" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="2" Text="接口地址" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ModelConfig.ChatBaseUrl}" PlaceholderText="http://127.0.0.1:11434" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="3" Text="允许思考" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding ModelConfig.ChatThink}" Content="启用推理（thinking）"
+                          Margin="0,0,0,6" automation:AutomationProperties.Name="允许思考" />
+                <TextBlock Grid.Row="4" Text="思考强度" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding ModelConfig.ThinkingLevelOptions}"
+                          SelectedItem="{Binding ModelConfig.ChatThinkingLevel}" IsEnabled="{Binding ModelConfig.ChatThink}"
+                          HorizontalAlignment="Stretch" Margin="0,0,0,6"
+                          automation:AutomationProperties.Name="思考强度">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Label}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </Grid>
+
+              <TextBlock Text="向量模型（Embedding）" FontWeight="SemiBold" />
+              <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+                <TextBlock Text="模型来源" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding ModelConfig.TierOptions}" SelectedItem="{Binding ModelConfig.EmbeddingTier}"
+                          HorizontalAlignment="Stretch" Margin="0,0,0,6">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Label}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Grid.Row="1" Text="模型名" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ModelConfig.EmbeddingModel}" PlaceholderText="例如 embeddinggemma-2:740m" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="2" Text="接口地址" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ModelConfig.EmbeddingBaseUrl}" PlaceholderText="http://127.0.0.1:11434" Margin="0,0,0,6" />
+              </Grid>
+
+              <WrapPanel>
+                <Button Classes="primary" Content="保存模型配置" Command="{Binding ModelConfig.SaveModelConfigurationCommand}" />
+              </WrapPanel>
+              <TextBlock Text="{Binding ModelConfig.ModelConfigStatus}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Border>
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasMcpControl}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="只读本地 MCP（默认关闭）" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding McpStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+          <TextBlock Text="仅暴露 search_events、activity_stats、list_reports、get_report 四个只读工具；无写工具，强制 loopback 与本地令牌。"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+          <TextBox Text="{Binding McpTokenText}" IsReadOnly="True" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+          <WrapPanel>
+            <Button Classes="secondary" Content="显示令牌" Command="{Binding RevealMcpTokenCommand}" Margin="0,0,8,8" />
+            <Button Classes="secondary" Content="轮换令牌" Command="{Binding RotateMcpTokenCommand}" Margin="0,0,8,8" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding Secrets.HasSecretAdmin}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="模型端点密钥" FontWeight="SemiBold" />
+          <TextBlock Text="密钥以 AES-GCM 加密保存在本机；写入后不可读取，models.json 通过 apiKeySecret 引用名称。"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+          <Grid ColumnDefinitions="*,*">
+            <TextBox Text="{Binding Secrets.SecretName}" PlaceholderText="密钥名称，例如 corp-api-key" Margin="0,0,6,0" />
+            <TextBox Grid.Column="1" Text="{Binding Secrets.SecretValue}" PasswordChar="●" PlaceholderText="密钥值" Margin="6,0,0,0" />
+          </Grid>
+          <WrapPanel>
+            <Button Classes="primary" Content="保存密钥" Command="{Binding Secrets.SaveSecretCommand}" Margin="0,0,8,8" />
+            <Button Classes="secondary" Content="刷新列表" Command="{Binding Secrets.RefreshSecretsCommand}" Margin="0,0,8,8" />
+            <Button Classes="secondary" Content="删除选中" Command="{Binding Secrets.DeleteSecretCommand}" Margin="0,0,8,8" />
+          </WrapPanel>
+          <ListBox ItemsSource="{Binding Secrets.SecretNames}" SelectedItem="{Binding Secrets.SelectedSecret}"
+                   MaxHeight="120" Background="Transparent" BorderThickness="0" />
+          <TextBlock Text="{Binding Secrets.SecretStatus}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasExportPreview}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="诊断导出预览（仅元数据，用户确认前不写外部文件）" FontWeight="SemiBold" />
+          <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180" FontFamily="Consolas" FontSize="12" />
+          <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
+        <StackPanel Spacing="8">
+          <TextBlock Text="权限引导" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding PermissionGuidanceText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+        </StackPanel>
+      </Border>
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
+        <StackPanel Spacing="10">
+          <TextBlock Text="平台能力" FontWeight="SemiBold" />
+          <ItemsControl ItemsSource="{Binding Capabilities}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:CapabilityItem">
+                <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,9">
+                  <Grid ColumnDefinitions="130,85,*,260">
+                    <TextBlock Text="{Binding KindText}" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{DynamicResource AccentBrush}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Summary}" TextWrapping="Wrap" Margin="8,0" />
+                    <TextBlock Grid.Column="3" Text="{Binding RemediationHint}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
+        <StackPanel Spacing="10">
+          <TextBlock Text="最近后台任务" FontWeight="SemiBold" />
+          <ItemsControl ItemsSource="{Binding RecentJobs}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ReportJobItem">
+                <Grid ColumnDefinitions="120,120,100,*" Margin="0,5">
+                  <TextBlock Text="{Binding DateText}" />
+                  <TextBlock Grid.Column="1" Text="{Binding StatusText}" />
+                  <TextBlock Grid.Column="2" Text="{Binding AttemptText}" />
+                  <TextBlock Grid.Column="3" Text="{Binding CreatedText}" Foreground="{DynamicResource MutedBrush}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
+        <StackPanel Spacing="10">
+          <TextBlock Text="最近脱敏结构化日志" FontWeight="SemiBold" />
+          <ItemsControl ItemsSource="{Binding RecentLogs}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:DiagnosticLogItem">
+                <Grid ColumnDefinitions="80,90,150,*" Margin="0,4">
+                  <TextBlock Text="{Binding TimeText}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                  <TextBlock Grid.Column="1" Text="{Binding LevelText}" FontSize="12" FontWeight="SemiBold" />
+                  <TextBlock Grid.Column="2" Text="{Binding CategoryText}" FontSize="12" Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="3" Text="{Binding MessageText}" FontSize="12" TextWrapping="Wrap" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+      <TextBlock Text="{Binding LastRefreshText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,12" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

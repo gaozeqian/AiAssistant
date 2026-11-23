@@ -1,36 +1,35 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Builds the Windows release artifacts for AiAssistant (self-contained folder + zip).
+    Builds the Windows portable zip for AiAssistant from the shared publish payload.
 
 .DESCRIPTION
-    Produces a self-contained win-x64 publish, optionally Authenticode-signs every binary,
-    copies the legal documents (LICENSE, EULA, THIRD-PARTY-NOTICES) and zips the folder.
-    The MSI is produced separately by package-windows-msi.ps1; MSIX is no longer supported.
-
-    Signing is opt-in: set AIASSISTANT_SIGN_CERT_THUMBPRINT (and optionally AIASSISTANT_TIMESTAMP_URL).
-    When a thumbprint is supplied but signtool is missing, the script fails instead of silently
-    producing an unsigned release.
+    Publishes once to artifacts/publish/win-x64, optionally Authenticode-signs every binary,
+    copies legal documents and bundled models, then produces
+    artifacts/dist/<version>/AiAssistant-<version>-windows-x64-portable[-dev].zip with a
+    single top-level directory. The MSI reuses the same publish payload
+    (package-windows-msi.ps1 -PayloadDirectory).
 
 .EXAMPLE
-    pwsh build/package/package-windows.ps1 -Version 0.1.0
+    pwsh build/package/package-windows.ps1 -Version 0.1.0 -SkipModelBundle
 
 .EXAMPLE
     $env:AIASSISTANT_SIGN_CERT_THUMBPRINT = "ABCDEF..."
-    pwsh build/package/package-windows.ps1
+    pwsh build/package/package-windows.ps1 -DevSelfSigned
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [switch]$Help,
     [string]$Version = "",
-    [string]$OutputRoot = "artifacts/package",
+    [string]$OutputRoot = "",
     [string]$SignThumbprint = $env:AIASSISTANT_SIGN_CERT_THUMBPRINT,
     [string]$TimestampUrl = $env:AIASSISTANT_TIMESTAMP_URL,
     [string]$VerifyRootPath = $env:AIASSISTANT_SIGN_ROOT_CER,
     [switch]$FrameworkDependent,
     [switch]$RequireSigning,
     [switch]$SkipTimestamp,
-    [switch]$SkipModelBundle
+    [switch]$SkipModelBundle,
+    [switch]$DevSelfSigned
 )
 
 if ($Help) {
@@ -57,6 +56,18 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 }
 
 $Version = $Version.TrimStart("v")
+$suffix = if ($DevSelfSigned) { "-dev" } else { "" }
+$distDir = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    Join-Path $artifactsRoot "dist\$Version"
+} elseif ([System.IO.Path]::IsPathRooted($OutputRoot)) {
+    $OutputRoot
+} else {
+    Join-Path $repoRoot $OutputRoot
+}
+
+$publishDir = Join-Path $artifactsRoot "publish\$runtime"
+$portableName = "AiAssistant-$Version-windows-x64"
+$portableStage = Join-Path $artifactsRoot "staging\$runtime-portable\$portableName"
 
 if ($RequireSigning -and [string]::IsNullOrWhiteSpace($SignThumbprint)) {
     throw "RequireSigning was set but AIASSISTANT_SIGN_CERT_THUMBPRINT is empty."
@@ -65,9 +76,6 @@ if ($RequireSigning -and [string]::IsNullOrWhiteSpace($SignThumbprint)) {
 if ([string]::IsNullOrWhiteSpace($TimestampUrl)) {
     $TimestampUrl = "http://timestamp.digicert.com"
 }
-
-$outputDir = if ([System.IO.Path]::IsPathRooted($OutputRoot)) { $OutputRoot } else { Join-Path $repoRoot $OutputRoot }
-$stageDir = Join-Path $artifactsRoot "build\staging\$runtime"
 $selfContained = -not $FrameworkDependent
 
 function Find-SdkTool {
@@ -98,67 +106,54 @@ function Find-SdkTool {
     return $null
 }
 
-Write-Host "== AiAssistant Windows package =="
-Write-Host "version=$Version runtime=$runtime selfContained=$selfContained"
+Write-Host "== AiAssistant Windows portable package =="
+Write-Host "version=$Version runtime=$runtime selfContained=$selfContained publish=$publishDir"
 
-if (Test-Path $stageDir -and $PSCmdlet.ShouldProcess($stageDir, "Remove stale staging directory")) {
-    Remove-Item -Path $stageDir -Recurse -Force
+if (Test-Path $publishDir) {
+    Remove-Item -Path $publishDir -Recurse -Force
 }
+New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
 
-New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
-$publishArgs = @(
-    "publish", (Join-Path $repoRoot "src\AiAssistant.Host\AiAssistant.Host.csproj"),
-    "-c", "Release",
-    "-r", $runtime,
-    "--self-contained", $selfContained.ToString().ToLowerInvariant(),
-    "-p:Version=$Version",
-    "-p:InformationalVersion=$Version",
-    "-tl:off", "-v:m",
-    "-o", $stageDir
-)
-& dotnet @publishArgs
+& dotnet publish (Join-Path $repoRoot "src\AiAssistant.Host\AiAssistant.Host.csproj") `
+    -c Release -r $runtime --self-contained $selfContained.ToLowerInvariant() `
+    -p:Version=$Version -p:InformationalVersion=$Version `
+    -tl:off -v:m -o $publishDir
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
 }
 
-# Local model assets ship with the installer; only the chat/embedding models stay external.
 $modelBundleSource = Join-Path $artifactsRoot "cache\models\bundle"
-$modelBundleTarget = Join-Path $stageDir "models"
 if ($SkipModelBundle) {
-    Write-Warning "Model bundle skipped; the installer will not include wake-word/ASR/TTS assets."
+    Write-Warning "Model bundle skipped; the portable package will not include wake-word/ASR/TTS assets."
 }
 else {
     if (-not (Test-Path -Path $modelBundleSource)) {
-        throw "Model bundle not found at $modelBundleSource. Run 'bash build/models/stage-bundle.sh' first, or pass -SkipModelBundle for a developer build."
+        throw "Model bundle not found at $modelBundleSource. Run 'bash build/models/stage-bundle.sh' first, or pass -SkipModelBundle."
     }
 
-    Copy-Item -Path $modelBundleSource -Destination $modelBundleTarget -Recurse -Force
+    Copy-Item -Path $modelBundleSource -Destination (Join-Path $publishDir "models") -Recurse -Force
     foreach ($required in @(
-        (Join-Path $modelBundleTarget "sherpa\kws\encoder.onnx"),
-        (Join-Path $modelBundleTarget "sherpa\model.int8.onnx"),
-        (Join-Path $modelBundleTarget "sherpa\silero_vad.onnx"),
-        (Join-Path $modelBundleTarget "sherpa\tts\model.onnx"))) {
+        (Join-Path $publishDir "models\sherpa\kws\encoder.onnx"),
+        (Join-Path $publishDir "models\sherpa\model.int8.onnx"),
+        (Join-Path $publishDir "models\sherpa\silero_vad.onnx"),
+        (Join-Path $publishDir "models\sherpa\tts\model.onnx"))) {
         if (-not (Test-Path -Path $required)) {
             throw "Bundled model missing: $required"
         }
     }
-
-    $bundleBytes = (Get-ChildItem -Path $modelBundleTarget -Recurse -File | Measure-Object -Property Length -Sum).Sum
-    Write-Host ("Bundled models: {0:N1} MB" -f ($bundleBytes / 1MB))
 }
 
-# Legal documents are part of the deliverable, not an optional extra.
 . (Join-Path $PSScriptRoot "legal-files.ps1")
-Copy-LegalFiles -Destination $stageDir -RepoRoot $repoRoot
+Copy-LegalFiles -Destination $publishDir -RepoRoot $repoRoot
 
-$binaries = Get-ChildItem -Path $stageDir -Recurse -Include *.exe, *.dll
+$binaries = Get-ChildItem -Path $publishDir -Recurse -Include *.exe, *.dll
 if (-not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
     $signtool = Find-SdkTool -Name "signtool.exe"
     if ($null -eq $signtool) {
         throw "Signing was requested but signtool.exe was not found. Install the Windows SDK or unset AIASSISTANT_SIGN_CERT_THUMBPRINT."
     }
 
-    Write-Host "Signing $($binaries.Count) binaries with certificate $SignThumbprint"
+    Write-Host "Signing $($binaries.Count) binaries in the shared publish payload"
     foreach ($binary in $binaries) {
         if ($SkipTimestamp) {
             & $signtool sign /fd SHA256 /sha1 $SignThumbprint $binary.FullName
@@ -177,7 +172,6 @@ if (-not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
             & $signtool verify /pa $binary.FullName | Out-Null
         }
         else {
-            # Self-signed rehearsal: treat the supplied certificate as the trusted root.
             & $signtool verify /pa /r $VerifyRootPath $binary.FullName | Out-Null
         }
 
@@ -190,28 +184,21 @@ else {
     Write-Warning "No signing certificate supplied; producing an unsigned developer build."
 }
 
-$zipPath = Join-Path $outputDir "AiAssistant-$Version-$runtime.zip"
-if (Test-Path $zipPath -and $PSCmdlet.ShouldProcess($zipPath, "Remove stale zip")) {
+if (Test-Path $portableStage) {
+    Remove-Item -Path $portableStage -Recurse -Force
+}
+New-Item -ItemType Directory -Path $portableStage -Force | Out-Null
+Copy-Item -Path (Join-Path $publishDir "*") -Destination $portableStage -Recurse -Force
+
+New-Item -ItemType Directory -Path $distDir -Force | Out-Null
+$zipPath = Join-Path $distDir "AiAssistant-$Version-windows-x64-portable$suffix.zip"
+if (Test-Path $zipPath) {
     Remove-Item $zipPath -Force
 }
 
-if ($PSCmdlet.ShouldProcess($zipPath, "Create release zip")) {
-    Compress-Archive -Path (Join-Path $stageDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
-}
-Write-Host "zip: $zipPath"
+Compress-Archive -Path $portableStage -DestinationPath $zipPath -CompressionLevel Optimal
+Write-Host "portable zip: $zipPath"
 
-$checksumFiles = Get-ChildItem -Path $outputDir -File |
-    Where-Object { $_.Extension -eq ".zip" } |
-    Sort-Object Name
-if ($checksumFiles.Count -gt 0) {
-    $checksumLines = foreach ($file in $checksumFiles) {
-        $hash = (Get-FileHash -Path $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-        "$hash  $($file.Name)"
-    }
-
-    $checksumPath = Join-Path $outputDir "SHA256SUMS"
-    Set-Content -Path $checksumPath -Value $checksumLines -Encoding ASCII
-    Write-Host "checksums: $checksumPath"
-}
-
-Write-Host "Windows package complete."
+. (Join-Path $PSScriptRoot "checksums.ps1")
+Write-DistChecksums -Directory $distDir -Version $Version
+Write-Host "Windows portable package complete."

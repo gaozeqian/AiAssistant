@@ -28,7 +28,7 @@
           <Shortcut Id="AppShortcut"
                     Name="时光"
                     Description="本地加密的活动记录、日报与证据问答"
-                    Target="[INSTALLFOLDER]AiAssistant.Host.exe"
+                    Target="[INSTALLFOLDER]AiAssistant.exe"
                     WorkingDirectory="INSTALLFOLDER"
                     Icon="AppIcon" />
           <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall" />

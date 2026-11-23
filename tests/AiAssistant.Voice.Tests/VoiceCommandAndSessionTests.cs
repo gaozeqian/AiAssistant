@@ -4,11 +4,13 @@ using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
+using AiAssistant.Testing.Common;
 using AiAssistant.Voice;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiAssistant.Voice.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class VoiceCommandAndSessionTests
 {
     [Fact]
@@ -203,7 +205,7 @@ public sealed class VoiceCommandAndSessionTests
     [Fact]
     public async Task Session_MissingWakeModel_DoesNotOpenMicrophone()
     {
-        var options = new SherpaVoiceOptions { ModelDirectory = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N")) };
+        var options = new SherpaVoiceOptions { ModelDirectory = TempArtifactDirectory.CreatePath("voice") };
         using var detector = new SherpaOnnxWakeWordDetector(options, NullLogger<SherpaOnnxWakeWordDetector>.Instance);
         Assert.Equal(CapabilityStatus.PermissionRequired, detector.Capability.Status);
         Assert.Empty(detector.Accept(new AudioFrame(DateTimeOffset.UtcNow, 16_000, 1, new float[512])));

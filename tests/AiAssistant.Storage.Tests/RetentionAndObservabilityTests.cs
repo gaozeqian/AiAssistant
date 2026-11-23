@@ -7,10 +7,12 @@ using AiAssistant.Storage.KeyStores;
 using AiAssistant.Storage.Media;
 using AiAssistant.Storage.Observability;
 using AiAssistant.Storage.Sqlite;
+using AiAssistant.Testing.Common;
 using Microsoft.Extensions.Logging;
 
 namespace AiAssistant.Storage.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class RetentionAndObservabilityTests : IDisposable
 {
     private sealed class MutableClock(DateTimeOffset initialUtc) : IClock
@@ -23,7 +25,7 @@ public sealed class RetentionAndObservabilityTests : IDisposable
 
     public RetentionAndObservabilityTests()
     {
-        _tempRoot = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"));
+        _tempRoot = TempArtifactDirectory.CreatePath("storage");
         Directory.CreateDirectory(_tempRoot);
     }
 

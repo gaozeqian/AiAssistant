@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiAssistant.Capture.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class BoundedCaptureCoordinatorTests
 {
     private sealed class FakeClock(DateTimeOffset initialUtc) : IClock

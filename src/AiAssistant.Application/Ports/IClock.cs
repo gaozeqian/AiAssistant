@@ -12,6 +12,8 @@ public interface IClock
 
     TimeZoneInfo LocalTimeZone { get; }
 
+    DateTimeOffset LocalNow => TimeZoneInfo.ConvertTime(UtcNow, LocalTimeZone);
+
     // 默认实现兼容既有测试替身；需要确定性定时器时由实现方覆盖。
     TimeProvider TimeProvider => System.TimeProvider.System;
 

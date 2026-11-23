@@ -9,16 +9,18 @@ using AiAssistant.Storage.KeyStores;
 using AiAssistant.Storage.Media;
 using AiAssistant.Storage.Sqlite;
 using AiAssistant.Storage.Vectors;
+using AiAssistant.Testing.Common;
 
 namespace AiAssistant.Storage.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class EncryptedStorageTests : IDisposable
 {
     private readonly string _tempRoot;
 
     public EncryptedStorageTests()
     {
-        _tempRoot = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"));
+        _tempRoot = TempArtifactDirectory.CreatePath("storage");
         Directory.CreateDirectory(_tempRoot);
     }
 

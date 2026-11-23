@@ -1,15 +1,14 @@
 using System.Buffers.Binary;
 using System.Text;
 using AiAssistant.Processing.Benchmarks;
+using AiAssistant.Testing.Common;
 
 namespace AiAssistant.Processing.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class RecognitionBenchmarkTests : IDisposable
 {
-    private readonly string _tempRoot = Path.Combine(
-        Path.GetTempPath(),
-        "aia-recognition-tests",
-        Guid.NewGuid().ToString("N")[..8]);
+    private readonly string _tempRoot = TempArtifactDirectory.CreatePath("benchmarks");
 
     public RecognitionBenchmarkTests()
     {
@@ -115,7 +114,7 @@ public sealed class RecognitionBenchmarkTests : IDisposable
         var markdown = RecognitionBenchmarkReport.Build(
             "中文语音识别黄金集（ASR）",
             "sherpa-onnx",
-            "/tmp/golden/asr",
+            "artifacts/test-results/golden/asr",
             rows,
             ["sample-c: reference text missing"],
             new DateTimeOffset(2026, 11, 21, 16, 30, 0, TimeSpan.FromHours(8)));

@@ -13,7 +13,7 @@
 
 请发邮件至 **zeqian_gao@outlook.com**，标题以 `[AiAssistant Security]` 开头，并尽量包含：
 
-- 受影响版本（`AiAssistant.Host --version` 输出）与平台（`win-x64` / `osx-arm64` / `linux-x64`）。
+- 受影响版本（`AiAssistant --version` 输出）与平台（`win-x64` / `osx-arm64` / `linux-x64`）。
 - 复现步骤、期望结果与实际结果。
 - 影响面判断：是否可导致数据外泄、权限提升、任意代码执行、加密密钥泄露或拒绝服务。
 - 可选的 PoC；请勿附带真实用户数据或生产密钥。
@@ -36,7 +36,7 @@
 
 - 本仓库源码、构建与打包脚本、安装包。
 - 本机数据面：加密数据库、密钥库使用、媒体加密、日志脱敏、MCP 只读服务鉴权。
-- 模型资产许可与随包第三方组件的合规问题（请同时抄送 `docs/compliance/` 维护者）。
+- 模型资产许可与随包第三方组件的合规问题（请同时抄送 `docs/release/compliance.md` 维护者）。
 
 不在范围内：
 

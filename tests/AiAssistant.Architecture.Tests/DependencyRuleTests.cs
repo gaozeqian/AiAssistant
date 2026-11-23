@@ -23,6 +23,7 @@ namespace AiAssistant.Architecture.Tests;
 /// <summary>
 /// Enforces all 6 physical architecture &amp; dependency rules from implementation.md §3.2.
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class DependencyRuleTests
 {
     private static readonly Assembly[] AllSourceAssemblies =
@@ -158,9 +159,12 @@ public sealed class DependencyRuleTests
     [Fact]
     public void Rule5_OnlyHost_MayActAsCompositionRootReferencingAllModules()
     {
+        // The Host assembly is published as AiAssistant (AssemblyName), while its project folder
+        // remains AiAssistant.Host; exclude it by marker type instead of assembly name.
+        var hostAssembly = typeof(HostAssemblyMarker).Assembly;
         var nonHostProjects = AllSourceAssemblies
-            .Select(a => a.GetName().Name!)
-            .Where(name => !string.Equals(name, "AiAssistant.Host", StringComparison.Ordinal))
+            .Where(assembly => !ReferenceEquals(assembly, hostAssembly))
+            .Select(assembly => assembly.GetName().Name!)
             .ToArray();
 
         foreach (var project in nonHostProjects)
@@ -299,6 +303,81 @@ public sealed class DependencyRuleTests
                 Assert.Fail($"{name} must be sealed or static");
             }
         }
+    }
+
+    [Fact]
+    public void TestProjects_AreRegisteredInSolutionAndReadme()
+    {
+        var repoRoot = FindRepoRoot();
+        var readme = File.ReadAllText(Path.Combine(repoRoot, "tests", "README.md"));
+        var solution = File.ReadAllText(Path.Combine(repoRoot, "AiAssistant.sln"));
+        var projects = Directory.GetFiles(
+            Path.Combine(repoRoot, "tests"),
+            "*.csproj",
+            SearchOption.AllDirectories);
+
+        Assert.NotEmpty(projects);
+        foreach (var project in projects)
+        {
+            var name = Path.GetFileNameWithoutExtension(project);
+            Assert.Contains(name, readme, StringComparison.Ordinal);
+            Assert.Contains(name, solution, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void DesktopTests_MustNotReferencePlatformProjects()
+    {
+        var csproj = XDocument.Load(Path.Combine(
+            FindRepoRoot(),
+            "tests",
+            "AiAssistant.Desktop.Tests",
+            "AiAssistant.Desktop.Tests.csproj"));
+        var references = GetProjectReferences(csproj);
+        Assert.DoesNotContain(references, reference => reference.StartsWith("AiAssistant.Platform.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TestMethods_MustNotSilentlyReturnWithoutSkip()
+    {
+        var repoRoot = FindRepoRoot();
+        var violations = new List<string>();
+        foreach (var file in Directory.GetFiles(Path.Combine(repoRoot, "tests"), "*.cs", SearchOption.AllDirectories))
+        {
+            var lines = File.ReadAllLines(file);
+            for (var index = 0; index < lines.Length; index++)
+            {
+                var trimmed = lines[index].TrimStart();
+                if (!trimmed.StartsWith("[Fact]", StringComparison.Ordinal) &&
+                    !trimmed.StartsWith("[Theory]", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                for (var cursor = index + 1; cursor < Math.Min(lines.Length, index + 80); cursor++)
+                {
+                    var candidate = lines[cursor];
+                    if (candidate.StartsWith("    [", StringComparison.Ordinal) ||
+                        candidate.StartsWith("    private ", StringComparison.Ordinal))
+                    {
+                        break;
+                    }
+
+                    if (!candidate.Trim().Equals("return;", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var recent = string.Join('\n', lines[Math.Max(index, cursor - 4)..cursor]);
+                    if (!recent.Contains("Assert.Skip", StringComparison.Ordinal))
+                    {
+                        violations.Add($"{Path.GetRelativePath(repoRoot, file)}:{cursor + 1}");
+                    }
+                }
+            }
+        }
+
+        Assert.Empty(violations);
     }
 
     private static XDocument LoadCsproj(string projectName)

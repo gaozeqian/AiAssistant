@@ -5,6 +5,7 @@ using AiAssistant.Core.ValueObjects;
 
 namespace AiAssistant.Core.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class DomainAndPolicyTests
 {
     private sealed class FakeClock(DateTimeOffset utcNow, TimeZoneInfo timeZone) : IClock

@@ -23,6 +23,6 @@ dotnet_diagnostic.CA1062.severity = none
 dotnet_diagnostic.CA2007.severity = none
 
 # xunit.v3 3.2 引入 xUnit1051（建议把 TestContext.Current.CancellationToken 传给异步 API）。
-# 迁移期仅在测试代码中暂缓；补齐传递后删除本节（见 docs/status/backlog.md）。
+# 迁移期仅在测试代码中暂缓；补齐传递后删除本节（见 docs/release/roadmap.md）。
 [tests/**/*.cs]
 dotnet_diagnostic.xUnit1051.severity = none

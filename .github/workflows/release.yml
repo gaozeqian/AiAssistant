@@ -58,7 +58,7 @@ jobs:
             -CertStoreLocation Cert:\CurrentUser\My `
             -KeyExportPolicy Exportable `
             -NotAfter (Get-Date).AddYears(1)
-          $cer = Join-Path $env:GITHUB_WORKSPACE "artifacts/package/AiAssistant-$version-win-x64.cer"
+          $cer = Join-Path $env:GITHUB_WORKSPACE "artifacts/dist/$version/AiAssistant-$version-windows-x64-dev.cer"
           New-Item -ItemType Directory -Force (Split-Path $cer) | Out-Null
           Export-Certificate -Cert $cert -FilePath $cer | Out-Null
           # 仅开发自签名模式导入本机信任库；正式 CA 路径绝不修改 runner 或用户信任库。
@@ -78,7 +78,7 @@ jobs:
             throw "Production release requires AIASSISTANT_PROD_SIGN_THUMBPRINT and AIASSISTANT_PROD_CERT_BASE64 (real CA certificate)."
           }
           $version = $env:APP_VERSION.TrimStart('v')
-          $cer = Join-Path $env:GITHUB_WORKSPACE "artifacts/package/AiAssistant-$version-win-x64.cer"
+          $cer = Join-Path $env:GITHUB_WORKSPACE "artifacts/dist/$version/AiAssistant-$version-windows-x64.cer"
           New-Item -ItemType Directory -Force (Split-Path $cer) | Out-Null
           [IO.File]::WriteAllBytes($cer, [Convert]::FromBase64String($env:AIASSISTANT_PROD_CERT_BASE64))
           "AIASSISTANT_SIGN_CERT_THUMBPRINT=$env:AIASSISTANT_PROD_SIGN_THUMBPRINT" >> $env:GITHUB_ENV
@@ -89,27 +89,32 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash build/models/fetch-bundle.sh
 
-      - name: Build and sign zip
-        shell: pwsh
-        run: ./build/package/package-windows.ps1 -Version $env:APP_VERSION -RequireSigning
-
-      - name: Build and sign MSI
+      - name: Build and sign portable zip
         shell: pwsh
         run: |
-          $cert = "artifacts/package/AiAssistant-$($env:APP_VERSION.TrimStart('v'))-win-x64.cer"
           $dev = if ($env:DEV_SELF_SIGNED -eq 'true') { @('-DevSelfSigned') } else { @() }
+          ./build/package/package-windows.ps1 -Version $env:APP_VERSION -RequireSigning @dev
+
+      - name: Build and sign MSI from shared payload
+        shell: pwsh
+        run: |
+          $version = $env:APP_VERSION.TrimStart('v')
+          $certName = if ($env:DEV_SELF_SIGNED -eq 'true') { "AiAssistant-$version-windows-x64-dev.cer" } else { "AiAssistant-$version-windows-x64.cer" }
+          $cert = "artifacts/dist/$version/$certName"
+          $dev = if ($env:DEV_SELF_SIGNED -eq 'true') { @('-DevSelfSigned', '-CertificatePath', $cert) } else { @() }
           ./build/package/package-windows-msi.ps1 `
             -Version $env:APP_VERSION `
-            -CertificatePath $cert `
             -SignThumbprint $env:AIASSISTANT_SIGN_CERT_THUMBPRINT @dev
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-win-x64
           path: |
-            artifacts/package/*.zip
-            artifacts/package/*.msi
-            artifacts/package/*.cer
+            artifacts/dist/**/*.zip
+            artifacts/dist/**/*.msi
+            artifacts/dist/**/*.cer
+            artifacts/dist/**/*.sha256
+            artifacts/dist/**/AiAssistant-*-SHA256SUMS.txt
           if-no-files-found: error
 
   macos:
@@ -128,16 +133,18 @@ jobs:
           dotnet test --solution AiAssistant.sln -c Release
 
       - name: Build Swift helper
-        working-directory: native/AiAssistant.MacHelper
-        run: swift build -c release
+        run: bash build/native/mac-helper.sh build
+
+      - name: Test Swift helper
+        run: bash build/native/mac-helper.sh test
 
       - name: Create self-signed signing identity (dev only)
         if: env.DEV_SELF_SIGNED == 'true'
         run: |
           version="${APP_VERSION#v}"
-          mkdir -p artifacts/package
+          mkdir -p "artifacts/dist/$version"
           bash build/package/macos/create-self-signed-identity.sh \
-            "$GITHUB_WORKSPACE/artifacts/package/AiAssistant-$version-osx-arm64.cer" \
+            "$GITHUB_WORKSPACE/artifacts/dist/$version/AiAssistant-$version-macos-arm64-dev.cer" \
             "AiAssistant Self-Signed"
 
       - name: Fetch bundled voice models
@@ -155,7 +162,7 @@ jobs:
             --version "$APP_VERSION" \
             --require-sign \
             --dev-self-signed \
-            --certificate "artifacts/package/AiAssistant-$version-osx-arm64.cer"
+            --certificate "artifacts/dist/$version/AiAssistant-$version-macos-arm64-dev.cer"
 
       - name: Package production Developer ID (no trust-store changes)
         if: env.DEV_SELF_SIGNED != 'true'
@@ -173,9 +180,11 @@ jobs:
         with:
           name: release-osx-arm64
           path: |
-            artifacts/package/*.pkg
-            artifacts/package/*.zip
-            artifacts/package/*.cer
+            artifacts/dist/**/*.pkg
+            artifacts/dist/**/*.zip
+            artifacts/dist/**/*.cer
+            artifacts/dist/**/*.sha256
+            artifacts/dist/**/AiAssistant-*-SHA256SUMS.txt
           if-no-files-found: error
 
   linux:
@@ -205,8 +214,10 @@ jobs:
         with:
           name: release-linux-x64
           path: |
-            artifacts/package/*.tar.gz
-            artifacts/package/*.deb
+            artifacts/dist/**/*.tar.gz
+            artifacts/dist/**/*.deb
+            artifacts/dist/**/*.sha256
+            artifacts/dist/**/AiAssistant-*-SHA256SUMS.txt
           if-no-files-found: error
 
   publish:
@@ -238,14 +249,10 @@ jobs:
 
       - name: Stage SBOM and checksums
         run: |
-          cp artifacts/build/sbom/bom.json dist/bom.json
-          cd dist
-          # POSIX: no GNU-only find -printf.
-          for file in *; do
-            [ -f "$file" ] || continue
-            [ "$file" = "SHA256SUMS" ] && continue
-            sha256sum "$file"
-          done > SHA256SUMS
+          version="${{ steps.version.outputs.value }}"
+          mkdir -p dist
+          cp "artifacts/dist/$version/AiAssistant-$version-sbom.cdx.json" dist/
+          bash build/package/checksums.sh "$PWD/dist" "$version"
 
       - name: Create draft release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
@@ -259,10 +266,10 @@ jobs:
 
             | 平台 | 交付物 | 签名 / 信任方式 |
             |---|---|---|
-            | Windows x64 | `.zip` + `.msi` | 正式 CA 签名；仅开发自签名构建导入证书 |
-            | macOS arm64 | `.pkg` + `.zip` | Developer ID 签名；仅开发自签名构建导入证书 |
-            | Linux x64 | `.tar.gz` + `.deb` | 未签名 |
+            | Windows x64 | `AiAssistant-<ver>-windows-x64-portable.zip` + `.msi` | 正式 CA 签名；开发自签名产物带 `-dev` |
+            | macOS arm64 | `AiAssistant-<ver>-macos-arm64.pkg` + `.app.zip` | Developer ID 签名；开发自签名产物带 `-dev` |
+            | Linux x64 | `aiassistant-<ver>-linux-x64.tar.gz` + `aiassistant_<ver>_amd64.deb` | 未签名 |
 
-            安装包由 GitHub Actions 在本工作流中构建；附 `bom.json` 与 `SHA256SUMS`。
+            安装包由 GitHub Actions 在本工作流中构建；附 `AiAssistant-<ver>-sbom.cdx.json` 与 `AiAssistant-<ver>-SHA256SUMS.txt`。
             开发自签名版本必须显式在手动触发时勾选 `dev_self_signed`，tag 推送走正式签名路径。
           files: dist/*

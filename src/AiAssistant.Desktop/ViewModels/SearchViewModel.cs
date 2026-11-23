@@ -14,6 +14,7 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
 {
     private readonly EvidenceSearchUseCase _search;
     private readonly RangeReportUseCase _range;
+    private readonly IClock _clock;
     private readonly string _exportDirectory;
     private readonly CancellationTokenSource _disposeCts = new();
     private DateTimeOffset? _fromDate;
@@ -30,11 +31,16 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
     private EvidenceQaAnswer? _lastAnswer;
     private RangeReport? _weeklyReport;
 
-    public SearchViewModel(EvidenceSearchUseCase search, RangeReportUseCase range, string exportDirectory)
+    public SearchViewModel(
+        EvidenceSearchUseCase search,
+        RangeReportUseCase range,
+        string exportDirectory,
+        IClock? clock = null)
     {
         _search = search ?? throw new ArgumentNullException(nameof(search));
         _range = range ?? throw new ArgumentNullException(nameof(range));
         _exportDirectory = exportDirectory ?? throw new ArgumentNullException(nameof(exportDirectory));
+        _clock = clock ?? new SystemClock();
         var (from, to) = _search.DefaultRange();
         _fromDate = new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         _toDate = new DateTimeOffset(to.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
@@ -280,10 +286,10 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
     }
 
     private DateOnly ResolveFrom() =>
-        DateOnly.FromDateTime((FromDate ?? TimeProvider.System.GetLocalNow().AddDays(-6)).LocalDateTime);
+        DateOnly.FromDateTime((FromDate ?? _clock.LocalNow.AddDays(-6)).LocalDateTime);
 
     private DateOnly ResolveTo() =>
-        DateOnly.FromDateTime((ToDate ?? TimeProvider.System.GetLocalNow()).LocalDateTime);
+        DateOnly.FromDateTime((ToDate ?? _clock.LocalNow).LocalDateTime);
 
     private void NavigateTo(EvidenceReference reference) =>
         NavigationRequested?.Invoke(this, new EvidenceNavigationRequest(reference.LocalDate, reference.EventId));

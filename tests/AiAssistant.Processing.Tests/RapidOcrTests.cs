@@ -2,10 +2,12 @@ using AiAssistant.Application.Ports;
 using AiAssistant.Core.Configuration;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Processing.Ocr;
+using AiAssistant.Testing.Common;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiAssistant.Processing.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class RapidOcrTests
 {
     [Fact]
@@ -13,7 +15,7 @@ public sealed class RapidOcrTests
     {
         var options = new RapidOcrOptions
         {
-            ModelDirectory = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"))
+            ModelDirectory = TempArtifactDirectory.CreatePath("processing")
         };
         using var recognizer = new RapidOcrTextRecognizer(
             options,

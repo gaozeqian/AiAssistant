@@ -14,6 +14,7 @@ namespace AiAssistant.Report.Tests;
 /// S8-R1 retrieval quality gate on a synthetic labelled corpus: keyword-only versus RRF hybrid.
 /// Uses deterministic concept embeddings so fusion/ranking can be measured without a real model.
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class RetrievalQualityTests
 {
     private static readonly string[][] ConceptKeywords =
@@ -184,7 +185,7 @@ public sealed class RetrievalQualityTests
                 return;
             }
 
-            var outputDirectory = ArtifactPaths.Resolve(directory.FullName, "evidence", "benchmarks");
+            var outputDirectory = ArtifactPaths.Resolve(directory.FullName, "test-results", "benchmarks");
             Directory.CreateDirectory(outputDirectory);
             await File.WriteAllTextAsync(
                 Path.Combine(outputDirectory, "retrieval-benchmark.md"),

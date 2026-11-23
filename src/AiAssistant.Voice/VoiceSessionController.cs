@@ -35,11 +35,12 @@ public sealed class VoiceSessionController : IVoiceSession
     private readonly ITtsService _tts;
     private readonly IAudioPlayback _playback;
     private readonly VoiceCommandRouter _router;
-    private readonly IVoiceCommandLog _commandLog;
     private readonly IClock _clock;
     private readonly VoiceSessionOptions _options;
     private readonly ILogger<VoiceSessionController> _logger;
-    private readonly IMediaStore? _commandAudioStore;
+    private readonly VoiceCommandAudioRecorder _commandAudio;
+    private readonly VoiceFeedbackPlayer _feedback;
+    private readonly VoiceCommandLogWriter _commandLogWriter;
     private readonly Lock _sync = new();
     private readonly List<float> _commandBuffer = [];
     private CancellationTokenSource? _runCts;
@@ -71,27 +72,23 @@ public sealed class VoiceSessionController : IVoiceSession
         _tts = tts;
         _playback = playback;
         _router = router;
-        _commandLog = commandLog;
         _clock = clock;
         _options = options;
         _logger = logger;
-        _commandAudioStore = commandAudioStore;
+        _commandAudio = new VoiceCommandAudioRecorder(commandAudioStore, options, clock, logger);
+        _feedback = new VoiceFeedbackPlayer(tts, playback, logger);
+        _commandLogWriter = new VoiceCommandLogWriter(commandLog, clock, logger);
     }
 
     public VoiceSessionState State => (VoiceSessionState)Volatile.Read(ref _state);
 
-    public bool RecordsCommandAudio => _commandAudioStore is not null && _options.RecordCommandAudio;
+    public bool RecordsCommandAudio => _commandAudio.RecordsCommandAudio;
 
     public Task SetCommandAudioRecordingAsync(bool enabled, CancellationToken ct)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ct.ThrowIfCancellationRequested();
-        if (enabled && _commandAudioStore is null)
-        {
-            throw new InvalidOperationException("Command audio storage is not available in this session.");
-        }
-
-        _options.RecordCommandAudio = enabled;
+        _commandAudio.SetEnabled(enabled);
         return Task.CompletedTask;
     }
 
@@ -256,7 +253,7 @@ public sealed class VoiceSessionController : IVoiceSession
         EmitInteraction(string.Empty, "我在听。");
         if (_options.EnableWakeChime)
         {
-            _ = PlayFeedbackSafelyAsync("我在", ct);
+            _ = _feedback.PlaySafelyAsync("我在", ct);
         }
     }
 
@@ -317,9 +314,9 @@ public sealed class VoiceSessionController : IVoiceSession
         }
 
         // Opt-in only: the post-wake command audio is encrypted before any business action runs.
-        var audioContentId = await TryPersistCommandAudioAsync(samples, ct);
+        var audioContentId = await _commandAudio.PersistAsync(samples, ct);
 
-        var parsed = VoiceCommandParser.Parse(transcript);
+        var parsed = VoiceCommandParser.Parse(transcript, _clock);
         if (parsed.Kind == VoiceCommandKind.Cancel && _pendingConfirmation is not null)
         {
             _pendingConfirmation = null;
@@ -344,10 +341,10 @@ public sealed class VoiceSessionController : IVoiceSession
         if (parsed.RequiresConfirmation)
         {
             _pendingConfirmation = parsed;
-            await LogCommandAsync(transcript, parsed, audioContentId);
+            await _commandLogWriter.WriteAsync(_wakeKeyword, transcript, parsed, audioContentId);
             SetState(VoiceSessionState.Responding);
             EmitInteraction(transcript, parsed.Feedback);
-            await PlayFeedbackAsync(parsed.Feedback, ct);
+            await _feedback.PlayAsync(parsed.Feedback, ct);
             BeginListening(_options.ConfirmationWindow);
             return;
         }
@@ -375,106 +372,16 @@ public sealed class VoiceSessionController : IVoiceSession
         SetState(VoiceSessionState.Responding);
         if (!string.IsNullOrWhiteSpace(transcript))
         {
-            await LogCommandAsync(transcript, command, audioContentId);
+            await _commandLogWriter.WriteAsync(_wakeKeyword, transcript, command, audioContentId);
         }
 
         EmitInteraction(transcript ?? string.Empty, feedback);
-        await PlayFeedbackAsync(feedback, ct);
+        await _feedback.PlayAsync(feedback, ct);
         _pendingConfirmation = null;
         _wakeWordDetector.Reset();
         _ignoreFramesBeforeUtc = _clock.UtcNow;
         SetState(VoiceSessionState.Sleeping);
         _lastWakeAt = _clock.UtcNow;
-    }
-
-    private async Task LogCommandAsync(string transcript, ParsedVoiceCommand? command, string? audioContentId)
-    {
-        try
-        {
-            await _commandLog.AppendAsync(
-                new VoiceCommandLogRecord(
-                    StableId.NewEventId(_clock.UtcNow),
-                    _clock.UtcNow,
-                    _wakeKeyword,
-                    transcript,
-                    command?.Kind.ToString() ?? VoiceCommandKind.Unknown.ToString(),
-                    command?.ParamsJson ?? "{}",
-                    ModelEndpointTier.LocalOffline,
-                    ResponseRef: null,
-                    AudioContentId: audioContentId),
-                CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Voice command log failed with {ExceptionType}.", ex.GetType().Name);
-        }
-    }
-
-    private async Task<string?> TryPersistCommandAudioAsync(float[] samples, CancellationToken ct)
-    {
-        if (_commandAudioStore is null || !_options.RecordCommandAudio || samples.Length == 0)
-        {
-            return null;
-        }
-
-        try
-        {
-            var now = _clock.UtcNow;
-            var wav = CommandAudioWavEncoder.Encode(samples, 16_000);
-            var reference = await _commandAudioStore.PutAsync(
-                new ContentWriteRequest(
-                    StableId.NewContentId(now),
-                    ContentKind.AudioPcm16Wav,
-                    wav,
-                    now,
-                    now + _options.CommandAudioRetention),
-                ct);
-            return reference.ContentId;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogWarning("Command audio persistence skipped ({ExceptionType}).", ex.GetType().Name);
-            return null;
-        }
-    }
-
-    private async Task PlayFeedbackSafelyAsync(string text, CancellationToken ct)
-    {
-        try
-        {
-            await PlayFeedbackAsync(text, ct);
-        }
-        catch (OperationCanceledException ex)
-        {
-            // Session stopped while feedback was playing
-            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Voice.VoiceSessionController.PlayFeedbackSafelyAsync", ex);
-        }
-    }
-
-    private async Task PlayFeedbackAsync(string text, CancellationToken ct)
-    {
-        try
-        {
-            if (!_tts.Capability.IsOperational)
-            {
-                return;
-            }
-
-            var speech = await _tts.SynthesizeAsync(new SpeechSynthesisRequest(text), ct);
-            if (speech.Samples.Length == 0 || speech.SampleRateHz <= 0)
-            {
-                return;
-            }
-
-            if (_playback.Capability.IsOperational)
-            {
-                await _playback.PlayAsync(speech.Samples, speech.SampleRateHz, ct);
-            }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogDebug("Voice feedback playback skipped ({ExceptionType}).", ex.GetType().Name);
-        }
     }
 
     private void BeginListening(TimeSpan window)

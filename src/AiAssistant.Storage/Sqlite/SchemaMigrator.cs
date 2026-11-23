@@ -153,11 +153,10 @@ internal static class SchemaMigrator
                     recordCmd.Transaction = tx;
                     recordCmd.CommandText = """
                         INSERT INTO schema_migrations(version, name, applied_at_utc)
-                        VALUES ($version, $name, $appliedAtUtc);
+                        VALUES ($version, $name, strftime('%Y-%m-%dT%H:%M:%fZ','now'));
                         """;
                     recordCmd.Parameters.AddWithValue("$version", step.Version.Number);
                     recordCmd.Parameters.AddWithValue("$name", step.Version.Name);
-                    recordCmd.Parameters.AddWithValue("$appliedAtUtc", TimeProvider.System.GetUtcNow().ToString("O"));
                     await recordCmd.ExecuteNonQueryAsync(ct);
                 }
 

@@ -15,22 +15,13 @@ namespace AiAssistant.Desktop;
 
 public sealed class ShellApp : Avalonia.Application, IDisposable
 {
+    private readonly DesktopLaunchContext _context;
     private TrayIcon? _trayIcon;
     private SingleInstance? _singleInstance;
 
-    public static Func<ShellViewModel>? ViewModelFactory { get; set; }
-
-    /// <summary>
-    /// Set by Host from the platform capability matrix. Only used for diagnostics; closing the
-    /// window always hides it and keeps capture running, quitting needs the explicit 退出 action.
-    /// </summary>
-    public static bool TrayAvailable { get; set; } = true;
-
-    /// <summary>Unix socket used to bring the hidden window back when the app is launched again.</summary>
-    public static string? InstanceSocketPath { get; set; }
-
-    public ShellApp()
+    public ShellApp(DesktopLaunchContext context)
     {
+        _context = context ?? throw new ArgumentNullException(nameof(context));
         // Overrides Avalonia's default "Avalonia Application" so the macOS menu bar / Dock label read 「时光」.
         Name = "时光";
     }
@@ -46,8 +37,7 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var shell = ViewModelFactory?.Invoke()
-                ?? throw new InvalidOperationException("Desktop ViewModel factory was not configured by Host.");
+            var shell = _context.ViewModelFactory();
             var icon = CreateApplicationIcon();
             var window = new MainWindow
             {
@@ -66,9 +56,9 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             }
 
             // Closing hides the window; launching again (dock icon / desktop entry) shows it.
-            if (!string.IsNullOrWhiteSpace(InstanceSocketPath))
+            if (!string.IsNullOrWhiteSpace(_context.InstanceSocketPath))
             {
-                _singleInstance = new SingleInstance(InstanceSocketPath);
+                _singleInstance = new SingleInstance(_context.InstanceSocketPath);
                 try
                 {
                     _singleInstance.Start(() => Avalonia.Threading.Dispatcher.UIThread.Post(window.ShowFromTray));
@@ -104,7 +94,7 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
                 StringComparison.Ordinal);
             // Tray-only on desktops that actually have a tray; without one the window must be
             // visible, otherwise the app would start with no reachable UI at all.
-            if (showWindow || runUiE2E || !TrayAvailable)
+            if (showWindow || runUiE2E || !_context.TrayAvailable)
             {
                 window.Show();
             }
@@ -117,9 +107,37 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
                 shell.Dispose();
             };
             var initialization = InitializeShellSafelyAsync(shell);
+
+            if (runUiE2E && _context.UiE2ERunner is { } runner)
+            {
+                var outputRoot = Environment.GetEnvironmentVariable(EnvironmentNames.UiE2EOutput)
+                    ?? AiAssistant.Core.Configuration.ArtifactPaths.Resolve("test-results", "e2e");
+                Directory.CreateDirectory(outputRoot);
+                _ = RunUiE2EAsync(runner, window, shell, initialization, desktop, outputRoot);
+            }
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static async Task RunUiE2EAsync(
+        Func<MainWindow, ShellViewModel, Task<Exception?>, Action<int>, string, Task<int>> runner,
+        MainWindow window,
+        ShellViewModel shell,
+        Task<Exception?> initialization,
+        IClassicDesktopStyleApplicationLifetime desktop,
+        string outputRoot)
+    {
+        try
+        {
+            var exitCode = await runner(window, shell, initialization, desktop.Shutdown, outputRoot);
+            desktop.Shutdown(exitCode);
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceError("UI E2E runner failed ({0}).", ex.GetType().Name);
+            desktop.Shutdown(2);
+        }
     }
 
     /// <summary>

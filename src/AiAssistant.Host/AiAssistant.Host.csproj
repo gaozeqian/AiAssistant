@@ -1,10 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <AssemblyName>AiAssistant</AssemblyName>
     <Description>Composition Root, startup, DI registration, OS platform wiring, and application lifecycle.</Description>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('Windows'))">..\..\build\package\assets\aiassistant.ico</ApplicationIcon>
-    <MacHelperBinaryPath>$(MSBuildProjectDirectory)/../../native/AiAssistant.MacHelper/.build/release/aiassistant-mac-helper</MacHelperBinaryPath>
+    <!-- SwiftPM 构建目录统一重定向到 artifacts/obj/native，源码树不再产生 .build/。 -->
+    <MacHelperBinaryPath>$(ArtifactsPath)/obj/native/mac-helper/release/aiassistant-mac-helper</MacHelperBinaryPath>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AiAssistant.Core\AiAssistant.Core.csproj" />
@@ -52,7 +54,6 @@
     <Delete Files="@(ForeignWhisperFile)" ContinueOnError="true" />
   </Target>
   <ItemGroup>
-    <!-- 基准命令只由工具宿主编译，不进入产品交付。 -->
-    <Compile Remove="Benchmarks/**/*.cs" />
+    <InternalsVisibleTo Include="AiAssistant.Host.Tests" />
   </ItemGroup>
 </Project>

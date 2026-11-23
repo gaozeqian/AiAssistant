@@ -15,7 +15,7 @@ usage() {
   cat <<'EOF'
 用法: bash tools/audit-conventions.sh [选项]
 
-逐条检查 R1–R10 规范，输出 PASS/FAIL 清单。结果与 docs/status/conformance.md 应一致。
+逐条检查 R1–R10 与补充规范，输出 PASS/FAIL 清单。
 
 选项:
   -h, --help  显示本帮助
@@ -35,7 +35,7 @@ note() { printf 'NOTE  %s\n' "$*"; }
 
 echo "== R1 根目录白名单 =="
 
-ALLOWED="AiAssistant.sln CHANGELOG.md CONTRIBUTING.md Directory.Build.props Directory.Build.targets Directory.Packages.props EULA.md LICENSE README.md SECURITY.md THIRD-PARTY-NOTICES.md artifacts build docs global.json native nuget.config samples src testconfig.json tests tools dotnet.config"
+ALLOWED="AiAssistant.sln CHANGELOG.md CONTRIBUTING.md Directory.Build.props Directory.Build.targets Directory.Packages.props EULA.md LICENSE README.md SECURITY.md THIRD-PARTY-NOTICES.md artifacts build docs global.json native nuget.config samples src tests tools dotnet.config"
 ALLOWED_HIDDEN=".config .editorconfig .gitattributes .github .gitignore .workbuddy .workbuddy-ai"
 
 for entry in * .[!.]*; do
@@ -63,7 +63,7 @@ for d in src tests docs build tools native samples; do
 done
 
 echo "== R3 命名 =="
-offending="$(git grep -nE 'MacOS|MacOs' -- . ':!docs/archive/**' ':!docs/guides/conventions.md' | grep -v 'IsMacOS()' | grep -viE '[Cc]ontents/MacOS' || true)"
+offending="$(git grep -nE 'MacOS|MacOs' -- . | grep -v 'IsMacOS()' | grep -viE '[Cc]ontents/MacOS' || true)"
 if [[ -z "$offending" ]]; then
   pass "R3 平台拼写唯一为 macOS（允许 IsMacOS()/Contents/MacOS/归档）"
 else
@@ -119,7 +119,7 @@ for p in docs:
         else:
             out.append(dest)
     links[p] = out
-start = os.path.join(docs_root, "README.md")
+start = os.path.normpath(os.path.join(docs_root, "README.md"))
 visited = {start: 0}
 q = deque([start])
 while q:
@@ -171,6 +171,12 @@ if [[ -z "$no_header" ]]; then
 else
   fail "R4 文档头信息不全：$(printf '\n%s' "$no_header" | head -5)"
 fi
+
+doc_count="$(find docs -name '*.md' | wc -l | tr -d ' ')"
+[[ "$doc_count" -le 26 ]] && pass "文档收敛为 $doc_count 篇（≤26）" || fail "文档数量反弹：$doc_count（应 ≤26）"
+
+stale_doc_dirs="$(find docs -maxdepth 1 -type d \( -name 'archive' -o -name 'status' -o -name 'testing' -o -name 'compliance' \) 2>/dev/null || true)"
+[[ -z "$stale_doc_dirs" ]] && pass "无已删除文档目录（archive/status/testing/compliance）" || fail "残留文档目录：$stale_doc_dirs"
 
 echo "== R4/补充 UTF-8 无 BOM =="
 bom="$("$PY" - "$REPO_ROOT" <<'PYEOF'
@@ -271,9 +277,43 @@ echo "== 补充：时钟抽象（ADR-0009） =="
 clock="$(git grep -nE 'DateTime\.(Now|Today|UtcNow)|DateTimeOffset\.(Now|UtcNow)' -- 'src/**/*.cs' | grep -vE 'IClock|TimeProvider|SystemClock|ClockExtensions' || true)"
 [[ -z "$clock" ]] && pass "生产代码无直接系统时钟调用" || fail "ADR-0009 违规：$(printf '\n%s' "$clock" | head -5)"
 
+timeprovider="$(git grep -n 'TimeProvider\.System' -- 'src/**/*.cs' | grep -v 'Ports/IClock.cs' || true)"
+[[ -z "$timeprovider" ]] && pass "R9 生产代码仅 IClock 实现允许 TimeProvider.System" || fail "R9 TimeProvider.System 绕过 IClock：$(printf '\n%s' "$timeprovider" | head -5)"
+
 echo "== R9 配置与常量 =="
 env_files="$(git grep -ln '"AIASSISTANT_' -- '*.cs' | grep -v 'EnvironmentNames.cs' || true)"
 [[ -z "$env_files" ]] && pass "R9 环境变量字面量仅存在于 EnvironmentNames.cs" || fail "R9 环境变量字面量散落：$env_files"
+
+echo "== 补充：测试工程与源码树零污染 =="
+stray_dirs="$(find src tests build tools native docs -type d \
+  \( -name '__pycache__' -o -name '.build' -o -name 'test-temp' -o -name 'TestResults' -o -name 'bin' -o -name 'obj' \) \
+  -not -path '*/obj/native/*' 2>/dev/null || true)"
+[[ -z "$stray_dirs" ]] && pass "源码树无 __pycache__/.build/test-temp/bin/obj 逃逸目录" || fail "源码树出现临时/编译目录：$stray_dirs"
+
+legacy_temp="$(find tests -name '*.cs' -not -path '*/AiAssistant.Testing.Common/*' -exec grep -nE 'AppContext\.BaseDirectory.*test-temp|"/tmp/|Path\.GetTempPath' {} + 2>/dev/null || true)"
+[[ -z "$legacy_temp" ]] && pass "测试临时目录统一走 artifacts/tmp" || fail "测试仍写旧临时目录：$(printf '\n%s' "$legacy_temp" | head -5)"
+
+missing_traits="$(git ls-files 'tests/**/*Tests.cs' | while IFS= read -r f; do
+  grep -q '\[Trait("Category"' "$f" || printf '%s\n' "$f"
+done)"
+[[ -z "$missing_traits" ]] && pass "测试类均声明 Category Trait" || fail "测试类缺 Category Trait：$missing_traits"
+
+project_count="$(find tests -name '*.csproj' | wc -l | tr -d ' ')"
+[[ "$project_count" -ge 15 ]] && pass "测试工程登记数 $project_count（含 Testing.Common）" || fail "测试工程数异常：$project_count"
+
+echo "== 补充：产物目录与命名契约 =="
+legacy_paths="$(git grep -nE 'artifacts/(build|package|evidence)(/|")' -- . ':!docs/**' ':!artifacts/**' || true)"
+[[ -z "$legacy_paths" ]] && pass "无旧产物目录引用（build/package/evidence）" || fail "仍引用旧产物目录：$(printf '\n%s' "$legacy_paths" | head -5)"
+
+root_dist="$(find . -maxdepth 1 -type d -name 'dist' -not -path './artifacts*' 2>/dev/null || true)"
+[[ -z "$root_dist" ]] && pass "仓库根无临时 dist/" || fail "仓库根出现 dist/：$root_dist"
+
+wrong_bin="$(grep -nE 'AiAssistant\.Host(\.exe)?' build/package/windows/Package.msi.wxs build/package/macos/Info.plist.template build/package/linux/aiassistant.desktop 2>/dev/null || true)"
+[[ -z "$wrong_bin" ]] && pass "平台清单引用发布态二进制 AiAssistant/aiassistant" || fail "平台清单仍引用 AiAssistant.Host：$(printf '\n%s' "$wrong_bin" | head -5)"
+
+for f in build/package/checksums.sh build/package/checksums.ps1 tools/clean-artifacts.sh; do
+  [[ -f "$f" ]] && pass "存在 $f" || fail "缺 $f"
+done
 
 echo
 echo "结果：$CHECKS 项检查，$FAILURES 项不合规"

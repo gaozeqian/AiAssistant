@@ -61,17 +61,29 @@ jobs:
       - name: Build (warnings as errors)
         run: dotnet build AiAssistant.sln -c Release --no-restore --warnaserror
 
-      - name: Run tests (Microsoft.Testing.Platform)
+      - name: Run tests (Microsoft.Testing.Platform + coverage)
         env:
           AIASSISTANT_SOAK_DAYS: "3"
-        run: dotnet test --solution AiAssistant.sln -c Release --no-build
+        run: >
+          dotnet test --solution AiAssistant.sln -c Release --no-build
+          --coverage
+          --coverage-output-format cobertura
+          --coverage-output "${{ github.workspace }}/artifacts/test-results/coverage/coverage.cobertura.xml"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-${{ matrix.rid }}
+          path: artifacts/test-results/coverage/
+          if-no-files-found: ignore
 
       - name: Upload multi-day soak report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: soak-report-${{ matrix.rid }}
-          path: artifacts/evidence/soak/*.md
+          path: artifacts/test-results/soak/*.md
           if-no-files-found: ignore
 
       - name: Upload benchmark reports
@@ -79,26 +91,27 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: benchmark-reports-${{ matrix.rid }}
-          path: artifacts/evidence/benchmarks/*.md
+          path: artifacts/test-results/benchmarks/*.md
           if-no-files-found: ignore
 
       - name: Build & Smoke-Test Swift Helper (macOS arm64)
         if: matrix.rid == 'osx-arm64'
-        working-directory: native/AiAssistant.MacHelper
-        run: |
-          swift build -c release
-          .build/release/aiassistant-mac-helper --smoke-check
+        run: bash build/native/mac-helper.sh smoke
+
+      - name: Test Swift Helper (macOS arm64)
+        if: matrix.rid == 'osx-arm64'
+        run: bash build/native/mac-helper.sh test
 
       - name: Verify RID Native Asset Packaging (${{ matrix.rid }})
         run: dotnet publish src/AiAssistant.Host/AiAssistant.Host.csproj -c Release -r ${{ matrix.rid }} --self-contained false
 
       - name: Verify Swift Helper Is Bundled (macOS arm64)
         if: matrix.rid == 'osx-arm64'
-        run: test -x artifacts/publish/AiAssistant.Host/release_${{ matrix.rid }}/aiassistant-mac-helper
+        run: test -x artifacts/publish/${{ matrix.rid }}/aiassistant-mac-helper
 
       - name: Verify Linux Portal Adapter Is Bundled (linux-x64)
         if: matrix.rid == 'linux-x64'
-        run: test -f artifacts/publish/AiAssistant.Host/release_${{ matrix.rid }}/Tmds.DBus.Protocol.dll
+        run: test -f artifacts/publish/${{ matrix.rid }}/Tmds.DBus.Protocol.dll
 
   package:
     name: Package (${{ matrix.rid }})
@@ -127,31 +140,31 @@ jobs:
 
       - name: Build Swift Helper (macOS arm64)
         if: matrix.rid == 'osx-arm64'
-        working-directory: native/AiAssistant.MacHelper
-        run: swift build -c release
+        run: bash build/native/mac-helper.sh build
 
       - name: Package (Windows, unsigned developer build)
         if: matrix.rid == 'win-x64'
         shell: pwsh
-        run: ./build/package/package-windows.ps1
+        run: ./build/package/package-windows.ps1 -SkipModelBundle
 
       - name: Package (macOS, layout only)
         if: matrix.rid == 'osx-arm64'
-        run: bash build/package/package-macos.sh --skip-sign
+        run: bash build/package/package-macos.sh --skip-sign --skip-models
 
       - name: Package (Linux)
         if: matrix.rid == 'linux-x64'
-        run: bash build/package/package-linux.sh
+        run: bash build/package/package-linux.sh --skip-models
 
       - name: Upload package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: package-${{ matrix.rid }}
           path: |
-            artifacts/package/*.zip
-            artifacts/package/*.tar.gz
-            artifacts/package/*.deb
-            artifacts/package/SHA256SUMS
+            artifacts/dist/**/*.zip
+            artifacts/dist/**/*.tar.gz
+            artifacts/dist/**/*.deb
+            artifacts/dist/**/*.sha256
+            artifacts/dist/**/AiAssistant-*-SHA256SUMS.txt
           if-no-files-found: error
 
   sbom-and-licenses:
@@ -176,7 +189,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sbom-cyclonedx
-          path: artifacts/build/sbom/bom.json
+          path: artifacts/dist/*/AiAssistant-*-sbom.cdx.json
 
   conventions:
     name: Repository Conventions Audit

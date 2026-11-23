@@ -6,12 +6,14 @@ using AiAssistant.Core.ValueObjects;
 using AiAssistant.Storage.KeyStores;
 using AiAssistant.Storage.Media;
 using AiAssistant.Storage.Sqlite;
+using AiAssistant.Testing.Common;
 
 namespace AiAssistant.Storage.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class VoiceCommandLogTests : IDisposable
 {
-    private readonly string _tempRoot = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"));
+    private readonly string _tempRoot = TempArtifactDirectory.CreatePath("storage");
 
     public VoiceCommandLogTests() => Directory.CreateDirectory(_tempRoot);
 

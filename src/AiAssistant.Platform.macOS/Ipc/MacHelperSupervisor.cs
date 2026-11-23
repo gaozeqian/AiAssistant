@@ -285,24 +285,103 @@ public sealed class MacHelperSupervisor : IMacHelperSupervisor
 
     private string BuildShortSocketPath()
     {
-        // Keep AF_UNIX sun_path strictly <= 96 UTF-8 bytes so both macOS (104B) and Windows/Linux (108B) succeed!
+        // Keep AF_UNIX sun_path strictly <= 96 UTF-8 bytes so both macOS (104B) and Windows/Linux (108B) succeed.
         var shortId = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6));
         var fileName = $"aia-{shortId}.sock";
 
-        if (!string.IsNullOrWhiteSpace(_options.SocketDirectory))
+        foreach (var directory in CandidateSocketDirectories())
         {
-            var candidateDir = _options.SocketDirectory!;
-            var candidatePath = Path.Combine(candidateDir, fileName);
-            if (System.Text.Encoding.UTF8.GetByteCount(candidatePath) <= 96)
+            if (string.IsNullOrWhiteSpace(directory))
             {
-                Directory.CreateDirectory(candidateDir);
+                continue;
+            }
+
+            string candidatePath;
+            try
+            {
+                candidatePath = Path.Combine(directory, fileName);
+            }
+            catch (ArgumentException ex)
+            {
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace(
+                    "Platform.macOS.Ipc.MacHelperSupervisor.BuildShortSocketPath", ex);
+                continue;
+            }
+
+            if (System.Text.Encoding.UTF8.GetByteCount(candidatePath) > 96)
+            {
+                continue;
+            }
+
+            if (TryEnsurePrivateDirectory(directory))
+            {
                 return candidatePath;
             }
         }
 
-        var fallbackDir = OperatingSystem.IsMacOS() ? "/tmp" : Path.GetTempPath();
-        Directory.CreateDirectory(fallbackDir);
-        return Path.Combine(fallbackDir, fileName);
+        throw new InvalidOperationException(
+            "No private socket directory fits the AF_UNIX 96-byte sun_path limit. " +
+            "Set a shorter helper socket directory and retry.");
+    }
+
+    /// <summary>
+    /// Candidate directories in priority order. Never falls back to the world-writable shared /tmp:
+    /// macOS uses the per-user $TMPDIR, Linux prefers $XDG_RUNTIME_DIR and then the user data dir.
+    /// </summary>
+    private IEnumerable<string?> CandidateSocketDirectories()
+    {
+        yield return _options.SocketDirectory;
+
+        if (OperatingSystem.IsMacOS())
+        {
+            yield return Environment.GetEnvironmentVariable("TMPDIR");
+            yield return Path.Combine(Path.GetTempPath(), "aiassistant");
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            var runtimeDirectory = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+            if (!string.IsNullOrWhiteSpace(runtimeDirectory))
+            {
+                yield return Path.Combine(runtimeDirectory, "aiassistant");
+            }
+
+            var dataDirectory = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrWhiteSpace(dataDirectory))
+            {
+                yield return Path.Combine(dataDirectory, "AiAssistant", "run");
+            }
+
+            yield return Path.Combine(Path.GetTempPath(), "aiassistant");
+        }
+        else
+        {
+            yield return Path.Combine(Path.GetTempPath(), "aiassistant");
+        }
+    }
+
+    private static bool TryEnsurePrivateDirectory(string path)
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                Directory.CreateDirectory(path);
+                return true;
+            }
+
+            const UnixFileMode Private =
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+            Directory.CreateDirectory(path, Private);
+            // CreateDirectory(path, mode) does not tighten an existing directory.
+            File.SetUnixFileMode(path, Private);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace(
+                "Platform.macOS.Ipc.MacHelperSupervisor.TryEnsurePrivateDirectory", ex);
+            return false;
+        }
     }
 
     private async Task TearDownCurrentSessionAsync(bool sendGracefulShutdown)

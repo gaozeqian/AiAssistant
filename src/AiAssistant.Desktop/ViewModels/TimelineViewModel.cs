@@ -12,6 +12,7 @@ namespace AiAssistant.Desktop.ViewModels;
 public sealed class TimelineViewModel : ObservableObject, IDisposable
 {
     private readonly TimelineUseCase _timeline;
+    private readonly TimelinePreviewLoader _previewLoader;
     private readonly CancellationTokenSource _disposeCts = new();
     private CancellationTokenSource? _queryCts;
     private CancellationTokenSource? _mediaCts;
@@ -30,6 +31,7 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
     public TimelineViewModel(TimelineUseCase timeline)
     {
         _timeline = timeline ?? throw new ArgumentNullException(nameof(timeline));
+        _previewLoader = new TimelinePreviewLoader(_timeline);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
     }
 
@@ -318,26 +320,17 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
         var ct = _mediaCts.Token;
         var eventId = item.Event.Id;
         IsPreviewLoading = true;
-        byte[]? plaintext = null;
         try
         {
-            plaintext = await _timeline.LoadDecryptedMediaAsync(item.Event.MediaRef.ContentId, ct);
-            ct.ThrowIfCancellationRequested();
-            if (plaintext is null)
-            {
-                PreviewError = "媒体已按保留策略清理，事件元数据仍可查看。";
-                return;
-            }
-
-            using var stream = new MemoryStream(plaintext, writable: false);
-            var bitmap = Bitmap.DecodeToWidth(stream, 960);
+            var result = await _previewLoader.LoadAsync(item.Event, ct);
             if (SelectedEvent?.Event.Id == eventId)
             {
-                PreviewImage = bitmap;
+                PreviewImage = result.Image;
+                PreviewError = result.Error;
             }
             else
             {
-                bitmap.Dispose();
+                result.Image?.Dispose();
             }
         }
         catch (OperationCanceledException ex)
@@ -345,70 +338,12 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
             // 切换选中项时取消上一次媒体加载属预期，静默降级。
             AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.TimelineViewModel.LoadPreviewSafelyAsync", ex);
         }
-        catch (StorageIntegrityException)
-        {
-            PreviewError = "媒体完整性校验失败或已损坏，未展示任何内容。";
-        }
-        catch (StorageAuthenticationException)
-        {
-            PreviewError = "媒体密钥不可用，请检查系统密钥库权限。";
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            PreviewError = "媒体无法解码或读取。原始事件未受影响。";
-        }
         finally
         {
-            if (plaintext is not null)
-            {
-                Array.Clear(plaintext);
-            }
-
             if (SelectedEvent?.Event.Id == eventId)
             {
                 IsPreviewLoading = false;
             }
         }
     }
-}
-
-public sealed record TimelineDateItem(DateOnly Date)
-{
-    // The panel is Chinese-only: format the weekday with zh-CN so an English OS locale does not
-    // render "2026年11月22日 Sunday" in the date picker.
-    private static readonly CultureInfo DisplayCulture = CultureInfo.GetCultureInfo("zh-CN");
-
-    public string DisplayName => Date.ToString("yyyy年MM月dd日 dddd", DisplayCulture);
-}
-
-public sealed class TimelineEventItem(ActivityEvent activityEvent)
-{
-    public ActivityEvent Event { get; } = activityEvent ?? throw new ArgumentNullException(nameof(activityEvent));
-
-    public string TimeText => Event.Timestamp.ToCapturedLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture);
-
-    public string AppName => Event.AppName;
-
-    public string Title => string.IsNullOrWhiteSpace(Event.WindowTitle) ? Event.AppName : Event.WindowTitle;
-
-    public string SourceText => Event.Source switch
-    {
-        SourceKind.WindowActivity => "窗口活动",
-        SourceKind.ScreenFrame => "屏幕快照",
-        SourceKind.FileActivity => "文件活动",
-        SourceKind.MicrophoneAudio => "麦克风",
-        SourceKind.BrowserTab => "浏览器",
-        SourceKind.SystemControl => "控制记录",
-        _ => "其他"
-    };
-
-    public string? DetailText => Event.Summary ?? Event.ExtractedText;
-
-    public bool HasDetailText => !string.IsNullOrWhiteSpace(DetailText);
-
-    public bool HasMedia => Event.MediaRef is not null;
-
-    public string CapturedTimeText => Event.Timestamp.ToCapturedLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.CurrentCulture);
-
-    public string MediaSizeText => Event.MediaRef is null ? string.Empty : $"{Event.MediaRef.PlaintextLength / 1024d:F1} KB · 仅在选中时解密";
 }

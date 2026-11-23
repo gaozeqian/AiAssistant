@@ -11,10 +11,12 @@ using AiAssistant.Core.ValueObjects;
 using AiAssistant.LocalApi;
 using AiAssistant.Processing;
 using AiAssistant.Summarization;
+using AiAssistant.Testing.Common;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiAssistant.Report.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class HybridSearchAndEvidenceTests
 {
     private static readonly DateTimeOffset BaseUtc = new(2026, 11, 20, 1, 0, 0, TimeSpan.Zero);
@@ -185,6 +187,7 @@ public sealed class HybridSearchAndEvidenceTests
             extractedText: text);
 }
 
+[Trait("Category", "Unit")]
 public sealed class RangeReportTests
 {
     private static readonly DateOnly Wednesday = new(2026, 11, 18);
@@ -410,6 +413,7 @@ public sealed class RangeReportTests
     }
 }
 
+[Trait("Category", "Unit")]
 public sealed class LoopbackMcpServerTests
 {
     [Fact]
@@ -636,15 +640,7 @@ public sealed class LoopbackMcpServerTests
 
 internal static class TestDirectories
 {
-    public static string Create(string prefix)
-    {
-        var directory = Path.Combine(
-            AppContext.BaseDirectory,
-            "test-temp",
-            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{prefix}-{Guid.NewGuid():N}"));
-        Directory.CreateDirectory(directory);
-        return directory;
-    }
+    public static string Create(string prefix) => TempArtifactDirectory.CreatePath(prefix);
 }
 
 internal sealed class FakeReportRasterizer : IReportRasterizer

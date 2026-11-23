@@ -1,72 +1,18 @@
-# 发布打包
+# build/package — 跨平台打包脚本
 
-跨平台发布脚本，产物统一落在 `artifacts/package/`（已被 `.gitignore` 忽略）。
+打包脚本把 `artifacts/publish/<rid>/` 的共享载荷组装为 `artifacts/staging/<rid>-<format>/`，
+最终产物统一写入 `artifacts/dist/<version>/`。`artifacts/` 已被 `.gitignore` 忽略。
 
-## 模型载荷（三平台共用）
+| 脚本 | 产物 |
+|---|---|
+| `package-windows.ps1` | `AiAssistant-<ver>-windows-x64-portable[-dev].zip`（顶层目录 + 一次 publish/签名） |
+| `package-windows-msi.ps1` | `AiAssistant-<ver>-windows-x64[-dev].msi`（复用同一 publish 载荷） |
+| `package-macos.sh` | `AiAssistant-<ver>-macos-arm64.app.zip` / `.pkg`（`-dev` 表示开发自签名） |
+| `package-linux.sh` | `aiassistant-<ver>-linux-x64.tar.gz`（顶层目录）/ `aiassistant_<ver>_amd64.deb` |
+| `checksums.sh` / `checksums.ps1` | 单包 `<file>.sha256` + `AiAssistant-<ver>-SHA256SUMS.txt` |
 
-安装包默认携带本机语音模型（KWS 唤醒词、Paraformer ASR、MeloTTS TTS、Silero VAD），**只有对话与 Embedding 模型保持外部**（Ollama / 内网 / 公网端点）。打包前先汇总资产：
+## 前置
 
-```bash
-bash build/models/stage-bundle.sh
-# 可选：把 Linux OCR 兜底与 Whisper 也带上
-bash build/models/stage-bundle.sh --with-rapidocr --with-whisper
-```
-
-- `stage-bundle.sh` 从 `artifacts/cache/models/sherpa-kws/kws`、`sherpa-onnx-paraformer-zh-small-2024-03-09`、`sherpa-tts`、`sherpa-vad` 汇总到 `artifacts/cache/models/bundle`；缺 KWS/ASR/TTS/VAD 任一项直接失败。MeloTTS 还要求 `sherpa-tts/dict/` 与 4 个 `*.fst`，缺失会导致数字、电话与多音字读错，因此一并纳入必检项。
-- 三个平台的打包脚本都会把 bundle 复制到应用目录：Windows `models\`、macOS `AiAssistant.app/Contents/MacOS/models`、Linux `/usr/lib/aiassistant/models`。
-- 应用解析顺序：`AIASSISTANT_*_MODEL_DIR` → `<数据目录>/models/...` → `<应用目录>/models/...`，用户可用数据目录覆盖随包模型。
-- 法务文件随包分发：`LICENSE`、`EULA.md`、`THIRD-PARTY-NOTICES.md` 与 `THIRD-PARTY-NOTICES-ONNXRUNTIME.txt`；Windows 安装目录根、macOS `AiAssistant.app/Contents/Resources/`、Linux `/usr/lib/aiassistant/` 与 `/usr/share/doc/aiassistant/`。任一文件缺失时打包脚本都会直接失败。
-- 开发调试可加 `-SkipModelBundle`（PowerShell）或 `--skip-models`（bash）跳过；**正式发布不要使用**。
-
-## Windows
-
-```powershell
-pwsh build/package/package-windows.ps1 -Version 0.1.0
-```
-
-- 默认 `win-x64` 自包含发布，输出 `AiAssistant-<version>-win-x64.zip`；MSI 由 `package-windows-msi.ps1` 单独产出。Windows 只发这两种格式，不再构建 MSIX。
-- 签名：设置 `AIASSISTANT_SIGN_CERT_THUMBPRINT`（证书指纹）与可选 `AIASSISTANT_TIMESTAMP_URL`；脚本会签名并校验全部 `.exe`/`.dll`。**指定了指纹但找不到 `signtool.exe` 时脚本会失败**，不会静默产出未签名包。
-- 自签名演练（不用于正式发布）：
-
-  ```powershell
-  $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=AiAssistant Test" `
-      -CertStoreLocation Cert:\CurrentUser\My -KeyExportPolicy Exportable
-  Export-Certificate -Cert $cert -FilePath "$env:TEMP\AiAssistantTest.cer"
-  certutil -user -addstore -f Root "$env:TEMP\AiAssistantTest.cer"
-  certutil -user -addstore -f TrustedPeople "$env:TEMP\AiAssistantTest.cer"
-  $env:AIASSISTANT_SIGN_CERT_THUMBPRINT = $cert.Thumbprint
-  pwsh build/package/package-windows.ps1 -RequireSigning -SkipTimestamp
-  ```
-
-  `-SkipTimestamp` 仅用于离线自签名；正式发布必须使用时间戳。
-- 图标由 `assets/generate-icon.py` 生成（纯 Python，无第三方依赖）：`python build/package/assets/generate-icon.py`。
-
-## macOS
-
-```bash
-# 布局/CI 冒烟（不签名）
-bash build/package/package-macos.sh --skip-sign
-
-# 正式发布（需在 macOS 上执行）
-export AIASSISTANT_CODESIGN_IDENTITY="Developer ID Application: Example (TEAMID)"
-export AIASSISTANT_NOTARY_PROFILE="aiassistant-notary"   # xcrun notarytool store-credentials 创建
-bash build/package/package-macos.sh
-```
-
-- 先构建 Swift Helper：`cd native/AiAssistant.MacHelper && swift build -c release`。
-- 产出 `AiAssistant.app`（`Contents/MacOS` 内含 Helper）与 `AiAssistant-<version>-osx-arm64.zip`。
-- 使用 hardened runtime + `macos/AiAssistant.entitlements`（JIT、音频输入）；有公证 profile 时自动 `notarytool submit --wait` 并 `stapler staple`。
-
-## Linux
-
-```bash
-bash build/package/package-linux.sh
-```
-
-- 产出便携 `AiAssistant-<version>-linux-x64.tar.gz`（含 `.desktop` 与图标）。
-- 安装 `dpkg-deb` 时额外产出 `.deb`（`usr/lib/aiassistant`、`usr/bin/aiassistant`、桌面入口）。
-- 依赖：`libsecret-1-0`、`libx11-6`、`libfontconfig1`；Wayland 会话建议安装 `xdg-desktop-portal` 与 `pipewire`。
-
-## CI
-
-`.github/workflows/ci.yml` 的 `package` 作业在三平台分别运行上述脚本（默认不签名）并上传产物；签名密钥通过仓库 Secrets 注入后自动启用。
+- 先构建 Swift Helper：`bash build/native/mac-helper.sh build`（产物在 `artifacts/obj/native/mac-helper/`）。
+- 随包模型：`bash build/models/fetch-bundle.sh` 后再 `stage-bundle.sh`；CI 布局验证可传 `--skip-models` / `-SkipModelBundle`。
+- Windows 便携包与 MSI 共享 `artifacts/publish/win-x64`，必须先运行 `package-windows.ps1` 再运行 MSI 脚本。

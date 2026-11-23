@@ -4,4 +4,7 @@
     <ProjectReference Include="..\..\src\AiAssistant.Application\AiAssistant.Application.csproj" />
     <ProjectReference Include="..\..\src\AiAssistant.Storage\AiAssistant.Storage.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AiAssistant.Testing.Common\AiAssistant.Testing.Common.csproj" />
+  </ItemGroup>
 </Project>

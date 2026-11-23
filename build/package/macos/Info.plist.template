@@ -9,7 +9,7 @@
   <key>CFBundleIdentifier</key>
   <string>com.aiassistant.desktop</string>
   <key>CFBundleExecutable</key>
-  <string>AiAssistant.Host</string>
+  <string>AiAssistant</string>
   <key>CFBundleIconFile</key>
   <string>AiAssistant</string>
   <key>CFBundlePackageType</key>

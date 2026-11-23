@@ -6,6 +6,7 @@ namespace AiAssistant.Voice.Tests;
 /// Guards the tuned wake-word defaults: the score was raised to 3.0 after the 13-positive /
 /// 2.12 h golden set showed 84.6% at 1.0 and zero false alarms either way (S7-R1).
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class SherpaVoiceOptionsTests
 {
     [Fact]
