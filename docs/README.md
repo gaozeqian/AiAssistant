@@ -40,6 +40,7 @@
 
 | 文档 | 说明 | 状态 |
 |---|---|---|
+| [testing/README.md](testing/README.md) | 测试与质量索引（黄金集、基线） | living |
 | [testing/golden-sets.md](testing/golden-sets.md) | ASR / OCR 识别黄金集与评测口径 | living |
 | [testing/baselines/2026-11-21-macos-arm64.md](testing/baselines/2026-11-21-macos-arm64.md) | macOS arm64 识别基线 | snapshot |
 
@@ -47,6 +48,7 @@
 
 | 文档 | 说明 | 状态 |
 |---|---|---|
+| [release/README.md](release/README.md) | 发布与运维索引 | living |
 | [release/delivery-matrix.md](release/delivery-matrix.md) | 三平台交付矩阵 | living |
 | [release/release-checklist.md](release/release-checklist.md) | 发布检查表 | living |
 | [release/release-notes-template.md](release/release-notes-template.md) | 发布说明模板 | living |
@@ -61,15 +63,10 @@
 
 | 文档 | 说明 | 状态 |
 |---|---|---|
+| [compliance/README.md](compliance/README.md) | 合规索引（依赖、模型许可） | living |
 | [compliance/dependency-manifest.md](compliance/dependency-manifest.md) | 依赖清单、许可证审计与 SBOM | living |
 | [compliance/model-assets.md](compliance/model-assets.md) | 随包模型资产与许可证 | living |
 | [../THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md) | 第三方组件归属与许可证全文 | living |
-
-## 决策记录
-
-| 文档 | 说明 | 状态 |
-|---|---|---|
-| [adr/](adr/README.md) | 0001–0010 架构决策 | living |
 
 ## 状态
 

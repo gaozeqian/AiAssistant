@@ -6,7 +6,7 @@
 
 ## 1. 目录职责（R1 / R2）
 
-根目录白名单：`README.md`、`LICENSE`、`EULA.md`、`CHANGELOG.md`、`CONTRIBUTING.md`、`SECURITY.md`、`THIRD-PARTY-NOTICES.md`、`.gitignore`、`.gitattributes`、`.editorconfig`、`.workbuddy/`、`AiAssistant.sln`、`Directory.Build.props`、`Directory.Packages.props`、`global.json`、`.config/`、`src/`、`tests/`、`docs/`、`build/`、`tools/`、`native/`、`samples/`、`artifacts/`、`.github/`。
+根目录白名单：`README.md`、`LICENSE`、`EULA.md`、`CHANGELOG.md`、`CONTRIBUTING.md`、`SECURITY.md`、`THIRD-PARTY-NOTICES.md`、`.gitignore`、`.gitattributes`、`.editorconfig`、`.workbuddy/`、`.workbuddy-ai/`、`AiAssistant.sln`、`Directory.Build.props`、`Directory.Build.targets`、`Directory.Packages.props`、`global.json`、`dotnet.config`、`testconfig.json`、`nuget.config`、`.config/`、`src/`、`tests/`、`docs/`、`build/`、`tools/`、`native/`、`samples/`、`artifacts/`、`.github/`。
 
 | 目录 | 唯一职责 | 禁止 |
 |---|---|---|

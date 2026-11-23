@@ -1,10 +1,35 @@
+<#
+.SYNOPSIS
+    Smoke-tests the local MCP endpoint with the official MCP Inspector CLI.
+
+.DESCRIPTION
+    Resolves the repository root via git rev-parse, verifies initialize / tools/list /
+    activity_stats against the loopback server. Exit codes: 0 pass / 1 failure / 2 usage error.
+
+.EXAMPLE
+    pwsh tools/mcp/inspector-smoke.ps1 -Help
+#>
+[CmdletBinding()]
 param(
+    [switch]$Help,
     [string]$Endpoint = "http://127.0.0.1:47831/mcp",
     [string]$Token = $env:AIASSISTANT_MCP_TOKEN,
     [string]$InspectorVersion = "2.16.0"
 )
 
+if ($Help) {
+    Get-Help -Name $PSCommandPath -Full
+    exit 0
+}
+
 $ErrorActionPreference = "Stop"
+$repoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
+if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+    Write-Error "Cannot resolve repository root: run this script from a Git working tree."
+    exit 2
+}
+$repoRoot = $repoRoot.Trim()
+Write-Verbose "repository root: $repoRoot"
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $OutputEncoding = [Text.Encoding]::UTF8
 

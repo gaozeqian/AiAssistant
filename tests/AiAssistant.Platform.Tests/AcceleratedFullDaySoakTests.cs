@@ -22,7 +22,7 @@ namespace AiAssistant.Platform.Tests;
 /// quota pressure, pause/resume intervals, blacklists, media retention sweeps, and zero-leak diagnostics.
 /// </summary>
 [Collection("Soak")]
-public sealed class S2FullDaySoakAcceptanceTests : IDisposable
+public sealed class AcceleratedFullDaySoakTests : IDisposable
 {
     private sealed class SimulatedClock(DateTimeOffset initialUtc, TimeZoneInfo localTz) : IClock
     {
@@ -63,7 +63,7 @@ public sealed class S2FullDaySoakAcceptanceTests : IDisposable
 
     private readonly string _tempRoot;
 
-    public S2FullDaySoakAcceptanceTests()
+    public AcceleratedFullDaySoakTests()
     {
         _tempRoot = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempRoot);

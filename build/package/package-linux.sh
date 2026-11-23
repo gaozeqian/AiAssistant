@@ -139,9 +139,9 @@ if command -v dpkg-deb >/dev/null 2>&1; then
   dpkg-deb --build --root-owner-group "$STAGE" "$DEB" >/dev/null
   echo "deb: $DEB"
 elif command -v python3 >/dev/null 2>&1; then
-  python3 "$SCRIPT_DIR/deb/build_deb.py" "$STAGE" "$DEB"
+  python3 "$SCRIPT_DIR/deb/build-deb.py" "$STAGE" "$DEB"
 elif command -v python >/dev/null 2>&1; then
-  python "$SCRIPT_DIR/deb/build_deb.py" "$STAGE" "$DEB"
+  python "$SCRIPT_DIR/deb/build-deb.py" "$STAGE" "$DEB"
 else
   echo "warning: neither dpkg-deb nor python found; skipping .deb" >&2
 fi

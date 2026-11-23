@@ -1,10 +1,26 @@
-# Dot-source this file, then call Copy-LegalFiles -Destination <dir> -RepoRoot <root>.
+<#
+.SYNOPSIS
+    Copies the single-source legal documents into a package staging directory.
+
+.DESCRIPTION
+    Dot-source this file, then call Copy-LegalFiles -Destination <dir> [-RepoRoot <root>].
+    When -RepoRoot is omitted the repository root is resolved with git rev-parse.
+    Get-Help Copy-LegalFiles -Full prints this help.
+#>
 function Copy-LegalFiles {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][string]$Destination,
-        [Parameter(Mandatory = $true)][string]$RepoRoot
+        [string]$RepoRoot = ""
     )
+
+    if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+        $RepoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
+    }
+    if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+        throw "Cannot resolve repository root: run this script from a Git working tree."
+    }
+    $RepoRoot = $RepoRoot.Trim()
 
     if (-not (Test-Path -Path $Destination)) {
         New-Item -ItemType Directory -Path $Destination -Force | Out-Null

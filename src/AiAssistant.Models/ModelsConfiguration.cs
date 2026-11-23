@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.Domain;
 
 namespace AiAssistant.Models;
@@ -17,8 +18,8 @@ public sealed record EmbeddingEndpointDocument
 {
     public string Tier { get; init; } = "LocalOffline";
     public string Provider { get; init; } = "ollama";
-    public string BaseUrl { get; init; } = "http://127.0.0.1:11434";
-    public string Model { get; init; } = "embeddinggemma-2:740m";
+    public string BaseUrl { get; init; } = ModelDefaults.OllamaBaseUrl;
+    public string Model { get; init; } = ModelDefaults.EmbeddingModel;
     public int TimeoutSeconds { get; init; } = 120;
     public string? ApiKeySecret { get; init; }
     public bool AllowRemoteEndpoint { get; init; }
@@ -37,9 +38,9 @@ public sealed record ModelEndpointDocument
 {
     public string Tier { get; init; } = "LocalOffline";
     public string Provider { get; init; } = "ollama";
-    public string BaseUrl { get; init; } = "http://127.0.0.1:11434";
-    public string ChatModel { get; init; } = "gemma4:12b";
-    public string EmbeddingModel { get; init; } = "embeddinggemma-2:740m";
+    public string BaseUrl { get; init; } = ModelDefaults.OllamaBaseUrl;
+    public string ChatModel { get; init; } = ModelDefaults.ChatModel;
+    public string EmbeddingModel { get; init; } = ModelDefaults.EmbeddingModel;
     public int TimeoutSeconds { get; init; } = 120;
     public string? ApiKeySecret { get; init; }
     public string? ClientCertificatePath { get; init; }

@@ -222,7 +222,7 @@ public sealed class AuditedModelGateway(IModelGateway inner, IModelAuditSink aud
         {
             var result = await inner.CompleteAsync(request, ct);
             auditSink.Record(new ModelAuditEntry(
-                DateTimeOffset.UtcNow,
+                TimeProvider.System.GetUtcNow(),
                 request.Purpose,
                 result.Tier,
                 result.ModelId,
@@ -237,7 +237,7 @@ public sealed class AuditedModelGateway(IModelGateway inner, IModelAuditSink aud
         catch (Exception ex)
         {
             auditSink.Record(new ModelAuditEntry(
-                DateTimeOffset.UtcNow,
+                TimeProvider.System.GetUtcNow(),
                 request.Purpose,
                 request.Tier,
                 inner.ChatModelId,
@@ -258,7 +258,7 @@ public sealed class AuditedModelGateway(IModelGateway inner, IModelAuditSink aud
         {
             var result = await inner.EmbedAsync(request, ct);
             auditSink.Record(new ModelAuditEntry(
-                DateTimeOffset.UtcNow,
+                TimeProvider.System.GetUtcNow(),
                 request.Purpose,
                 request.Tier,
                 result.ModelId,
@@ -273,7 +273,7 @@ public sealed class AuditedModelGateway(IModelGateway inner, IModelAuditSink aud
         catch (Exception ex)
         {
             auditSink.Record(new ModelAuditEntry(
-                DateTimeOffset.UtcNow,
+                TimeProvider.System.GetUtcNow(),
                 request.Purpose,
                 request.Tier,
                 inner.EmbeddingModelId,

@@ -69,7 +69,7 @@ public sealed class VoiceCommandParser
                 raw,
                 "正在生成今天的日报。",
                 false,
-                JsonSerializer.Serialize(new { date = DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }));
+                JsonSerializer.Serialize(new { date = DateOnly.FromDateTime(TimeProvider.System.GetLocalNow().LocalDateTime.Date).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }));
         }
 
         if (normalized.Contains("暂停", StringComparison.Ordinal) &&

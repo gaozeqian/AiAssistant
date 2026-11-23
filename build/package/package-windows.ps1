@@ -19,8 +19,9 @@
     $env:AIASSISTANT_SIGN_CERT_THUMBPRINT = "ABCDEF..."
     pwsh build/package/package-windows.ps1
 #>
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess = $true)]
 param(
+    [switch]$Help,
     [string]$Version = "",
     [string]$OutputRoot = "artifacts/package",
     [string]$SignThumbprint = $env:AIASSISTANT_SIGN_CERT_THUMBPRINT,
@@ -31,6 +32,11 @@ param(
     [switch]$SkipTimestamp,
     [switch]$SkipModelBundle
 )
+
+if ($Help) {
+    Get-Help -Name $PSCommandPath -Full
+    exit 0
+}
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
@@ -95,7 +101,7 @@ function Find-SdkTool {
 Write-Host "== AiAssistant Windows package =="
 Write-Host "version=$Version runtime=$runtime selfContained=$selfContained"
 
-if (Test-Path $stageDir) {
+if (Test-Path $stageDir -and $PSCmdlet.ShouldProcess($stageDir, "Remove stale staging directory")) {
     Remove-Item -Path $stageDir -Recurse -Force
 }
 
@@ -185,11 +191,13 @@ else {
 }
 
 $zipPath = Join-Path $outputDir "AiAssistant-$Version-$runtime.zip"
-if (Test-Path $zipPath) {
+if (Test-Path $zipPath -and $PSCmdlet.ShouldProcess($zipPath, "Remove stale zip")) {
     Remove-Item $zipPath -Force
 }
 
-Compress-Archive -Path (Join-Path $stageDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
+if ($PSCmdlet.ShouldProcess($zipPath, "Create release zip")) {
+    Compress-Archive -Path (Join-Path $stageDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
+}
 Write-Host "zip: $zipPath"
 
 $checksumFiles = Get-ChildItem -Path $outputDir -File |

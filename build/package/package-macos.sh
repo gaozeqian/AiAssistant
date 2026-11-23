@@ -22,7 +22,8 @@ usage() {
   --notary-profile <名称>   notarytool 钥匙串配置名，默认读 $AIASSISTANT_NOTARY_PROFILE
   --output <目录>           产物目录，默认 $AIASSISTANT_PACKAGE_OUTPUT 或 artifacts/package
   --runtime <RID>           目标运行时，默认 osx-arm64
-  --certificate <路径>      自签名证书，随 pkg 一起分发并在 postinstall 导入
+  --certificate <路径>      自签名证书（仅开发模式，需与 --dev-self-signed 同用）
+  --dev-self-signed         显式启用开发自签名模式：postinstall 导入证书到系统信任库
   --keychain <路径>         签名使用的钥匙串
   --require-sign            强制要求签名（缺标识或与 --skip-sign 同用即失败）
   --skip-sign               跳过 codesign / 公证（仅布局装配）
@@ -46,6 +47,7 @@ SKIP_SIGN=0
 SKIP_MODELS=0
 REQUIRE_SIGN=0
 CERTIFICATE_PATH=""
+DEV_SELF_SIGNED=0
 FRAMEWORK_DEPENDENT=0
 RUNTIME="osx-arm64"
 KEYCHAIN=""
@@ -61,6 +63,7 @@ while [[ $# -gt 0 ]]; do
     --skip-models) SKIP_MODELS=1; shift ;;
     --require-sign) REQUIRE_SIGN=1; shift ;;
     --certificate) require_value "$@"; CERTIFICATE_PATH="$2"; shift 2 ;;
+    --dev-self-signed) DEV_SELF_SIGNED=1; shift ;;
     --keychain) require_value "$@"; KEYCHAIN="$2"; shift 2 ;;
     --framework-dependent) FRAMEWORK_DEPENDENT=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -82,6 +85,15 @@ VERSION="${VERSION#v}"
 if [[ -z "$VERSION" ]]; then
   echo "unable to determine version; pass --version" >&2
   exit 1
+fi
+
+if [[ -n "$CERTIFICATE_PATH" && "$DEV_SELF_SIGNED" -ne 1 ]]; then
+  echo "error: --certificate requires explicit --dev-self-signed (production packages must not modify the system trust store)" >&2
+  exit 2
+fi
+if [[ "$DEV_SELF_SIGNED" -eq 1 && -z "$CERTIFICATE_PATH" ]]; then
+  echo "error: --dev-self-signed requires --certificate" >&2
+  exit 2
 fi
 
 if [[ "$REQUIRE_SIGN" -eq 1 ]]; then

@@ -1,11 +1,35 @@
+<#
+.SYNOPSIS
+    Build and sign the Windows MSI installer for AiAssistant.
+
+.DESCRIPTION
+    Resolves the repository root with git rev-parse, stages the payload and compiles Package.msi.wxs.
+    Signing is opt-in (-SkipSigning); use -WhatIf to preview destructive staging operations.
+    Exit codes: 0 success / 1 build failure.
+
+.EXAMPLE
+    pwsh build/package/package-windows-msi.ps1 -Version 0.1.0 -CertificatePath cert.cer
+#>
+[CmdletBinding(SupportsShouldProcess = $true)]
 param(
-    [Parameter(Mandatory = $true)][string]$Version,
-    [Parameter(Mandatory = $true)][string]$CertificatePath,
+    [switch]$Help,
+    [Parameter(Mandatory = $false)][string]$Version = "",
+    [Parameter(Mandatory = $false)][string]$CertificatePath = "",
     [string]$OutputDirectory = "artifacts/package",
     [string]$SignThumbprint = $env:AIASSISTANT_SIGN_CERT_THUMBPRINT,
     [switch]$SkipSigning,
-    [switch]$SkipModelBundle
+    [switch]$SkipModelBundle,
+    [switch]$DevSelfSigned
 )
+
+if ($Help) {
+    Get-Help -Name $PSCommandPath -Full
+    exit 0
+}
+if ([string]::IsNullOrWhiteSpace($Version) -or [string]::IsNullOrWhiteSpace($CertificatePath)) {
+    Write-Error "-Version and -CertificatePath are required."
+    exit 2
+}
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
@@ -28,7 +52,7 @@ if (-not (Test-Path $CertificatePath)) {
 }
 
 New-Item -ItemType Directory -Force $outputRoot | Out-Null
-if (Test-Path $stage) {
+if (Test-Path $stage -and $PSCmdlet.ShouldProcess($stage, "Remove stale MSI staging directory")) {
     Remove-Item $stage -Recurse -Force -Confirm:$false
 }
 
@@ -40,7 +64,12 @@ dotnet publish (Join-Path $repoRoot "src\AiAssistant.Host\AiAssistant.Host.cspro
     -p:Version=$Version -p:InformationalVersion=$Version `
     -tl:off -v:m -o $stage
 
-Copy-Item $CertificatePath (Join-Path $stage "AiAssistant.cer") -Force
+if ($DevSelfSigned) {
+    Copy-Item $CertificatePath (Join-Path $stage "AiAssistant.cer") -Force
+}
+else {
+    Write-Host "Skipping certificate import payload: MSI is not in --dev-self-signed mode."
+}
 Copy-Item (Join-Path $repoRoot "build\package\assets\aiassistant.ico") (Join-Path $stage "aiassistant.ico") -Force
 
 # Local model assets ship with the installer; only the chat/embedding models stay external.
@@ -88,7 +117,8 @@ if (-not $SkipSigning -and -not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
 }
 
 dotnet tool restore | Out-Null
-dotnet wix build -arch x64 -d SourceDir="$stage" -d Version="$Version" -o "$msiPath" "$wxs"
+$wixDevFlag = if ($DevSelfSigned) { '1' } else { '0' }
+dotnet wix build -arch x64 -d SourceDir="$stage" -d Version="$Version" -d DEVSELFSIGNED="$wixDevFlag" -o "$msiPath" "$wxs"
 if ($LASTEXITCODE -ne 0) {
     throw "WiX build failed"
 }

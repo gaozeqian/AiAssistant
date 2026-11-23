@@ -116,21 +116,6 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
                 shell.Dispose();
             };
             var initialization = InitializeShellSafelyAsync(shell);
-            if (runUiE2E)
-            {
-                var outputRoot = Environment.GetEnvironmentVariable(EnvironmentNames.UiE2EOutput);
-                if (string.IsNullOrWhiteSpace(outputRoot))
-                {
-                    outputRoot = ArtifactPaths.Resolve("evidence", "e2e");
-                }
-
-                _ = UiE2ERunner.RunAsync(
-                    window,
-                    shell,
-                    initialization,
-                    desktop.Shutdown,
-                    Path.GetFullPath(outputRoot));
-            }
         }
 
         base.OnFrameworkInitializationCompleted();

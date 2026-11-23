@@ -14,6 +14,13 @@
     <PackageReference Include="CommunityToolkit.Mvvm" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Assets/aiassistant.png" LogicalName="AiAssistant.Desktop.Assets.aiassistant.png" />
+    <!-- 唯一图标源在 build/package/assets；此处只做链接嵌入，避免重复二进制资产。 -->
+    <EmbeddedResource Include="../../build/package/assets/aiassistant.png"
+                      LogicalName="AiAssistant.Desktop.Assets.aiassistant.png"
+                      Link="Assets/aiassistant.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- UI 自驱动 E2E 只由工具宿主编译。 -->
+    <Compile Remove="UiE2ERunner.cs" />
   </ItemGroup>
 </Project>

@@ -1,11 +1,11 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using AiAssistant.Core.Configuration;
 using AiAssistant.Application.Policies;
 using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
 using AiAssistant.Capture;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Platform.Windows;
@@ -28,11 +28,11 @@ public sealed class SoakCollectionDefinition;
 /// then verifies zero control-event loss, zero privacy leaks, bounded queue, schema integrity and retention.
 /// </summary>
 [Collection("Soak")]
-public sealed class S9MultiDaySoakTests : IDisposable
+public sealed class MultiDaySoakTests : IDisposable
 {
     private readonly string _tempRoot;
 
-    public S9MultiDaySoakTests()
+    public MultiDaySoakTests()
     {
         _tempRoot = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempRoot);

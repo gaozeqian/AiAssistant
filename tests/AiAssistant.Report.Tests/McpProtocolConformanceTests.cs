@@ -218,6 +218,7 @@ public sealed class McpProtocolConformanceTests
                     events ?? new QueryableEventRepository([]),
                     new InMemoryReportRepository(),
                     new SystemClock()),
+                new SystemClock(),
                 NullLogger<LoopbackMcpServer>.Instance);
             await server.StartAsync(CancellationToken.None);
             var client = new HttpClient

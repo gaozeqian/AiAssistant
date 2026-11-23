@@ -37,6 +37,8 @@
       </Directory>
     </StandardDirectory>
 
+    <!-- 仅在显式 DEVSELFSIGNED=1（开发自签名）时导入根证书；正式 CA 签名 installer 不修改信任库。 -->
+    <Property Id="DEVSELFSIGNED" Value="0" />
     <CustomAction Id="SetImportRootCertData" Property="ImportRootCert" Value="[INSTALLFOLDER]" />
     <CustomAction Id="SetImportTrustedPeopleData" Property="ImportTrustedPeople" Value="[INSTALLFOLDER]" />
     <CustomAction Id="ImportRootCert"
@@ -53,10 +55,10 @@
                   Return="check" />
 
     <InstallExecuteSequence>
-      <Custom Action="SetImportRootCertData" After="InstallFiles" Condition="NOT Installed" />
-      <Custom Action="SetImportTrustedPeopleData" After="SetImportRootCertData" Condition="NOT Installed" />
-      <Custom Action="ImportRootCert" After="SetImportTrustedPeopleData" Condition="NOT Installed" />
-      <Custom Action="ImportTrustedPeople" After="ImportRootCert" Condition="NOT Installed" />
+      <Custom Action="SetImportRootCertData" After="InstallFiles" Condition="DEVSELFSIGNED = 1 AND NOT Installed" />
+      <Custom Action="SetImportTrustedPeopleData" After="SetImportRootCertData" Condition="DEVSELFSIGNED = 1 AND NOT Installed" />
+      <Custom Action="ImportRootCert" After="SetImportTrustedPeopleData" Condition="DEVSELFSIGNED = 1 AND NOT Installed" />
+      <Custom Action="ImportTrustedPeople" After="ImportRootCert" Condition="DEVSELFSIGNED = 1 AND NOT Installed" />
     </InstallExecuteSequence>
   </Package>
 </Wix>

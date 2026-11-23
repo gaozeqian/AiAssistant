@@ -36,10 +36,11 @@
 | 参数 | 说明 |
 |---|---|
 | `--benchmark-model [--output <p>]` | 固定对话基准 |
-| `--benchmark-retrieval [--output <p>]` | 检索质量基准 |
-| `--benchmark-asr [--samples <目录>] [--output <p>]` | 中文 ASR 黄金集，报告 CER |
-| `--benchmark-ocr [--samples <目录>] [--output <p>]` | OCR 黄金集（Linux RapidOCR） |
-| `--benchmark-kws [--samples <目录>] [--output <p>]` | 唤醒词黄金集 |
+| `--probe-model` | 打印端点能力 |
+
+检索 / ASR / OCR / KWS 基准与 UI 自驱动 E2E 已剥离到不随包发布的
+[`tools/AiAssistant.Diagnostics.Host`](../../tools/AiAssistant.Diagnostics.Host/AiAssistant.Diagnostics.Host.csproj)，
+不再由 `AiAssistant.Host` 接受对应参数。
 | `--probe-model` | 打印端点能力 |
 | `--import-model-secret <名称>` | 从 stdin 读取密钥并加密存储 |
 | `--list-model-secrets` | 列出密钥名（永不显示值） |

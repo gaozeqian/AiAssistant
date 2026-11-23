@@ -14,7 +14,7 @@
     <PackageReference Include="Whisper.net.Runtime" />
   </ItemGroup>
   <ItemGroup>
-    <!-- OpenCC (Apache-2.0) TSCharacters.txt, used only for ASR/OCR metric normalization. -->
-    <EmbeddedResource Include="Resources/TSCharacters.txt" LogicalName="AiAssistant.Processing.Benchmarks.TSCharacters.txt" />
+    <!-- 基准/评测代码只由 tools/AiAssistant.Diagnostics.Host 编译。 -->
+    <Compile Remove="Benchmarks/**/*.cs" />
   </ItemGroup>
 </Project>

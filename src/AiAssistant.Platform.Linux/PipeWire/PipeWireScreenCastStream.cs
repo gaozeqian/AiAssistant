@@ -230,7 +230,7 @@ public sealed class PipeWireScreenCastStream : IDisposable
             latest = _latest;
         }
 
-        if (latest is not null && DateTimeOffset.UtcNow - latest.CapturedAtUtc <= maxFrameAge)
+        if (latest is not null && TimeProvider.System.GetUtcNow() - latest.CapturedAtUtc <= maxFrameAge)
         {
             return latest;
         }
@@ -509,7 +509,7 @@ public sealed class PipeWireScreenCastStream : IDisposable
 
     private void ConsiderBuffer(IntPtr bufferPointer)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = TimeProvider.System.GetUtcNow();
         if (now - _lastCopiedAt < _minFrameInterval)
         {
             return;

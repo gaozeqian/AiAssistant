@@ -2,11 +2,13 @@ using AiAssistant.Application.Policies;
 using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
 using AiAssistant.Capture;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Export;
 using AiAssistant.LocalApi;
+using AiAssistant.Models;
 using AiAssistant.Platform.Linux;
 using AiAssistant.Platform.Linux.Accessibility;
 using AiAssistant.Platform.Linux.Desktop;
@@ -26,12 +28,10 @@ using AiAssistant.Storage.Observability;
 using AiAssistant.Storage.Sqlite;
 using AiAssistant.Storage.Vectors;
 using AiAssistant.Summarization;
-using AiAssistant.Models;
 using AiAssistant.Voice;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Host;
 
@@ -93,53 +93,6 @@ public sealed class AppRuntime : IAsyncDisposable
 
     /// <summary>Only registered where a managed image OCR adapter exists (Linux RapidOCR).</summary>
     public IImageOcrRecognizer? OcrRecognizer => _services.GetService<IImageOcrRecognizer>();
-
-    /// <summary>
-    /// Seeds one realistic local work day of synthetic events for the in-app UI E2E run. Only
-    /// touches an empty store so repeated runs stay idempotent and never mix with real user data.
-    /// </summary>
-    public async Task<int> SeedUiE2EEventsAsync(CancellationToken ct = default)
-    {
-        var repository = _services.GetRequiredService<IEventRepository>();
-        await foreach (var _ in repository.QueryAsync(new EventQuery(Limit: 1), ct))
-        {
-            return 0;
-        }
-
-        var samples = new (string App, string Title, string Text)[]
-        {
-            ("Rider", "数据库迁移方案.cs", "完成 SQLite3MC 页级加密迁移方案评审，确认错误密钥不可读的验收标准"),
-            ("Chrome", "SQLite 加密文档", "查阅 SQLite3MC 与 sqlite-vec 联合加载的兼容性说明"),
-            ("Rider", "模型网关.cs", "接入 gemma4 模型网关，补齐超时、脱敏与审计装饰器"),
-            ("Chrome", "Wayland 抓屏问题", "修复 PNG 滤波解码缺陷，补充 6 项回归测试"),
-            ("Rider", "检索服务.cs", "实现关键词与向量 RRF 融合检索，统一证据引用"),
-            ("Terminal", "dotnet test", "全量测试通过，0 警告 0 错误"),
-            ("Chrome", "Ollama 文档", "确认 embeddinggemma 查询指令前缀与文档格式"),
-            ("Rider", "日报生成器.cs", "实现活动分段与 map-reduce 结构化日报"),
-            ("Chrome", "发布检查表", "核对安装包、SBOM 与签名流程"),
-            ("Rider", "语音会话.cs", "四态语音状态机与 8 秒命令窗口")
-        };
-
-        var now = DateTimeOffset.UtcNow;
-        var zone = TimeZoneInfo.Local;
-        var events = new List<ActivityEvent>(samples.Length);
-        for (var index = 0; index < samples.Length; index++)
-        {
-            var (app, title, text) = samples[index];
-            // Keep the whole day within one activity segment (inactivity gap is 12 minutes) so the
-            // report map stage issues a single model call instead of one per event.
-            events.Add(new ActivityEvent(
-                $"uie2e-{index:D2}",
-                OccurredTimestamp.FromInstant(now.AddMinutes(-(index * 3)), zone),
-                SourceKind.WindowActivity,
-                app,
-                title,
-                extractedText: text));
-        }
-
-        await repository.AppendBatchAsync(events, ct);
-        return events.Count;
-    }
 
     /// <summary>Starts the macOS Swift helper for commands that need it without starting capture.</summary>
     public async Task StartMacHelperAsync(CancellationToken ct)

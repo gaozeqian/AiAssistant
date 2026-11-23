@@ -65,7 +65,7 @@ public sealed class KwsBenchmarkCommand(IWakeWordDetector detector)
             Path.GetFullPath(sampleDirectory),
             summary,
             warnings,
-            DateTimeOffset.Now);
+            TimeProvider.System.GetLocalNow());
 
         var fullOutputPath = Path.GetFullPath(outputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullOutputPath)!);

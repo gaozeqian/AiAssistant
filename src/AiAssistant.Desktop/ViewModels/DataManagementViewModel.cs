@@ -16,7 +16,7 @@ public enum PendingDeletion
 public sealed class DataManagementViewModel : ObservableObject
 {
     private readonly IDataDeletionService _deletion;
-    private DateTimeOffset? _selectedDate = DateTimeOffset.Now.Date;
+    private DateTimeOffset? _selectedDate = TimeProvider.System.GetLocalNow().Date;
     private PendingDeletion _pending;
     private string _statusMessage = "删除不可撤销；加密媒体与结构化事件会同时移除。";
     private string _errorMessage = string.Empty;
@@ -140,7 +140,7 @@ public sealed class DataManagementViewModel : ObservableObject
     }
 
     private DateOnly ResolveDate() =>
-        DateOnly.FromDateTime((SelectedDate ?? DateTimeOffset.Now).LocalDateTime);
+        DateOnly.FromDateTime((SelectedDate ?? TimeProvider.System.GetLocalNow()).LocalDateTime);
 
     private async Task RunAsync(Func<CancellationToken, Task> action)
     {

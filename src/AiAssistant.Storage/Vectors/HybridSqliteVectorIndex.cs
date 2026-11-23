@@ -212,7 +212,7 @@ public sealed class HybridSqliteVectorIndex(EncryptedSqliteConnectionFactory con
         cmd.Parameters.AddWithValue("$version", model.ModelVersion);
         cmd.Parameters.AddWithValue("$dims", model.Dimensions);
         cmd.Parameters.AddWithValue("$backend", backend);
-        cmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+        cmd.Parameters.AddWithValue("$now", TimeProvider.System.GetUtcNow().ToString("O"));
         await cmd.ExecuteNonQueryAsync(ct);
     }
 

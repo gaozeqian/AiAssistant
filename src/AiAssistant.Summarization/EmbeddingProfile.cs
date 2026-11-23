@@ -1,3 +1,5 @@
+using AiAssistant.Core.Configuration;
+
 namespace AiAssistant.Summarization;
 
 /// <summary>
@@ -16,7 +18,7 @@ public static class EmbeddingProfile
             return overrideValue;
         }
 
-        return embeddingModel.Contains("embeddinggemma", StringComparison.OrdinalIgnoreCase)
+        return ModelDefaults.IsEmbeddingGemma(embeddingModel)
             ? HybridSearchOptions.EmbeddingGemmaQueryInstruction
             : string.Empty;
     }
@@ -28,7 +30,7 @@ public static class EmbeddingProfile
             return overrideValue;
         }
 
-        return embeddingModel.Contains("embeddinggemma", StringComparison.OrdinalIgnoreCase)
+        return ModelDefaults.IsEmbeddingGemma(embeddingModel)
             ? TitleTextDocumentStyle
             : DefaultDocumentStyle;
     }

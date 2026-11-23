@@ -78,7 +78,8 @@ public sealed class ProtectedModelSecretStore : IDisposable
         return all.Keys.OrderBy(name => name, StringComparer.Ordinal).ToArray();
     }
 
-    private async Task<Dictionary<string, string>> LoadAllAsync(CancellationToken ct)    {
+    private async Task<Dictionary<string, string>> LoadAllAsync(CancellationToken ct)
+    {
         await _gate.WaitAsync(ct);
         try
         {

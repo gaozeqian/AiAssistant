@@ -22,6 +22,7 @@ public sealed class LoopbackMcpServer : IAsyncDisposable
     private readonly LocalMcpTokenStore _tokens;
     private readonly McpJsonRpcDispatcher _dispatcher;
     private readonly SlidingWindowRateLimiter _limiter;
+    private readonly IClock _clock;
     private readonly ILogger<LoopbackMcpServer> _logger;
     private readonly Lock _sync = new();
     private TcpListener? _listener;
@@ -39,13 +40,16 @@ public sealed class LoopbackMcpServer : IAsyncDisposable
         McpServerOptions options,
         LocalMcpTokenStore tokens,
         McpToolCatalog tools,
+        IClock clock,
         ILogger<LoopbackMcpServer> logger)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(tokens);
         ArgumentNullException.ThrowIfNull(tools);
+        ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(logger);
         _options = options;
+        _clock = clock;
         _tokens = tokens;
         _dispatcher = new McpJsonRpcDispatcher(tools);
         _limiter = new SlidingWindowRateLimiter(options.MaxRequestsPerMinute);
@@ -276,10 +280,12 @@ public sealed class LoopbackMcpServer : IAsyncDisposable
         Interlocked.Increment(ref _requests);
         var request = outcome.Request;
 
-        if (!_limiter.TryAcquire(DateTimeOffset.UtcNow, out var retryAfter))
+        // MCP Streamable HTTP 安全规范：先校验来源头，再校验路径/方法，最后鉴权与限流。
+        // 未授权请求不得消耗限流配额，否则本地攻击者可用伪造请求造成 DoS。
+        if (!IsTrustedTransportHeaders(request.Headers))
         {
-            Interlocked.Increment(ref _rateLimited);
-            await WriteResponseAsync(stream, 429, "Too Many Requests", token, $"Retry-After: {retryAfter}\r\n");
+            Interlocked.Increment(ref _unauthorized);
+            await WriteResponseAsync(stream, 403, "Forbidden", token);
             return;
         }
 
@@ -301,6 +307,19 @@ public sealed class LoopbackMcpServer : IAsyncDisposable
         {
             Interlocked.Increment(ref _unauthorized);
             await WriteResponseAsync(stream, 401, "Unauthorized", token, "WWW-Authenticate: Bearer\r\n");
+            return;
+        }
+
+        if (isPost && !IsSupportedProtocolHeader(request.Headers, out var versionError))
+        {
+            await WriteResponseAsync(stream, 400, "Bad Request", token, json: versionError);
+            return;
+        }
+
+        if (!_limiter.TryAcquire(_clock.UtcNow, out var retryAfter))
+        {
+            Interlocked.Increment(ref _rateLimited);
+            await WriteResponseAsync(stream, 429, "Too Many Requests", token, $"Retry-After: {retryAfter}\r\n");
             return;
         }
 
@@ -366,6 +385,65 @@ public sealed class LoopbackMcpServer : IAsyncDisposable
         var acceptsJson = accept.Contains("application/json", StringComparison.OrdinalIgnoreCase) ||
                           accept.Contains("*/*", StringComparison.Ordinal);
         return wantsSse && !acceptsJson;
+    }
+
+    /// <summary>
+    /// MCP Streamable HTTP: reject cross-origin/DNS-rebinding probes and non-loopback Host headers.
+    /// The Origin header is optional for CLI clients; when present it must name this loopback endpoint.
+    /// </summary>
+    private bool IsTrustedTransportHeaders(Dictionary<string, string> headers)
+    {
+        if (!headers.TryGetValue("Host", out var host) || !IsLoopbackAuthority(host, Port))
+        {
+            return false;
+        }
+
+        if (headers.TryGetValue("Origin", out var origin) && !string.IsNullOrWhiteSpace(origin))
+        {
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+                !IsLoopbackAuthority(uri.Authority, Port))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsLoopbackAuthority(string authority, int port)
+    {
+        if (string.IsNullOrWhiteSpace(authority))
+        {
+            return false;
+        }
+
+        var candidate = authority.Trim();
+        return string.Equals(candidate, $"127.0.0.1:{port}", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(candidate, $"localhost:{port}", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSupportedProtocolHeader(Dictionary<string, string> headers, out string? error)
+    {
+        error = null;
+        if (!headers.TryGetValue("MCP-Protocol-Version", out var value) || string.IsNullOrWhiteSpace(value))
+        {
+            // Clients older than 2025-06-18 did not send this header; accept as 2025-03-26.
+            return true;
+        }
+
+        if (McpJsonRpcDispatcher.IsSupportedProtocolVersion(value.Trim()))
+        {
+            return true;
+        }
+
+        var supported = string.Join(", ", McpJsonRpcDispatcher.SupportedVersionsHeader
+            .Split(", ", StringSplitOptions.RemoveEmptyEntries)
+            .Select(version => $"\"{version}\""));
+        error = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{{\"code\":-32600,\"message\":\"UnsupportedProtocolVersionError\",\"data\":{{\"supported\":[{supported}]}}}}}}");
+        return false;
     }
 
     private bool IsAuthorized(Dictionary<string, string> headers)

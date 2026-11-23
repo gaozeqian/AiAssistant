@@ -31,25 +31,23 @@
 | `PDFsharp` | `6.1.1` | `Export` | MIT | 可检索 PDF、TrueType 字体子集嵌入 |
 | `NAudio` | `3.3.0` | `Platform.Windows` | MIT | WASAPI 共享模式单路麦克风采集（仅 Windows 生效） |
 | `NetArchTest.Rules` | `1.3.2` | `Architecture.Tests` | MIT | 编译产物与依赖方向自动化门禁 |
-| `Microsoft.NET.Test.Sdk` | `17.14.1` | `tests/*` | MIT | 测试宿主 |
-| `xunit` | `2.9.3` | `tests/*` | Apache-2.0 | 单元、集成与契约测试框架 |
-| `xunit.runner.visualstudio` | `3.1.4` | `tests/*` | Apache-2.0 | 测试运行器 |
-| `coverlet.collector` | `6.0.4` | `tests/*` | MIT | 覆盖率收集 |
+| `xunit.v3` | `3.2.2` | `tests/*` | Apache-2.0 | 单元、集成与契约测试框架；内置 MTP v1 运行器（Microsoft.Testing.Platform 1.9.1），替代 VSTest |
+| `Microsoft.Testing.Extensions.CodeCoverage` | `17.14.2` | `tests/*` | MIT（Microsoft .NET Library 条款） | MTP 原生覆盖率收集（`--coverage`），替代 coverlet.collector |
 
 **硬性约束**：`AiAssistant.Core` 保持**零第三方依赖**；许可证仅允许 `MIT`、`Apache-2.0`、`BSD-2-Clause`、`BSD-3-Clause`。
 
 ## 2. 本地生成 SBOM 与许可证扫描命令
 
-首版使用**离线**生成器，直接读取 NuGet 还原图（`obj/project.assets.json`），无需安装外部工具，适合内网与低权限环境：
+使用**离线**生成器，直接读取统一产物布局下的 NuGet 还原图（`artifacts/obj/<Project>/project.assets.json`），无需安装外部工具，适合内网与低权限环境。CycloneDX **1.6**（ECMA-424）清单包含 NuGet 依赖、Swift `AiAssistant.MacHelper` 与随包本地模型（ML-BOM）：
 
 ```bash
 dotnet restore AiAssistant.sln
 
-# 生成 CycloneDX 1.5 JSON SBOM（含 SHA-512 哈希与依赖关系）
-python build/sbom/generate-sbom.py --verify
+# 生成 CycloneDX 1.6 JSON SBOM（哈希、依赖、许可证白名单）
+python3 build/sbom/generate-sbom.py --verify --check-manifest
 
-# 校验每个集中管理的包都在本清单中登记
-python build/sbom/generate-sbom.py --check-manifest
+# 仅打印摘要、不写文件
+python3 build/sbom/generate-sbom.py --dry-run
 
 # 可选：需要完整许可证文本时使用外部工具
 dotnet tool install --global CycloneDX

@@ -278,10 +278,10 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
     }
 
     private DateOnly ResolveFrom() =>
-        DateOnly.FromDateTime((FromDate ?? DateTimeOffset.Now.AddDays(-6)).LocalDateTime);
+        DateOnly.FromDateTime((FromDate ?? TimeProvider.System.GetLocalNow().AddDays(-6)).LocalDateTime);
 
     private DateOnly ResolveTo() =>
-        DateOnly.FromDateTime((ToDate ?? DateTimeOffset.Now).LocalDateTime);
+        DateOnly.FromDateTime((ToDate ?? TimeProvider.System.GetLocalNow()).LocalDateTime);
 
     private void NavigateTo(EvidenceReference reference) =>
         NavigationRequested?.Invoke(this, new EvidenceNavigationRequest(reference.LocalDate, reference.EventId));

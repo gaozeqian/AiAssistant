@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Xml.Linq;
 using AiAssistant.Application;
 using AiAssistant.Capture;
@@ -195,6 +195,79 @@ public sealed class DependencyRuleTests
 
         var refs = GetProjectReferences(illegalXml);
         Assert.Contains("AiAssistant.Storage", refs);
+    }
+
+    /// <summary>Exact dependency matrix for all 16 production modules (single source: the .csproj files).</summary>
+    [Fact]
+    public void Rule7_AllSixteenModules_MatchExactDependencyMatrix()
+    {
+        var expected = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["AiAssistant.Core"] = [],
+            ["AiAssistant.Application"] = ["AiAssistant.Core"],
+            ["AiAssistant.Capture"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Desktop"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Export"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.LocalApi"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Models"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Platform.Linux"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Platform.Windows"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Platform.macOS"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Processing"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Scheduler"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Storage"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Summarization"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Voice"] = ["AiAssistant.Application", "AiAssistant.Core"],
+            ["AiAssistant.Host"] =
+            [
+                "AiAssistant.Application", "AiAssistant.Capture", "AiAssistant.Core", "AiAssistant.Desktop",
+                "AiAssistant.Export", "AiAssistant.LocalApi", "AiAssistant.Models", "AiAssistant.Platform.Linux",
+                "AiAssistant.Platform.Windows", "AiAssistant.Platform.macOS", "AiAssistant.Processing",
+                "AiAssistant.Scheduler", "AiAssistant.Storage", "AiAssistant.Summarization", "AiAssistant.Voice"
+            ]
+        };
+
+        Assert.Equal(16, expected.Count);
+        foreach (var (project, allowed) in expected)
+        {
+            Assert.Equal(allowed, GetProjectReferences(LoadCsproj(project)));
+        }
+    }
+
+    [Fact]
+    public void Rule8_ProductionAssemblies_MustNotExposeTestOrBenchmarkTypes()
+    {
+        foreach (var assembly in AllSourceAssemblies)
+        {
+            var leaked = assembly.GetExportedTypes()
+                .Where(type => type.FullName?.Contains(".Tests", StringComparison.Ordinal) == true ||
+                               type.FullName?.Contains(".Benchmarks", StringComparison.Ordinal) == true)
+                .Select(type => type.FullName)
+                .ToArray();
+            Assert.Empty(leaked);
+        }
+    }
+
+    [Fact]
+    public void Rule9_ProductionCode_MustNotCallSystemClockDirectly()
+    {
+        var repoRoot = FindRepoRoot();
+        var sourceRoot = Path.Combine(repoRoot, "src");
+        var forbidden = new[]
+        {
+            "DateTime.Now", "DateTime.Today", "DateTime.UtcNow",
+            "DateTimeOffset.Now", "DateTimeOffset.UtcNow"
+        };
+        var violations = Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .SelectMany(path => File.ReadLines(path)
+                .Select((line, index) => (path, line, index))
+                .Where(item => forbidden.Any(token => item.line.Contains(token, StringComparison.Ordinal)) &&
+                               !item.line.Contains("IClock", StringComparison.Ordinal) &&
+                               !item.line.Contains("SystemClock", StringComparison.Ordinal) &&
+                               !item.line.Contains("TimeProvider", StringComparison.Ordinal)))
+            .Select(item => $"{Path.GetRelativePath(repoRoot, item.path)}:{item.index + 1}")
+            .ToArray();
+        Assert.Empty(violations);
     }
 
     private static XDocument LoadCsproj(string projectName)

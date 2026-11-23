@@ -1,9 +1,9 @@
 using System.Text;
 using AiAssistant.Application.Ports;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using Whisper.net;
-using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Processing;
 

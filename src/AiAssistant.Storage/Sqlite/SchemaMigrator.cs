@@ -157,7 +157,7 @@ public static class SchemaMigrator
                         """;
                     recordCmd.Parameters.AddWithValue("$version", step.Version.Number);
                     recordCmd.Parameters.AddWithValue("$name", step.Version.Name);
-                    recordCmd.Parameters.AddWithValue("$appliedAtUtc", DateTimeOffset.UtcNow.ToString("O"));
+                    recordCmd.Parameters.AddWithValue("$appliedAtUtc", TimeProvider.System.GetUtcNow().ToString("O"));
                     await recordCmd.ExecuteNonQueryAsync(ct);
                 }
 

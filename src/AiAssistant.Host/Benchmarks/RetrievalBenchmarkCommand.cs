@@ -2,10 +2,10 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using AiAssistant.Application.Ports;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.Domain;
 using AiAssistant.Summarization;
 using Microsoft.Extensions.Logging.Abstractions;
-using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Host.Benchmarks;
 
@@ -144,7 +144,7 @@ public sealed class RetrievalBenchmarkCommand(IModelGateway model)
         builder.AppendLine();
         builder.AppendLine(CultureInfo.InvariantCulture, $"- 模型：`{model.EmbeddingModelId}` · 维度 {dimensions}");
         builder.AppendLine(CultureInfo.InvariantCulture, $"- 语料：{eventCount} 条合成事件 / {queryCount} 个查询 / TopK {TopK}");
-        builder.AppendLine(CultureInfo.InvariantCulture, $"- 时间：{DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"- 时间：{TimeProvider.System.GetUtcNow():yyyy-MM-dd HH:mm:ss} UTC");
         builder.AppendLine("- 说明：合成语料不含个人数据；查询一半为精确词、一半为同义词。");
         var displayPrefix = QueryPrefix.Replace("\n", "\\n", StringComparison.Ordinal);
         builder.AppendLine(CultureInfo.InvariantCulture,

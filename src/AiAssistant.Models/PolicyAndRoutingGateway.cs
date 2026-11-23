@@ -68,7 +68,7 @@ public sealed class PublicCloudConsentGate
         lock (_sync)
         {
             _confirmation = confirmation;
-            _confirmedAtUtc = DateTimeOffset.UtcNow;
+            _confirmedAtUtc = TimeProvider.System.GetUtcNow();
         }
     }
 

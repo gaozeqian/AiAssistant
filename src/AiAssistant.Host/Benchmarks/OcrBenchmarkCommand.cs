@@ -61,7 +61,7 @@ public sealed class OcrBenchmarkCommand(IImageOcrRecognizer? ocr)
             Path.GetFullPath(sampleDirectory),
             rows,
             set.Warnings,
-            DateTimeOffset.Now);
+            TimeProvider.System.GetLocalNow());
 
         var fullOutputPath = Path.GetFullPath(outputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullOutputPath)!);

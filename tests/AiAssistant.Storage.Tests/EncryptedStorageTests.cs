@@ -1,6 +1,6 @@
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
-using System.IO.Compression;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.Exceptions;
@@ -12,11 +12,11 @@ using AiAssistant.Storage.Vectors;
 
 namespace AiAssistant.Storage.Tests;
 
-public sealed class EncryptedStorageAndPocTests : IDisposable
+public sealed class EncryptedStorageTests : IDisposable
 {
     private readonly string _tempRoot;
 
-    public EncryptedStorageAndPocTests()
+    public EncryptedStorageTests()
     {
         _tempRoot = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempRoot);

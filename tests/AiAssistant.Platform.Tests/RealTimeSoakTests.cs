@@ -1,10 +1,10 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using AiAssistant.Core.Configuration;
 using AiAssistant.Application.Policies;
 using AiAssistant.Application.Ports;
 using AiAssistant.Capture;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Platform.Windows;
@@ -23,11 +23,11 @@ namespace AiAssistant.Platform.Tests;
 /// AIASSISTANT_REAL_SOAK_MINUTES=10..120; disabled by default so CI stays fast.
 /// </summary>
 [Collection("Soak")]
-public sealed class S9RealTimeSoakTests : IDisposable
+public sealed class RealTimeSoakTests : IDisposable
 {
     private readonly string _tempRoot;
 
-    public S9RealTimeSoakTests()
+    public RealTimeSoakTests()
     {
         _tempRoot = Path.Combine(ArtifactPaths.Resolve(FindRepoRoot(), "tmp", "soak-real"), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempRoot);

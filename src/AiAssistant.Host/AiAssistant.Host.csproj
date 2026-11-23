@@ -46,4 +46,8 @@
     </ItemGroup>
     <Delete Files="@(ForeignWhisperFile)" ContinueOnError="true" />
   </Target>
+  <ItemGroup>
+    <!-- 基准命令只由工具宿主编译，不进入产品交付。 -->
+    <Compile Remove="Benchmarks/**/*.cs" />
+  </ItemGroup>
 </Project>

@@ -10,8 +10,8 @@ public enum ModelProviderKind
 public sealed class ModelGatewayOptions
 {
     public ModelProviderKind Provider { get; init; } = ModelProviderKind.Ollama;
-    public Uri BaseAddress { get; init; } = new("http://127.0.0.1:11434");
-    public string ChatModel { get; init; } = "gemma4:12b";
+    public Uri BaseAddress { get; init; } = new(ModelDefaults.OllamaBaseUrl);
+    public string ChatModel { get; init; } = ModelDefaults.ChatModel;
 
     /// <summary>
     /// Whether to let Ollama thinking models (e.g. gemma4 / qwen3) reason before answering.
@@ -23,7 +23,7 @@ public sealed class ModelGatewayOptions
     /// <summary>Optional thinking effort for Ollama (<c>low</c>/<c>medium</c>/<c>high</c>); ignored when <see cref="Think"/> is false.</summary>
     public string? ThinkingLevel { get; init; }
 
-    public string EmbeddingModel { get; init; } = "embeddinggemma-2:740m";
+    public string EmbeddingModel { get; init; } = ModelDefaults.EmbeddingModel;
     public string? ApiKey { get; init; }
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(120);
     public bool AllowRemoteEndpoint { get; init; }
@@ -41,11 +41,11 @@ public sealed class ModelGatewayOptions
             : ModelProviderKind.Ollama;
 
         var defaultBase = provider == ModelProviderKind.Ollama
-            ? "http://127.0.0.1:11434"
-            : "http://127.0.0.1:1234";
+            ? ModelDefaults.OllamaBaseUrl
+            : ModelDefaults.LmStudioBaseUrl;
         var baseUrl = Environment.GetEnvironmentVariable(EnvironmentNames.ModelBaseUrl);
-        var chatModel = Environment.GetEnvironmentVariable(EnvironmentNames.ChatModel) ?? "gemma4:12b";
-        var embeddingModel = Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingModel) ?? "embeddinggemma-2:740m";
+        var chatModel = Environment.GetEnvironmentVariable(EnvironmentNames.ChatModel) ?? ModelDefaults.ChatModel;
+        var embeddingModel = Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingModel) ?? ModelDefaults.EmbeddingModel;
 
         return new ModelGatewayOptions
         {

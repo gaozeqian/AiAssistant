@@ -24,6 +24,13 @@ public sealed class McpJsonRpcDispatcher
         "2025-06-18"
     ];
 
+    /// <summary>Advertised versions for MCP-Protocol-Version header negotiation.</summary>
+    public static string SupportedVersionsHeader =>
+        string.Join(", ", SupportedProtocolVersions);
+
+    public static bool IsSupportedProtocolVersion(string? version) =>
+        version is not null && SupportedProtocolVersions.Contains(version, StringComparer.Ordinal);
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly McpToolCatalog _tools;
 

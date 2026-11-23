@@ -7,14 +7,22 @@ namespace AiAssistant.Models;
 
 /// <summary>
 /// Builds a dedicated HttpClient per endpoint with proxy, client certificate (mTLS) and enterprise CA trust.
-/// Credentials are held only in memory and never written to logs.
+/// Credentials are held only in memory and never written to logs. Certificate handles are owned by the
+/// SocketsHttpHandler so they are released exactly when the HttpClient (and therefore the handler) is disposed.
 /// </summary>
 public static class ModelHttpClientFactory
 {
     public static HttpClient Create(ModelEndpointSettings endpoint)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
-        var handler = new SocketsHttpHandler
+        var clientCertificate = string.IsNullOrWhiteSpace(endpoint.ClientCertificatePath)
+            ? null
+            : LoadClientCertificate(endpoint);
+        var enterpriseCa = string.IsNullOrWhiteSpace(endpoint.EnterpriseCaPath)
+            ? null
+            : X509CertificateLoader.LoadCertificateFromFile(endpoint.EnterpriseCaPath);
+
+        var socketsHandler = new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
             ConnectTimeout = TimeSpan.FromSeconds(Math.Min(30, endpoint.Timeout.TotalSeconds)),
@@ -23,26 +31,25 @@ public static class ModelHttpClientFactory
 
         if (endpoint.Proxy is not null)
         {
-            handler.Proxy = new WebProxy(endpoint.Proxy);
+            socketsHandler.Proxy = new WebProxy(endpoint.Proxy);
         }
 
         var ssl = new SslClientAuthenticationOptions();
-        if (!string.IsNullOrWhiteSpace(endpoint.ClientCertificatePath))
+        if (clientCertificate is not null)
         {
-            ssl.ClientCertificates = new X509CertificateCollection
-            {
-                LoadClientCertificate(endpoint)
-            };
+            ssl.ClientCertificates = new X509CertificateCollection { clientCertificate };
         }
 
-        if (!string.IsNullOrWhiteSpace(endpoint.EnterpriseCaPath))
+        if (enterpriseCa is not null)
         {
-            var ca = X509CertificateLoader.LoadCertificateFromFile(endpoint.EnterpriseCaPath);
             ssl.RemoteCertificateValidationCallback = (_, certificate, _, errors) =>
-                ValidateWithEnterpriseCa(certificate, errors, ca);
+                ValidateWithEnterpriseCa(certificate, errors, enterpriseCa);
         }
 
-        handler.SslOptions = ssl;
+        socketsHandler.SslOptions = ssl;
+        // SocketsHttpHandler is sealed on net10.0; a delegating handler owns the certificate handles
+        // and releases them (together with the inner handler) when HttpClient is disposed.
+        var handler = new CertificateOwnerHandler(socketsHandler, clientCertificate, enterpriseCa);
         var client = new HttpClient(handler)
         {
             BaseAddress = endpoint.BaseAddress,
@@ -64,6 +71,26 @@ public static class ModelHttpClientFactory
     {
         ArgumentNullException.ThrowIfNull(endpoint);
         return endpoint.Proxy is not null || !endpoint.BaseAddress.IsLoopback;
+    }
+
+    /// <summary>
+    /// Owns certificate handles for the lifetime of the handler; no closure keeps them alive after disposal.
+    /// </summary>
+    private sealed class CertificateOwnerHandler(
+        HttpMessageHandler innerHandler,
+        X509Certificate2? clientCertificate,
+        X509Certificate2? enterpriseCa) : DelegatingHandler(innerHandler)
+    {
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                clientCertificate?.Dispose();
+                enterpriseCa?.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
     }
 
     private static X509Certificate2 LoadClientCertificate(ModelEndpointSettings endpoint)

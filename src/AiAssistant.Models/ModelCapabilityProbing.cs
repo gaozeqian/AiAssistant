@@ -115,7 +115,7 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
                 item.Tier == endpoint.Tier &&
                 item.ChatModel == endpoint.ChatModel &&
                 string.Equals(item.BaseUrl, endpoint.BaseAddress.ToString(), StringComparison.OrdinalIgnoreCase) &&
-                DateTimeOffset.UtcNow - item.ProbedAtUtc < CacheTtl);
+                TimeProvider.System.GetUtcNow() - item.ProbedAtUtc < CacheTtl);
             if (existing is not null)
             {
                 results.Add(existing);
@@ -178,7 +178,7 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
             structured,
             tools,
             diagnostic,
-            DateTimeOffset.UtcNow);
+            TimeProvider.System.GetUtcNow());
     }
 
     private static async Task<bool> TryChatAsync(HttpClient client, ModelEndpointSettings endpoint, CancellationToken ct)

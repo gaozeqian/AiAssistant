@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 专用宿主：只承载 E2E 自驱动与基准命令，绝不随产品安装包发布。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Description>Developer-only host for UI E2E self-driving and recognition/retrieval benchmarks.</Description>
+    <RootNamespace>AiAssistant.Diagnostics.Host</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../src/AiAssistant.Processing/Benchmarks/**/*.cs" Link="Benchmarks/%(Filename)%(Extension)" />
+    <Compile Include="../../src/AiAssistant.Host/Benchmarks/**/*.cs" Link="HostBenchmarks/%(Filename)%(Extension)" />
+    <Compile Include="../../src/AiAssistant.Desktop/UiE2ERunner.cs" Link="UiE2ERunner.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="../../src/AiAssistant.Processing/Resources/TSCharacters.txt"
+                      LogicalName="AiAssistant.Processing.Benchmarks.TSCharacters.txt"
+                      Link="Resources/TSCharacters.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/AiAssistant.Application/AiAssistant.Application.csproj" />
+    <ProjectReference Include="../../src/AiAssistant.Core/AiAssistant.Core.csproj" />
+    <ProjectReference Include="../../src/AiAssistant.Desktop/AiAssistant.Desktop.csproj" />
+    <ProjectReference Include="../../src/AiAssistant.Export/AiAssistant.Export.csproj" />
+    <ProjectReference Include="../../src/AiAssistant.Host/AiAssistant.Host.csproj" />
+    <ProjectReference Include="../../src/AiAssistant.Models/AiAssistant.Models.csproj" />
+    <ProjectReference Include="../../src/AiAssistant.Platform.Linux/AiAssistant.Platform.Linux.csproj" />
+    <ProjectReference Include="../../src/AiAssistant.Processing/AiAssistant.Processing.csproj" />
+    <ProjectReference Include="../../src/AiAssistant.Summarization/AiAssistant.Summarization.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+  </ItemGroup>
+</Project>

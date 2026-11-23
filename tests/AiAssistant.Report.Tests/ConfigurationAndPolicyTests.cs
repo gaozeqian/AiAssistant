@@ -2,21 +2,21 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using AiAssistant.Application.Ports;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Models;
 using AiAssistant.Processing;
 using AiAssistant.Storage.KeyStores;
 using Microsoft.Extensions.Logging.Abstractions;
-using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Report.Tests;
 
-public sealed class S6ConfigurationAndPolicyTests : IDisposable
+public sealed class ConfigurationAndPolicyTests : IDisposable
 {
     private readonly string _tempRoot = Path.Combine(AppContext.BaseDirectory, "test-temp", Guid.NewGuid().ToString("N"));
 
-    public S6ConfigurationAndPolicyTests() => Directory.CreateDirectory(_tempRoot);
+    public ConfigurationAndPolicyTests() => Directory.CreateDirectory(_tempRoot);
 
     public void Dispose()
     {
@@ -432,7 +432,8 @@ public sealed class S6ConfigurationAndPolicyTests : IDisposable
         Assert.Equal(ModelEndpointTier.LocalOffline, reloaded.Policy.DefaultTier);
     }
 
-    private sealed class FakeSecretResolver(IReadOnlyDictionary<string, string> values) : IModelSecretResolver    {
+    private sealed class FakeSecretResolver(IReadOnlyDictionary<string, string> values) : IModelSecretResolver
+    {
         public Task<string?> ResolveAsync(string reference, CancellationToken ct) =>
             Task.FromResult(values.TryGetValue(reference, out var value) ? value : null);
     }

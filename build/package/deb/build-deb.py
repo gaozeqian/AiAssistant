@@ -9,12 +9,15 @@ The output is a standard ar archive with debian-binary, control.tar.gz and data.
 
 from __future__ import annotations
 
+import argparse
 import gzip
 import io
 import os
+import subprocess
 import sys
 import tarfile
 import time
+from pathlib import Path
 
 
 def add_tree(tar: tarfile.TarFile, root: str, arc_prefix: str, skip_debian: bool) -> None:
@@ -71,25 +74,55 @@ def ar_member(name: str, data: bytes) -> bytes:
     return header + data + padding
 
 
+def repo_root() -> Path:
+    """Resolve the repository root via git; fall back to the package directory layout."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True
+        )
+        return Path(result.stdout.strip()).resolve()
+    except (OSError, subprocess.CalledProcessError):
+        return Path(__file__).resolve().parents[3]
+
+
 def main() -> int:
-    if len(sys.argv) != 3:
-        print("usage: build_deb.py <stage-dir> <output.deb>", file=sys.stderr)
-        return 2
-    stage = os.path.abspath(sys.argv[1])
-    output = os.path.abspath(sys.argv[2])
+    parser = argparse.ArgumentParser(
+        description="Build a Debian .deb from a staged root without dpkg-deb.",
+        epilog="Exit codes: 0 success / 1 build failure / 2 usage error.",
+    )
+    parser.add_argument("stage", help="staged root containing DEBIAN/control")
+    parser.add_argument("output", help="output .deb path")
+    parser.add_argument("--repo", default=None, help="repository root (default: git rev-parse)")
+    parser.add_argument("--dry-run", action="store_true", help="validate inputs without writing the .deb")
+    args = parser.parse_args()
+
+    root = Path(args.repo).resolve() if args.repo else repo_root()
+    stage = Path(args.stage)
+    if not stage.is_absolute():
+        stage = (Path.cwd() / stage).resolve() if Path.cwd() != root else (root / stage).resolve()
+    output = Path(args.output)
+    if not output.is_absolute():
+        output = (root / output).resolve()
     control_dir = os.path.join(stage, "DEBIAN")
     if not os.path.isfile(os.path.join(control_dir, "control")):
         print(f"missing control file: {control_dir}/control", file=sys.stderr)
-        return 3
+        return 1
 
-    control = gzip_tar(lambda tar: add_tree(tar, control_dir, "./", skip_debian=False))
-    data = gzip_tar(lambda tar: add_tree(tar, stage, "./", skip_debian=True))
+    if args.dry_run:
+        print(f"[dry-run] would write deb: {output} from {stage}")
+        return 0
 
-    with open(output, "wb") as handle:
-        handle.write(b"!<arch>\n")
-        handle.write(ar_member("debian-binary", b"2.0\n"))
-        handle.write(ar_member("control.tar.gz", control))
-        handle.write(ar_member("data.tar.gz", data))
+    try:
+        control = gzip_tar(lambda tar: add_tree(tar, control_dir, "./", skip_debian=False))
+        data = gzip_tar(lambda tar: add_tree(tar, stage, "./", skip_debian=True))
+        with open(output, "wb") as handle:
+            handle.write(b"!<arch>\n")
+            handle.write(ar_member("debian-binary", b"2.0\n"))
+            handle.write(ar_member("control.tar.gz", control))
+            handle.write(ar_member("data.tar.gz", data))
+    except OSError as exc:
+        print(f"deb build failed: {exc}", file=sys.stderr)
+        return 1
     print(f"deb: {output}")
     return 0
 

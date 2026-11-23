@@ -13,6 +13,13 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 *.md text eol=lf
+*.py text eol=lf
+*.swift text eol=lf
+*.axaml text eol=lf
+*.wxs text eol=lf
+*.plist text eol=lf
+*.entitlements text eol=lf
+*.desktop text eol=lf
 
 # 二进制产物：不做行尾与 diff 处理。
 *.png binary

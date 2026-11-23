@@ -29,6 +29,7 @@ usage() {
 
 选项:
   --apply            真正删除（默认只打印计划）
+  --dry-run          显式声明只打印计划（默认行为）
   --models           同时清理 cache/models（不含 _retired）
   --packages         同时清理 evidence/packages
   --yes              跳过逐目录确认（仅用于非交互环境）
@@ -49,6 +50,7 @@ ASSUME_YES=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply) APPLY=1; shift ;;
+    --dry-run) APPLY=0; shift ;;
     --models) WITH_MODELS=1; shift ;;
     --packages) WITH_PACKAGES=1; shift ;;
     --yes) ASSUME_YES=1; shift ;;
@@ -86,16 +88,32 @@ for path in "${candidates[@]:-}"; do
 done
 
 # package/：按文件名里的版本号保留最新一组。
+# 仅使用 BSD/GNU 共同支持的 find/sed/sort/tail；不用 find -printf、sort -V、head -n -1。
 if [[ -d "$ROOT/package" ]]; then
-  while IFS= read -r old; do
-    [[ -n "$old" ]] || continue
-    add_path "旧版本安装包" "$old" "保留最新版本"
-  done < <(
-    find "$ROOT/package" -maxdepth 1 -type f -name 'AiAssistant-*' -printf '%f\n' 2>/dev/null |
-      sed -n 's/^AiAssistant-\([0-9][0-9.]*\)-.*/\1/p' |
-      sort -u -V | head -n -1 |
-      while read -r v; do find "$ROOT/package" -maxdepth 1 -type f -name "AiAssistant-$v-*"; done
-  )
+  versions="$(
+    find "$ROOT/package" -maxdepth 1 -type f -name 'AiAssistant-*' 2>/dev/null |
+      while IFS= read -r f; do basename "$f"; done |
+      sed -n 's/^AiAssistant-\([0-9][0-9.]*\)-.*/\1/p' | sort -u
+  )"
+  if [[ -n "$versions" ]]; then
+    # 将三段版本号补齐为定长数字键，再用普通 sort 排序，最后去掉最新一项。
+    ordered="$(
+      printf '%s\n' "$versions" | while IFS= read -r v; do
+        key="$(printf '%s\n' "$v" | awk -F. '{ printf "%06d%06d%06d", $1+0, $2+0, $3+0 }')"
+        printf '%s\t%s\n' "$key" "$v"
+      done | sort -k1,1n | cut -f2
+    )"
+    old_versions="$(printf '%s\n' "$ordered" | sed '$d')"
+    if [[ -n "$old_versions" ]]; then
+      while IFS= read -r v; do
+        [[ -n "$v" ]] || continue
+        while IFS= read -r old; do
+          [[ -n "$old" ]] || continue
+          add_path "旧版本安装包" "$old" "保留最新版本"
+        done < <(find "$ROOT/package" -maxdepth 1 -type f -name "AiAssistant-$v-*")
+      done <<<"$old_versions"
+    fi
+  fi
 fi
 
 # evidence/e2e/：保留最近 5 轮（按目录名倒序，名称含时间戳）。
@@ -103,7 +121,12 @@ if [[ -d "$ROOT/evidence/e2e" ]]; then
   while IFS= read -r old; do
     [[ -n "$old" ]] || continue
     add_path "旧 E2E 轮次" "$old" "保留最近 5 轮"
-  done < <(find "$ROOT/evidence/e2e" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r | tail -n +6 | while read -r d; do printf '%s\n' "$ROOT/evidence/e2e/$d"; done)
+  done < <(
+    find "$ROOT/evidence/e2e" -mindepth 1 -maxdepth 1 -type d |
+      while IFS= read -r d; do basename "$d"; done |
+      sort -r | tail -n +6 |
+      while IFS= read -r d; do printf '%s\n' "$ROOT/evidence/e2e/$d"; done
+  )
 fi
 
 if [[ "$WITH_MODELS" -eq 1 && -d "$ROOT/cache/models" ]]; then

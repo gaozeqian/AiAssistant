@@ -1,6 +1,6 @@
 using System.Diagnostics;
-using AiAssistant.Core.Configuration;
 using AiAssistant.Application.Ports;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Platform.macOS;
 using AiAssistant.Platform.macOS.Ipc;

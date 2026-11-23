@@ -14,6 +14,8 @@ using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 
+[assembly: AvaloniaTestApplication(typeof(AiAssistant.Platform.Tests.DesktopTestAppBuilder))]
+
 namespace AiAssistant.Platform.Tests;
 
 public static class DesktopTestAppBuilder
@@ -41,6 +43,7 @@ public sealed class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<TabItem>().Count() == 7);
 
         var tabs = window.GetVisualDescendants().OfType<TabItem>().ToArray();
         Assert.Equal(7, tabs.Length);
@@ -65,6 +68,7 @@ public sealed class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
+        await WaitUntilAsync(() => Names(window).Contains("搜索应用、标题或正文"));
 
         Assert.Contains("搜索应用、标题或正文", Names(window));
         Assert.Contains("刷新时间线", Names(window));
@@ -486,11 +490,15 @@ public sealed class DesktopViewModelTests
         window.Activate();
         window.KeyPress(Key.F, RawInputModifiers.Control, PhysicalKey.F, "f");
         await WaitUntilAsync(() => shell.SelectedSectionIndex == 1);
+        // 切页后的控件在 UI 线程上延迟实现；先等待再访问，避免异步命令里出现未观察异常。
+        await WaitUntilAsync(() => HasTextBox(window, "检索关键词或问题"));
 
         TextBoxByName(window, "检索关键词或问题").Text = "迁移";
+        await WaitUntilAsync(() => HasButton(window, "检索证据"));
         Click(window, "检索证据");
         await WaitUntilAsync(() => search.Evidence.Count == 1);
 
+        await WaitUntilAsync(() => HasButton(window, "定位"));
         Click(window, "定位");
         await WaitUntilAsync(() => timeline.SelectedEvent?.Event.Id == "cited");
         Assert.Equal(0, shell.SelectedSectionIndex);
@@ -547,6 +555,10 @@ public sealed class DesktopViewModelTests
     private static Button ButtonByText(Window window, string text) =>
         window.GetVisualDescendants().OfType<Button>()
             .First(button => string.Equals(button.Content?.ToString(), text, StringComparison.Ordinal));
+
+    private static bool HasTextBox(Window window, string name) =>
+        window.GetVisualDescendants().OfType<TextBox>()
+            .Any(control => string.Equals(AutomationProperties.GetName(control), name, StringComparison.Ordinal));
 
     private static TextBox TextBoxByName(Window window, string name) =>
         window.GetVisualDescendants().OfType<TextBox>()
@@ -640,10 +652,14 @@ public sealed class DesktopViewModelTests
             data: data);
     }
 
+    // xunit.v3 下每次 StartNew + Dispose 会话会因 Dispatcher 停止等待而挂起；
+    // 改为程序集级共享会话，生命周期由测试宿主进程统一回收。
+    private static readonly HeadlessUnitTestSession SharedHeadlessSession =
+        HeadlessUnitTestSession.GetOrStartForAssembly(typeof(DesktopViewModelTests).Assembly);
+
     private static async Task RunInHeadlessSession(Func<Task> test)
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(DesktopTestAppBuilder));
-        await session.Dispatch(test, CancellationToken.None);
+        await SharedHeadlessSession.Dispatch(test, CancellationToken.None).ConfigureAwait(false);
     }
 
     private static ActivityEvent CreateEvent(string id, OccurredTimestamp timestamp, string? contentId = null) =>

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -34,12 +35,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string? _selectedSecret;
     private string _secretStatus = "密钥值写入后不可读取；models.json 通过 apiKeySecret 引用名称。";
     private bool _isLoading;
-    private string _chatBaseUrl = "http://127.0.0.1:11434";
+    private string _chatBaseUrl = ModelDefaults.OllamaBaseUrl;
     private string _chatModel = string.Empty;
     private ModelTierOption _chatTier = new("LocalOffline", "本机");
     private bool _chatThink;
     private ModelThinkingLevelOption _chatThinkingLevel = new("low", "低");
-    private string _embeddingBaseUrl = "http://127.0.0.1:11434";
+    private string _embeddingBaseUrl = ModelDefaults.OllamaBaseUrl;
     private string _embeddingModel = string.Empty;
     private ModelTierOption _embeddingTier = new("LocalOffline", "本机");
     private string _modelConfigStatus = "保存后需重启应用生效。";
@@ -379,7 +380,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
                     Environment.NewLine,
                     needsAttention.Select(item =>
                         $"{CapabilityItem.KindLabel(item.Kind)}：{item.RemediationHint ?? item.Summary}"));
-            LastRefreshText = $"最后刷新：{DateTimeOffset.Now:HH:mm:ss} · 诊断不包含正文、密钥或完整文件路径";
+            LastRefreshText = $"最后刷新：{TimeProvider.System.GetLocalNow():HH:mm:ss} · 诊断不包含正文、密钥或完整文件路径";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
         {
@@ -566,7 +567,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
             Directory.CreateDirectory(_exportDirectory);
             var path = Path.Combine(
                 _exportDirectory,
-                $"AiAssistant-诊断导出-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.json");
+                $"AiAssistant-诊断导出-{TimeProvider.System.GetLocalNow():yyyyMMdd-HHmmss}.json");
             await _diagnostics.ExportConfirmedPreviewAsync(path, preview, CancellationToken.None);
             ExportPreviewJson = preview;
             ExportStatusText = $"已导出脱敏诊断：{path}";

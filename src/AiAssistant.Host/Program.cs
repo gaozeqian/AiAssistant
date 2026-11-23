@@ -3,7 +3,6 @@ using System.Reflection;
 using System.Text;
 using AiAssistant.Application.UseCases;
 using AiAssistant.Core.Configuration;
-using AiAssistant.Host.Benchmarks;
 using AiAssistant.Platform.Linux.Desktop;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -59,10 +58,6 @@ public static class Program
 
         try
         {
-            // The UI E2E writes model settings, so give it a private copy of the configured
-            // models.json instead of mutating the shared file used by normal runs.
-            PrepareUiE2EConfiguration(args);
-
             // Blocking is intentional: it keeps the main thread free to own the AppKit/Avalonia loop.
             var runtime = AppRuntime.CreateAsync().GetAwaiter().GetResult();
             try
@@ -76,17 +71,6 @@ public static class Program
                     return 0;
                 }
 
-                if (args.Contains("--ui-e2e", StringComparer.OrdinalIgnoreCase))
-                {
-                    // Give the self-driven UI flow a realistic day of local activity to search/report on.
-                    runtime.DatabaseMaintenance.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
-                    var seeded = runtime.SeedUiE2EEventsAsync().GetAwaiter().GetResult();
-                    if (seeded > 0)
-                    {
-                        Console.WriteLine($"ui-e2e: seeded {seeded} synthetic events");
-                    }
-                }
-
                 var handoff = new DesktopShellHandoff();
                 var exitCode = RunAsync(runtime, args, handoff).GetAwaiter().GetResult();
                 if (!handoff.Requested)
@@ -94,17 +78,10 @@ public static class Program
                     return exitCode;
                 }
 
-                // UI E2E 钩子：`--show-window` 让 tray-only 应用直接显示主窗口并隔离数据目录，
-                // 供外部 AX 驱动测试；`--ui-e2e` 额外启用内置真实 UI 自驱动流程（真实窗口 + 真实渲染）。
+                // 外部 AX 驱动测试可请求显示窗口；内置 UI 自驱动已迁到 tools/AiAssistant.Diagnostics.Host。
                 if (args.Contains("--show-window", StringComparer.OrdinalIgnoreCase))
                 {
                     Environment.SetEnvironmentVariable(EnvironmentNames.UiE2EShow, "1");
-                }
-
-                if (args.Contains("--ui-e2e", StringComparer.OrdinalIgnoreCase))
-                {
-                    Environment.SetEnvironmentVariable(EnvironmentNames.UiE2EShow, "1");
-                    Environment.SetEnvironmentVariable(EnvironmentNames.UiE2E, "1");
                 }
 
                 if (TryGetOption(args, "--data-directory", out var dataDirectory))
@@ -331,40 +308,6 @@ public static class Program
                 return report.SuccessRate > 0 ? 0 : 1;
             }
 
-            if (args.Contains("--benchmark-retrieval", StringComparer.OrdinalIgnoreCase))
-            {
-                var outputPath = ResolveBenchmarkOutput(args, "retrieval");
-                return await new RetrievalBenchmarkCommand(runtime.ModelGateway)
-                    .RunAsync(outputPath, CancellationToken.None);
-            }
-
-            if (args.Contains("--benchmark-asr", StringComparer.OrdinalIgnoreCase))
-            {
-                var samples = ResolveSamplesDirectory(args, "asr");
-                var outputPath = ResolveBenchmarkOutput(args, "asr");
-                return await new AsrBenchmarkCommand(runtime.AsrEngine)
-                    .RunAsync(samples, outputPath, CancellationToken.None);
-            }
-
-            if (args.Contains("--benchmark-kws", StringComparer.OrdinalIgnoreCase))
-            {
-                var samples = ResolveSamplesDirectory(args, "kws");
-                var outputPath = ResolveBenchmarkOutput(args, "kws");
-                return await new KwsBenchmarkCommand(runtime.WakeWordDetector)
-                    .RunAsync(samples, outputPath, CancellationToken.None);
-            }
-
-            if (args.Contains("--benchmark-ocr", StringComparer.OrdinalIgnoreCase))
-            {
-                using var helperCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-                await runtime.StartMacHelperAsync(helperCts.Token);
-
-                var samples = ResolveSamplesDirectory(args, "ocr");
-                var outputPath = ResolveBenchmarkOutput(args, "ocr");
-                return await new OcrBenchmarkCommand(runtime.OcrRecognizer)
-                    .RunAsync(samples, outputPath, CancellationToken.None);
-            }
-
             var isMaintenanceCommand = args.Any(argument =>
                 string.Equals(argument, "--backup", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(argument, "--restore", StringComparison.OrdinalIgnoreCase) ||
@@ -380,7 +323,7 @@ public static class Program
 
             if (args.Contains("--report-range", StringComparer.OrdinalIgnoreCase))
             {
-                var today = DateOnly.FromDateTime(DateTime.Today);
+                var today = DateOnly.FromDateTime(TimeProvider.System.GetLocalNow().LocalDateTime.Date);
                 var from = ParseDateOption(args, "--from", today.AddDays(-6));
                 var to = ParseDateOption(args, "--to", today);
                 var outputDirectory = ResolveOutputDirectory(args, "reports");
@@ -662,7 +605,7 @@ public static class Program
         return ArtifactPaths.Resolve(
             "evidence",
             "benchmarks",
-            $"{prefix}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.md");
+            $"{prefix}-{TimeProvider.System.GetUtcNow():yyyyMMdd-HHmmss}.md");
     }
 
     /// <summary>Arguments that run headless and must never touch the GUI single-instance socket.</summary>

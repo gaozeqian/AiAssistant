@@ -139,7 +139,7 @@ public sealed class ModelBenchmarkRunner(
         var averageLatency = results.Count == 0 ? 0 : (long)results.Average(item => item.DurationMilliseconds);
         return new ModelBenchmarkReport(
             modelId,
-            DateTimeOffset.UtcNow,
+            TimeProvider.System.GetUtcNow(),
             results,
             successRate,
             jsonRate,

@@ -1,8 +1,8 @@
 using AiAssistant.Application.Ports;
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Processing.Ocr;
 using Microsoft.Extensions.Logging.Abstractions;
-using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Processing.Tests;
 

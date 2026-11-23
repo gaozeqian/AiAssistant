@@ -140,10 +140,10 @@ public sealed class UnixDomainSocketMacHelperClient : IAsyncDisposable
         TimeSpan connectTimeout,
         CancellationToken ct)
     {
-        var deadline = DateTime.UtcNow.Add(connectTimeout);
+        var deadline = TimeProvider.System.GetUtcNow().UtcDateTime.Add(connectTimeout);
         Exception? lastError = null;
 
-        while (DateTime.UtcNow < deadline)
+        while (TimeProvider.System.GetUtcNow().UtcDateTime < deadline)
         {
             ct.ThrowIfCancellationRequested();
             var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);

@@ -421,6 +421,7 @@ public sealed class LoopbackMcpServerTests
             new McpServerOptions { Enabled = false },
             tokens,
             new McpToolCatalog(new QueryableEventRepository([]), new InMemoryReportRepository(), new SystemClock()),
+            new SystemClock(),
             NullLogger<LoopbackMcpServer>.Instance);
 
         await server.StartAsync(CancellationToken.None);
@@ -597,6 +598,7 @@ public sealed class LoopbackMcpServerTests
                     events ?? new QueryableEventRepository([]),
                     new InMemoryReportRepository(),
                     new SystemClock()),
+                new SystemClock(),
                 NullLogger<LoopbackMcpServer>.Instance);
             await server.StartAsync(CancellationToken.None);
             var client = new HttpClient { BaseAddress = new Uri(server.Endpoint!.Replace("/mcp", string.Empty, StringComparison.Ordinal)) };

@@ -1,10 +1,10 @@
 using System.Globalization;
 using System.Text;
+using AiAssistant.Desktop.ViewModels;
+using AiAssistant.Desktop.Views;
 using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
-using AiAssistant.Desktop.ViewModels;
-using AiAssistant.Desktop.Views;
 
 namespace AiAssistant.Desktop;
 
@@ -35,7 +35,7 @@ public static class UiE2ERunner
         ArgumentNullException.ThrowIfNull(initialization);
         ArgumentNullException.ThrowIfNull(shutdown);
 
-        var directory = Path.Combine(outputRoot, $"ui-{DateTime.Now:yyyyMMdd-HHmmss}");
+        var directory = Path.Combine(outputRoot, $"ui-{TimeProvider.System.GetLocalNow().LocalDateTime:yyyyMMdd-HHmmss}");
         Directory.CreateDirectory(directory);
         var steps = new List<StepResult>();
         var index = 0;
@@ -449,7 +449,7 @@ public static class UiE2ERunner
         var builder = new StringBuilder();
         builder.AppendLine("# 真实 UI 端到端测试报告");
         builder.AppendLine();
-        builder.AppendLine(CultureInfo.InvariantCulture, $"- 时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"- 时间：{TimeProvider.System.GetLocalNow():yyyy-MM-dd HH:mm:ss zzz}");
         builder.AppendLine(CultureInfo.InvariantCulture, $"- 平台：{System.Runtime.InteropServices.RuntimeInformation.OSDescription}");
         builder.AppendLine(CultureInfo.InvariantCulture, $"- 结论：{(failures == 0 ? "通过" : "失败")}（步骤 {steps.Count}，失败 {failures}，跳过 {skipped}）");
         builder.AppendLine(CultureInfo.InvariantCulture, $"- 输出目录：`{directory}`");

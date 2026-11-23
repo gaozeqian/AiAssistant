@@ -1,4 +1,4 @@
-name: Release (self-signed MSI/PKG/deb)
+name: Release
 
 on:
   workflow_dispatch:
@@ -7,31 +7,48 @@ on:
         description: "Release version (e.g. 0.1.0)"
         required: true
         default: "0.1.0"
+      dev_self_signed:
+        description: "Explicitly build a DEVELOPER self-signed release (imports local trust roots)"
+        type: boolean
+        required: false
+        default: true
   push:
     tags:
       - "v*"
+
+# 最小权限：只有 publish job 需要写 Release。
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   DOTNET_NOLOGO: "true"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
   APP_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version }}
+  # tag 推送一律视为正式签名路径；只有手动触发并显式勾选才是开发自签名。
+  DEV_SELF_SIGNED: ${{ !startsWith(github.ref, 'refs/tags/') && inputs.dev_self_signed }}
 
 jobs:
   windows:
-    name: Windows MSI (self-signed)
+    name: Windows zip + MSI
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.0.x
 
       - name: Restore & test
         run: |
           dotnet restore AiAssistant.sln
-          dotnet test AiAssistant.sln -c Release
+          dotnet test --solution AiAssistant.sln -c Release
 
-      - name: Create self-signed code-signing certificate
+      - name: Create self-signed code-signing certificate (dev only)
+        if: env.DEV_SELF_SIGNED == 'true'
         shell: pwsh
         run: |
           $version = $env:APP_VERSION.TrimStart('v')
@@ -44,9 +61,27 @@ jobs:
           $cer = Join-Path $env:GITHUB_WORKSPACE "artifacts/package/AiAssistant-$version-win-x64.cer"
           New-Item -ItemType Directory -Force (Split-Path $cer) | Out-Null
           Export-Certificate -Cert $cert -FilePath $cer | Out-Null
+          # 仅开发自签名模式导入本机信任库；正式 CA 路径绝不修改 runner 或用户信任库。
           certutil -user -addstore -f Root $cer | Out-Null
           certutil -user -addstore -f TrustedPeople $cer | Out-Null
           "AIASSISTANT_SIGN_CERT_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
+
+      - name: Verify production signing identity (non-dev)
+        if: env.DEV_SELF_SIGNED != 'true'
+        shell: pwsh
+        env:
+          AIASSISTANT_PROD_SIGN_THUMBPRINT: ${{ secrets.AIASSISTANT_PROD_SIGN_THUMBPRINT }}
+          AIASSISTANT_PROD_CERT_BASE64: ${{ secrets.AIASSISTANT_PROD_CERT_BASE64 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:AIASSISTANT_PROD_SIGN_THUMBPRINT) -or
+              [string]::IsNullOrWhiteSpace($env:AIASSISTANT_PROD_CERT_BASE64)) {
+            throw "Production release requires AIASSISTANT_PROD_SIGN_THUMBPRINT and AIASSISTANT_PROD_CERT_BASE64 (real CA certificate)."
+          }
+          $version = $env:APP_VERSION.TrimStart('v')
+          $cer = Join-Path $env:GITHUB_WORKSPACE "artifacts/package/AiAssistant-$version-win-x64.cer"
+          New-Item -ItemType Directory -Force (Split-Path $cer) | Out-Null
+          [IO.File]::WriteAllBytes($cer, [Convert]::FromBase64String($env:AIASSISTANT_PROD_CERT_BASE64))
+          "AIASSISTANT_SIGN_CERT_THUMBPRINT=$env:AIASSISTANT_PROD_SIGN_THUMBPRINT" >> $env:GITHUB_ENV
 
       - name: Fetch bundled voice models
         shell: bash
@@ -56,18 +91,19 @@ jobs:
 
       - name: Build and sign zip
         shell: pwsh
-        run: |
-          ./build/package/package-windows.ps1 -Version $env:APP_VERSION -RequireSigning
+        run: ./build/package/package-windows.ps1 -Version $env:APP_VERSION -RequireSigning
 
       - name: Build and sign MSI
         shell: pwsh
         run: |
+          $cert = "artifacts/package/AiAssistant-$($env:APP_VERSION.TrimStart('v'))-win-x64.cer"
+          $dev = if ($env:DEV_SELF_SIGNED -eq 'true') { @('-DevSelfSigned') } else { @() }
           ./build/package/package-windows-msi.ps1 `
             -Version $env:APP_VERSION `
-            -CertificatePath "artifacts/package/AiAssistant-$($env:APP_VERSION.TrimStart('v'))-win-x64.cer" `
-            -SignThumbprint $env:AIASSISTANT_SIGN_CERT_THUMBPRINT
+            -CertificatePath $cert `
+            -SignThumbprint $env:AIASSISTANT_SIGN_CERT_THUMBPRINT @dev
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-win-x64
           path: |
@@ -77,24 +113,26 @@ jobs:
           if-no-files-found: error
 
   macos:
-    name: macOS PKG (self-signed)
+    name: macOS pkg + zip
     runs-on: macos-latest
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.0.x
 
       - name: Restore & test
         run: |
           dotnet restore AiAssistant.sln
-          dotnet test AiAssistant.sln -c Release
+          dotnet test --solution AiAssistant.sln -c Release
 
       - name: Build Swift helper
         working-directory: native/AiAssistant.MacHelper
         run: swift build -c release
 
-      - name: Create self-signed signing identity
+      - name: Create self-signed signing identity (dev only)
+        if: env.DEV_SELF_SIGNED == 'true'
         run: |
           version="${APP_VERSION#v}"
           mkdir -p artifacts/package
@@ -107,7 +145,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash build/models/fetch-bundle.sh
 
-      - name: Package, sign and create PKG
+      - name: Package dev self-signed (imports local trust root)
+        if: env.DEV_SELF_SIGNED == 'true'
         env:
           AIASSISTANT_CODESIGN_IDENTITY: AiAssistant Self-Signed
         run: |
@@ -115,53 +154,71 @@ jobs:
           bash build/package/package-macos.sh \
             --version "$APP_VERSION" \
             --require-sign \
+            --dev-self-signed \
             --certificate "artifacts/package/AiAssistant-$version-osx-arm64.cer"
 
-      - uses: actions/upload-artifact@v4
+      - name: Package production Developer ID (no trust-store changes)
+        if: env.DEV_SELF_SIGNED != 'true'
+        env:
+          AIASSISTANT_CODESIGN_IDENTITY: ${{ secrets.MACOS_DEVELOPER_ID }}
+          AIASSISTANT_NOTARY_PROFILE: ${{ secrets.MACOS_NOTARY_PROFILE }}
+        run: |
+          if [ -z "$AIASSISTANT_CODESIGN_IDENTITY" ]; then
+            echo "Production release requires MACOS_DEVELOPER_ID secret." >&2
+            exit 1
+          fi
+          bash build/package/package-macos.sh --version "$APP_VERSION" --require-sign
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-osx-arm64
           path: |
             artifacts/package/*.pkg
+            artifacts/package/*.zip
             artifacts/package/*.cer
           if-no-files-found: error
 
   linux:
-    name: Linux deb
+    name: Linux tar.gz + deb
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.0.x
 
       - name: Restore & test
         run: |
           dotnet restore AiAssistant.sln
-          dotnet test AiAssistant.sln -c Release
+          dotnet test --solution AiAssistant.sln -c Release
 
       - name: Fetch bundled voice models
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash build/models/fetch-bundle.sh
 
-      - name: Package deb
+      - name: Package tar.gz and deb
         run: bash build/package/package-linux.sh --version "$APP_VERSION"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-linux-x64
-          path: artifacts/package/*.deb
+          path: |
+            artifacts/package/*.tar.gz
+            artifacts/package/*.deb
           if-no-files-found: error
 
   publish:
     name: Create GitHub Release
     needs: [windows, macos, linux]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.0.x
 
@@ -170,7 +227,7 @@ jobs:
           dotnet restore AiAssistant.sln
           python3 build/sbom/generate-sbom.py --verify --check-manifest
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
           merge-multiple: true
@@ -183,27 +240,29 @@ jobs:
         run: |
           cp artifacts/build/sbom/bom.json dist/bom.json
           cd dist
-          find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' | sort | while read -r file; do
+          # POSIX: no GNU-only find -printf.
+          for file in *; do
+            [ -f "$file" ] || continue
+            [ "$file" = "SHA256SUMS" ] && continue
             sha256sum "$file"
           done > SHA256SUMS
 
       - name: Create draft release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: v${{ steps.version.outputs.value }}
           name: AiAssistant ${{ steps.version.outputs.value }}
           draft: true
           prerelease: true
           body: |
-            AiAssistant ${{ steps.version.outputs.value }} — 三平台自签名安装包。
+            AiAssistant ${{ steps.version.outputs.value }} — 三平台交付物。
 
-            | 平台 | 安装包 | 签名 |
+            | 平台 | 交付物 | 签名 / 信任方式 |
             |---|---|---|
-            | Windows x64 | `.msi` | 自签名 Authenticode，安装时导入证书 |
-            | macOS arm64 | `.pkg` | 自签名 codesign，postinstall 导入证书 |
-            | Linux x64 | `.deb` | 未签名 |
+            | Windows x64 | `.zip` + `.msi` | 正式 CA 签名；仅开发自签名构建导入证书 |
+            | macOS arm64 | `.pkg` + `.zip` | Developer ID 签名；仅开发自签名构建导入证书 |
+            | Linux x64 | `.tar.gz` + `.deb` | 未签名 |
 
-            安装包由 GitHub Actions 在本工作流中构建；附 `.cer` 公钥证书与 `SHA256SUMS`。
-            Windows MSI 会以管理员权限运行 `certutil` 导入证书；macOS PKG 会以 root 运行 `security add-trusted-cert`。
-            自签名证书不会被系统默认信任；macOS 版本未公证。
+            安装包由 GitHub Actions 在本工作流中构建；附 `bom.json` 与 `SHA256SUMS`。
+            开发自签名版本必须显式在手动触发时勾选 `dev_self_signed`，tag 推送走正式签名路径。
           files: dist/*

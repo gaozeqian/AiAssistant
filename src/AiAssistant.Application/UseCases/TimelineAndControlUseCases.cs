@@ -172,7 +172,7 @@ public sealed class DiagnosticsUseCase(
         var snapshot = await GetSnapshotAsync(ct);
         var payload = new
         {
-            exportedAtUtc = DateTimeOffset.UtcNow,
+            exportedAtUtc = TimeProvider.System.GetUtcNow(),
             platform = snapshot.PlatformName,
             schemaVersion = snapshot.DatabaseHealth.SchemaVersion.Number,
             database = new

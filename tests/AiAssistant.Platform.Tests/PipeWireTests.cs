@@ -1,8 +1,8 @@
+using AiAssistant.Core.Configuration;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Platform.Linux.PipeWire;
 using AiAssistant.Platform.Linux.Portal;
 using Microsoft.Extensions.Logging.Abstractions;
-using AiAssistant.Core.Configuration;
 
 namespace AiAssistant.Platform.Tests;
 
