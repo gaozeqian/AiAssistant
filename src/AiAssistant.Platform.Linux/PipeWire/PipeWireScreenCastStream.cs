@@ -7,8 +7,6 @@ using Microsoft.Win32.SafeHandles;
 
 namespace AiAssistant.Platform.Linux.PipeWire;
 
-public sealed record PipeWireFrame(int Width, int Height, byte[] Bgra32, DateTimeOffset CapturedAtUtc);
-
 /// <summary>
 /// Consumes one xdg-desktop-portal ScreenCast node through libpipewire: a private thread loop,
 /// a PW_DIRECTION_INPUT stream, and a bounded latest-frame slot. Any failure degrades capture to
@@ -16,11 +14,10 @@ public sealed record PipeWireFrame(int Width, int Height, byte[] Bgra32, DateTim
 /// </summary>
 public sealed class PipeWireScreenCastStream : IDisposable
 {
-    private static readonly object InitLock = new();
-    private static bool _initialised;
 
     private readonly ILogger<PipeWireScreenCastStream> _logger;
     private readonly TimeSpan _minFrameInterval;
+    private readonly PipeWireFrameProcessor _frameProcessor;
     private readonly Lock _sync = new();
     private readonly List<GCHandle> _pinnedHandles = [];
 
@@ -48,22 +45,7 @@ public sealed class PipeWireScreenCastStream : IDisposable
         ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
         _minFrameInterval = minFrameInterval ?? TimeSpan.FromSeconds(1);
-    }
-
-    /// <summary>True when the PipeWire client library can be loaded on this host.</summary>
-    public static bool IsLibraryAvailable
-    {
-        get
-        {
-            try
-            {
-                return NativeLibrary.TryLoad(PipeWireNative.Library, out _);
-            }
-            catch (Exception ex) when (ex is DllNotFoundException or BadImageFormatException)
-            {
-                return false;
-            }
-        }
+        _frameProcessor = new PipeWireFrameProcessor(_minFrameInterval);
     }
 
     public CapabilityState Capability
@@ -116,7 +98,7 @@ public sealed class PipeWireScreenCastStream : IDisposable
             return false;
         }
 
-        if (!EnsureInitialised())
+        if (!PipeWireNativeSetup.EnsureInitialised())
         {
             error = "libpipewire is not available";
             return false;
@@ -145,7 +127,7 @@ public sealed class PipeWireScreenCastStream : IDisposable
                 throw new InvalidOperationException("pw_context_connect_fd failed");
             }
 
-            var properties = BuildStreamProperties(targetSerial);
+            var properties = PipeWireNativeSetup.BuildStreamProperties(targetSerial);
             _stream = PipeWireNative.StreamNew(_core, "aiassistant-screencast", properties);
             if (_stream == IntPtr.Zero)
             {
@@ -346,51 +328,6 @@ public sealed class PipeWireScreenCastStream : IDisposable
         Stop();
     }
 
-    private static bool EnsureInitialised()
-    {
-        lock (InitLock)
-        {
-            if (_initialised)
-            {
-                return true;
-            }
-
-            try
-            {
-                var argc = Marshal.AllocHGlobal(sizeof(int));
-                var argv = Marshal.AllocHGlobal(IntPtr.Size);
-                try
-                {
-                    Marshal.WriteInt32(argc, 0);
-                    Marshal.WriteIntPtr(argv, IntPtr.Zero);
-                    PipeWireNative.Init(argc, argv);
-                }
-                finally
-                {
-                    Marshal.FreeHGlobal(argc);
-                    Marshal.FreeHGlobal(argv);
-                }
-
-                _initialised = true;
-                return true;
-            }
-            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
-            {
-                return false;
-            }
-        }
-    }
-
-    private static IntPtr BuildStreamProperties(uint? targetSerial)
-    {
-        var properties = targetSerial.HasValue
-            ? string.Create(
-                CultureInfo.InvariantCulture,
-                $"media.type=Video media.category=Capture media.role=Screen target.object={targetSerial.Value}")
-            : "media.type=Video media.category=Capture media.role=Screen";
-        return PipeWireNative.PropertiesNewString(properties);
-    }
-
     private static StreamEvents CreateStreamEvents() => new()
     {
         Version = PipeWireNative.StreamEventsVersion,
@@ -454,17 +391,18 @@ public sealed class PipeWireScreenCastStream : IDisposable
 
     private void ApplyNegotiatedFormat(IntPtr param)
     {
-        var size = Marshal.ReadInt32(param);
-        if (size <= 0 || size > 8192)
+        if (!PipeWireFrameProcessor.TryParseNegotiatedFormat(
+                param,
+                out var format,
+                out var width,
+                out var height,
+                out var error))
         {
-            return;
-        }
+            if (error is not null)
+            {
+                _lastError = error;
+            }
 
-        var bytes = new byte[8 + size];
-        Marshal.Copy(param, bytes, 0, bytes.Length);
-        if (!SpaPodCodec.TryParseVideoFormat(bytes, out var format, out var width, out var height))
-        {
-            _lastError = "unsupported negotiated video format";
             return;
         }
 
@@ -511,51 +449,23 @@ public sealed class PipeWireScreenCastStream : IDisposable
     private void ConsiderBuffer(IntPtr bufferPointer)
     {
         var now = TimeProvider.System.GetUtcNow();
-        if (now - _lastCopiedAt < _minFrameInterval)
+        if (!_frameProcessor.TryCreateFrame(
+                bufferPointer,
+                Volatile.Read(ref _negotiatedWidth),
+                Volatile.Read(ref _negotiatedHeight),
+                Volatile.Read(ref _negotiatedFormat),
+                now,
+                out var frame,
+                out var error))
         {
+            if (error is not null)
+            {
+                _lastError = error;
+            }
+
             return;
         }
 
-        var spaBufferPointer = Marshal.ReadIntPtr(bufferPointer);
-        if (spaBufferPointer == IntPtr.Zero)
-        {
-            return;
-        }
-
-        var spaBuffer = Marshal.PtrToStructure<PipeWireNative.SpaBuffer>(spaBufferPointer);
-        if (spaBuffer.DataCount == 0 || spaBuffer.Datas == IntPtr.Zero)
-        {
-            return;
-        }
-
-        // spa_buffer.datas points at the first spa_data struct (not an array of pointers).
-        var spaData = Marshal.PtrToStructure<PipeWireNative.SpaData>(spaBuffer.Datas);
-        if (spaData.Data == IntPtr.Zero || spaData.Chunk == IntPtr.Zero)
-        {
-            return;
-        }
-
-        var chunk = Marshal.PtrToStructure<PipeWireNative.SpaChunk>(spaData.Chunk);
-        var width = Volatile.Read(ref _negotiatedWidth);
-        var height = Volatile.Read(ref _negotiatedHeight);
-        var format = Volatile.Read(ref _negotiatedFormat);
-        if (chunk.Size == 0 || width <= 0 || height <= 0 || format == 0)
-        {
-            return;
-        }
-
-        var size = (int)Math.Min(chunk.Size, spaData.MaxSize == 0 ? chunk.Size : spaData.MaxSize);
-        var source = new byte[size];
-        Marshal.Copy(IntPtr.Add(spaData.Data, (int)chunk.Offset), source, 0, size);
-        if (!PipeWireFrameConverter.TryConvertToBgra32(source, width, height, chunk.Stride, format, out var bgra) ||
-            bgra is null)
-        {
-            _lastError = "unsupported pixel layout";
-            return;
-        }
-
-        var frame = new PipeWireFrame(width, height, bgra, now);
-        _lastCopiedAt = now;
         TaskCompletionSource<PipeWireFrame?>? waiter;
         lock (_sync)
         {
@@ -594,47 +504,6 @@ public sealed class PipeWireScreenCastStream : IDisposable
     private static void OnTriggerDone(IntPtr data)
     {
     }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct StreamEvents
-    {
-        public uint Version;
-        public IntPtr Destroy;
-        public IntPtr StateChanged;
-        public IntPtr ControlInfo;
-        public IntPtr IoChanged;
-        public IntPtr ParamChanged;
-        public IntPtr AddBuffer;
-        public IntPtr RemoveBuffer;
-        public IntPtr Process;
-        public IntPtr Drained;
-        public IntPtr Command;
-        public IntPtr TriggerDone;
-    }
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void DestroyCallback(IntPtr data);
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void StateChangedCallback(IntPtr data, int oldState, int state, IntPtr error);
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void ControlInfoCallback(IntPtr data, uint id, IntPtr control);
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void IoChangedCallback(IntPtr data, uint id, IntPtr area, uint size);
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void ParamChangedCallback(IntPtr data, uint id, IntPtr param);
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void BufferCallback(IntPtr data, IntPtr buffer);
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void ProcessCallback(IntPtr data);
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void CommandCallback(IntPtr data, IntPtr command);
 
     private static readonly DestroyCallback OnDestroyCallback = OnDestroy;
     private static readonly StateChangedCallback OnStateChangedCallback = OnStateChanged;

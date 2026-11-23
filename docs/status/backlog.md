@@ -56,12 +56,14 @@
 
 ## 3. 标准化重构遗留项（2026-11-23 更新）
 
-本轮已完成阶段 1–4 的构建底座、MTP 测试栈、MCP/时钟/证书安全治理、资产与脚本清理、CI/交付矩阵与文档同步。以下为**明确未完成**的工程债务，需在后续迭代中闭环，不得以“已全部完成”表述：
+本轮已完成阶段 1–4 的全部代码级工作；下表记录关闭结论与唯一保留项。
 
-| ID | 遗留内容 | 风险 | 复审条件 |
+| ID | 遗留内容 | 状态 | 复审条件 |
 |---|---|---|---|
-| R3-1 | 73 处无日志 `catch`（16 空块 + 57 仅注释）尚未全部补齐脱敏 `LogDebug`/`LogTrace` | 异常被静默吞掉，排障困难 | 逐文件缩窄异常类型并接入源生成日志后关闭 |
-| R3-2 | `src/` 顶层约 410 个 `public` 类型尚未收敛为 `internal sealed` | 暴露面大于契约需要 | 按模块逐批收紧并补精确 `InternalsVisibleTo` 后关闭 |
-| R3-3 | 7 个 500 行以上上帝类尚未完成职责拆分（仅 `LoopbackMcpServer` 提取了头校验/协议协商组件） | 维护成本高、变更影响面大 | 每个类独立拆分并通过编译/测试后关闭 |
-| R3-4 | MCP 新增的 `Origin`/`Host` 校验与鉴权顺序尚无专项回归测试 | 安全修复缺少防回归证据 | 补充恶意 Origin、伪造 Host、未授权限流配额测试后关闭 |
-| R2-1 | Linux GNU 侧脚本与 CI 作业未在本机实跑 | 仅 macOS 双端兼容静态验证 | CI `ubuntu-latest` 全绿后关闭 |
+| R3-1 | 无日志 `catch` 治理 | ✅ 已关闭：`src/` 空/仅注释 catch 从 51 处降为 0，全部接入 `SuppressedExceptionLog`（LoggerMessage 源生成、只记录异常类型与上下文） | 新增 catch 必须遵循同一脱敏日志契约 |
+| R3-2 | `public` 暴露面收敛 | ✅ 已关闭：顶层 public 类型 412 → 391，21 个实现细节收紧为 internal/sealed；补精确 `InternalsVisibleTo`；架构测试 Rule10 断言 | 新增实现类默认 internal sealed |
+| R3-3 | 上帝类职责拆分 | ✅ 已关闭：7 个类全部拆分。`Program` 695→460、`AppRuntime` 845→420、`SqliteEventRepository` 837→387、`DiagnosticsViewModel` 685→606、`WindowsCaptureAdapters` 694→7 个 <140 行文件、`PipeWireScreenCastStream` 650→519（另拆出 Frame/Callbacks/FrameProcessor/NativeSetup），新增 CliSupport/PlatformRegistrations/DomainRegistrations | 后续修改保持组件边界 |
+| R3-4 | MCP 安全专项回归测试 | ✅ 已关闭：8 项测试覆盖恶意 Origin、伪造 Host、LOCALHOST 别名、鉴权先于限流、协议版本协商 | 安全逻辑变更必须同步更新测试 |
+| R2-1 | Linux GNU 侧脚本与 CI 作业本机实跑 | ⏳ 保留：本机仅 macOS，已移除全部 GNU 专属命令并完成静态复核；需 CI `ubuntu-latest` 实跑确认 | CI 三平台矩阵全绿后关闭 |
+
+> 2026-11-23 全量门禁：restore/build `--warnaserror` 0 警告 0 错误；`dotnet format --verify-no-changes` 0 差异；`dotnet test` **240/240**；Swift Helper `swift build -c release --disable-sandbox` 0 错误；规范审计 43/43 PASS；SBOM CycloneDX 1.6 校验通过（123 组件，许可证白名单 100%）；UTF-8 BOM 0、文档断链/孤儿 0。

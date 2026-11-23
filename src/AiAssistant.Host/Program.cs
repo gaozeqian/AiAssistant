@@ -43,7 +43,7 @@ public static class Program
         if (args.Contains("--help", StringComparer.OrdinalIgnoreCase) ||
             args.Contains("-h", StringComparer.OrdinalIgnoreCase))
         {
-            Console.WriteLine(HelpText);
+            Console.WriteLine(CliSupport.HelpText);
             return 0;
         }
 
@@ -65,7 +65,7 @@ public static class Program
             {
                 // Closing the window hides it (capture keeps running); launching again should
                 // surface the existing window instead of starting a second recorder.
-                if (IsGuiInvocation(args) &&
+                if (CliSupport.IsGuiInvocation(args) &&
                     Desktop.SingleInstance.TryActivateExisting(runtime.InstanceSocketPath))
                 {
                     Console.WriteLine("AiAssistant 已在运行，已请求显示主窗口。");
@@ -85,7 +85,7 @@ public static class Program
                     Environment.SetEnvironmentVariable(EnvironmentNames.UiE2EShow, "1");
                 }
 
-                if (TryGetOption(args, "--data-directory", out var dataDirectory))
+                if (CliSupport.TryGetOption(args, "--data-directory", out var dataDirectory))
                 {
                     Environment.SetEnvironmentVariable(EnvironmentNames.DataDirectory, dataDirectory);
                 }
@@ -94,7 +94,7 @@ public static class Program
                 Desktop.ShellApp.InstanceSocketPath = runtime.InstanceSocketPath;
                 Desktop.ShellApp.ViewModelFactory = runtime.CreateShellViewModel;
                 return OperatingSystem.IsLinux() && runtime.LinuxBackendState is { } linuxBackend
-                    ? StartLinuxDesktop(linuxBackend, args)
+                    ? CliSupport.StartLinuxDesktop(linuxBackend, args)
                     : BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
             }
             finally
@@ -232,10 +232,10 @@ public static class Program
                 return health.IsHealthy ? 0 : 1;
             }
 
-            if (TryGetOption(args, "--import-model-secret", out var secretName))
+            if (CliSupport.TryGetOption(args, "--import-model-secret", out var secretName))
             {
                 Console.Error.Write($"Secret value for '{secretName}': ");
-                var secretValue = ReadSecretFromConsole();
+                var secretValue = CliSupport.ReadSecretFromConsole();
                 if (string.IsNullOrWhiteSpace(secretValue))
                 {
                     Console.Error.WriteLine("Secret value is empty; nothing was stored.");
@@ -263,7 +263,7 @@ public static class Program
                 return 0;
             }
 
-            if (TryGetOption(args, "--delete-model-secret", out var deleteSecretName))
+            if (CliSupport.TryGetOption(args, "--delete-model-secret", out var deleteSecretName))
             {
                 if (!args.Contains("--confirm-delete-secret", StringComparer.OrdinalIgnoreCase))
                 {
@@ -303,7 +303,7 @@ public static class Program
             if (args.Contains("--benchmark-model", StringComparer.OrdinalIgnoreCase))
             {
                 var report = await runtime.ModelBenchmark.RunAsync(CancellationToken.None);
-                var outputPath = ResolveBenchmarkOutput(args, "model");
+                var outputPath = CliSupport.ResolveBenchmarkOutput(args, "model");
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
                 await File.WriteAllTextAsync(outputPath, report.ToMarkdown(), CancellationToken.None);
                 Console.WriteLine(
@@ -328,9 +328,9 @@ public static class Program
             if (args.Contains("--report-range", StringComparer.OrdinalIgnoreCase))
             {
                 var today = DateOnly.FromDateTime(TimeProvider.System.GetLocalNow().LocalDateTime.Date);
-                var from = ParseDateOption(args, "--from", today.AddDays(-6));
-                var to = ParseDateOption(args, "--to", today);
-                var outputDirectory = ResolveOutputDirectory(args, "reports");
+                var from = CliSupport.ParseDateOption(args, "--from", today.AddDays(-6));
+                var to = CliSupport.ParseDateOption(args, "--to", today);
+                var outputDirectory = CliSupport.ResolveOutputDirectory(args, "reports");
                 var report = await runtime.RangeReport.GenerateAsync(from, to, CancellationToken.None);
                 var export = await runtime.RangeReport.ExportAsync(report, outputDirectory, CancellationToken.None);
                 Console.WriteLine(
@@ -352,9 +352,9 @@ public static class Program
                 return 0;
             }
 
-            if (TryGetOption(args, "--ask", out var question))
+            if (CliSupport.TryGetOption(args, "--ask", out var question))
             {
-                var days = ParseIntOption(args, "--days", 7, 1, 366);
+                var days = CliSupport.ParseIntOption(args, "--days", 7, 1, 366);
                 var answer = await runtime.EvidenceSearch.AskRecentAsync(question, days, CancellationToken.None);
                 Console.WriteLine(answer.Answer);
                 Console.WriteLine(
@@ -365,7 +365,7 @@ public static class Program
                         $"[{evidence.EvidenceId}] {evidence.LocalDate:yyyy-MM-dd} {evidence.AppName} | {evidence.Title}");
                 }
 
-                if (TryGetOption(args, "--output", out var exportDirectory))
+                if (CliSupport.TryGetOption(args, "--output", out var exportDirectory))
                 {
                     var path = await runtime.EvidenceSearch.ExportAnswerAsync(
                         answer,
@@ -384,14 +384,14 @@ public static class Program
                 return 0;
             }
 
-            if (TryGetOption(args, "--backup", out var backupPath))
+            if (CliSupport.TryGetOption(args, "--backup", out var backupPath))
             {
                 await runtime.DatabaseMaintenance.BackupEncryptedAsync(Path.GetFullPath(backupPath), CancellationToken.None);
                 Console.WriteLine($"AiAssistant encrypted backup written to {Path.GetFullPath(backupPath)}");
                 return 0;
             }
 
-            if (TryGetOption(args, "--restore", out var restorePath))
+            if (CliSupport.TryGetOption(args, "--restore", out var restorePath))
             {
                 if (!args.Contains("--confirm-restore", StringComparer.OrdinalIgnoreCase))
                 {
@@ -419,7 +419,7 @@ public static class Program
             }
 
             await runtime.StartAsync();
-            if (TryGetOption(args, "--capture-smoke", out var captureSecondsText))
+            if (CliSupport.TryGetOption(args, "--capture-smoke", out var captureSecondsText))
             {
                 // Real-machine acceptance helper (S3-R1): runs the capture pipeline headless for N seconds
                 // and reports what actually reached the encrypted store, without starting the desktop shell.
@@ -455,241 +455,6 @@ public static class Program
         }
     }
 
-    public static AppBuilder BuildAvaloniaApp() => BuildAvaloniaApp(null);
+    public static AppBuilder BuildAvaloniaApp() => CliSupport.BuildAvaloniaApp(null);
 
-    private static bool TryGetOption(string[] args, string name, out string value)
-    {
-        for (var i = 0; i < args.Length; i++)
-        {
-            if (!string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (i + 1 >= args.Length || string.IsNullOrWhiteSpace(args[i + 1]))
-            {
-                throw new ArgumentException($"Option {name} requires a value.");
-            }
-
-            value = args[i + 1];
-            return true;
-        }
-
-        value = string.Empty;
-        return false;
-    }
-
-    private const string HelpText = """
-        AiAssistant.Host [options]
-
-        Diagnostics:
-          --help, -h                         Show this help
-          --version                          Print version
-          --smoke-check                      Verify the binary can start
-          --startup-check                    Initialize storage and exit
-          --capture-smoke [seconds]          Run the capture pipeline headless and report persisted events
-          --doctor                           Storage health + model probe + MCP status
-
-        Reports & Q&A:
-          --report-range --from <date> --to <date> [--output <dir>]
-                                             Generate Markdown + SVG + stats without the UI
-          --ask "<question>" [--days 7] [--output <dir>]
-                                             Evidence-grounded Q&A over recent local events
-
-        Maintenance:
-          --backup <path>                    Write an encrypted backup
-          --restore <path> --confirm-restore Restore an encrypted backup
-          --purge-data --confirm-purge       Delete all captured local data
-          --rebuild-vectors                  Rebuild the embedding index
-
-        Models:
-          --benchmark-model [--output <p>]   Run the fixed chat benchmark
-          --benchmark-retrieval [--output <p>] Run the retrieval quality benchmark
-          --benchmark-asr [--samples <dir>] [--output <p>]
-                                             Run the Chinese ASR golden set (wav + txt) and report CER
-          --benchmark-ocr [--samples <dir>] [--output <p>]
-                                             Run the OCR golden set (png + txt); Linux RapidOCR only
-          --benchmark-kws [--samples <dir>] [--output <p>]
-                                             Run the wake-word golden set (positive/negative wav)
-          --probe-model                      Print endpoint capabilities
-          --import-model-secret <name>       Read a secret from stdin and store it encrypted
-          --list-model-secrets               List secret names (values are never shown)
-          --delete-model-secret <name> --confirm-delete-secret
-
-        Local MCP:
-          --mcp-serve                        Run the read-only MCP endpoint headlessly
-          --mcp-token                        Print the local bearer token
-        """;
-
-    private static DateOnly ParseDateOption(string[] args, string name, DateOnly fallback)
-    {
-        if (!TryGetOption(args, name, out var value))
-        {
-            return fallback;
-        }
-
-        return DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
-            ? date
-            : throw new ArgumentException($"Option {name} must use yyyy-MM-dd.");
-    }
-
-    private static int ParseIntOption(string[] args, string name, int fallback, int min, int max)
-    {
-        if (!TryGetOption(args, name, out var value))
-        {
-            return fallback;
-        }
-
-        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
-        {
-            throw new ArgumentException($"Option {name} must be an integer.");
-        }
-
-        return Math.Clamp(parsed, min, max);
-    }
-
-    private static string ResolveOutputDirectory(string[] args, string defaultFolder) =>
-        TryGetOption(args, "--output", out var value)
-            ? Path.GetFullPath(value)
-            : ArtifactPaths.Resolve("evidence", defaultFolder);
-
-    private static string? ReadSecretFromConsole()
-    {
-        if (Console.IsInputRedirected)
-        {
-            return Console.In.ReadLine();
-        }
-
-        var builder = new StringBuilder();
-        while (true)
-        {
-            var key = Console.ReadKey(intercept: true);
-            if (key.Key == ConsoleKey.Enter)
-            {
-                Console.WriteLine();
-                break;
-            }
-
-            if (key.Key == ConsoleKey.Backspace)
-            {
-                if (builder.Length > 0)
-                {
-                    builder.Length--;
-                }
-
-                continue;
-            }
-
-            if (!char.IsControl(key.KeyChar))
-            {
-                builder.Append(key.KeyChar);
-            }
-        }
-
-        return builder.ToString();
-    }
-
-    private static string ResolveSamplesDirectory(string[] args, string prefix)
-    {
-        if (TryGetOption(args, "--samples", out var value))
-        {
-            return Path.GetFullPath(value);
-        }
-
-        return ArtifactPaths.Resolve("evidence", "golden", prefix);
-    }
-
-    private static string ResolveBenchmarkOutput(string[] args, string prefix)
-    {
-        if (TryGetOption(args, "--output", out var value))
-        {
-            return Path.GetFullPath(value);
-        }
-
-        return ArtifactPaths.Resolve(
-            "evidence",
-            "benchmarks",
-            $"{prefix}-{TimeProvider.System.GetUtcNow():yyyyMMdd-HHmmss}.md");
-    }
-
-    /// <summary>Arguments that run headless and must never touch the GUI single-instance socket.</summary>
-    private static readonly string[] HeadlessArgumentPrefixes =
-    [
-        "--smoke-check", "--help", "-h", "--version", "--mcp-token", "--mcp-serve", "--doctor",
-        "--probe-model", "--benchmark-", "--report-range", "--ask", "--rebuild-vectors",
-        "--backup", "--restore", "--purge-data", "--import-model-secret", "--list-model-secrets",
-        "--delete-model-secret", "--capture-smoke", "--startup-check", "--ui-e2e"
-    ];
-
-    private static bool IsGuiInvocation(string[] args) =>
-        !args.Any(argument => HeadlessArgumentPrefixes.Any(prefix =>
-            argument.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)));
-
-    private static void PrepareUiE2EConfiguration(string[] args)
-    {
-        if (!args.Contains("--ui-e2e", StringComparer.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        var source = Environment.GetEnvironmentVariable(EnvironmentNames.ModelsConfig);
-        var dataDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.DataDirectory);
-        if (string.IsNullOrWhiteSpace(source) || !File.Exists(source) || string.IsNullOrWhiteSpace(dataDirectory))
-        {
-            return;
-        }
-
-        Directory.CreateDirectory(dataDirectory);
-        var target = Path.Combine(dataDirectory, "models.json");
-        if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.Ordinal))
-        {
-            File.Copy(source, target, overwrite: true);
-            Environment.SetEnvironmentVariable(EnvironmentNames.ModelsConfig, target);
-        }
-    }
-
-    private static int StartLinuxDesktop(LinuxDisplayBackendState backendState, string[] args)
-    {
-        var lifetime = new ClassicDesktopStyleApplicationLifetime { Args = args };
-        try
-        {
-            BuildAvaloniaApp(backendState.Decision.Backend).SetupWithLifetime(lifetime);
-        }
-        catch (Exception ex) when (backendState.TryMarkInitializationFallback(ex.GetType().Name))
-        {
-            lifetime.Dispose();
-            Console.Error.WriteLine($"Native Wayland initialization failed ({ex.GetType().Name}); retrying with X11/XWayland.");
-            lifetime = new ClassicDesktopStyleApplicationLifetime { Args = args };
-            BuildAvaloniaApp(LinuxDisplayBackendKind.X11).SetupWithLifetime(lifetime);
-        }
-
-        try
-        {
-            return lifetime.Start(args);
-        }
-        finally
-        {
-            lifetime.Dispose();
-        }
-    }
-
-    public static AppBuilder BuildAvaloniaApp(LinuxDisplayBackendKind? linuxBackend)
-    {
-        var builder = AppBuilder.Configure<Desktop.ShellApp>()
-            .UsePlatformDetect()
-            .WithInterFont()
-            .LogToTrace();
-
-        if (OperatingSystem.IsLinux())
-        {
-            var selectedBackend = linuxBackend ?? LinuxDisplayBackendSelector.Select(LinuxDesktopSessionSnapshot.Detect()).Backend;
-            if (selectedBackend == LinuxDisplayBackendKind.Wayland)
-            {
-                // ADR-0006: Native Wayland is the default; Main retries X11 only after an initialization failure.
-                builder = builder.UseWayland();
-            }
-        }
-
-        return builder;
-    }
 }

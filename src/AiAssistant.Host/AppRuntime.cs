@@ -178,7 +178,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IVectorIndex>(new HybridSqliteVectorIndex(connectionFactory));
         services.AddSingleton(secretStore);
         services.AddSingleton(modelsConfiguration);
-        RegisterReports(services, modelsConfiguration, dataDirectory);
+        DomainRegistrations.RegisterReports(services, modelsConfiguration, dataDirectory);
         services.AddSingleton(new CapturePipelineOptions { WhitelistedDirectories = whitelist });
         services.AddSingleton<PrivacyBlacklistPolicy>();
         if (linuxBackendState is not null)
@@ -188,21 +188,21 @@ public sealed class AppRuntime : IAsyncDisposable
 
         if (OperatingSystem.IsWindows())
         {
-            RegisterWindows(services, clock, keyStore);
+            PlatformRegistrations.RegisterWindows(services, clock, keyStore);
         }
         else if (OperatingSystem.IsMacOS())
         {
-            RegisterMacPlatform(services, clock, keyStore);
+            PlatformRegistrations.RegisterMacPlatform(services, clock, keyStore);
         }
         else
         {
-            RegisterLinux(services, clock, keyStore, options, linuxBackendState ?? new LinuxDisplayBackendState());
+            PlatformRegistrations.RegisterLinux(services, clock, keyStore, options, linuxBackendState ?? new LinuxDisplayBackendState());
         }
 
         var sherpaModelDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.SherpaModelDir);
         if (string.IsNullOrWhiteSpace(sherpaModelDirectory))
         {
-            sherpaModelDirectory = ResolveModelDirectory(
+            sherpaModelDirectory = DomainRegistrations.ResolveModelDirectory(
                 dataDirectory,
                 "sherpa",
                 Path.Combine("kws", "encoder.onnx"),
@@ -212,7 +212,7 @@ public sealed class AppRuntime : IAsyncDisposable
         }
 
         services.AddSingleton(new SherpaOnnxOptions { ModelDirectory = Path.GetFullPath(sherpaModelDirectory) });
-        RegisterAsrEngine(services, dataDirectory);
+        DomainRegistrations.RegisterAsrEngine(services, dataDirectory);
         services.AddSingleton<IVadSegmenter, SherpaOnnxVadSegmenter>();
         services.AddSingleton<ISpeakerDiarizationEngine, SherpaOnnxDiarizationEngine>();
         services.AddSingleton<IEventEnrichmentPipeline>(provider => new ProcessingPipeline(
@@ -227,7 +227,7 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IAudioHub>(provider => new AudioHub(
             provider.GetRequiredService<IAudioCaptureFactory>(),
             provider.GetRequiredService<ILogger<AudioHub>>()));
-        RegisterVoice(services, dataDirectory, clock);
+        DomainRegistrations.RegisterVoice(services, dataDirectory, clock);
 
         services.AddSingleton<ICaptureCoordinator>(provider => new BoundedCaptureCoordinator(
             provider.GetServices<ICaptureSource>(),
@@ -417,429 +417,4 @@ public sealed class AppRuntime : IAsyncDisposable
     /// model assets (so users can override a bundled model), otherwise the folder shipped next to
     /// the executable by the installer is used. Callers handle explicit environment overrides first.
     /// </summary>
-    private static string ResolveModelDirectory(string dataDirectory, string name, params string[] markers)
-    {
-        var dataPath = Path.GetFullPath(Path.Combine(dataDirectory, "models", name));
-        if (HasModelMarker(dataPath, markers))
-        {
-            return dataPath;
-        }
-
-        var bundledPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "models", name));
-        return HasModelMarker(bundledPath, markers) ? bundledPath : dataPath;
-    }
-
-    private static string ResolveModelFile(string dataDirectory, string name, string fileName)
-    {
-        var dataPath = Path.GetFullPath(Path.Combine(dataDirectory, "models", name, fileName));
-        if (File.Exists(dataPath))
-        {
-            return dataPath;
-        }
-
-        var bundledPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "models", name, fileName));
-        return File.Exists(bundledPath) ? bundledPath : dataPath;
-    }
-
-    private static bool HasModelMarker(string directory, string[] markers) =>
-        markers.Length == 0
-            ? Directory.Exists(directory)
-            : markers.Any(marker => File.Exists(Path.Combine(directory, marker)));
-
-    /// <summary>Whisper is opt-in for high-quality batch recognition; sherpa-onnx stays the default.</summary>
-    private static void RegisterAsrEngine(IServiceCollection services, string dataDirectory)
-    {
-        var kind = AsrEngineSelection.Parse(
-            Environment.GetEnvironmentVariable(AsrEngineSelection.EnvironmentVariableName));
-        if (kind != AsrEngineKind.Whisper)
-        {
-            services.AddSingleton<IAsrEngine, SherpaOnnxAsrEngine>();
-            return;
-        }
-
-        var modelPath = Environment.GetEnvironmentVariable(EnvironmentNames.WhisperModelPath);
-        if (string.IsNullOrWhiteSpace(modelPath))
-        {
-            modelPath = ResolveModelFile(dataDirectory, "whisper", "ggml-small.bin");
-        }
-
-        services.AddSingleton(new WhisperAsrOptions { ModelPath = Path.GetFullPath(modelPath) });
-        services.AddSingleton<IAsrEngine, WhisperAsrEngine>();
-    }
-
-    private static void RegisterVoice(IServiceCollection services, string dataDirectory, IClock clock)
-    {
-        var modelDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.SherpaModelDir);
-        if (string.IsNullOrWhiteSpace(modelDirectory))
-        {
-            modelDirectory = ResolveModelDirectory(
-                dataDirectory,
-                "sherpa",
-                Path.Combine("kws", "encoder.onnx"),
-                "model.int8.onnx",
-                Path.Combine("tts", "model.onnx"),
-                "silero_vad.onnx");
-        }
-
-        // Fall back to the tuned defaults declared on SherpaVoiceOptions so the two cannot drift.
-        var voiceDefaults = new SherpaVoiceOptions();
-        var voiceOptions = new SherpaVoiceOptions
-        {
-            ModelDirectory = Path.GetFullPath(modelDirectory),
-            KeywordsScore = ReadFloatEnvironment(EnvironmentNames.KwsScore, voiceDefaults.KeywordsScore, 0.1f, 10f),
-            KeywordsThreshold = ReadFloatEnvironment(EnvironmentNames.KwsThreshold, voiceDefaults.KeywordsThreshold, 0.01f, 0.99f)
-        };
-        var sessionOptions = new VoiceSessionOptions
-        {
-            EnableWakeChime = !string.Equals(
-                Environment.GetEnvironmentVariable(EnvironmentNames.VoiceDisableChime),
-                "true",
-                StringComparison.OrdinalIgnoreCase),
-            RecordCommandAudio = string.Equals(
-                Environment.GetEnvironmentVariable(EnvironmentNames.VoiceRecordCommandAudio),
-                "true",
-                StringComparison.OrdinalIgnoreCase),
-            CommandAudioRetention = TimeSpan.FromDays(ParseBoundedInt(
-                Environment.GetEnvironmentVariable(EnvironmentNames.VoiceAudioRetentionDays),
-                7,
-                1,
-                365))
-        };
-        var navigation = new VoiceNavigationHub();
-        services.AddSingleton(voiceOptions);
-        services.AddSingleton(sessionOptions);
-        services.AddSingleton(navigation);
-        services.AddSingleton<IVoiceViewNavigator>(navigation);
-        services.AddSingleton<IWakeWordDetector, SherpaOnnxWakeWordDetector>();
-        services.AddSingleton<ITtsService, SherpaOnnxTtsService>();
-        services.AddSingleton<IVoiceCommandLog, SqliteVoiceCommandLog>();
-        services.AddSingleton<VoiceCommandRouter>();
-        services.AddSingleton<IVoiceSession>(provider => new VoiceSessionController(
-            provider.GetRequiredService<IAudioHub>(),
-            provider.GetRequiredService<IWakeWordDetector>(),
-            provider.GetRequiredService<IAsrEngine>(),
-            provider.GetRequiredService<ITtsService>(),
-            provider.GetRequiredService<IAudioPlayback>(),
-            provider.GetRequiredService<VoiceCommandRouter>(),
-            provider.GetRequiredService<IVoiceCommandLog>(),
-            clock,
-            sessionOptions,
-            provider.GetRequiredService<ILogger<VoiceSessionController>>(),
-            provider.GetRequiredService<IMediaStore>()));
-    }
-
-    private static void RegisterReports(
-        IServiceCollection services,
-        ModelsConfiguration configuration,
-        string dataDirectory)
-    {
-        var auditSink = new InMemoryModelAuditSink();
-        var redactor = new SensitiveDataRedactor();
-        var consent = new PublicCloudConsentGate();
-        services.AddSingleton(configuration.Policy);
-        services.AddSingleton(consent);
-        services.AddSingleton<IModelAuditSink>(auditSink);
-        services.AddSingleton<ITextRedactor>(redactor);
-
-        var endpointGateways = new Dictionary<ModelEndpointTier, IModelGateway>();
-        foreach (var endpoint in configuration.Endpoints)
-        {
-            var client = ModelHttpClientFactory.Create(endpoint);
-            services.AddSingleton(client);
-            var backendOptions = new ModelGatewayOptions
-            {
-                Provider = endpoint.Provider,
-                BaseAddress = endpoint.BaseAddress,
-                ChatModel = endpoint.ChatModel,
-                EmbeddingModel = endpoint.EmbeddingModel,
-                Think = endpoint.Think,
-                ThinkingLevel = endpoint.ThinkingLevel,
-                ApiKey = endpoint.ApiKey,
-                RequestTimeout = endpoint.Timeout,
-                AllowRemoteEndpoint = true
-            };
-            var backend = new HttpModelBackend(client, backendOptions);
-            services.AddSingleton(backend);
-            endpointGateways[endpoint.Tier] = new EndpointModelGateway(
-                backend,
-                endpoint,
-                Microsoft.Extensions.Logging.Abstractions.NullLogger<EndpointModelGateway>.Instance);
-        }
-
-        var chatRouter = new TierRoutingModelGateway(endpointGateways, configuration.Policy);
-        var chatGateway = new AuditedModelGateway(
-            new PolicyEnforcedModelGateway(
-                new ThreeGateModelGateway(chatRouter, redactor),
-                configuration.Policy,
-                consent),
-            auditSink);
-
-        // Embedding may target an independent endpoint (different tier/address/model). When no
-        // dedicated embedding endpoint is configured, reuse the default tier's endpoint.
-        var defaultTierEndpoint = configuration.Endpoints.First(item => item.Tier == configuration.Policy.DefaultTier);
-        var embeddingEndpoint = configuration.EmbeddingEndpoint ?? defaultTierEndpoint;
-        var embeddingClient = ModelHttpClientFactory.Create(embeddingEndpoint);
-        services.AddSingleton(embeddingClient);
-        var embeddingBackend = new HttpModelBackend(embeddingClient, new ModelGatewayOptions
-        {
-            Provider = embeddingEndpoint.Provider,
-            BaseAddress = embeddingEndpoint.BaseAddress,
-            ChatModel = embeddingEndpoint.ChatModel,
-            EmbeddingModel = embeddingEndpoint.EmbeddingModel,
-            ApiKey = embeddingEndpoint.ApiKey,
-            RequestTimeout = embeddingEndpoint.Timeout,
-            AllowRemoteEndpoint = true
-        });
-        services.AddSingleton(embeddingBackend);
-        var embeddingEndpointGateway = new EndpointModelGateway(
-            embeddingBackend,
-            embeddingEndpoint,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<EndpointModelGateway>.Instance);
-        var embeddingGateway = new AuditedModelGateway(
-            new PolicyEnforcedModelGateway(
-                new ThreeGateModelGateway(embeddingEndpointGateway, redactor),
-                configuration.Policy,
-                consent),
-            auditSink);
-
-        var gateway = new SplitChatEmbeddingGateway(chatGateway, embeddingGateway, embeddingEndpoint.Tier);
-        services.AddSingleton(gateway);
-        services.AddSingleton<IModelGateway>(gateway);
-        var standardClient = new GatewayChatClient(gateway, configuration.Policy.DefaultTier);
-        services.AddSingleton<IChatClient>(standardClient);
-        services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(standardClient);
-
-        var capabilityCache = new ModelCapabilityCache(Path.Combine(dataDirectory, "model-capabilities.json"));
-        services.AddSingleton(capabilityCache);
-        var probeEndpoints = configuration.Endpoints
-            .Where(endpoint => endpoint.Tier switch
-            {
-                ModelEndpointTier.LocalOffline => true,
-                ModelEndpointTier.CorporateIntranet => configuration.Policy.AllowIntranet,
-                ModelEndpointTier.PublicCloud => configuration.Policy.AllowPublicCloud &&
-                                                 (!configuration.Policy.RequirePublicCloudConsent || consent.IsGranted),
-                _ => false
-            })
-            .ToArray();
-        services.AddSingleton<IModelCapabilityProber>(new ModelCapabilityProber(
-            probeEndpoints,
-            capabilityCache,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<ModelCapabilityProber>.Instance));
-
-        services.AddSingleton<IReportRepository, SqliteReportRepository>();
-        services.AddSingleton(new ReportGenerationOptions { DefaultTier = configuration.Policy.DefaultTier });
-        services.AddSingleton<IReportGenerationRunner, ReportGenerationRunner>();
-        var localEmbeddingModel = configuration.Endpoints
-            .FirstOrDefault(endpoint => endpoint.Tier == ModelEndpointTier.LocalOffline)
-            ?.EmbeddingModel ?? string.Empty;
-        var documentStyle = EmbeddingProfile.ResolveDocumentStyle(
-            localEmbeddingModel,
-            Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingDocumentStyle));
-        services.AddSingleton(provider => new EventEmbeddingIndexer(
-            provider.GetRequiredService<IEventRepository>(),
-            provider.GetRequiredService<IVectorIndex>(),
-            gateway,
-            configuration.Policy.DefaultTier,
-            documentStyle));
-        services.AddSingleton(provider => new ModelBenchmarkRunner(
-            provider.GetRequiredService<IModelGateway>(),
-            configuration.Policy.DefaultTier));
-
-        var scheduleTime = TimeOnly.TryParse(
-            Environment.GetEnvironmentVariable(EnvironmentNames.ReportTime),
-            out var parsedTime)
-            ? parsedTime
-            : new TimeOnly(18, 30);
-        services.AddSingleton(new ReportScheduleOptions
-        {
-            DailyLocalTime = scheduleTime,
-            EnableScheduledDaily = !string.Equals(
-                Environment.GetEnvironmentVariable(EnvironmentNames.ReportDisableSchedule),
-                "true",
-                StringComparison.OrdinalIgnoreCase),
-            EnableStartupCatchUp = true
-        });
-        services.AddSingleton<ReportJobWorker>();
-    }
-
-    private static void RegisterWindows(IServiceCollection services, IClock clock, IKeyStore keyStore)
-    {
-        var screenCapture = new WindowsScreenCapture(clock);
-        var windowSource = new WindowsWindowActivitySource(clock, screenCapture);
-        var fileSource = new WhitelistedFileActivitySource(clock);
-        var textExtractor = new WindowsTextExtractor();
-        var processPath = Environment.ProcessPath;
-        var executableCommand = string.IsNullOrWhiteSpace(processPath) ? "AiAssistant.Host" : $"\"{processPath}\"";
-        var autoStart = new WindowsAutoStartService(executableCommand);
-
-        services.AddSingleton<IScreenCapture>(screenCapture);
-        services.AddSingleton<IWindowActivitySource>(windowSource);
-        services.AddSingleton<IFileActivitySource>(fileSource);
-        services.AddSingleton<ICaptureSource>(windowSource);
-        services.AddSingleton<ICaptureSource>(fileSource);
-        services.AddSingleton<ITextExtractor>(textExtractor);
-        services.AddSingleton<IAutoStartService>(autoStart);
-        services.AddSingleton<IAudioCaptureFactory>(new WindowsAudioCaptureFactory(clock));
-        services.AddSingleton<IAudioPlayback>(new WindowsAudioPlayback());
-        services.AddSingleton<ICapabilityProvider>(new WindowsCapabilityProvider(
-            screenCapture,
-            windowSource,
-            fileSource,
-            textExtractor,
-            keyStore,
-            autoStart));
-    }
-
-    private static void RegisterMacPlatform(IServiceCollection services, IClock clock, IKeyStore keyStore)
-    {
-        var helperPath = ResolveMacHelperPath();
-        IMacHelperProcessLauncher? launcher = helperPath is not null ? new SubprocessMacHelperLauncher(helperPath) : null;
-        var helperOptions = new MacHelperOptions { HelperExecutablePath = helperPath };
-        var processPath = Environment.ProcessPath;
-        var executablePath = string.IsNullOrWhiteSpace(processPath) ? "/Applications/AiAssistant.app/Contents/MacOS/AiAssistant.Host" : processPath;
-        var autoStart = new LaunchAgentAutoStartService(executablePath);
-
-        services.AddSingleton(helperOptions);
-        services.AddSingleton<IMacHelperSupervisor>(provider => new MacHelperSupervisor(
-            launcher,
-            helperOptions,
-            provider.GetRequiredService<ILogger<MacHelperSupervisor>>()));
-        services.AddSingleton<IScreenCapture>(provider =>
-            new ScreenCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
-        services.AddSingleton<IWindowActivitySource>(provider =>
-            new WindowActivitySource(
-                provider.GetRequiredService<IMacHelperSupervisor>(),
-                clock,
-                provider.GetRequiredService<IScreenCapture>()));
-        services.AddSingleton<IFileActivitySource>(provider =>
-            new FileActivitySource(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
-        services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IWindowActivitySource>());
-        services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IFileActivitySource>());
-        services.AddSingleton<ITextExtractor>(provider =>
-            new TextExtractor(provider.GetRequiredService<IMacHelperSupervisor>()));
-        services.AddSingleton<IImageOcrRecognizer>(provider =>
-            new ImageOcrRecognizer(provider.GetRequiredService<IMacHelperSupervisor>()));
-        services.AddSingleton<IAudioCapture>(provider =>
-            new AudioCapture(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
-        services.AddSingleton<IAudioCaptureFactory>(provider =>
-            new AudioCaptureFactory(provider.GetRequiredService<IMacHelperSupervisor>(), clock));
-        services.AddSingleton<IAudioPlayback>(provider =>
-            new AudioPlayback(provider.GetRequiredService<IMacHelperSupervisor>()));
-        services.AddSingleton<IAutoStartService>(autoStart);
-        services.AddSingleton<ICapabilityProvider>(provider => new CapabilityProvider(
-            provider.GetRequiredService<IScreenCapture>(),
-            provider.GetRequiredService<IWindowActivitySource>(),
-            provider.GetRequiredService<IFileActivitySource>(),
-            provider.GetRequiredService<ITextExtractor>(),
-            provider.GetRequiredService<IAudioCapture>(),
-            keyStore,
-            autoStart,
-            provider.GetRequiredService<IMacHelperSupervisor>()));
-    }
-
-    private static void RegisterLinux(
-        IServiceCollection services,
-        IClock clock,
-        IKeyStore keyStore,
-        StorageOptions options,
-        LinuxDisplayBackendState backendState)
-    {
-        var processPath = Environment.ProcessPath;
-        var executablePath = string.IsNullOrWhiteSpace(processPath) ? "/usr/bin/aiassistant-host" : processPath;
-        var autoStart = new XdgAutoStartService(executablePath);
-
-        services.AddSingleton(backendState);
-        services.AddSingleton<IXdgPortalClient, TmdsXdgPortalClient>();
-        services.AddSingleton<IPortalRestoreTokenStore>(
-            new ProtectedPortalRestoreTokenStore(Path.Combine(options.DataDirectory, "portal"), keyStore));
-        services.AddSingleton<XdgPortalSessionManager>(provider => new XdgPortalSessionManager(
-            provider.GetRequiredService<IXdgPortalClient>(),
-            provider.GetRequiredService<IPortalRestoreTokenStore>(),
-            provider.GetRequiredService<ILogger<XdgPortalSessionManager>>()));
-        services.AddSingleton<IAtSpiAccessibilityClient, TmdsAtSpiClient>();
-        services.AddSingleton(new X11ScreenCapture(clock));
-        var pipeWireOptions = new WaylandPipeWireOptions
-        {
-            EnablePipeWire = !string.Equals(
-                Environment.GetEnvironmentVariable(EnvironmentNames.WaylandPipeWire),
-                "false",
-                StringComparison.OrdinalIgnoreCase)
-        };
-        services.AddSingleton(pipeWireOptions);
-        services.AddSingleton(provider => new PipeWireScreenCastStream(
-            provider.GetRequiredService<ILogger<PipeWireScreenCastStream>>(),
-            pipeWireOptions.MinFrameInterval));
-        services.AddSingleton(provider => new WaylandScreenCapture(
-            provider.GetRequiredService<IXdgPortalClient>(),
-            provider.GetRequiredService<XdgPortalSessionManager>(),
-            clock,
-            provider.GetRequiredService<ILogger<WaylandScreenCapture>>(),
-            provider.GetRequiredService<PipeWireScreenCastStream>(),
-            pipeWireOptions));
-        services.AddSingleton<LinuxScreenCapture>();
-        services.AddSingleton<IScreenCapture>(provider => provider.GetRequiredService<LinuxScreenCapture>());
-        services.AddSingleton<IWindowActivitySource>(provider => new LinuxWindowActivitySource(
-            backendState,
-            provider.GetRequiredService<IAtSpiAccessibilityClient>(),
-            clock,
-            provider.GetRequiredService<X11ScreenCapture>()));
-        services.AddSingleton<IFileActivitySource>(new LinuxInotifyFileActivitySource(clock));
-        services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IWindowActivitySource>());
-        services.AddSingleton<ICaptureSource>(provider => provider.GetRequiredService<IFileActivitySource>());
-        var rapidOcrDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.RapidOcrModelDir);
-        if (string.IsNullOrWhiteSpace(rapidOcrDirectory))
-        {
-            rapidOcrDirectory = ResolveModelDirectory(
-                options.DataDirectory,
-                "rapidocr",
-                "ch_PP-OCRv4_det_infer.onnx",
-                "ch_PP-OCRv4_rec_infer.onnx");
-        }
-
-        services.AddSingleton(new RapidOcrOptions { ModelDirectory = Path.GetFullPath(rapidOcrDirectory) });
-        services.AddSingleton<RapidOcrTextRecognizer>();
-        services.AddSingleton<IImageOcrRecognizer>(provider => provider.GetRequiredService<RapidOcrTextRecognizer>());
-        services.AddSingleton<ITextExtractor>(provider => new LinuxTextExtractor(
-            provider.GetRequiredService<IAtSpiAccessibilityClient>(),
-            provider.GetRequiredService<IImageOcrRecognizer>()));
-        services.AddSingleton<IAudioCapture>(new LinuxPulseAudioCapture(clock));
-        services.AddSingleton<IAudioCaptureFactory>(new LinuxAudioCaptureFactory(clock));
-        services.AddSingleton<IAudioPlayback>(new LinuxAudioPlayback());
-        services.AddSingleton<IAutoStartService>(autoStart);
-        services.AddSingleton<ICapabilityProvider>(provider => new LinuxCapabilityProvider(
-            provider.GetRequiredService<IScreenCapture>(),
-            provider.GetRequiredService<IWindowActivitySource>(),
-            provider.GetRequiredService<IFileActivitySource>(),
-            provider.GetRequiredService<ITextExtractor>(),
-            provider.GetRequiredService<IAudioCapture>(),
-            keyStore,
-            autoStart,
-            backendState));
-    }
-
-    private static float ReadFloatEnvironment(string name, float fallback, float min, float max)
-    {
-        var raw = Environment.GetEnvironmentVariable(name);
-        return float.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value)
-            ? Math.Clamp(value, min, max)
-            : fallback;
-    }
-
-    private static string? ResolveMacHelperPath()
-    {
-        var overridePath = Environment.GetEnvironmentVariable(EnvironmentNames.MacHelperPath);
-        if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
-        {
-            return Path.GetFullPath(overridePath);
-        }
-
-        var baseDir = AppContext.BaseDirectory;
-        string[] candidates =
-        [
-            Path.Combine(baseDir, "aiassistant-mac-helper"),
-            Path.GetFullPath(Path.Combine(baseDir, "..", "Helpers", "aiassistant-mac-helper"))
-        ];
-
-        return candidates.FirstOrDefault(File.Exists);
-    }
 }

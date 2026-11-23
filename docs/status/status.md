@@ -10,7 +10,7 @@
 - **最近更新时间**：`2026-11-22`
 - **最近执行环境**：`win-x64` Windows 11（10.0.26300）+ `.NET SDK 10.0.402` + 局域网模型 `http://192.168.1.109:11434`（`gemma4:12b-mlx` / `embeddinggemma-2:740m`）；上一轮 `osx-arm64` macOS 26.7.3 + SDK 10.0.404；再上一轮 `linux-x64` Ubuntu 26.04 + GNOME Wayland
 - **当前构建状态**：✅ `win-x64` 本轮 Release 0 警告 0 错误（Host/Desktop/Report.Tests 实建）；`osx-arm64` Swift Helper 历史结论见第 4 节日志
-- **当前测试状态**：✅ 2026-11-23 起 `dotnet test --solution AiAssistant.sln -c Release` 在 Microsoft.Testing.Platform 原生模式下全量通过（**231/231**），旧 VSTest 回环 Socket 崩溃已根除；`dotnet format --verify-no-changes` 与 `dotnet build --warnaserror` 均为 0 差异 / 0 警告 0 错误。Swift Helper `swift build -c release --disable-sandbox` 构建通过。历史 `--ui-e2e` 真机结论见归档日志；该自驱动流程已迁至工具宿主，不随产品发布。
+- **当前测试状态**：✅ 2026-11-23 起 `dotnet test --solution AiAssistant.sln -c Release` 在 Microsoft.Testing.Platform 原生模式下全量通过（**240/240**），旧 VSTest 回环 Socket 崩溃已根除；`dotnet format --verify-no-changes` 与 `dotnet build --warnaserror` 均为 0 差异 / 0 警告 0 错误。Swift Helper `swift build -c release --disable-sandbox` 构建通过。历史 `--ui-e2e` 真机结论见归档日志；该自驱动流程已迁至工具宿主，不随产品发布。
 - **下一步待确认事项**：`S9-R4` 需先恢复 GitHub 账单/支出限额；`S9-R1`/`S3-R1` 需真实证书与 macOS Developer ID；`S9-R3` 需管理员会话实装 MSI 并做人工走查签字；`S3-R2` 需 KDE Wayland/X11 真机；`S4-R`/`S7-R1` 需外挂语音/OCR 模型与真人唤醒词正样本；`S9-R2` 仅剩显示器/麦克风热插拔。详见 [backlog.md](backlog.md)
 
 ---
