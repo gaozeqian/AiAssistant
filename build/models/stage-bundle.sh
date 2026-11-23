@@ -80,7 +80,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   log "dry-run：将重建 $BUNDLE"
   log "  sherpa/kws        <- $KWS_SRC"
   log "  sherpa           <- $ASR_SRC/model.int8.onnx + tokens.txt"
-  log "  sherpa/tts       <- $TTS_SRC（含 dict/ 与 4 个 .fst）"
+  log "  sherpa/tts       <- ${TTS_SRC}（含 dict/ 与 4 个 .fst）"
   log "  sherpa/silero_vad.onnx <- $VAD_SRC"
   [[ "$WITH_RAPIDOCR" -eq 1 ]] && log "  rapidocr         <- $MODELS/rapidocr（缺失时跳过）"
   [[ "$WITH_WHISPER" -eq 1 ]] && log "  whisper          <- $MODELS/whisper/ggml-small.bin（缺失时跳过）"

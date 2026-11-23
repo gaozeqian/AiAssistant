@@ -17,7 +17,7 @@ usage() {
 把 artifacts/cache/models 下已下载的 KWS / Paraformer / MeloTTS 资产复制到
 <目标数据目录>/models/sherpa，供本机 GUI 直接使用。
 
-  [目标数据目录]   默认 $AIASSISTANT_DATA_DIRECTORY；否则按 OS 解析：
+  [目标数据目录]   默认 ${AIASSISTANT_DATA_DIRECTORY}；否则按 OS 解析：
                    macOS  ~/Library/Application Support/AiAssistant
                    Linux  ${XDG_DATA_HOME:-$HOME/.local/share}/AiAssistant
 
@@ -50,7 +50,7 @@ ASR_SRC="$MODELS/sherpa-onnx-paraformer-zh-small-2024-03-09"
 TTS_SRC="$MODELS/sherpa-tts"
 
 for path in "$KWS_SRC" "$ASR_SRC"; do
-  [[ -d "$path" ]] || { echo "缺少模型资产目录：$path（请先下载 sherpa-onnx KWS / Paraformer 模型）" >&2; exit 1; }
+  [[ -d "$path" ]] || { echo "缺少模型资产目录：${path}（请先下载 sherpa-onnx KWS / Paraformer 模型）" >&2; exit 1; }
 done
 
 default_data_root() {

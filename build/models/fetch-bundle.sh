@@ -144,5 +144,5 @@ if [[ -f "$TTS_DIR/LICENSE" ]]; then
 fi
 cp "$CACHE/silero_vad_v5.onnx" "$MODELS/sherpa-vad/silero_vad.onnx"
 
-log "资产已展开到 $MODELS，开始汇总随包载荷。"
+log "资产已展开到 ${MODELS}，开始汇总随包载荷。"
 bash "$SCRIPT_DIR/stage-bundle.sh" ${PASSTHROUGH+"${PASSTHROUGH[@]}"}

@@ -154,6 +154,21 @@ jobs:
             "$GITHUB_WORKSPACE/artifacts/dist/$version/AiAssistant-$version-macos-arm64-dev.cer" \
             "AiAssistant Self-Signed"
 
+      - name: Trust self-signed identity on runner (dev only)
+        if: env.DEV_SELF_SIGNED == 'true'
+        timeout-minutes: 5
+        run: |
+          version="${APP_VERSION#v}"
+          cert="$GITHUB_WORKSPACE/artifacts/dist/$version/AiAssistant-$version-macos-arm64-dev.cer"
+          # 仅 dev 模式的临时 runner 导入信任根；正式 Developer ID 路径不修改信任库。
+          sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$cert" || \
+            sudo security add-trusted-cert -d -r trustAsRoot -k /Library/Keychains/System.keychain "$cert"
+          if ! security find-identity -v -p codesigning | grep -q "AiAssistant Self-Signed"; then
+            echo "self-signed identity is not trusted for code signing" >&2
+            security find-identity -v -p codesigning >&2
+            exit 1
+          fi
+
       - name: Fetch bundled voice models
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

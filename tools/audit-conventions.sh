@@ -173,7 +173,7 @@ else
 fi
 
 doc_count="$(find docs -name '*.md' | wc -l | tr -d ' ')"
-[[ "$doc_count" -le 26 ]] && pass "文档收敛为 $doc_count 篇（≤26）" || fail "文档数量反弹：$doc_count（应 ≤26）"
+[[ "$doc_count" -le 26 ]] && pass "文档收敛为 $doc_count 篇（≤26）" || fail "文档数量反弹：${doc_count}（应 ≤26）"
 
 stale_doc_dirs="$(find docs -maxdepth 1 -type d \( -name 'archive' -o -name 'status' -o -name 'testing' -o -name 'compliance' \) 2>/dev/null || true)"
 [[ -z "$stale_doc_dirs" ]] && pass "无已删除文档目录（archive/status/testing/compliance）" || fail "残留文档目录：$stale_doc_dirs"
@@ -235,7 +235,7 @@ for f in .github/PULL_REQUEST_TEMPLATE.md .github/CODEOWNERS .github/dependabot.
 done
 
 legal_call="$(grep -l 'legal-files' build/package/package-windows.ps1 build/package/package-windows-msi.ps1 build/package/package-linux.sh build/package/package-macos.sh | wc -l | tr -d ' ')"
-[[ "$legal_call" -eq 4 ]] && pass "R8 四个打包脚本均接入 legal-files" || fail "R8 打包脚本接入 legal-files 的个数=$legal_call（应为 4）"
+[[ "$legal_call" -eq 4 ]] && pass "R8 四个打包脚本均接入 legal-files" || fail "R8 打包脚本接入 legal-files 的个数=${legal_call}（应为 4）"
 
 ORT_VER="$(sed -n 's:.*Include="Microsoft.ML.OnnxRuntime.Managed" Version="\([^"]*\)".*:\1:p' Directory.Packages.props | head -1)"
 NUGET_ROOT="${NUGET_PACKAGES:-$HOME/.nuget/packages}"
@@ -299,7 +299,7 @@ done)"
 [[ -z "$missing_traits" ]] && pass "测试类均声明 Category Trait" || fail "测试类缺 Category Trait：$missing_traits"
 
 project_count="$(find tests -name '*.csproj' | wc -l | tr -d ' ')"
-[[ "$project_count" -ge 15 ]] && pass "测试工程登记数 $project_count（含 Testing.Common）" || fail "测试工程数异常：$project_count"
+[[ "$project_count" -ge 15 ]] && pass "测试工程登记数 ${project_count}（含 Testing.Common）" || fail "测试工程数异常：$project_count"
 
 echo "== 补充：产物目录与命名契约 =="
 legacy_paths="$(git grep -nE 'artifacts/(build|package|evidence)(/|")' -- . ':!docs/**' ':!artifacts/**' || true)"
