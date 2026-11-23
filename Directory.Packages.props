@@ -46,7 +46,7 @@
   <ItemGroup Label="Local Inference">
     <!-- Managed bindings only: the native ONNX Runtime is already shipped by sherpa-onnx (1.28.2).
          Adding Microsoft.ML.OnnxRuntime would overwrite it with a newer SONAME and break sherpa. -->
-    <PackageVersion Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.28.0" />
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.32.0" />
   </ItemGroup>
 
   <ItemGroup Label="Testing (Microsoft.Testing.Platform / xunit.v3)">
