@@ -73,9 +73,10 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
                 {
                     _singleInstance.Start(() => Avalonia.Threading.Dispatcher.UIThread.Post(window.ShowFromTray));
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Activation is best-effort; capture keeps running regardless.
+                    AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.ShellApp.OnFrameworkInitializationCompleted", ex);
                 }
             }
 

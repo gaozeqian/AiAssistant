@@ -28,9 +28,10 @@ public static class Program
         {
             Console.OutputEncoding = Encoding.UTF8;
         }
-        catch (IOException)
+        catch (IOException ex)
         {
             // No console attached (service/tray mode); keep default encoding.
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Host.Program.Main", ex);
         }
 
         if (args.Contains("--smoke-check", StringComparer.OrdinalIgnoreCase))
@@ -104,9 +105,10 @@ public static class Program
                 {
                     runtime.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
                 }
-                catch (TimeoutException)
+                catch (TimeoutException ex)
                 {
                     // Bounded shutdown: the OS reclaims remaining resources when the process exits.
+                    AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Host.Program.Main", ex);
                 }
             }
         }
@@ -154,9 +156,10 @@ public static class Program
                 {
                     await Task.Delay(Timeout.InfiniteTimeSpan, shutdown.Token);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
                     // Normal Ctrl+C shutdown
+                    AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Host.Program.RunAsync", ex);
                 }
 
                 return 0;
@@ -201,9 +204,10 @@ public static class Program
                         using var helperCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                         await macHelper.StartAsync(helperCts.Token);
                     }
-                    catch (OperationCanceledException)
+                    catch (OperationCanceledException ex)
                     {
                         // Helper start timed out; the status line below still reports the supervisor state.
+                        AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Host.Program.RunAsync", ex);
                     }
 
                     Console.WriteLine(

@@ -186,9 +186,10 @@ public sealed class LoopbackMcpServer : IAsyncDisposable
             {
                 await acceptTask.WaitAsync(ct);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
                 // Expected during shutdown
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("LocalApi.LoopbackMcpServer.StopAsync", ex);
             }
         }
 
@@ -242,9 +243,10 @@ public sealed class LoopbackMcpServer : IAsyncDisposable
             {
                 await HandleClientAsync(client, ct);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
                 // Shutdown or request timeout
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("LocalApi.LoopbackMcpServer.HandleClientSafelyAsync", ex);
             }
             catch (IOException ex)
             {

@@ -109,9 +109,10 @@ public sealed class SingleInstance : IDisposable
             {
                 onActivate();
             }
-            catch
+            catch (Exception ex)
             {
                 // Activation must never crash the capture loop.
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.SingleInstance.AcceptLoopAsync", ex);
             }
         }
     }
@@ -140,11 +141,15 @@ public sealed class SingleInstance : IDisposable
                 File.Delete(_socketPath);
             }
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            // 清理遗留 socket 文件失败属预期，忽略即可。
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.SingleInstance.Dispose", ex);
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            // 无权限删除 socket 文件属预期，忽略即可。
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.SingleInstance.Dispose", ex);
         }
     }
 }

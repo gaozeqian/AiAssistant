@@ -217,8 +217,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         {
             await Timeline.NavigateToEventAsync(request.LocalDate, request.EventId);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+            // 导航期间取消属预期，静默降级。
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.ShellViewModel.NavigateTimelineAsync", ex);
         }
     }
 

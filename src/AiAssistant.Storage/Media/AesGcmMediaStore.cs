@@ -345,9 +345,10 @@ public sealed class AesGcmMediaStore : IMediaStore
         {
             SecureEraseAndDelete(fullPath);
         }
-        catch
+        catch (Exception ex)
         {
             // Best-effort rollback cleanup
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Storage.Media.AesGcmMediaStore.DeletePhysicalBlobQuietly", ex);
         }
     }
 

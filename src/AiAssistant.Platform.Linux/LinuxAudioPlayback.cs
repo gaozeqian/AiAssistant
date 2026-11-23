@@ -63,6 +63,7 @@ public sealed class LinuxAudioPlayback : IAudioPlayback
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
         {
             // Feedback is optional; missing PulseAudio must not stop voice commands.
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Linux.LinuxAudioPlayback.PlayAsync", ex);
         }
 
         return Task.CompletedTask;

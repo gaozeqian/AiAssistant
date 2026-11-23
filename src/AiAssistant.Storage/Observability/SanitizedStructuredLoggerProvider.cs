@@ -241,9 +241,10 @@ public sealed partial class SanitizedStructuredLoggerProvider : ILoggerProvider,
 
             File.AppendAllText(logPath, jsonLine + Environment.NewLine, Encoding.UTF8);
         }
-        catch
+        catch (Exception ex)
         {
             // Telemetry / logging failure must never crash application host
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Storage.Observability.SanitizedStructuredLoggerProvider.AppendBoundedJsonLine", ex);
         }
     }
 

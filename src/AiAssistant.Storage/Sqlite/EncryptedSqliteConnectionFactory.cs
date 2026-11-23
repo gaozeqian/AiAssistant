@@ -236,9 +236,10 @@ public sealed class EncryptedSqliteConnectionFactory
             {
                 total += new FileInfo(file).Length;
             }
-            catch
+            catch (Exception ex)
             {
                 // Ignore transient temp files being deleted concurrently
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Storage.Sqlite.EncryptedSqliteConnectionFactory.CalculateDirectorySize", ex);
             }
         }
 

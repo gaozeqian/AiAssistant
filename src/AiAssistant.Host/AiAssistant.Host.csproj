@@ -26,6 +26,11 @@
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Wayland" />
+    <!-- 组合根直接使用这些 API：显式声明，避免依赖 Hosting 的传递依赖。 -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
   <Target Name="BundleSwiftHelper" AfterTargets="Publish" Condition="$([MSBuild]::IsOsPlatform('OSX')) And Exists('$(MacHelperBinaryPath)')">

@@ -217,9 +217,10 @@ public sealed class OsProtectedKeyStore : IKeyStore, IDisposable
                 return true;
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Fall back to 0600 user KEK envelope if security binary / unlocked keychain unavailable
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Storage.KeyStores.OsProtectedKeyStore.TryReadOrWriteMacKeychain", ex);
         }
 
         return false;
@@ -246,9 +247,10 @@ public sealed class OsProtectedKeyStore : IKeyStore, IDisposable
                 return true;
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Fall back to 0600 user KEK envelope when secret-tool or D-Bus session is unavailable
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Storage.KeyStores.OsProtectedKeyStore.TryReadOrWriteLinuxSecretTool", ex);
         }
 
         return false;

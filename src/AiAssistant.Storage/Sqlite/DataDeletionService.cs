@@ -83,12 +83,15 @@ public sealed class DataDeletionService : IDataDeletionService
                 File.Delete(file);
                 deleted++;
             }
-            catch (IOException)
+            catch (IOException ex)
             {
                 // A reader may still hold the blob; the row is already gone so it can never be referenced again.
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Storage.Sqlite.DataDeletionService.DeleteMediaFiles.IO", ex);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+                // 预期降级：无权限删除该文件时跳过，相关数据库记录已清除不会再被引用。
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Storage.Sqlite.DataDeletionService.DeleteMediaFiles.AccessDenied", ex);
             }
         }
 

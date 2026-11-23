@@ -98,9 +98,10 @@ public sealed class SubprocessMacHelperLauncher(string executablePath) : IMacHel
                     await process.WaitForExitAsync(cts.Token);
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 // Best-effort process cleanup
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Platform.macOS.Ipc.OsProcessInstance.DisposeAsync", ex);
             }
             finally
             {
@@ -216,18 +217,20 @@ public sealed class UnixDomainSocketMacHelperClient : IAsyncDisposable
         {
             _stream.Dispose();
         }
-        catch
+        catch (Exception ex)
         {
             // Ignore close errors
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Platform.macOS.Ipc.UnixDomainSocketMacHelperClient.DisposeAsync.StreamClose", ex);
         }
 
         try
         {
             await _readerTask;
         }
-        catch
+        catch (Exception ex)
         {
             // Expected on socket close
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Platform.macOS.Ipc.UnixDomainSocketMacHelperClient.DisposeAsync.ReaderDrain", ex);
         }
 
         FailAllPending();
@@ -254,9 +257,10 @@ public sealed class UnixDomainSocketMacHelperClient : IAsyncDisposable
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Peer crashed or closed socket
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Platform.macOS.Ipc.UnixDomainSocketMacHelperClient.RunReadLoopAsync", ex);
         }
         finally
         {

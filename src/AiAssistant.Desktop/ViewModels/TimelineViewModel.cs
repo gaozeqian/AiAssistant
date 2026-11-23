@@ -229,8 +229,10 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
             _suppressDateSelection = false;
             await LoadEventsAsync();
         }
-        catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (_disposeCts.IsCancellationRequested)
         {
+            // 释放时取消属预期，静默返回。
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.TimelineViewModel.RefreshAsync", ex);
         }
         catch (Exception ex) when (ex is AiAssistantDomainException or IOException or UnauthorizedAccessException)
         {
@@ -250,8 +252,10 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
         {
             await LoadEventsAsync();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+            // 切换日期时取消上一次查询属预期，静默降级。
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.TimelineViewModel.LoadSelectedDateSafelyAsync", ex);
         }
         catch (Exception ex) when (ex is AiAssistantDomainException or IOException or UnauthorizedAccessException)
         {
@@ -336,8 +340,10 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
                 bitmap.Dispose();
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+            // 切换选中项时取消上一次媒体加载属预期，静默降级。
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.TimelineViewModel.LoadPreviewSafelyAsync", ex);
         }
         catch (StorageIntegrityException)
         {

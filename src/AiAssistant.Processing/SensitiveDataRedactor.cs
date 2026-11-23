@@ -58,9 +58,10 @@ public sealed partial class SensitiveDataRedactor : ITextRedactor
                     return "[REDACTED]";
                 });
             }
-            catch (RegexMatchTimeoutException)
+            catch (RegexMatchTimeoutException ex)
             {
                 // A pathological user pattern must never block persistence.
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Processing.SensitiveDataRedactor.Redact", ex);
             }
         }
 

@@ -1,3 +1,4 @@
+using AiAssistant.Application.Diagnostics;
 using AiAssistant.Application.Policies;
 using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
@@ -244,7 +245,9 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<DiagnosticsUseCase>();
         services.AddSingleton<ReportUseCase>();
         RegisterSearchAndLocalApi(services, dataDirectory, keyStore, modelsConfiguration);
-        return new AppRuntime(services.BuildServiceProvider(), dataDirectory) { LinuxBackendState = linuxBackendState };
+        var provider = services.BuildServiceProvider();
+        SuppressedExceptionLog.Configure(provider.GetRequiredService<ILoggerFactory>());
+        return new AppRuntime(provider, dataDirectory) { LinuxBackendState = linuxBackendState };
     }
 
     private static void RegisterSearchAndLocalApi(

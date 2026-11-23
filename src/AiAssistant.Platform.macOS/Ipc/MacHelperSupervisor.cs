@@ -123,9 +123,10 @@ public sealed class MacHelperSupervisor : IMacHelperSupervisor
             {
                 await _supervisorTask;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
                 // Normal shutdown
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Platform.macOS.Ipc.MacHelperSupervisor.DisposeAsync", ex);
             }
         }
 
@@ -318,9 +319,10 @@ public sealed class MacHelperSupervisor : IMacHelperSupervisor
                         TimeSpan.FromMilliseconds(250),
                         cts.Token);
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Ignore shutdown send errors
+                    AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Platform.macOS.Ipc.MacHelperSupervisor.TearDownCurrentSessionAsync", ex);
                 }
             }
 
@@ -350,9 +352,10 @@ public sealed class MacHelperSupervisor : IMacHelperSupervisor
                 File.Delete(path);
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Ignore cleanup failure
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Platform.macOS.Ipc.MacHelperSupervisor.DeleteSocketFileQuietly", ex);
         }
     }
 }

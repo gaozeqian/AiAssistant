@@ -175,9 +175,10 @@ public sealed class VoiceSessionController : IVoiceSession
         {
             await task.WaitAsync(ct);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             // Expected when the session is stopped
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Voice.VoiceSessionController.StopAsync", ex);
         }
         finally
         {
@@ -216,9 +217,10 @@ public sealed class VoiceSessionController : IVoiceSession
                 }
             }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
         {
             // Normal shutdown
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Voice.VoiceSessionController.RunAsync", ex);
         }
         catch (Exception ex)
         {
@@ -442,9 +444,10 @@ public sealed class VoiceSessionController : IVoiceSession
         {
             await PlayFeedbackAsync(text, ct);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             // Session stopped while feedback was playing
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Voice.VoiceSessionController.PlayFeedbackSafelyAsync", ex);
         }
     }
 

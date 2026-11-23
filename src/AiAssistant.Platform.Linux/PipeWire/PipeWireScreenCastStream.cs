@@ -282,6 +282,7 @@ public sealed class PipeWireScreenCastStream : IDisposable
             catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
             {
                 // Library already unavailable; nothing left to stop.
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Linux.PipeWire.PipeWireScreenCastStream.Stop", ex);
             }
         }
 

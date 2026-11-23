@@ -385,8 +385,11 @@ public static class UiE2ERunner
             {
                 shutdown(exitCode);
             }
-            catch
+            catch (Exception ex)
             {
+                // 工具宿主退出路径：关闭失败不应掩盖原退出码，仅记录异常类型。
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace(
+                    "Tools.UiE2ERunner.Shutdown", ex);
             }
         });
         return exitCode;

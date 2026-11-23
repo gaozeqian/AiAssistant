@@ -151,6 +151,8 @@ public sealed class ModelConfigurationAdmin(
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or UriFormatException)
         {
+            // 本机探测失败属预期降级：改用 OpenAI 兼容端点。
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Models.ModelConfigurationAdmin.ResolveLocalProviderAsync", ex);
         }
 
         return "openai";

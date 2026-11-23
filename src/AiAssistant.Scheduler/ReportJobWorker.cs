@@ -84,9 +84,10 @@ public sealed class ReportJobWorker : IAsyncDisposable
             {
                 await _workerTask;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
                 // Expected shutdown
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Scheduler.ReportJobWorker.DisposeAsync", ex);
             }
         }
 

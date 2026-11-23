@@ -126,9 +126,10 @@ public sealed class XdgPortalSessionManager(
             {
                 await client.CloseSessionAsync(session.SessionPath, CancellationToken.None);
             }
-            catch
+            catch (Exception ex)
             {
                 // Best-effort remote cleanup
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Linux.Portal.XdgPortalSessionManager.DisposeAsync", ex);
             }
         }
 
@@ -174,7 +175,12 @@ public sealed class XdgPortalSessionManager(
                 nameof(XdgPortalRequestException));
             if (sessionPath is not null)
             {
-                try { await client.CloseSessionAsync(sessionPath, ct); } catch { }
+                try { await client.CloseSessionAsync(sessionPath, ct); }
+                catch (Exception closeEx)
+                {
+                    // Portal 清理为尽力而为；关闭失败不应掩盖原始失败。
+                    AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Linux.Portal.XdgPortalSessionManager.TryCreateSessionAsync.CloseSession", closeEx);
+                }
             }
 
             return null;
@@ -190,7 +196,12 @@ public sealed class XdgPortalSessionManager(
                 ex.GetType().Name);
             if (sessionPath is not null)
             {
-                try { await client.CloseSessionAsync(sessionPath, ct); } catch { }
+                try { await client.CloseSessionAsync(sessionPath, ct); }
+                catch (Exception closeEx)
+                {
+                    // Portal 清理为尽力而为；关闭失败不应掩盖原始失败。
+                    AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Linux.Portal.XdgPortalSessionManager.TryCreateSessionAsync.CloseSession", closeEx);
+                }
             }
 
             return null;

@@ -290,13 +290,15 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
         {
             await task.WaitAsync(timeout);
         }
-        catch (TimeoutException)
+        catch (TimeoutException ex)
         {
             // Shutdown must stay bounded even when a native source does not observe cancellation.
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Capture.BoundedCaptureCoordinator.WaitOrTimeoutAsync", ex);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             // Normal cancellation during teardown.
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Capture.BoundedCaptureCoordinator.WaitOrTimeoutAsync", ex);
         }
     }
 
@@ -309,9 +311,10 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
                 await SubmitSampleAsync(sample, ct);
             }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
         {
             // Clean shutdown
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Capture.BoundedCaptureCoordinator.PumpSourceAsync", ex);
         }
         catch (Exception ex)
         {
@@ -362,9 +365,10 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
                 }
             }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
         {
             // Fall through to drain pending control commands
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Capture.BoundedCaptureCoordinator.RunConsumerLoopAsync", ex);
         }
         finally
         {

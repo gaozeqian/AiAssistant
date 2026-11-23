@@ -100,9 +100,10 @@ public sealed class MediaRetentionService : IRetentionService
             {
                 await _backgroundLoop;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
                 // Expected on shutdown
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Storage.Media.MediaRetentionService.DisposeAsync", ex);
             }
         }
 
@@ -125,9 +126,10 @@ public sealed class MediaRetentionService : IRetentionService
         {
             _ = await RunSweepNowAsync(ct);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
         {
             // Normal shutdown
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Storage.Media.MediaRetentionService.RunSweepSafeAsync", ex);
         }
         catch (Exception ex)
         {

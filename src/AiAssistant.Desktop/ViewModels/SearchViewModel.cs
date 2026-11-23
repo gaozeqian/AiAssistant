@@ -262,8 +262,10 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
         {
             await action(_disposeCts.Token);
         }
-        catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (_disposeCts.IsCancellationRequested)
         {
+            // 释放时取消属预期，无需向用户报错。
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.SearchViewModel.RunAsync", ex);
         }
         catch (Exception ex)
         {

@@ -116,9 +116,10 @@ public sealed class AudioHub(IAudioCaptureFactory captureFactory, ILogger<AudioH
             {
                 await pumpTask;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
                 // Expected on shutdown
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Processing.AudioHub.DisposeAsync", ex);
             }
         }
     }
@@ -161,9 +162,10 @@ public sealed class AudioHub(IAudioCaptureFactory captureFactory, ILogger<AudioH
                 }
             }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
         {
             // Normal stop after last unsubscribe
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Processing.AudioHub.PumpAsync", ex);
         }
         catch (Exception ex)
         {
@@ -175,9 +177,10 @@ public sealed class AudioHub(IAudioCaptureFactory captureFactory, ILogger<AudioH
             {
                 await capture.DisposeAsync();
             }
-            catch
+            catch (Exception ex)
             {
                 // Best-effort device release
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Processing.AudioHub.PumpAsync", ex);
             }
 
             lock (_sync)
@@ -227,9 +230,10 @@ public sealed class AudioHub(IAudioCaptureFactory captureFactory, ILogger<AudioH
             {
                 await pumpToStop;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
                 // Expected when the last subscriber leaves
+                AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Processing.AudioHub.RemoveSubscriberAsync", ex);
             }
         }
     }
