@@ -10,7 +10,7 @@ namespace AiAssistant.Processing.Benchmarks;
 /// Traditional output is not mis-scored as recognition errors. Arabic numerals are kept as-is:
 /// "2012" vs "二零一二" is a formatting difference that still counts, and is called out in reports.
 /// </summary>
-public static class CharacterErrorRate
+internal static class CharacterErrorRate
 {
     private static readonly Lazy<IReadOnlyDictionary<char, char>> TraditionalToSimplified =
         new(LoadTraditionalToSimplified, LazyThreadSafetyMode.ExecutionAndPublication);

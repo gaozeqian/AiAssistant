@@ -3,7 +3,7 @@ using AiAssistant.Application.Ports;
 namespace AiAssistant.Processing.Ocr;
 
 /// <summary>BGRA32 frame helper shared by the ONNX pipeline; decoding stays in the platform adapter.</summary>
-public sealed record RapidOcrImage(byte[] Pixels, int Width, int Height)
+internal sealed record RapidOcrImage(byte[] Pixels, int Width, int Height)
 {
     public static bool TryCreate(ImageFrameBuffer frame, out RapidOcrImage? image)
     {

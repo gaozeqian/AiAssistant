@@ -7,7 +7,7 @@ namespace AiAssistant.Storage.Sqlite;
 /// <summary>
 /// Sequential forward-only schema migration runner. Refuses to run old application code against a newer schema (implementation.md §3.4).
 /// </summary>
-public static class SchemaMigrator
+internal static class SchemaMigrator
 {
     private sealed record MigrationStep(SchemaVersion Version, string Sql);
 

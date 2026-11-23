@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace AiAssistant.Models;
 
 /// <summary>Direct local model gateway; tiers above LocalOffline are rejected until S6 policy exists.</summary>
-public sealed class LocalModelGateway(
+internal sealed class LocalModelGateway(
     HttpModelBackend backend,
     ModelGatewayOptions options,
     ILogger<LocalModelGateway> logger) : IModelGateway
@@ -145,7 +145,7 @@ public sealed class InMemoryModelAuditSink : IModelAuditSink
     }
 }
 
-public sealed class TimeoutModelGateway(IModelGateway inner, ModelGatewayOptions options) : IModelGateway
+internal sealed class TimeoutModelGateway(IModelGateway inner, ModelGatewayOptions options) : IModelGateway
 {
     public CapabilityState Capability => inner.Capability;
     public string ChatModelId => inner.ChatModelId;

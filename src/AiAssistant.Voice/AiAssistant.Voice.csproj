@@ -10,4 +10,8 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="org.k2fsa.sherpa.onnx" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AiAssistant.Voice.Tests" />
+  </ItemGroup>
 </Project>

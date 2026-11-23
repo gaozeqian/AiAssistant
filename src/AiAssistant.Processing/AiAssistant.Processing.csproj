@@ -17,4 +17,8 @@
     <!-- 基准/评测代码只由 tools/AiAssistant.Diagnostics.Host 编译。 -->
     <Compile Remove="Benchmarks/**/*.cs" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AiAssistant.Processing.Tests" />
+  </ItemGroup>
 </Project>

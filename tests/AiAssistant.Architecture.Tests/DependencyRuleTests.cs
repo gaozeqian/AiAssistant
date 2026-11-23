@@ -270,6 +270,37 @@ public sealed class DependencyRuleTests
         Assert.Empty(violations);
     }
 
+    /// <summary>
+    /// Implementation details that were deliberately tightened in the exposure-surface cleanup
+    /// must stay non-public; concrete classes must stay sealed unless intentionally static/abstract.
+    /// </summary>
+    [Fact]
+    public void Rule10_InternalImplementationDetails_KeepMinimalExposure()
+    {
+        string[] internalOnly =
+        [
+            "ReportMarkdownBuilder", "PromptMinimizer", "ResidualSensitiveDataDetector",
+            "X11WindowActivitySource", "LocalModelGateway", "TimeoutModelGateway",
+            "SlidingWindowRateLimiter", "SchemaMigrator", "VoiceCommandParser",
+            "CommandAudioWavEncoder", "RapidOcrCtcDecoder", "RapidOcrDetPostProcessor",
+            "RapidOcrImage", "EnergyTurnDiarizationEngine",
+            "DailyReportStats", "ModelsFileDocument", "EmbeddingEndpointDocument",
+            "ModelPolicyDocument", "ModelEndpointDocument", "PendingDeletion"
+        ];
+
+        foreach (var name in internalOnly)
+        {
+            var type = AllSourceAssemblies
+                .SelectMany(assembly => assembly.GetTypes())
+                .Single(candidate => candidate.Name == name);
+            Assert.False(type.IsPublic, $"{name} must not be publicly exposed");
+            if (type.IsClass && !type.IsAbstract && !type.IsSealed)
+            {
+                Assert.Fail($"{name} must be sealed or static");
+            }
+        }
+    }
+
     private static XDocument LoadCsproj(string projectName)
     {
         var repoRoot = FindRepoRoot();

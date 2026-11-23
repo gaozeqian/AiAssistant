@@ -1,7 +1,7 @@
 namespace AiAssistant.LocalApi;
 
 /// <summary>Fixed one-minute sliding window used to bound local request volume and token guessing.</summary>
-public sealed class SlidingWindowRateLimiter(int maxRequestsPerMinute)
+internal sealed class SlidingWindowRateLimiter(int maxRequestsPerMinute)
 {
     private readonly Queue<DateTimeOffset> _hits = new();
     private readonly Lock _sync = new();

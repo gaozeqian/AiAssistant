@@ -6,7 +6,7 @@ namespace AiAssistant.Voice;
 /// Minimal 16-bit mono PCM WAV container for opt-in command audio.
 /// Keeps the encrypted blob self-describing without pulling in an audio codec dependency.
 /// </summary>
-public static class CommandAudioWavEncoder
+internal static class CommandAudioWavEncoder
 {
     private const int HeaderBytes = 44;
 

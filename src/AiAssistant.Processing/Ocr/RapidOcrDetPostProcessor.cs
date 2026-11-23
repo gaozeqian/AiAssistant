@@ -5,7 +5,7 @@ namespace AiAssistant.Processing.Ocr;
 /// bounding box and proportional padding instead of polygon unclip. Screen text is predominantly
 /// horizontal, so this keeps the dependency-free path accurate enough while staying unit-testable.
 /// </summary>
-public static class RapidOcrDetPostProcessor
+internal static class RapidOcrDetPostProcessor
 {
     private const int MinComponentPixels = 8;
     private const int MinBoxSide = 3;

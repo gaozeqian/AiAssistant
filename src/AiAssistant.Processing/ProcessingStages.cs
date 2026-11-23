@@ -178,7 +178,7 @@ public sealed class SpeakerDiarizationStage(ISpeakerDiarizationEngine? engine, i
 /// Deterministic no-model fallback for environments without diarization assets.
 /// It segments by energy gaps and labels alternating turns, and is always reported as Degraded.
 /// </summary>
-public sealed class EnergyTurnDiarizationEngine(int minimumTurnMs = 800) : ISpeakerDiarizationEngine
+internal sealed class EnergyTurnDiarizationEngine(int minimumTurnMs = 800) : ISpeakerDiarizationEngine
 {
     public CapabilityState Capability => CapabilityState.Degraded(
         CapabilityKind.AudioCapture,

@@ -34,4 +34,9 @@
   <ItemGroup>
     <PackageReference Include="Avalonia" />
   </ItemGroup>
+
+  <!-- 基准源码以链接方式编译进本程序集；内部 DTO 仅对对应单测工程可见。 -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="AiAssistant.Processing.Tests" />
+  </ItemGroup>
 </Project>

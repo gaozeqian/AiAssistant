@@ -256,7 +256,7 @@ public sealed class X11ScreenCapture(IClock clock) : IScreenCapture
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
-public sealed class X11WindowActivitySource(IClock clock, IScreenCapture? screenCapture = null) : IWindowActivitySource
+internal sealed class X11WindowActivitySource(IClock clock, IScreenCapture? screenCapture = null) : IWindowActivitySource
 {
     public SourceKind Kind => SourceKind.WindowActivity;
 

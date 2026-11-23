@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AiAssistant.Desktop.ViewModels;
 
-public enum PendingDeletion
+internal enum PendingDeletion
 {
     None = 0,
     Date = 1,

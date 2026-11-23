@@ -4,7 +4,7 @@ using AiAssistant.Core.Domain;
 
 namespace AiAssistant.Models;
 
-public sealed record ModelsFileDocument
+internal sealed record ModelsFileDocument
 {
     public int SchemaVersion { get; init; } = 1;
     public ModelPolicyDocument Policy { get; init; } = new();
@@ -14,7 +14,7 @@ public sealed record ModelsFileDocument
     public EmbeddingEndpointDocument? Embedding { get; init; }
 }
 
-public sealed record EmbeddingEndpointDocument
+internal sealed record EmbeddingEndpointDocument
 {
     public string Tier { get; init; } = "LocalOffline";
     public string Provider { get; init; } = "ollama";
@@ -25,7 +25,7 @@ public sealed record EmbeddingEndpointDocument
     public bool AllowRemoteEndpoint { get; init; }
 }
 
-public sealed record ModelPolicyDocument
+internal sealed record ModelPolicyDocument
 {
     public bool AllowIntranet { get; init; } = true;
     public bool AllowPublicCloud { get; init; }
@@ -34,7 +34,7 @@ public sealed record ModelPolicyDocument
     public bool RequirePublicCloudConsent { get; init; } = true;
 }
 
-public sealed record ModelEndpointDocument
+internal sealed record ModelEndpointDocument
 {
     public string Tier { get; init; } = "LocalOffline";
     public string Provider { get; init; } = "ollama";

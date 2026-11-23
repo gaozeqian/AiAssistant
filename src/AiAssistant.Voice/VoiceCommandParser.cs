@@ -28,7 +28,7 @@ public sealed record ParsedVoiceCommand(
     string ParamsJson = "{}",
     string? Question = null);
 
-public sealed class VoiceCommandParser
+internal sealed class VoiceCommandParser
 {
     public static ParsedVoiceCommand Parse(string? transcript)
     {

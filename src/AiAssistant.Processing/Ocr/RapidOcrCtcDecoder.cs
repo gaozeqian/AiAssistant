@@ -1,7 +1,7 @@
 namespace AiAssistant.Processing.Ocr;
 
 /// <summary>Greedy CTC decoding for PP-OCR recognition heads (index 0 is the blank label).</summary>
-public static class RapidOcrCtcDecoder
+internal static class RapidOcrCtcDecoder
 {
     public static (string Text, double Confidence) GreedyDecode(
         ReadOnlySpan<float> logits,

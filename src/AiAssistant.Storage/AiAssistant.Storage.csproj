@@ -14,4 +14,8 @@
     <PackageReference Include="System.Numerics.Tensors" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AiAssistant.Storage.Tests" />
+  </ItemGroup>
 </Project>

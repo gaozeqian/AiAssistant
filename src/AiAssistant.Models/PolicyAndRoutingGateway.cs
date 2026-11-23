@@ -341,7 +341,7 @@ public sealed class ThreeGateModelGateway(
     public Task<ModelCapabilitySnapshot> ProbeAsync(CancellationToken ct) => inner.ProbeAsync(ct);
 }
 
-public static partial class PromptMinimizer
+internal static partial class PromptMinimizer
 {
     public static string Minimize(string? input, int maxCharacters)
     {
@@ -361,7 +361,7 @@ public static partial class PromptMinimizer
     private static partial Regex ExcessBlankLinesRegex();
 }
 
-public sealed partial class ResidualSensitiveDataDetector
+internal sealed partial class ResidualSensitiveDataDetector
 {
     public static bool HasResidualSensitiveData(string input) =>
         !string.IsNullOrEmpty(input) && ResidualPatterns().Any(pattern => pattern.IsMatch(input));

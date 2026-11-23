@@ -301,7 +301,7 @@ public sealed class ReportGenerationRunner : IReportGenerationRunner
     }
 }
 
-public sealed record DailyReportStats(
+internal sealed record DailyReportStats(
     DateOnly LocalDate,
     int EventCount,
     int SegmentCount,
@@ -312,7 +312,7 @@ public sealed record DailyReportStats(
     string EndpointTier,
     bool RedactionApplied);
 
-public static class ReportMarkdownBuilder
+internal static class ReportMarkdownBuilder
 {
     public static string Build(DateOnly date, DailyReportDocument document, DailyReportStats stats)
     {
