@@ -49,6 +49,7 @@ jobs:
 
       - name: Create self-signed code-signing certificate (dev only)
         if: env.DEV_SELF_SIGNED == 'true'
+        timeout-minutes: 5
         shell: pwsh
         run: |
           $version = $env:APP_VERSION.TrimStart('v')
@@ -61,10 +62,10 @@ jobs:
           $cer = Join-Path $env:GITHUB_WORKSPACE "artifacts/dist/$version/AiAssistant-$version-windows-x64-dev.cer"
           New-Item -ItemType Directory -Force (Split-Path $cer) | Out-Null
           Export-Certificate -Cert $cert -FilePath $cer | Out-Null
-          # 仅开发自签名模式导入本机信任库；正式 CA 路径绝不修改 runner 或用户信任库。
-          certutil -user -addstore -f Root $cer | Out-Null
-          certutil -user -addstore -f TrustedPeople $cer | Out-Null
+          # 不向 runner 信任库写入：headless runner 的 Root 导入会弹出不可见确认框并永久阻塞。
+          # 签名按 CurrentUser\My 指纹查找；校验用 /r 指定根证书文件，无需信任库。
           "AIASSISTANT_SIGN_CERT_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
+          "AIASSISTANT_SIGN_ROOT_CER=$cer" >> $env:GITHUB_ENV
 
       - name: Verify production signing identity (non-dev)
         if: env.DEV_SELF_SIGNED != 'true'
@@ -140,6 +141,7 @@ jobs:
 
       - name: Create self-signed signing identity (dev only)
         if: env.DEV_SELF_SIGNED == 'true'
+        timeout-minutes: 5
         run: |
           version="${APP_VERSION#v}"
           mkdir -p "artifacts/dist/$version"

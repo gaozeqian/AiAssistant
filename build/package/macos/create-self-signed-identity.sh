@@ -45,6 +45,13 @@ fi
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
+# OpenSSL 3 默认用 AES/PBKDF2/SHA-256 导出 PKCS#12，macOS security import 会报
+# "MAC verification failed"；-legacy 恢复 3DES/SHA-1，LibreSSL 默认即兼容。
+PKCS12_LEGACY=()
+if openssl version 2>/dev/null | grep -q '^OpenSSL 3'; then
+  PKCS12_LEGACY=(-legacy)
+fi
+
 openssl req -x509 -newkey rsa:2048 -nodes \
   -keyout "$WORK/key.pem" -out "$WORK/cert.pem" -days 365 \
   -subj "/CN=$IDENTITY_NAME" \
@@ -53,6 +60,7 @@ openssl req -x509 -newkey rsa:2048 -nodes \
   -addext "extendedKeyUsage=codeSigning" >/dev/null 2>&1
 
 openssl pkcs12 -export -out "$WORK/identity.p12" \
+  ${PKCS12_LEGACY[@]+"${PKCS12_LEGACY[@]}"} \
   -inkey "$WORK/key.pem" -in "$WORK/cert.pem" -passout "pass:$PASSWORD" >/dev/null 2>&1
 
 security create-keychain -p "$PASSWORD" "$KEYCHAIN" 2>/dev/null || true
