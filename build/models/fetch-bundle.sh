@@ -91,8 +91,13 @@ fetch() {
 
 extract() {
   local archive="$1" dest="$2"
+  # GNU tar (含 Git Bash) 会把 "C:/..." 误判为远程主机，--force-local 强制按本地路径处理。
+  local tar_opts=()
+  if tar --version 2>/dev/null | grep -q 'GNU tar'; then
+    tar_opts+=(--force-local)
+  fi
   mkdir -p "$dest"
-  tar -xjf "$archive" -C "$dest"
+  tar -xjf "$archive" -C "$dest" ${tar_opts[@]+"${tar_opts[@]}"}
 }
 
 fetch kws-models sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2

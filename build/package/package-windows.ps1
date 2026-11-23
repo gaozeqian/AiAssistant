@@ -115,7 +115,7 @@ if (Test-Path $publishDir) {
 New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
 
 & dotnet publish (Join-Path $repoRoot "src\AiAssistant.Host\AiAssistant.Host.csproj") `
-    -c Release -r $runtime --self-contained $selfContained.ToLowerInvariant() `
+    -c Release -r $runtime --self-contained $(if ($selfContained) { "true" } else { "false" }) `
     -p:Version=$Version -p:InformationalVersion=$Version `
     -tl:off -v:m -o $publishDir
 if ($LASTEXITCODE -ne 0) {
