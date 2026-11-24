@@ -14,7 +14,7 @@
 | KWS 唤醒词 | `sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01`；`models/sherpa/kws/{encoder,decoder,joiner}.onnx`、`tokens.txt`、`keywords.txt` | k2-fsa / sherpa-onnx 模型发布（作者 pkufool），使用 icefall 在 WenetSpeech 上训练 | Apache-2.0 | 本产品生成 `keywords.txt`（自定义唤醒词「你好时光」）；未修改权重 |
 | MeloTTS 语音合成 | `vits-melo-tts-zh_en`；`models/sherpa/tts/**`（含 `dict/` 与 4 个 `*.fst`） | © 2024 MyShell.ai：MeloTTS；由 sherpa-onnx 转换为 VITS ONNX | MIT | 未修改权重；随包附带分词词典与文本正则化 FST |
 | Silero VAD | `silero_vad_v5.onnx`；`models/sherpa/silero_vad.onnx` | © 2020-present Silero Team | MIT | 未修改 |
-| sherpa-onnx | NuGet `org.k2fsa.sherpa.onnx` 2.0.2；原生库随发布产物分发 | © k2-fsa / sherpa-onnx contributors | Apache-2.0 | 未修改 |
+| sherpa-onnx | NuGet `org.k2fsa.sherpa.onnx` 2.0.3；原生库随发布产物分发 | © k2-fsa / sherpa-onnx contributors | Apache-2.0 | 未修改 |
 | ONNX Runtime | 1.28.2；由 sherpa-onnx 原生库携带 | © Microsoft Corporation | MIT | 未修改 |
 
 ### Paraformer 归属链说明
