@@ -81,7 +81,16 @@ security import "$WORK/identity.p12" -k "$KEYCHAIN" -P "$PASSWORD" -T /usr/bin/c
 security set-key-partition-list -S apple-tool:,apple: -s -k "$PASSWORD" "$KEYCHAIN" >/dev/null
 
 # 自签名身份无需显式信任即可被 codesign 使用；用户需先信任导出的证书，Gatekeeper 才会放行应用。
-security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"') >/dev/null
+# 逐个收集现有用户钥匙串：路径可能含空格，用数组保留参数边界，不依赖 shell 分词。
+existing_keychains=()
+while IFS= read -r kc; do
+  kc="${kc#"${kc%%[![:space:]]*}"}"
+  kc="${kc%"${kc##*[![:space:]]}"}"
+  if [[ -n "$kc" ]]; then
+    existing_keychains+=("$kc")
+  fi
+done <<< "$(security list-keychains -d user | tr -d '"')"
+security list-keychains -d user -s "$KEYCHAIN" ${existing_keychains[@]+"${existing_keychains[@]}"} >/dev/null
 
 mkdir -p "$(dirname "$OUTPUT_CERT")"
 cp "$WORK/cert.pem" "$OUTPUT_CERT"
