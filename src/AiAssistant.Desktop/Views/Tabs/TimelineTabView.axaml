@@ -24,30 +24,37 @@
                   automation:AutomationProperties.Name="刷新时间线" />
         </Grid>
 
-        <Grid Grid.Row="3" Margin="0,14,0,0">
-          <ListBox ItemsSource="{Binding Events}" SelectedItem="{Binding SelectedEvent}"
-                   Background="Transparent" BorderThickness="0">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:TimelineEventItem">
-                <Border Padding="10,9" CornerRadius="7" Margin="0,2">
-                  <Grid ColumnDefinitions="62,*" RowDefinitions="Auto,Auto,Auto">
-                    <TextBlock Grid.RowSpan="3" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="12"
-                               Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Top" Margin="0,2,8,0" />
-                    <TextBlock Grid.Column="1" Text="{Binding AppName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Title}" TextWrapping="Wrap"
-                               MaxHeight="40" FontSize="12" Margin="0,3,0,0" />
-                    <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding SourceText}" FontSize="12"
-                               Foreground="{DynamicResource MutedBrush}" Margin="0,5,0,0" />
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-          <TextBlock Text="暂无可显示的活动" Foreground="{DynamicResource MutedBrush}"
-                     HorizontalAlignment="Center" VerticalAlignment="Center"
-                     IsVisible="{Binding !HasSelectedEvent}" />
-          <ProgressBar IsIndeterminate="True" VerticalAlignment="Top" IsVisible="{Binding IsLoading}" />
-        </Grid>
+        <DockPanel Grid.Row="3" Margin="0,14,0,0" LastChildFill="True">
+          <Button DockPanel.Dock="Bottom" Classes="secondary" Command="{Binding LoadMoreCommand}"
+                  Content="加载更早的记录" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                  Margin="0,8,0,0" IsVisible="{Binding HasMore}" IsEnabled="{Binding !IsLoadingMore}"
+                  automation:AutomationProperties.Name="加载更早的活动记录" />
+          <Grid>
+            <ListBox ItemsSource="{Binding Events}" SelectedItem="{Binding SelectedEvent}"
+                     Background="Transparent" BorderThickness="0">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:TimelineEventItem">
+                  <Border Padding="10,9" CornerRadius="7" Margin="0,2">
+                    <Grid ColumnDefinitions="62,*" RowDefinitions="Auto,Auto,Auto">
+                      <TextBlock Grid.RowSpan="3" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="12"
+                                 Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Top" Margin="0,2,8,0" />
+                      <TextBlock Grid.Column="1" Text="{Binding AppName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Title}" TextWrapping="Wrap"
+                                 MaxHeight="40" FontSize="12" Margin="0,3,0,0" />
+                      <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding SourceText}" FontSize="12"
+                                 Foreground="{DynamicResource MutedBrush}" Margin="0,5,0,0" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Text="暂无可显示的活动" Foreground="{DynamicResource MutedBrush}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsVisible="{Binding !HasSelectedEvent}" />
+            <ProgressBar IsIndeterminate="True" VerticalAlignment="Top" IsVisible="{Binding IsLoading}" />
+            <ProgressBar IsIndeterminate="True" VerticalAlignment="Bottom" IsVisible="{Binding IsLoadingMore}" />
+          </Grid>
+        </DockPanel>
 
         <StackPanel Grid.Row="4" Margin="0,12,0,0" Spacing="5">
           <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
@@ -64,6 +71,8 @@
             <TextBlock Text="{Binding AppName}" FontSize="13" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" />
             <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,4" />
             <TextBlock Text="{Binding CapturedTimeText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Text="{Binding DisplayText}" FontSize="12" Foreground="{DynamicResource MutedBrush}"
+                       IsVisible="{Binding HasDisplayText}" />
           </StackPanel>
           <Border Grid.Column="1" Background="{DynamicResource AccentSoftBackgroundBrush}" CornerRadius="6" Padding="9,5" VerticalAlignment="Top">
             <TextBlock Text="仅本机" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />

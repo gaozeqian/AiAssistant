@@ -162,10 +162,22 @@ public sealed class SqliteEventRepository : IEventRepository
             cmd.Parameters.AddWithValue("$kw", $"%{query.SearchKeyword.Trim()}%");
         }
 
+        // Keyset paging: strictly "older than the cursor row". Newly captured events sort before
+        // the cursor, so they cannot shift the page and cause duplicates or gaps.
+        if (query.Before is { } cursor)
+        {
+            clauses.Add("(e.occurred_at_utc < $beforeUtc OR (e.occurred_at_utc = $beforeUtc AND e.id < $beforeId))");
+            cmd.Parameters.AddWithValue("$beforeUtc", cursor.OccurredAtUtc.ToUniversalTime().ToString("O"));
+            cmd.Parameters.AddWithValue("$beforeId", cursor.EventId);
+        }
+
         var whereSql = clauses.Count > 0 ? $"WHERE {string.Join(" AND ", clauses)}" : string.Empty;
         var limit = Math.Clamp(query.Limit, 1, 10_000);
+        var direction = query.Descending ? "DESC" : "ASC";
         cmd.Parameters.AddWithValue("$limit", limit);
 
+        // The id tiebreaker keeps paged reads stable when several events share a timestamp;
+        // without a total order the cursor boundary can duplicate or skip rows.
         cmd.CommandText = $"""
             SELECT
                 e.id, e.occurred_at_utc, e.ended_at_utc, e.local_date, e.time_zone_id, e.utc_offset_minutes,
@@ -174,7 +186,7 @@ public sealed class SqliteEventRepository : IEventRepository
             FROM events e
             LEFT JOIN content_refs c ON e.content_id = c.content_id
             {whereSql}
-            ORDER BY e.occurred_at_utc ASC
+            ORDER BY e.occurred_at_utc {direction}, e.id {direction}
             LIMIT $limit;
             """;
 

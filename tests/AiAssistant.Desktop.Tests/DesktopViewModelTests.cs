@@ -36,7 +36,20 @@ public sealed partial class DesktopViewModelTests
             [EnumeratorCancellation] CancellationToken ct)
         {
             await Task.Yield();
-            foreach (var item in Events.Where(item => item.Timestamp.LocalDate == query.LocalDate))
+            var matches = Events.Where(item => item.Timestamp.LocalDate == query.LocalDate);
+            if (query.Before is { } cursor)
+            {
+                matches = matches.Where(item =>
+                    item.Timestamp.OccurredAtUtc < cursor.OccurredAtUtc ||
+                    (item.Timestamp.OccurredAtUtc == cursor.OccurredAtUtc &&
+                     string.CompareOrdinal(item.Id, cursor.EventId) < 0));
+            }
+
+            matches = query.Descending
+                ? matches.OrderByDescending(item => item.Timestamp.OccurredAtUtc).ThenByDescending(item => item.Id, StringComparer.Ordinal)
+                : matches.OrderBy(item => item.Timestamp.OccurredAtUtc).ThenBy(item => item.Id, StringComparer.Ordinal);
+            var page = matches.Take(Math.Max(1, query.Limit));
+            foreach (var item in page)
             {
                 ct.ThrowIfCancellationRequested();
                 yield return item;

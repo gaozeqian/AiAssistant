@@ -423,4 +423,84 @@ public sealed class EncryptedStorageTests : IDisposable
         Assert.True((await restartedMaintenance.CheckHealthAsync(CancellationToken.None)).IsHealthy);
         Assert.Equal(enqueued.JobId, running.Id);
     }
+
+    [Fact]
+    public async Task SqliteEventRepository_PagesNewestFirst_WithStableOrderAndNoDuplicates()
+    {
+        var options = new StorageOptions { DataDirectory = Path.Combine(_tempRoot, "paging") };
+        var key = RandomNumberGenerator.GetBytes(32);
+        var factory = new EncryptedSqliteConnectionFactory(options, new StaticKeyStore(key));
+        var maintenance = new SqliteDatabaseMaintenanceService(factory);
+        var mediaStore = new AesGcmMediaStore(factory, new StaticKeyStore(key));
+        var repository = new SqliteEventRepository(factory, mediaStore);
+        await maintenance.InitializeAsync(CancellationToken.None);
+
+        // Half of the rows share a timestamp on purpose: paging must stay a total order,
+        // otherwise LIMIT/OFFSET duplicates or skips rows between pages.
+        var start = new DateTimeOffset(2026, 11, 20, 8, 0, 0, TimeSpan.Zero);
+        var events = new List<ActivityEvent>();
+        for (var i = 0; i < 250; i++)
+        {
+            var instant = start.AddSeconds(i / 2);
+            events.Add(new ActivityEvent(
+                $"e{i:D4}",
+                OccurredTimestamp.FromInstant(instant, TimeZoneInfo.Utc),
+                SourceKind.WindowActivity,
+                "App",
+                "row " + i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+
+        await repository.AppendBatchAsync(events, CancellationToken.None);
+
+        var localDate = DateOnly.FromDateTime(start.UtcDateTime);
+        var firstPage = await ReadPageAsync(repository, localDate, before: null, limit: 100);
+        var secondPage = await ReadPageAsync(repository, localDate, CursorFor(events, firstPage[^1]), limit: 100);
+        var thirdPage = await ReadPageAsync(repository, localDate, CursorFor(events, secondPage[^1]), limit: 100);
+
+        Assert.Equal(100, firstPage.Count);
+        Assert.Equal(100, secondPage.Count);
+        Assert.Equal(50, thirdPage.Count);
+        Assert.Equal(250, firstPage.Concat(secondPage).Concat(thirdPage).Distinct().Count());
+        Assert.Equal("e0249", firstPage[0]);
+        Assert.Equal("e0000", thirdPage[^1]);
+
+        // Newest-first query: ids strictly decrease inside a page.
+        Assert.True(string.CompareOrdinal(firstPage[0], firstPage[1]) > 0);
+
+        // A row captured after page 1 was read must not shift the next page: the cursor still
+        // points at the last row the user actually saw.
+        var lateEvent = new ActivityEvent(
+            "e9999",
+            OccurredTimestamp.FromInstant(start.AddHours(2), TimeZoneInfo.Utc),
+            SourceKind.WindowActivity,
+            "App",
+            "late row");
+        await repository.AppendBatchAsync([lateEvent], CancellationToken.None);
+        var afterInsert = await ReadPageAsync(repository, localDate, CursorFor(events, firstPage[^1]), limit: 100);
+        Assert.Equal(secondPage, afterInsert);
+        Assert.DoesNotContain("e9999", afterInsert);
+    }
+
+    private static EventCursor CursorFor(IReadOnlyList<ActivityEvent> events, string eventId)
+    {
+        var match = events.First(item => item.Id == eventId);
+        return new EventCursor(match.Timestamp.OccurredAtUtc, match.Id);
+    }
+
+    private static async Task<List<string>> ReadPageAsync(
+        SqliteEventRepository repository,
+        DateOnly localDate,
+        EventCursor? before,
+        int limit)
+    {
+        var ids = new List<string>();
+        await foreach (var item in repository.QueryAsync(
+                           new EventQuery(LocalDate: localDate, Limit: limit, Descending: true, Before: before),
+                           CancellationToken.None))
+        {
+            ids.Add(item.Id);
+        }
+
+        return ids;
+    }
 }

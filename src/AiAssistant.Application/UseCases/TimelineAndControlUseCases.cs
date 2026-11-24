@@ -7,6 +7,12 @@ using AiAssistant.Core.ValueObjects;
 namespace AiAssistant.Application.UseCases;
 
 /// <summary>
+/// One page of a day's timeline, ordered newest→oldest to match the list (first row is the latest
+/// activity). <see cref="HasMore"/> means older records exist below this page.
+/// </summary>
+public sealed record TimelinePage(IReadOnlyList<ActivityEvent> Events, bool HasMore);
+
+/// <summary>
 /// Application use case for querying timeline events, on-demand decrypted media, and deleting user data.
 /// Desktop ViewModels depend only on this and sibling use cases—never directly on Storage or Platform.
 /// </summary>
@@ -15,21 +21,45 @@ public sealed class TimelineUseCase(
     IMediaStore mediaStore,
     IClock clock)
 {
+    /// <summary>Default page size; a busy day can exceed ten thousand events, so the list pages instead of truncating.</summary>
+    public const int DefaultPageSize = 200;
+
     public DateOnly GetTodayLocalDate() => clock.Now().LocalDate;
 
-    public async Task<IReadOnlyList<ActivityEvent>> GetEventsForDateAsync(
+    /// <summary>
+    /// Loads one newest-first page of a date. <paramref name="before"/> is the last row already shown;
+    /// passing it returns the next older slice without being disturbed by events captured in between.
+    /// </summary>
+    public async Task<TimelinePage> GetEventsForDateAsync(
         DateOnly localDate,
         string? keyword = null,
+        EventCursor? before = null,
+        int pageSize = DefaultPageSize,
         CancellationToken ct = default)
     {
-        var list = new List<ActivityEvent>();
-        var query = new EventQuery(LocalDate: localDate, SearchKeyword: keyword, Limit: 1000);
+        var size = Math.Clamp(pageSize, 1, 2_000);
+        // Fetch one extra row to detect "older records exist" without a second COUNT query.
+        var query = new EventQuery(
+            LocalDate: localDate,
+            SearchKeyword: keyword,
+            Limit: size + 1,
+            Descending: true,
+            Before: before);
+
+        var list = new List<ActivityEvent>(size + 1);
         await foreach (var item in eventRepository.QueryAsync(query, ct))
         {
             list.Add(item);
         }
 
-        return list;
+        var hasMore = list.Count > size;
+        if (hasMore)
+        {
+            list.RemoveAt(list.Count - 1);
+        }
+
+        // Already newest-first: the list shows the latest activity at the top.
+        return new TimelinePage(list, hasMore);
     }
 
     public Task<IReadOnlyList<DateOnly>> ListActiveDatesAsync(CancellationToken ct = default) =>

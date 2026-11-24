@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using AiAssistant.Application.Policies;
 using AiAssistant.Application.Ports;
@@ -25,15 +26,23 @@ public sealed partial class DesktopViewModelTests
         var repository = new InMemoryEventRepository();
         var mediaStore = new FakeMediaStore();
         var clock = new SystemClock();
-        var timestamp = ((IClock)clock).Now();
-        repository.Events.Add(CreateEvent("without-media", timestamp));
+        // Midday keeps both events on the same local date regardless of when the test runs.
+        var now = ((IClock)clock).Now();
+        var noonLocal = now.LocalDate.ToDateTime(new TimeOnly(12, 0));
+        var noon = OccurredTimestamp.FromInstant(
+            new DateTimeOffset(noonLocal, TimeZoneInfo.Local.GetUtcOffset(noonLocal)),
+            TimeZoneInfo.Local);
+        repository.Events.Add(CreateEvent("without-media", noon));
         using var viewModel = new TimelineViewModel(new TimelineUseCase(repository, mediaStore, clock));
 
         await viewModel.InitializeAsync();
         Assert.Single(viewModel.Events);
         Assert.Equal(0, mediaStore.ReadCount);
 
-        repository.Events.Add(CreateEvent("with-media", timestamp, "content-1"));
+        repository.Events.Add(CreateEvent(
+            "with-media",
+            OccurredTimestamp.FromInstant(noon.OccurredAtUtc.AddSeconds(1), TimeZoneInfo.Local),
+            "content-1"));
         await viewModel.RefreshCommand.ExecuteAsync(null);
         await WaitUntilAsync(() => viewModel.PreviewImage is not null);
 
@@ -65,6 +74,115 @@ public sealed partial class DesktopViewModelTests
         Assert.Equal("second", viewModel.SelectedEvent?.Event.Id);
     });
 
+
+    [Fact]
+    public Task Timeline_ReselectAfterRefresh_ReloadsPreview() => RunInHeadlessSession(async () =>
+    {
+        var repository = new InMemoryEventRepository();
+        var mediaStore = new FakeMediaStore();
+        var clock = new SystemClock();
+        var timestamp = ((IClock)clock).Now();
+        repository.Events.Add(CreateEvent("first", timestamp, "content-1"));
+        using var viewModel = new TimelineViewModel(new TimelineUseCase(repository, mediaStore, clock));
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PreviewImage is not null);
+
+        // Refresh clears Events; the bound ListBox answers by pushing SelectedItem=null back,
+        // which used to dispose the media CTS without clearing it.
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        await WaitUntilAsync(() => viewModel.PreviewImage is not null);
+
+        viewModel.SelectedEvent = null;
+        Assert.False(viewModel.HasPreview);
+
+        viewModel.SelectedEvent = viewModel.Events[0];
+        await WaitUntilAsync(() => viewModel.HasPreview);
+    });
+
+    [Fact]
+    public Task Timeline_PagesNewestFirst_AndLoadsAllRecordsBeyondFormerCap() => RunInHeadlessSession(async () =>
+    {
+        var repository = new InMemoryEventRepository();
+        var clock = new SystemClock();
+        var now = ((IClock)clock).Now();
+        var startOfDayLocal = now.LocalDate.ToDateTime(TimeOnly.MinValue);
+        var timeZone = TimeZoneInfo.Local;
+        var offset = timeZone.GetUtcOffset(startOfDayLocal);
+        const int total = 1200; // more than the old hard-coded 1000-row cap
+        for (var i = 0; i < total; i++)
+        {
+            var instant = new DateTimeOffset(startOfDayLocal.AddMinutes(i), offset);
+            repository.Events.Add(CreateEvent(
+                "e" + i.ToString("D4", CultureInfo.InvariantCulture),
+                OccurredTimestamp.FromInstant(instant, timeZone)));
+        }
+
+        using var viewModel = new TimelineViewModel(new TimelineUseCase(repository, new FakeMediaStore(), clock));
+        await viewModel.InitializeAsync();
+
+        // First page is the newest slice, rendered newest→oldest: the top row is the latest event.
+        Assert.Equal(TimelineUseCase.DefaultPageSize, viewModel.Events.Count);
+        Assert.Equal("e1199", viewModel.Events[0].Event.Id);
+        Assert.Equal("e1000", viewModel.Events[^1].Event.Id);
+        Assert.Equal("e1199", viewModel.SelectedEvent?.Event.Id);
+        Assert.True(viewModel.HasMore);
+
+        while (viewModel.HasMore)
+        {
+            await viewModel.LoadMoreCommand.ExecuteAsync(null);
+        }
+
+        Assert.Equal(total, viewModel.Events.Count);
+        Assert.Equal("e1199", viewModel.Events[0].Event.Id);
+        Assert.Equal("e0000", viewModel.Events[^1].Event.Id);
+        Assert.Equal(total, viewModel.Events.Select(item => item.Event.Id).Distinct().Count());
+        Assert.Contains("已加载 1200 条", viewModel.StatusMessage, StringComparison.Ordinal);
+    });
+
+    [Fact]
+    public Task Timeline_NewRecordsDuringPaging_DoNotDuplicateOrSkipRows() => RunInHeadlessSession(async () =>
+    {
+        var repository = new InMemoryEventRepository();
+        var clock = new SystemClock();
+        var now = ((IClock)clock).Now();
+        var startOfDayLocal = now.LocalDate.ToDateTime(TimeOnly.MinValue);
+        var timeZone = TimeZoneInfo.Local;
+        var offset = timeZone.GetUtcOffset(startOfDayLocal);
+        const int total = 300;
+        for (var i = 0; i < total; i++)
+        {
+            var instant = new DateTimeOffset(startOfDayLocal.AddMinutes(i), offset);
+            repository.Events.Add(CreateEvent(
+                "e" + i.ToString("D4", CultureInfo.InvariantCulture),
+                OccurredTimestamp.FromInstant(instant, timeZone)));
+        }
+
+        using var viewModel = new TimelineViewModel(new TimelineUseCase(repository, new FakeMediaStore(), clock));
+        await viewModel.InitializeAsync();
+        Assert.Equal(TimelineUseCase.DefaultPageSize, viewModel.Events.Count);
+        Assert.Equal("e0299", viewModel.Events[0].Event.Id);
+
+        // A capture lands while the user is paging. Offset paging would shift the next page and
+        // skip/duplicate a row; the keyset cursor must keep returning exactly the older rows.
+        var lateInstant = new DateTimeOffset(startOfDayLocal.AddMinutes(total + 5), offset);
+        repository.Events.Add(CreateEvent(
+            "e0300",
+            OccurredTimestamp.FromInstant(lateInstant, timeZone)));
+
+        await viewModel.LoadMoreCommand.ExecuteAsync(null);
+
+        Assert.Equal(total, viewModel.Events.Count);
+        Assert.DoesNotContain("e0300", viewModel.Events.Select(item => item.Event.Id));
+        Assert.Equal("e0000", viewModel.Events[^1].Event.Id);
+        Assert.Equal(total, viewModel.Events.Select(item => item.Event.Id).Distinct().Count());
+        Assert.Equal("e0299", viewModel.Events[0].Event.Id);
+
+        // A refresh is what surfaces the new row, at the top.
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        Assert.Equal("e0300", viewModel.Events[0].Event.Id);
+        Assert.Equal(TimelineUseCase.DefaultPageSize, viewModel.Events.Count);
+    });
 
     [Fact]
     public Task SearchEvidence_JumpNavigatesTimelineToCitedEvent() => RunInHeadlessSession(async () =>
