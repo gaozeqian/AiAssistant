@@ -18,6 +18,7 @@
 
 ### Changed
 
+- 模型接入统一为 OpenAI 兼容协议：移除 Ollama 原生 `/api/chat`、`/api/embed`、`/api/tags` 路径与 `provider` 配置，所有端点统一调用 `/v1/*`；`models.json` 升级为 schema 3（`1`/`2` 仍可读取并在保存时升级）。思考开关映射为 `reasoning_effort`，本机端点关闭思考时发送 `none`，避免推理型模型返回空内容；远程端点仅在显式开启思考时发送。
 - 时钟访问统一收敛到 `IClock`（对齐 `System.TimeProvider`）；模型地址与默认模型名收敛到 `ModelDefaults`。
 - E2E 自驱动与基准命令从生产交付剥离到 `tools/AiAssistant.Diagnostics.Host`。
 - 三平台交付矩阵四处文档/CI 对齐：Windows `.zip` + `.msi`、macOS `.pkg` + `.zip`、Linux `.tar.gz` + `.deb`。

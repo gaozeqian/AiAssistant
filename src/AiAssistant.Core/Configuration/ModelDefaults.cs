@@ -7,8 +7,9 @@ namespace AiAssistant.Core.Configuration;
 /// </summary>
 public static class ModelDefaults
 {
-    public const string OllamaBaseUrl = "http://127.0.0.1:11434";
-    public const string LmStudioBaseUrl = "http://127.0.0.1:1234";
+    /// <summary>Default loopback endpoint; any OpenAI-compatible runtime (Ollama, LM Studio, vLLM) serves it.</summary>
+    public const string LocalBaseUrl = "http://127.0.0.1:11434";
+
     public const string ChatModel = "gemma4:12b";
     public const string EmbeddingModel = "embeddinggemma-2:740m";
 

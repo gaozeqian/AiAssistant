@@ -220,7 +220,6 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
         var handler = new CapabilityHandler();
         var endpoint = new ModelEndpointSettings(
             ModelEndpointTier.LocalOffline,
-            ModelProviderKind.Ollama,
             new Uri("http://127.0.0.1:11434"),
             "gemma4:12b",
             "embeddinggemma-2:740m",
@@ -354,7 +353,7 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
 
         var json = await File.ReadAllTextAsync(path);
         Assert.DoesNotContain("CorporateIntranet", json, StringComparison.Ordinal);
-        Assert.Contains("\"schemaVersion\": 2", json, StringComparison.Ordinal);
+        Assert.Contains("\"schemaVersion\": 3", json, StringComparison.Ordinal);
 
         var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
             .LoadAsync(path, CancellationToken.None);
@@ -367,10 +366,10 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
     }
 
     [Fact]
-    public async Task ModelConfigurationAdmin_PreservesNonOllamaLocalProvider()
+    public async Task ModelConfigurationAdmin_SavesLocalEndpointWithoutProviderField()
     {
-        // "本机" is not tied to Ollama: an OpenAI-compatible local runtime (LM Studio, vLLM, ...) must
-        // keep its provider instead of being silently rewritten to Ollama.
+        // Every runtime now speaks the OpenAI-compatible API, so "本机" no longer records a
+        // provider: an LM Studio / vLLM address is kept as-is and the retired field is dropped.
         var path = Path.Combine(_tempRoot, "models.json");
         await File.WriteAllTextAsync(path, """
             {
@@ -391,9 +390,13 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
                 new ModelEndpointView("http://127.0.0.1:1234", "local-embed-2", "LocalOffline")),
             CancellationToken.None);
 
+        var json = await File.ReadAllTextAsync(path);
+        Assert.DoesNotContain("provider", json, StringComparison.OrdinalIgnoreCase);
+
         var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
             .LoadAsync(path, CancellationToken.None);
-        Assert.Equal(ModelProviderKind.OpenAiCompatible, reloaded.Chat.Provider);
+        Assert.Equal(3, reloaded.SchemaVersion);
+        Assert.Equal("http://127.0.0.1:1234/", reloaded.Chat.BaseAddress.ToString());
         Assert.Equal("local-chat-2", reloaded.Chat.ChatModel);
         Assert.Equal("local-embed-2", reloaded.Embedding.EmbeddingModel);
     }
@@ -434,7 +437,7 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
         Assert.Equal("corp-chat", reloaded.Chat.ChatModel);
         Assert.Equal(ModelEndpointTier.CorporateIntranet, reloaded.Chat.Tier);
         Assert.True(reloaded.Chat.AllowRemoteEndpoint);
-        Assert.Equal(ModelProviderKind.OpenAiCompatible, reloaded.Chat.Provider);
+        Assert.Equal(3, reloaded.SchemaVersion);
         // The default tier follows the chat endpoint; the embedding endpoint stays local.
         Assert.Equal(ModelEndpointTier.CorporateIntranet, reloaded.Policy.DefaultTier);
         Assert.Equal(ModelEndpointTier.LocalOffline, reloaded.Embedding.Tier);
@@ -638,9 +641,9 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
         {
             Interlocked.Increment(ref _requestCount);
             var path = request.RequestUri!.AbsolutePath;
-            if (path == "/api/embed")
+            if (path == "/v1/embeddings")
             {
-                return Json("""{"embeddings":[[0.1,0.2]]}""");
+                return Json("""{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2]}]}""");
             }
 
             var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
@@ -648,21 +651,24 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
             {
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent("""{"message":{"content":"OK"}}""" + "\n", Encoding.UTF8, "application/x-ndjson")
+                    Content = new StringContent(
+                        "data: {\"choices\":[{\"delta\":{\"content\":\"OK\"}}]}\n\n",
+                        Encoding.UTF8,
+                        "text/event-stream")
                 };
             }
 
             if (body.Contains("\"tools\"", StringComparison.Ordinal))
             {
-                return Json("""{"message":{"content":"","tool_calls":[{"function":{"name":"noop"}}]}}""");
+                return Json("""{"choices":[{"message":{"content":"","tool_calls":[{"function":{"name":"noop"}}]}}]}""");
             }
 
-            if (body.Contains("\"format\":\"json\"", StringComparison.Ordinal))
+            if (body.Contains("\"response_format\"", StringComparison.Ordinal))
             {
-                return Json("""{"message":{"content":"{\"ok\":true}"}}""");
+                return Json("""{"choices":[{"message":{"content":"{\"ok\":true}"}}]}""");
             }
 
-            return Json("""{"message":{"content":"OK"}}""");
+            return Json("""{"choices":[{"message":{"content":"OK"}}]}""");
         }
 
         private static HttpResponseMessage Json(string body) =>

@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AiAssistant.Application.Ports;
 using Microsoft.Extensions.AI;
 
@@ -14,8 +15,9 @@ public sealed record ModelEndpointProbeResult(
     string Diagnostic);
 
 /// <summary>
-/// Minimal Ollama / OpenAI-compatible HTTP backend implementing the standard Microsoft.Extensions.AI interfaces.
-/// It never logs request or response bodies.
+/// OpenAI-compatible HTTP backend implementing the standard Microsoft.Extensions.AI interfaces.
+/// Ollama, LM Studio, vLLM and cloud vendors are all reached through the same <c>/v1</c> surface;
+/// only the base address, model name and key differ. It never logs request or response bodies.
 /// </summary>
 public sealed class HttpModelBackend : IChatClient, IEmbeddingGenerator<string, Embedding<float>>
 {
@@ -47,51 +49,32 @@ public sealed class HttpModelBackend : IChatClient, IEmbeddingGenerator<string, 
             throw new ModelGatewayException("No chat model is configured.");
         }
 
-        // Thinking models otherwise burn the output budget on reasoning and can return empty
-        // content; `think` accepts false, true, or an effort level (low/medium/high).
-        object think = !_options.Think
-            ? false
-            : string.IsNullOrWhiteSpace(_options.ThinkingLevel) ? true : _options.ThinkingLevel;
+        var payload = new JsonObject
+        {
+            ["model"] = model,
+            ["messages"] = new JsonArray(messages
+                .Select(message => (JsonNode)new JsonObject
+                {
+                    ["role"] = ToOpenAiRole(message.Role),
+                    ["content"] = message.Text
+                })
+                .ToArray()),
+            ["temperature"] = options?.Temperature ?? 0.2f,
+            ["max_tokens"] = options?.MaxOutputTokens ?? 2048,
+            ["stream"] = false
+        };
 
-        object payload = _options.Provider == ModelProviderKind.Ollama
-            ? new
-            {
-                model,
-                messages = messages.Select(message => new
-                {
-                    role = ToOllamaRole(message.Role),
-                    content = message.Text
-                }),
-                stream = false,
-                think,
-                options = new
-                {
-                    temperature = options?.Temperature ?? 0.2,
-                    num_predict = options?.MaxOutputTokens ?? 2048
-                }
-            }
-            : new
-            {
-                model,
-                messages = messages.Select(message => new
-                {
-                    role = ToOpenAiRole(message.Role),
-                    content = message.Text
-                }),
-                temperature = options?.Temperature ?? 0.2,
-                max_tokens = options?.MaxOutputTokens ?? 2048,
-                stream = false
-            };
+        if (ReasoningEffortPolicy.Resolve(_options.Think, _options.ThinkingLevel, _options.BaseAddress) is { } reasoningEffort)
+        {
+            payload["reasoning_effort"] = reasoningEffort;
+        }
 
-        var endpoint = _options.Provider == ModelProviderKind.Ollama ? "/api/chat" : "/v1/chat/completions";
-        using var response = await _http.PostAsJsonAsync(endpoint, payload, cancellationToken);
+        using var response = await _http.PostAsJsonAsync("/v1/chat/completions", payload, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-        var text = _options.Provider == ModelProviderKind.Ollama
-            ? document.RootElement.GetProperty("message").GetProperty("content").GetString()
-            : document.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+        var text = document.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
 
         return new ChatResponse(new ChatMessage(ChatRole.Assistant, text ?? string.Empty))
         {
@@ -118,30 +101,22 @@ public sealed class HttpModelBackend : IChatClient, IEmbeddingGenerator<string, 
     {
         var model = options?.ModelId ?? _options.EmbeddingModel;
         var inputs = values.ToArray();
-        object payload = _options.Provider == ModelProviderKind.Ollama
-            ? new { model, input = inputs }
-            : new { model, input = inputs };
-        var endpoint = _options.Provider == ModelProviderKind.Ollama ? "/api/embed" : "/v1/embeddings";
-        using var response = await _http.PostAsJsonAsync(endpoint, payload, cancellationToken);
+        var payload = new JsonObject
+        {
+            ["model"] = model,
+            ["input"] = new JsonArray(inputs.Select(input => (JsonNode)input!).ToArray())
+        };
+
+        using var response = await _http.PostAsJsonAsync("/v1/embeddings", payload, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         var embeddings = new List<Embedding<float>>(inputs.Length);
-        if (_options.Provider == ModelProviderKind.Ollama)
+        foreach (var item in document.RootElement.GetProperty("data").EnumerateArray())
         {
-            foreach (var vector in document.RootElement.GetProperty("embeddings").EnumerateArray())
-            {
-                embeddings.Add(new Embedding<float>(vector.EnumerateArray().Select(v => v.GetSingle()).ToArray()));
-            }
-        }
-        else
-        {
-            foreach (var item in document.RootElement.GetProperty("data").EnumerateArray())
-            {
-                embeddings.Add(new Embedding<float>(
-                    item.GetProperty("embedding").EnumerateArray().Select(v => v.GetSingle()).ToArray()));
-            }
+            embeddings.Add(new Embedding<float>(
+                item.GetProperty("embedding").EnumerateArray().Select(v => v.GetSingle()).ToArray()));
         }
 
         return new GeneratedEmbeddings<Embedding<float>>(embeddings);
@@ -167,31 +142,17 @@ public sealed class HttpModelBackend : IChatClient, IEmbeddingGenerator<string, 
 
         try
         {
-            var endpoint = _options.Provider == ModelProviderKind.Ollama ? "/api/tags" : "/v1/models";
-            using var response = await _http.GetAsync(endpoint, ct);
+            using var response = await _http.GetAsync("/v1/models", ct);
             await EnsureSuccessAsync(response, ct);
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
 
             var models = new List<string>();
-            if (_options.Provider == ModelProviderKind.Ollama)
+            foreach (var model in document.RootElement.GetProperty("data").EnumerateArray())
             {
-                foreach (var model in document.RootElement.GetProperty("models").EnumerateArray())
+                if (model.TryGetProperty("id", out var id) && id.GetString() is { } value)
                 {
-                    if (model.TryGetProperty("name", out var name) && name.GetString() is { } value)
-                    {
-                        models.Add(value);
-                    }
-                }
-            }
-            else
-            {
-                foreach (var model in document.RootElement.GetProperty("data").EnumerateArray())
-                {
-                    if (model.TryGetProperty("id", out var id) && id.GetString() is { } value)
-                    {
-                        models.Add(value);
-                    }
+                    models.Add(value);
                 }
             }
 
@@ -223,10 +184,8 @@ public sealed class HttpModelBackend : IChatClient, IEmbeddingGenerator<string, 
         await Task.CompletedTask;
     }
 
-    private static string ToOllamaRole(ChatRole role) =>
+    private static string ToOpenAiRole(ChatRole role) =>
         role == ChatRole.System ? "system" : role == ChatRole.Assistant ? "assistant" : "user";
-
-    private static string ToOpenAiRole(ChatRole role) => ToOllamaRole(role);
 }
 
 public sealed class ModelGatewayException(string message, Exception? inner = null) : Exception(message, inner);

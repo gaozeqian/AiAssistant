@@ -5,23 +5,23 @@ using AiAssistant.Core.Domain;
 namespace AiAssistant.Models;
 
 /// <summary>
-/// models.json schema 2. It stores only the models currently in use: one chat endpoint and one
+/// models.json schema 3. It stores only the models currently in use: one chat endpoint and one
 /// embedding endpoint, each with its own tier, address, model name and secret reference. There is
-/// no endpoint list and no policy block; the policy gates are derived from the two tiers.
+/// no endpoint list, no policy block and no provider switch: every endpoint speaks the
+/// OpenAI-compatible API, so the policy gates are derived from the two tiers.
 /// </summary>
 internal sealed record ModelsFileDocument
 {
-    public int SchemaVersion { get; init; } = 2;
+    public int SchemaVersion { get; init; } = 3;
     public ModelEndpointDocument Chat { get; init; } = new();
     public ModelEndpointDocument? Embedding { get; init; }
 }
 
-/// <summary>One model endpoint (chat or embedding) in schema 2.</summary>
+/// <summary>One model endpoint (chat or embedding) in schema 3.</summary>
 internal sealed record ModelEndpointDocument
 {
     public string Tier { get; init; } = "LocalOffline";
-    public string Provider { get; init; } = "ollama";
-    public string BaseUrl { get; init; } = ModelDefaults.OllamaBaseUrl;
+    public string BaseUrl { get; init; } = ModelDefaults.LocalBaseUrl;
     public string Model { get; init; } = ModelDefaults.ChatModel;
     public int TimeoutSeconds { get; init; } = 120;
     public string? ApiKeySecret { get; init; }
@@ -32,7 +32,7 @@ internal sealed record ModelEndpointDocument
     public string? ProxyUrl { get; init; }
     public bool AllowRemoteEndpoint { get; init; }
 
-    /// <summary>Whether the chat model may reason before answering (Ollama thinking models).</summary>
+    /// <summary>Whether the chat model may reason before answering (translated to <c>reasoning_effort</c>).</summary>
     public bool Think { get; init; }
 
     /// <summary>Optional thinking effort: low / medium / high.</summary>
@@ -51,8 +51,7 @@ internal sealed record ModelsFileDocumentV1
 internal sealed record EmbeddingEndpointDocumentV1
 {
     public string Tier { get; init; } = "LocalOffline";
-    public string Provider { get; init; } = "ollama";
-    public string BaseUrl { get; init; } = ModelDefaults.OllamaBaseUrl;
+    public string BaseUrl { get; init; } = ModelDefaults.LocalBaseUrl;
     public string Model { get; init; } = ModelDefaults.EmbeddingModel;
     public int TimeoutSeconds { get; init; } = 120;
     public string? ApiKeySecret { get; init; }
@@ -71,8 +70,7 @@ internal sealed record ModelPolicyDocumentV1
 internal sealed record ModelEndpointDocumentV1
 {
     public string Tier { get; init; } = "LocalOffline";
-    public string Provider { get; init; } = "ollama";
-    public string BaseUrl { get; init; } = ModelDefaults.OllamaBaseUrl;
+    public string BaseUrl { get; init; } = ModelDefaults.LocalBaseUrl;
     public string ChatModel { get; init; } = ModelDefaults.ChatModel;
     public string EmbeddingModel { get; init; } = ModelDefaults.EmbeddingModel;
     public int TimeoutSeconds { get; init; } = 120;
@@ -97,7 +95,6 @@ public sealed record ModelPolicy(
 
 public sealed record ModelEndpointSettings(
     ModelEndpointTier Tier,
-    ModelProviderKind Provider,
     Uri BaseAddress,
     string ChatModel,
     string EmbeddingModel,
@@ -131,13 +128,13 @@ public interface IModelSecretResolver
 }
 
 /// <summary>
-/// Versioned models.json loader. Schema 2 holds the active chat and embedding endpoints only;
-/// schema 1 files are still readable and map onto the same in-memory shape. Unknown newer
-/// schema versions fail closed.
+/// Versioned models.json loader. Schema 3 holds the active chat and embedding endpoints only;
+/// schema 1 and 2 files are still readable and map onto the same in-memory shape (the retired
+/// <c>provider</c> field is ignored). Unknown newer schema versions fail closed.
 /// </summary>
 public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolver)
 {
-    public const int SupportedSchemaVersion = 2;
+    public const int SupportedSchemaVersion = 3;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public async Task<ModelsConfiguration> LoadAsync(string path, CancellationToken ct)
@@ -250,7 +247,7 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
         return new ModelsConfiguration(1, policy, chat, embedding);
     }
 
-    /// <summary>Schema 2 without an embedding document: same endpoint, default embedding model.</summary>
+    /// <summary>Schema 3 without an embedding document: same endpoint, default embedding model.</summary>
     private static ModelEndpointSettings DeriveEmbeddingFromChat(ModelEndpointSettings chat) =>
         chat with
         {
@@ -262,7 +259,7 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
 
     private static ModelPolicy BuildPolicy(ModelEndpointTier chatTier, ModelEndpointTier embeddingTier)
     {
-        // Schema 2 has no policy block: selecting a tier in the UI is the explicit decision, so the
+        // Schema 3 has no policy block: selecting a tier in the UI is the explicit decision, so the
         // corresponding gate opens and public-cloud consent is satisfied by that choice.
         var intranet = chatTier == ModelEndpointTier.CorporateIntranet || embeddingTier == ModelEndpointTier.CorporateIntranet;
         var publicCloud = chatTier == ModelEndpointTier.PublicCloud || embeddingTier == ModelEndpointTier.PublicCloud;
@@ -299,7 +296,6 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
     private async Task<ModelEndpointSettings> ParseLegacyEmbeddingAsync(EmbeddingEndpointDocumentV1 document, CancellationToken ct)
     {
         var tier = ParseTier(document.Tier, "embedding");
-        var provider = ParseProvider(document.Provider, "embedding");
         var baseAddress = ParseBaseAddress(document.BaseUrl, tier, "embedding");
         if (string.IsNullOrWhiteSpace(document.Model))
         {
@@ -309,7 +305,6 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
         var apiKey = await ResolveSecretAsync(document.ApiKeySecret, ct);
         return new ModelEndpointSettings(
             tier,
-            provider,
             baseAddress,
             string.Empty,
             document.Model,
@@ -329,7 +324,6 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
     private async Task<ModelEndpointSettings> ParseLegacyEndpointAsync(ModelEndpointDocumentV1 document, CancellationToken ct)
     {
         var tier = ParseTier(document.Tier, "chat");
-        var provider = ParseProvider(document.Provider, "chat");
         var baseAddress = ParseBaseAddress(document.BaseUrl, tier, "chat");
         if (string.IsNullOrWhiteSpace(document.ChatModel))
         {
@@ -348,7 +342,6 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
         var certificatePassword = await ResolveSecretAsync(document.ClientCertificatePasswordSecret, ct);
         return new ModelEndpointSettings(
             tier,
-            provider,
             baseAddress,
             document.ChatModel,
             document.EmbeddingModel,
@@ -375,7 +368,6 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
     {
         var role = isEmbedding ? "embedding" : "chat";
         var tier = ParseTier(document.Tier, role);
-        var provider = ParseProvider(document.Provider, role);
         var baseAddress = ParseBaseAddress(document.BaseUrl, tier, role);
         if (string.IsNullOrWhiteSpace(document.Model))
         {
@@ -394,7 +386,6 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
         var certificatePassword = await ResolveSecretAsync(document.ClientCertificatePasswordSecret, ct);
         return new ModelEndpointSettings(
             tier,
-            provider,
             baseAddress,
             isEmbedding ? string.Empty : document.Model,
             isEmbedding ? document.Model : string.Empty,
@@ -423,14 +414,6 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
 
         return tier;
     }
-
-    private static ModelProviderKind ParseProvider(string value, string role) =>
-        value.ToLowerInvariant() switch
-        {
-            "ollama" => ModelProviderKind.Ollama,
-            "openai" or "lmstudio" or "openai-compatible" => ModelProviderKind.OpenAiCompatible,
-            _ => throw new ModelConfigurationException($"Unknown {role} provider '{value}'.")
-        };
 
     private static Uri ParseBaseAddress(string value, ModelEndpointTier tier, string role)
     {
@@ -510,7 +493,6 @@ public sealed class ModelsConfigurationLoader(IModelSecretResolver secretResolve
         var options = ModelGatewayOptions.FromEnvironment();
         var chat = new ModelEndpointSettings(
             ModelEndpointTier.LocalOffline,
-            options.Provider,
             options.BaseAddress,
             options.ChatModel,
             string.Empty,

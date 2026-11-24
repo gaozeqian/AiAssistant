@@ -2,13 +2,15 @@
 
 > **状态**：living ｜ **最后更新**：2026-11-23 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：默认模型、端点策略、语音模型安装或 UI 联调方式变化时
 
-应用默认只使用本机 Ollama（`http://127.0.0.1:11434`），不向云端发送数据。配置键权威清单见 [配置参考](../reference/configuration.md)。
+应用默认只使用本机端点（`http://127.0.0.1:11434`），不向云端发送数据。所有端点统一走 **OpenAI 兼容协议**（`/v1/chat/completions`、`/v1/embeddings`、`/v1/models`）：Ollama、LM Studio、vLLM 与云厂商只差地址、模型名和密钥，没有 provider 开关。配置键权威清单见 [配置参考](../reference/configuration.md)。
 
-## 1. Ollama 对话 / 向量模型
+## 1. 对话 / 向量模型
+
+Ollama 自带 OpenAI 兼容端点，默认运行时不需额外适配：
 
 ```bash
 ollama list
-curl http://127.0.0.1:11434/api/tags
+curl http://127.0.0.1:11434/v1/models
 ```
 
 | 用途 | 默认模型 |
@@ -31,8 +33,8 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj -- --benchmark
 ```
 
 - 更换 embedding 模型或文档格式后执行 `--rebuild-vectors`；采集后直接问答会自动补建索引。
-- 推理型模型默认 `think: false`，避免耗尽输出预算；可在诊断页「模型配置」开启思考并选择强度，或设置 `AIASSISTANT_MODEL_THINK` / `AIASSISTANT_MODEL_THINKING_LEVEL`。
-- loopback 端点显式绕过系统代理，避免公司代理导致 Ollama 失败。
+- 推理型模型默认向本机端点发送 `reasoning_effort: "none"`，避免耗尽输出预算；可在诊断页「模型配置」开启思考并选择强度（`low`/`medium`/`high`），或设置 `AIASSISTANT_MODEL_THINK` / `AIASSISTANT_MODEL_THINKING_LEVEL`。远程端点仅在显式开启思考时发送该字段，避免不支持它的厂商返回 HTTP 400。
+- loopback 端点显式绕过系统代理，避免公司代理导致本机模型调用失败。
 
 ## 2. 语音模型安装
 
@@ -77,12 +79,12 @@ tts/  model.onnx tokens.txt lexicon.txt *.fst dict/
 
 ## 4. 从 UI 配置模型
 
-诊断页「模型配置」可独立设置对话与向量端点：来源（本机/内网/公网）、模型名、Base URL、接口密钥、思考开关与强度。
+诊断页「模型配置」可独立设置对话与向量端点：来源（本机/内网/公网）、模型名、Base URL、接口密钥、思考开关与强度。地址指向任意 OpenAI 兼容运行时即可（Ollama、LM Studio、vLLM 或云厂商）。
 
 - 两个模型完全独立：同档位也可以使用不同地址、不同模型与不同密钥。
 - 本机端点必须 loopback；内网/公网允许远程地址，失败不会自动回落到本机。
 - 接口密钥在对应端点输入框填写，写入加密库（名称固定为 `chat-endpoint-key` / `embedding-endpoint-key`），`models.json` 只保存 `apiKeySecret` 引用；勾选「清除已保存密钥」可删除。
-- 保存写入 `<数据目录>/models.json`，只保留当前在用的对话与向量模型（schema 2），重启生效。
+- 保存写入 `<数据目录>/models.json`，只保留当前在用的对话与向量模型（schema 3），重启生效。
 - 也可用 `--import-model-secret <名称>` 预先写入密钥，再在 `apiKeySecret` 中引用该名称。
 
 ## 5. Linux 桌面图标与托盘

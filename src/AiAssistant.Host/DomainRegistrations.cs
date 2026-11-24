@@ -171,7 +171,6 @@ internal static class DomainRegistrations
         services.AddSingleton(chatClient);
         var chatBackend = new HttpModelBackend(chatClient, new ModelGatewayOptions
         {
-            Provider = configuration.Chat.Provider,
             BaseAddress = configuration.Chat.BaseAddress,
             ChatModel = configuration.Chat.ChatModel,
             EmbeddingModel = configuration.Chat.EmbeddingModel,
@@ -202,7 +201,6 @@ internal static class DomainRegistrations
         services.AddSingleton(embeddingClient);
         var embeddingBackend = new HttpModelBackend(embeddingClient, new ModelGatewayOptions
         {
-            Provider = configuration.Embedding.Provider,
             BaseAddress = configuration.Embedding.BaseAddress,
             ChatModel = configuration.Embedding.ChatModel,
             EmbeddingModel = configuration.Embedding.EmbeddingModel,

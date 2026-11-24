@@ -1,8 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "chat": {
     "tier": "LocalOffline",
-    "provider": "ollama",
     "baseUrl": "http://127.0.0.1:11434",
     "model": "gemma4:12b",
     "timeoutSeconds": 120,
@@ -10,7 +9,6 @@
   },
   "embedding": {
     "tier": "LocalOffline",
-    "provider": "ollama",
     "baseUrl": "http://127.0.0.1:11434",
     "model": "embeddinggemma-2:740m",
     "timeoutSeconds": 120

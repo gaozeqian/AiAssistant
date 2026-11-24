@@ -12,7 +12,7 @@ namespace AiAssistant.Desktop.ViewModels;
 public sealed class ModelConfigurationEditorViewModel : ObservableObject
 {
     private readonly IModelConfigurationAdmin? _modelConfiguration;
-    private string _chatBaseUrl = ModelDefaults.OllamaBaseUrl;
+    private string _chatBaseUrl = ModelDefaults.LocalBaseUrl;
     private string _chatModel = string.Empty;
     private ModelTierOption _chatTier = new("LocalOffline", "本机");
     private bool _chatThink;
@@ -20,7 +20,7 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
     private string _chatApiKey = string.Empty;
     private bool _clearChatApiKey;
     private string? _chatApiKeySecret;
-    private string _embeddingBaseUrl = ModelDefaults.OllamaBaseUrl;
+    private string _embeddingBaseUrl = ModelDefaults.LocalBaseUrl;
     private string _embeddingModel = string.Empty;
     private ModelTierOption _embeddingTier = new("LocalOffline", "本机");
     private string _embeddingApiKey = string.Empty;
@@ -142,7 +142,7 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
         new("PublicCloud", "公网 API")
     ];
 
-    /// <summary>Thinking effort passed to Ollama thinking models when 允许思考 is enabled.</summary>
+    /// <summary>Reasoning effort sent as <c>reasoning_effort</c> when 允许思考 is enabled.</summary>
     public IReadOnlyList<ModelThinkingLevelOption> ThinkingLevelOptions { get; } =
     [
         new("low", "低"),
@@ -150,7 +150,7 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
         new("high", "高")
     ];
 
-    /// <summary>Whether the chat model may reason before answering (Ollama thinking models).</summary>
+    /// <summary>Whether the chat model may reason before answering (maps to <c>reasoning_effort</c>).</summary>
     public bool ChatThink
     {
         get => _chatThink;
@@ -186,7 +186,7 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
 
         var isHttps = Uri.TryCreate(current, UriKind.Absolute, out var httpsUri) &&
                       httpsUri.Scheme == Uri.UriSchemeHttps;
-        return isEmpty || isHttps ? ModelDefaults.OllamaBaseUrl : current;
+        return isEmpty || isHttps ? ModelDefaults.LocalBaseUrl : current;
     }
 
     private async Task SaveAsync()

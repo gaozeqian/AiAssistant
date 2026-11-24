@@ -7,7 +7,7 @@ namespace AiAssistant.Models;
 
 /// <summary>
 /// Reads the active chat / embedding endpoint settings for the UI and persists edits back to
-/// models.json schema 2. Chat and embedding are independent documents, so they may share a tier
+/// models.json schema 3. Chat and embedding are independent documents, so they may share a tier
 /// while pointing at different addresses, models and keys. Only the two models in use are stored.
 /// </summary>
 public sealed class ModelConfigurationAdmin(
@@ -70,17 +70,9 @@ public sealed class ModelConfigurationAdmin(
             _current.Embedding.ApiKey,
             ct);
 
-        var chatProvider = chatTier == ModelEndpointTier.LocalOffline
-            ? await ResolveLocalProviderAsync(chatBaseUrl, _current.Chat.Provider, ct)
-            : ModelProviderKind.OpenAiCompatible;
-        var embeddingProvider = embeddingTier == ModelEndpointTier.LocalOffline
-            ? await ResolveLocalProviderAsync(embeddingBaseUrl, _current.Embedding.Provider, ct)
-            : ModelProviderKind.OpenAiCompatible;
-
         var chat = _current.Chat with
         {
             Tier = chatTier,
-            Provider = chatProvider,
             BaseAddress = new Uri(chatBaseUrl),
             ChatModel = update.Chat.Model.Trim(),
             EmbeddingModel = string.Empty,
@@ -95,7 +87,6 @@ public sealed class ModelConfigurationAdmin(
         var embedding = _current.Embedding with
         {
             Tier = embeddingTier,
-            Provider = embeddingProvider,
             BaseAddress = new Uri(embeddingBaseUrl),
             ChatModel = string.Empty,
             EmbeddingModel = update.Embedding.Model.Trim(),
@@ -137,7 +128,6 @@ public sealed class ModelConfigurationAdmin(
         new()
         {
             Tier = settings.Tier.ToString(),
-            Provider = settings.Provider == ModelProviderKind.Ollama ? "ollama" : "openai",
             BaseUrl = settings.BaseAddress.ToString().TrimEnd('/'),
             Model = model,
             TimeoutSeconds = Math.Clamp((int)Math.Round(settings.Timeout.TotalSeconds), 1, 600),
@@ -186,33 +176,6 @@ public sealed class ModelConfigurationAdmin(
         var value = view.ApiKey.Trim();
         await secrets.SetAsync(secretName, value, ct);
         return (secretName, value);
-    }
-
-    /// <summary>
-    /// "本机" is not tied to a specific runtime. Keep an existing provider, otherwise probe
-    /// Ollama's /api/tags once and fall back to the OpenAI-compatible API (LM Studio, vLLM, ...).
-    /// </summary>
-    private static async Task<ModelProviderKind> ResolveLocalProviderAsync(
-        string baseUrl,
-        ModelProviderKind existingProvider,
-        CancellationToken ct)
-    {
-        try
-        {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-            using var response = await http.GetAsync(new Uri(new Uri(baseUrl), "/api/tags"), ct);
-            if (response.IsSuccessStatusCode)
-            {
-                return ModelProviderKind.Ollama;
-            }
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or UriFormatException)
-        {
-            // 本机探测失败属预期降级：改用 OpenAI 兼容端点。
-            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Models.ModelConfigurationAdmin.ResolveLocalProviderAsync", ex);
-        }
-
-        return existingProvider == ModelProviderKind.Ollama ? ModelProviderKind.OpenAiCompatible : existingProvider;
     }
 
     private static void ValidateEndpoint(ModelEndpointView view, ModelEndpointTier tier, bool isEmbedding)

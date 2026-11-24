@@ -20,7 +20,6 @@ public static class EnvironmentNames
     public const string IpcToken = "AIASSISTANT_IPC_TOKEN";
 
     // 模型网关
-    public const string ModelProvider = "AIASSISTANT_MODEL_PROVIDER";
     public const string ModelBaseUrl = "AIASSISTANT_MODEL_BASE_URL";
     public const string ChatModel = "AIASSISTANT_CHAT_MODEL";
     public const string EmbeddingModel = "AIASSISTANT_EMBEDDING_MODEL";

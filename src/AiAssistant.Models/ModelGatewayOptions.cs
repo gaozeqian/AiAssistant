@@ -1,26 +1,25 @@
 using AiAssistant.Core.Configuration;
+
 namespace AiAssistant.Models;
 
-public enum ModelProviderKind
-{
-    Ollama = 0,
-    OpenAiCompatible = 1
-}
-
+/// <summary>
+/// Endpoint settings for one model role. Every runtime is reached over the OpenAI-compatible
+/// HTTP API, so there is no provider switch: Ollama, LM Studio, vLLM and cloud vendors are
+/// distinguished only by base address, model name and key.
+/// </summary>
 public sealed class ModelGatewayOptions
 {
-    public ModelProviderKind Provider { get; init; } = ModelProviderKind.Ollama;
-    public Uri BaseAddress { get; init; } = new(ModelDefaults.OllamaBaseUrl);
+    public Uri BaseAddress { get; init; } = new(ModelDefaults.LocalBaseUrl);
     public string ChatModel { get; init; } = ModelDefaults.ChatModel;
 
     /// <summary>
-    /// Whether to let Ollama thinking models (e.g. gemma4 / qwen3) reason before answering.
-    /// Defaults to off: reasoning consumes the output budget, which made structured reports slow
-    /// and could return empty content. Ignored by models without a thinking mode.
+    /// Whether the chat model may reason before answering. Translated to the OpenAI-compatible
+    /// <c>reasoning_effort</c> field; off keeps thinking models from spending the output budget
+    /// on reasoning and returning empty content.
     /// </summary>
     public bool Think { get; init; }
 
-    /// <summary>Optional thinking effort for Ollama (<c>low</c>/<c>medium</c>/<c>high</c>); ignored when <see cref="Think"/> is false.</summary>
+    /// <summary>Optional reasoning effort (<c>low</c>/<c>medium</c>/<c>high</c>); ignored when <see cref="Think"/> is false.</summary>
     public string? ThinkingLevel { get; init; }
 
     public string EmbeddingModel { get; init; } = ModelDefaults.EmbeddingModel;
@@ -33,26 +32,15 @@ public sealed class ModelGatewayOptions
 
     public static ModelGatewayOptions FromEnvironment()
     {
-        var provider = string.Equals(
-            Environment.GetEnvironmentVariable(EnvironmentNames.ModelProvider),
-            "lmstudio",
-            StringComparison.OrdinalIgnoreCase)
-            ? ModelProviderKind.OpenAiCompatible
-            : ModelProviderKind.Ollama;
-
-        var defaultBase = provider == ModelProviderKind.Ollama
-            ? ModelDefaults.OllamaBaseUrl
-            : ModelDefaults.LmStudioBaseUrl;
         var baseUrl = Environment.GetEnvironmentVariable(EnvironmentNames.ModelBaseUrl);
         var chatModel = Environment.GetEnvironmentVariable(EnvironmentNames.ChatModel) ?? ModelDefaults.ChatModel;
         var embeddingModel = Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingModel) ?? ModelDefaults.EmbeddingModel;
 
         return new ModelGatewayOptions
         {
-            Provider = provider,
-            BaseAddress = Uri.TryCreate(string.IsNullOrWhiteSpace(baseUrl) ? defaultBase : baseUrl, UriKind.Absolute, out var uri)
+            BaseAddress = Uri.TryCreate(string.IsNullOrWhiteSpace(baseUrl) ? ModelDefaults.LocalBaseUrl : baseUrl, UriKind.Absolute, out var uri)
                 ? uri
-                : new Uri(defaultBase),
+                : new Uri(ModelDefaults.LocalBaseUrl),
             ChatModel = chatModel,
             EmbeddingModel = embeddingModel,
             Think = string.Equals(

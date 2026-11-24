@@ -207,7 +207,7 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
         try
         {
             using var response = await client.PostAsJsonAsync(
-                ChatPath(endpoint),
+                ChatPath,
                 BuildChatPayload(endpoint, "只回复 OK", stream: false, json: false, tools: false),
                 ct);
             return response.IsSuccessStatusCode;
@@ -222,7 +222,7 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, ChatPath(endpoint))
+            using var request = new HttpRequestMessage(HttpMethod.Post, ChatPath)
             {
                 Content = JsonContent.Create(BuildChatPayload(endpoint, "回复 OK", stream: true, json: false, tools: false))
             };
@@ -247,9 +247,8 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
     {
         try
         {
-            var path = endpoint.Provider == ModelProviderKind.Ollama ? "/api/embed" : "/v1/embeddings";
             using var response = await client.PostAsJsonAsync(
-                path,
+                EmbeddingsPath,
                 new { model = endpoint.EmbeddingModel, input = EmbeddingProbeInput },
                 ct);
             if (!response.IsSuccessStatusCode)
@@ -259,9 +258,7 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
 
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-            return document.RootElement.TryGetProperty(
-                endpoint.Provider == ModelProviderKind.Ollama ? "embeddings" : "data",
-                out _);
+            return document.RootElement.TryGetProperty("data", out _);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -274,7 +271,7 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
         try
         {
             using var response = await client.PostAsJsonAsync(
-                ChatPath(endpoint),
+                ChatPath,
                 BuildChatPayload(endpoint, "只输出 JSON：{\"ok\":true}", stream: false, json: true, tools: false),
                 ct);
             if (!response.IsSuccessStatusCode)
@@ -282,7 +279,7 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
                 return false;
             }
 
-            var text = await ExtractContentAsync(response, endpoint.Provider, ct);
+            var text = await ExtractContentAsync(response, ct);
             using var _ = JsonDocument.Parse(text);
             return true;
         }
@@ -297,7 +294,7 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
         try
         {
             using var response = await client.PostAsJsonAsync(
-                ChatPath(endpoint),
+                ChatPath,
                 BuildChatPayload(endpoint, "请调用 noop 工具。", stream: false, json: false, tools: true),
                 ct);
             if (!response.IsSuccessStatusCode)
@@ -332,22 +329,19 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
             ["stream"] = stream
         };
 
-        if (endpoint.Provider == ModelProviderKind.Ollama)
+        payload["max_tokens"] = 32;
+        payload["temperature"] = 0;
+        if (json)
         {
-            payload["options"] = new JsonObject { ["num_predict"] = 32, ["temperature"] = 0 };
-            if (json)
-            {
-                payload["format"] = "json";
-            }
+            payload["response_format"] = new JsonObject { ["type"] = "json_object" };
         }
-        else
+
+        // Probe with thinking off: a 32-token smoke test must measure the API surface, not how long
+        // the model reasons. Loopback runtimes get an explicit "none"; remote providers are left
+        // untouched because they reject parameters they do not support.
+        if (endpoint.BaseAddress.IsLoopback)
         {
-            payload["max_tokens"] = 32;
-            payload["temperature"] = 0;
-            if (json)
-            {
-                payload["response_format"] = new JsonObject { ["type"] = "json_object" };
-            }
+            payload["reasoning_effort"] = "none";
         }
 
         if (tools)
@@ -372,16 +366,13 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
 
     private static async Task<string> ExtractContentAsync(
         HttpResponseMessage response,
-        ModelProviderKind provider,
         CancellationToken ct)
     {
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-        return provider == ModelProviderKind.Ollama
-            ? document.RootElement.GetProperty("message").GetProperty("content").GetString() ?? string.Empty
-            : document.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? string.Empty;
+        return document.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? string.Empty;
     }
 
-    private static string ChatPath(ModelEndpointSettings endpoint) =>
-        endpoint.Provider == ModelProviderKind.Ollama ? "/api/chat" : "/v1/chat/completions";
+    private const string ChatPath = "/v1/chat/completions";
+    private const string EmbeddingsPath = "/v1/embeddings";
 }

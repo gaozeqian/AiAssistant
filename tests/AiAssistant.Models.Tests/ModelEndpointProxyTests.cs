@@ -73,7 +73,6 @@ public sealed class ModelEndpointProxyTests
     private static ModelEndpointSettings Create(Uri baseAddress) =>
         new(
             ModelEndpointTier.LocalOffline,
-            ModelProviderKind.Ollama,
             baseAddress,
             "gemma4:12b",
             "embeddinggemma-2:740m",

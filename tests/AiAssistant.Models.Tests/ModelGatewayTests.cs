@@ -41,9 +41,9 @@ public sealed class ModelGatewayTests
     }
 
     [Fact]
-    public async Task OllamaHttpBackend_ParsesChatEmbeddingsAndProbe()
+    public async Task OpenAiCompatibleBackend_ParsesChatEmbeddingsAndProbe()
     {
-        var handler = new OllamaHandler();
+        var handler = new OpenAiCompatibleHandler();
         var options = new ModelGatewayOptions
         {
             ChatModel = "gemma4:12b",
@@ -66,14 +66,15 @@ public sealed class ModelGatewayTests
         Assert.Single(embeddings);
         Assert.Equal([0.1f, 0.2f, 0.3f], embeddings[0].Vector.ToArray());
         Assert.Contains("\"stream\":false", handler.LastChatBody, StringComparison.Ordinal);
-        // Thinking is off by default so reasoning cannot exhaust the output budget.
-        Assert.Contains("\"think\":false", handler.LastChatBody, StringComparison.Ordinal);
+        // Thinking is off by default; a loopback runtime is told explicitly so reasoning cannot
+        // exhaust the output budget and return empty content.
+        Assert.Contains("\"reasoning_effort\":\"none\"", handler.LastChatBody, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task OllamaHttpBackend_SendsThinkingLevelWhenEnabled()
+    public async Task OpenAiCompatibleBackend_SendsReasoningEffortWhenEnabled()
     {
-        var handler = new OllamaHandler();
+        var handler = new OpenAiCompatibleHandler();
         var options = new ModelGatewayOptions
         {
             ChatModel = "gemma4:12b",
@@ -89,7 +90,30 @@ public sealed class ModelGatewayTests
             null,
             CancellationToken.None);
 
-        Assert.Contains("\"think\":\"high\"", handler.LastChatBody, StringComparison.Ordinal);
+        Assert.Contains("\"reasoning_effort\":\"high\"", handler.LastChatBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OpenAiCompatibleBackend_OmitsReasoningEffortForRemoteEndpoints()
+    {
+        // Cloud vendors reject unsupported parameters with HTTP 400, so the thinking switch is
+        // only translated for loopback runtimes.
+        var handler = new OpenAiCompatibleHandler();
+        var options = new ModelGatewayOptions
+        {
+            BaseAddress = new Uri("https://api.example.com"),
+            ChatModel = "cloud-chat",
+            EmbeddingModel = "cloud-embed"
+        };
+        using var http = new HttpClient(handler);
+        var backend = new HttpModelBackend(http, options);
+
+        _ = await backend.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "生成日报")],
+            null,
+            CancellationToken.None);
+
+        Assert.DoesNotContain("reasoning_effort", handler.LastChatBody, StringComparison.Ordinal);
     }
 
     private sealed class RecordingModelGateway : IModelGateway
@@ -119,27 +143,27 @@ public sealed class ModelGatewayTests
             Task.FromResult(new ModelCapabilitySnapshot(true, true, "fake-chat", "fake-embedding", ModelEndpointTier.LocalOffline, "ok"));
     }
 
-    private sealed class OllamaHandler : HttpMessageHandler
+    private sealed class OpenAiCompatibleHandler : HttpMessageHandler
     {
         public string LastChatBody { get; private set; } = string.Empty;
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
-            if (path == "/api/tags")
+            if (path == "/v1/models")
             {
-                return Json("""{"models":[{"name":"gemma4:12b"},{"name":"embeddinggemma-2:740m"}]}""");
+                return Json("""{"object":"list","data":[{"id":"gemma4:12b"},{"id":"embeddinggemma-2:740m"}]}""");
             }
 
-            if (path == "/api/chat")
+            if (path == "/v1/chat/completions")
             {
                 LastChatBody = await request.Content!.ReadAsStringAsync(cancellationToken);
-                return Json("""{"message":{"role":"assistant","content":"测试回复"},"done":true}""");
+                return Json("""{"choices":[{"index":0,"message":{"role":"assistant","content":"测试回复"},"finish_reason":"stop"}]}""");
             }
 
-            if (path == "/api/embed")
+            if (path == "/v1/embeddings")
             {
-                return Json("""{"embeddings":[[0.1,0.2,0.3]]}""");
+                return Json("""{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2,0.3]}]}""");
             }
 
             return new HttpResponseMessage(HttpStatusCode.NotFound);

@@ -23,7 +23,6 @@
 
 | 变量 | 作用 | 默认 |
 |---|---|---|
-| `AIASSISTANT_MODEL_PROVIDER` | 端点提供方 | 空（按配置） |
 | `AIASSISTANT_MODEL_BASE_URL` | 本机/内网端点 | `http://127.0.0.1:11434` |
 | `AIASSISTANT_CHAT_MODEL` | 对话模型 | `gemma4:12b` |
 | `AIASSISTANT_EMBEDDING_MODEL` | 向量模型 | `embeddinggemma-2:740m` |
