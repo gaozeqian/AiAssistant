@@ -40,7 +40,7 @@
 | `Microsoft.Extensions.Hosting.Abstractions` | 11.0.0 | MIT | 宿主抽象 |
 | `Microsoft.Extensions.Logging.Abstractions` | 11.0.0 | MIT | 日志抽象 |
 | `System.Numerics.Tensors` | 11.0.0 | MIT | 向量运算 |
-| `org.k2fsa.sherpa.onnx` | 2.0.2 | Apache-2.0 | 语音识别/唤醒/TTS |
+| `org.k2fsa.sherpa.onnx` | 2.0.3 | Apache-2.0 | 语音识别/唤醒/TTS |
 | `Whisper.net` | 1.9.1 | MIT | 可选 ASR |
 | `Whisper.net.Runtime` | 1.9.1 | MIT | Whisper 原生运行时 |
 | `NAudio` | 3.3.0 | MIT | Windows 音频 |
