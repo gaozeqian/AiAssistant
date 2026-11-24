@@ -7,6 +7,9 @@ internal static partial class Win32Native
     public const int SmCxScreen = 0;
     public const int SmCyScreen = 1;
     public const int Srccopy = 0x00CC0020;
+    public const uint MonitorInfoPrimary = 1;
+    public const uint MonitorDefaultToPrimary = 1;
+    public const uint MonitorDefaultToNearest = 2;
     public const int GwlStyle = -16;
     public const int EsPassword = 0x0020;
     public const uint WmGetTextLength = 0x000E;
@@ -38,6 +41,53 @@ internal static partial class Win32Native
     {
         public BitmapInfoHeader BmiHeader;
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+
+        public readonly int Width => Right - Left;
+        public readonly int Height => Bottom - Top;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct MonitorInfoEx
+    {
+        public uint Size;
+        public NativeRect Monitor;
+        public NativeRect Work;
+        public uint Flags;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string DeviceName;
+    }
+
+    public delegate bool MonitorEnumProc(nint hMonitor, nint hdcMonitor, ref NativeRect lprcMonitor, nint dwData);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool EnumDisplayMonitors(nint hdc, nint lprcClip, MonitorEnumProc lpfnEnum, nint dwData);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetMonitorInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetMonitorInfo(nint hMonitor, ref MonitorInfoEx lpmi);
+
+    [DllImport("user32.dll")]
+    public static extern nint MonitorFromWindow(nint hwnd, uint dwFlags);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern nint MonitorFromPoint(NativePoint pt, uint dwFlags);
 
     public delegate bool EnumWindowsProc(nint hWnd, nint lParam);
 

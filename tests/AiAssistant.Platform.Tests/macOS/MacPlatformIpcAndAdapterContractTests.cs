@@ -66,10 +66,11 @@ public sealed class MacPlatformIpcAndAdapterContractTests : IDisposable
         Assert.Equal("AiAssistant", window.WindowTitle);
         Assert.Equal((nint)42, window.NativeWindowHandle);
 
-        var screen = await screenCapture.CaptureFrameAsync(CancellationToken.None);
-        Assert.NotNull(screen);
-        Assert.Equal(1280, screen!.Width);
+        var screens = await screenCapture.CaptureDisplaysAsync(new ScreenCaptureTarget(), CancellationToken.None);
+        var screen = Assert.Single(screens);
+        Assert.Equal(1280, screen.Width);
         Assert.Equal([0x89, 0x50, 0x4E, 0x47], screen.EncodedPngBytes);
+        Assert.True(screen.IsForegroundDisplay);
 
         var extracted = await textExtractor.ExtractAsync(
             new TextExtractionRequest(42, "Xcode", "AiAssistant"),
@@ -182,7 +183,7 @@ public sealed class MacPlatformIpcAndAdapterContractTests : IDisposable
         Assert.Equal(CapabilityStatus.PermissionRequired, screen.Capability.Status);
         Assert.Equal(CapabilityStatus.Degraded, window.Capability.Status);
         Assert.Equal(CapabilityStatus.PermissionRequired, audio.Capability.Status);
-        Assert.Null(await screen.CaptureFrameAsync(CancellationToken.None));
+        Assert.Empty(await screen.CaptureDisplaysAsync(new ScreenCaptureTarget(), CancellationToken.None));
 
         var firstToken = behavior.LastReceivedToken;
         await launcher.Instances[0].CrashAsync();

@@ -131,15 +131,14 @@ public sealed class LinuxPlatformContractTests : IDisposable
         await using var manager = CreateManager(client, store);
         var capture = new WaylandScreenCapture(client, manager, new SystemClock(), NullLogger<WaylandScreenCapture>.Instance);
 
-        var frame = await capture.CaptureFrameAsync(CancellationToken.None);
-        Assert.NotNull(frame);
-        Assert.Equal(2, frame!.Width);
+        var frame = Assert.Single(await capture.CaptureDisplaysAsync(new ScreenCaptureTarget(), CancellationToken.None));
+        Assert.Equal(2, frame.Width);
         Assert.Equal(2, frame.Height);
         Assert.Equal([0x89, 0x50, 0x4E, 0x47], frame.EncodedPngBytes[..4]);
 
         client.ScreenshotFailure = new XdgPortalRequestException(1, "Screenshot");
-        var afterRevocation = await capture.CaptureFrameAsync(CancellationToken.None);
-        Assert.Null(afterRevocation);
+        var afterRevocation = await capture.CaptureDisplaysAsync(new ScreenCaptureTarget(), CancellationToken.None);
+        Assert.Empty(afterRevocation);
         Assert.Null(store.Token);
         Assert.Equal(XdgPortalSessionStatus.PermissionRequired, manager.Snapshot.Status);
         Assert.Equal(CapabilityStatus.Degraded, capture.Capability.Status);

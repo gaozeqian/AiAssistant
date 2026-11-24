@@ -108,7 +108,15 @@ public sealed record MacScreenFrameDto(
     int Width,
     int Height,
     ulong PerceptualHash,
-    string PngBase64);
+    string PngBase64,
+    string? DisplayId = null,
+    string? DisplayName = null,
+    int? DisplayLeft = null,
+    int? DisplayTop = null,
+    int? DisplayWidth = null,
+    int? DisplayHeight = null,
+    bool? IsPrimary = null,
+    bool? IsForegroundDisplay = null);
 
 public sealed record MacExtractedTextDto(
     string Text,
@@ -133,6 +141,7 @@ public sealed record MacIpcResponse(
     MacPermissionsDto? Permissions = null,
     MacForegroundWindowDto? Window = null,
     MacScreenFrameDto? ScreenFrame = null,
+    IReadOnlyList<MacScreenFrameDto>? ScreenFrames = null,
     MacExtractedTextDto? ExtractedText = null,
     IReadOnlyList<MacFileChangeDto>? FileChanges = null,
     MacAudioChunkDto? AudioChunk = null);

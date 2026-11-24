@@ -85,13 +85,18 @@ public sealed class WindowsPlatformAdapterTests : IDisposable
             Assert.True(screenCapture.Capability.IsOperational);
             Assert.True(windowSource.Capability.IsOperational);
 
-            // Capture frame if interactive desktop session is available; null is allowed in headless Session 0
-            var frame = await screenCapture.CaptureFrameAsync(CancellationToken.None);
-            if (frame is not null)
+            // Capture every display if an interactive desktop session is available; an empty list
+            // is allowed in headless Session 0.
+            var frames = await screenCapture.CaptureDisplaysAsync(new ScreenCaptureTarget(), CancellationToken.None);
+            foreach (var frame in frames)
             {
                 Assert.True(frame.Width > 0 && frame.Height > 0);
                 Assert.Equal([0x89, 0x50, 0x4E, 0x47], frame.EncodedPngBytes[..4]);
+                Assert.NotNull(frame.Display);
             }
+
+            // Exactly one display is flagged as hosting the foreground window.
+            Assert.True(frames.Count(item => item.IsForegroundDisplay) <= 1);
         }
         else
         {

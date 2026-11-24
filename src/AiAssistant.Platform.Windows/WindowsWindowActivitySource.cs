@@ -94,16 +94,42 @@ public sealed class WindowsWindowActivitySource(IClock clock, IScreenCapture? sc
 
             if (screenCapture is not null && screenCapture.Capability.IsOperational)
             {
-                var frame = await screenCapture.CaptureFrameAsync(ct);
-                if (frame is not null)
+                var frames = await screenCapture.CaptureDisplaysAsync(
+                    new ScreenCaptureTarget(current.NativeWindowHandle),
+                    ct);
+                if (frames.Count > 0)
                 {
-                    yield return current with
+                    // One record per display: the monitor hosting the foreground window keeps the
+                    // window context, the other monitors are stored as desktop snapshots.
+                    foreach (var frame in frames)
                     {
-                        Source = SourceKind.ScreenFrame,
-                        RawMediaBytes = frame.EncodedPngBytes,
-                        MediaKind = ContentKind.ScreenshotPng,
-                        PerceptualHash = frame.PerceptualHash
-                    };
+                        var metadata = ScreenCaptureMetadata.FromDisplay(frame);
+                        if (frame.IsForegroundDisplay)
+                        {
+                            yield return current with
+                            {
+                                Timestamp = frame.Timestamp,
+                                Source = SourceKind.ScreenFrame,
+                                RawMediaBytes = frame.EncodedPngBytes,
+                                MediaKind = ContentKind.ScreenshotPng,
+                                PerceptualHash = frame.PerceptualHash,
+                                Metadata = metadata
+                            };
+                        }
+                        else
+                        {
+                            yield return new CapturedSample(
+                                frame.Timestamp,
+                                SourceKind.ScreenFrame,
+                                "Desktop",
+                                frame.Display is null ? "显示器" : $"显示器 {frame.Display.Name}",
+                                RawMediaBytes: frame.EncodedPngBytes,
+                                MediaKind: ContentKind.ScreenshotPng,
+                                PerceptualHash: frame.PerceptualHash,
+                                Metadata: metadata);
+                        }
+                    }
+
                     continue;
                 }
             }

@@ -237,16 +237,38 @@ public sealed class BoundedCaptureCoordinator : ICaptureCoordinator
 
         if (_screenCapture is not null && _screenCapture.Capability.IsOperational)
         {
-            var frame = await _screenCapture.CaptureFrameAsync(ct);
-            if (frame is not null)
+            var frames = await _screenCapture.CaptureDisplaysAsync(
+                new ScreenCaptureTarget(sample.NativeWindowHandle),
+                ct);
+            if (frames.Count > 0)
             {
-                sample = sample with
+                // Manual snapshots follow the same per-display rule as continuous capture.
+                foreach (var frame in frames)
                 {
-                    Source = SourceKind.ScreenFrame,
-                    RawMediaBytes = frame.EncodedPngBytes,
-                    MediaKind = ContentKind.ScreenshotPng,
-                    PerceptualHash = frame.PerceptualHash
-                };
+                    var metadata = ScreenCaptureMetadata.FromDisplay(frame);
+                    var item = frame.IsForegroundDisplay
+                        ? sample with
+                        {
+                            Timestamp = frame.Timestamp,
+                            Source = SourceKind.ScreenFrame,
+                            RawMediaBytes = frame.EncodedPngBytes,
+                            MediaKind = ContentKind.ScreenshotPng,
+                            PerceptualHash = frame.PerceptualHash,
+                            Metadata = metadata
+                        }
+                        : new CapturedSample(
+                            frame.Timestamp,
+                            SourceKind.ScreenFrame,
+                            "Desktop",
+                            frame.Display is null ? "显示器" : $"显示器 {frame.Display.Name}",
+                            RawMediaBytes: frame.EncodedPngBytes,
+                            MediaKind: ContentKind.ScreenshotPng,
+                            PerceptualHash: frame.PerceptualHash,
+                            Metadata: metadata);
+                    await SubmitSampleAsync(item, ct);
+                }
+
+                return;
             }
         }
 

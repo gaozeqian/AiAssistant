@@ -171,12 +171,12 @@ public sealed class X11ScreenCapture(IClock clock) : IScreenCapture
         ? CapabilityState.Supported(CapabilityKind.ScreenCapture, "X11 XGetImage 截图（PNG + 感知哈希）")
         : CapabilityState.Unavailable(CapabilityKind.ScreenCapture, "X11 显示不可用");
 
-    public Task<ScreenCaptureFrame?> CaptureFrameAsync(CancellationToken ct)
+    public Task<IReadOnlyList<ScreenCaptureFrame>> CaptureDisplaysAsync(ScreenCaptureTarget target, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (!Capability.IsOperational)
         {
-            return Task.FromResult<ScreenCaptureFrame?>(null);
+            return Task.FromResult<IReadOnlyList<ScreenCaptureFrame>>([]);
         }
 
         nint display = 0;
@@ -186,7 +186,7 @@ public sealed class X11ScreenCapture(IClock clock) : IScreenCapture
             display = X11Native.XOpenDisplay(null);
             if (display == 0)
             {
-                return Task.FromResult<ScreenCaptureFrame?>(null);
+                return Task.FromResult<IReadOnlyList<ScreenCaptureFrame>>([]);
             }
 
             var root = X11Native.XDefaultRootWindow(display);
@@ -194,25 +194,25 @@ public sealed class X11ScreenCapture(IClock clock) : IScreenCapture
             var height = X11Native.XDisplayHeight(display, 0);
             if (root == 0 || width <= 0 || height <= 0 || width > 16384 || height > 16384)
             {
-                return Task.FromResult<ScreenCaptureFrame?>(null);
+                return Task.FromResult<IReadOnlyList<ScreenCaptureFrame>>([]);
             }
 
             image = X11Native.XGetImage(display, root, 0, 0, (uint)width, (uint)height, X11Native.AllPlanes, X11Native.ZPixmap);
             if (image == 0)
             {
-                return Task.FromResult<ScreenCaptureFrame?>(null);
+                return Task.FromResult<IReadOnlyList<ScreenCaptureFrame>>([]);
             }
 
             var layout = Marshal.PtrToStructure<X11Native.XImageLayout>(image);
             if (layout.Data == 0 || layout.BytesPerLine <= 0 || layout.BitsPerPixel is not (24 or 32))
             {
-                return Task.FromResult<ScreenCaptureFrame?>(null);
+                return Task.FromResult<IReadOnlyList<ScreenCaptureFrame>>([]);
             }
 
             var byteCount = checked(layout.BytesPerLine * layout.Height);
             if (byteCount <= 0 || byteCount > 512 * 1024 * 1024)
             {
-                return Task.FromResult<ScreenCaptureFrame?>(null);
+                return Task.FromResult<IReadOnlyList<ScreenCaptureFrame>>([]);
             }
 
             var raw = new byte[byteCount];
@@ -233,11 +233,13 @@ public sealed class X11ScreenCapture(IClock clock) : IScreenCapture
                 targetHeight);
             var hash = PerceptualHash.ComputeFromBgra32(bgra, targetWidth, targetHeight, targetWidth * 4);
             var png = PngCodec.EncodeBgra32(bgra, targetWidth, targetHeight);
-            return Task.FromResult<ScreenCaptureFrame?>(new ScreenCaptureFrame(clock.Now(), targetWidth, targetHeight, hash, png));
+            // The X11 root window spans every monitor (Xinerama/RandR), so one composite frame covers them all.
+            return Task.FromResult<IReadOnlyList<ScreenCaptureFrame>>(
+                [new ScreenCaptureFrame(clock.Now(), targetWidth, targetHeight, hash, png, IsForegroundDisplay: true)]);
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException or OverflowException)
         {
-            return Task.FromResult<ScreenCaptureFrame?>(null);
+            return Task.FromResult<IReadOnlyList<ScreenCaptureFrame>>([]);
         }
         finally
         {
@@ -380,16 +382,24 @@ internal sealed class X11WindowActivitySource(IClock clock, IScreenCapture? scre
             lastEmit = now;
             if (screenCapture is not null && screenCapture.Capability.IsOperational)
             {
-                var frame = await screenCapture.CaptureFrameAsync(ct);
-                if (frame is not null)
+                var frames = await screenCapture.CaptureDisplaysAsync(
+                    new ScreenCaptureTarget(current.NativeWindowHandle),
+                    ct);
+                if (frames.Count > 0)
                 {
-                    yield return current with
+                    foreach (var frame in frames)
                     {
-                        Source = SourceKind.ScreenFrame,
-                        RawMediaBytes = frame.EncodedPngBytes,
-                        MediaKind = ContentKind.ScreenshotPng,
-                        PerceptualHash = frame.PerceptualHash
-                    };
+                        yield return current with
+                        {
+                            Timestamp = frame.Timestamp,
+                            Source = SourceKind.ScreenFrame,
+                            RawMediaBytes = frame.EncodedPngBytes,
+                            MediaKind = ContentKind.ScreenshotPng,
+                            PerceptualHash = frame.PerceptualHash,
+                            Metadata = ScreenCaptureMetadata.FromDisplay(frame)
+                        };
+                    }
+
                     continue;
                 }
             }

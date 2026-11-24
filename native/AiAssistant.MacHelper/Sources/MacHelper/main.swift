@@ -190,14 +190,15 @@ enum MacHelperServer {
             )
 
         case "screen.capture":
-            let result = MacNativeCapabilities.captureScreen(maxWidth: req.maxWidth ?? 1280)
+            let result = MacNativeCapabilities.captureScreens(maxWidth: req.maxWidth ?? 1280)
             switch result {
-            case .success(let frame):
+            case .success(let frames):
                 return MacIpcResponse(
                     requestId: req.requestId,
                     ok: true,
                     permissions: MacNativeCapabilities.queryPermissions(),
-                    screenFrame: frame
+                    screenFrame: frames.first,
+                    screenFrames: frames
                 )
             case .failure(.permissionDenied(let msg)):
                 return MacIpcResponse(

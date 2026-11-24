@@ -100,16 +100,24 @@ public sealed class WindowActivitySource(
 
             if (screenCapture is not null && screenCapture.Capability.IsOperational)
             {
-                var frame = await screenCapture.CaptureFrameAsync(ct);
-                if (frame is not null)
+                var frames = await screenCapture.CaptureDisplaysAsync(
+                    new ScreenCaptureTarget(current.NativeWindowHandle),
+                    ct);
+                if (frames.Count > 0)
                 {
-                    yield return current with
+                    foreach (var frame in frames)
                     {
-                        Source = SourceKind.ScreenFrame,
-                        RawMediaBytes = frame.EncodedPngBytes,
-                        MediaKind = ContentKind.ScreenshotPng,
-                        PerceptualHash = frame.PerceptualHash
-                    };
+                        yield return current with
+                        {
+                            Timestamp = frame.Timestamp,
+                            Source = SourceKind.ScreenFrame,
+                            RawMediaBytes = frame.EncodedPngBytes,
+                            MediaKind = ContentKind.ScreenshotPng,
+                            PerceptualHash = frame.PerceptualHash,
+                            Metadata = ScreenCaptureMetadata.FromDisplay(frame)
+                        };
+                    }
+
                     continue;
                 }
             }

@@ -101,7 +101,9 @@ enum MacNativeCapabilities {
         )
     }
 
-    static func captureScreen(maxWidth: Int) -> Result<MacScreenFrameDto, MacAdapterError> {
+    /// Captures every connected display. The display hosting the frontmost window is flagged so the
+    /// host can keep window context on that record and store the other monitors as desktop snapshots.
+    static func captureScreens(maxWidth: Int) -> Result<[MacScreenFrameDto], MacAdapterError> {
         guard CGPreflightScreenCaptureAccess() else {
             PermissionPrompter.shared.requestScreenRecordingIfNeeded()
             return .failure(.permissionDenied("Screen Recording permission has not been granted; approve the system prompt or enable it in System Settings."))
@@ -109,39 +111,68 @@ enum MacNativeCapabilities {
 
         let clampedMaxWidth = max(320, min(maxWidth, 2560))
         let semaphore = DispatchSemaphore(value: 0)
-        let box = AsyncBox<MacScreenFrameDto>()
+        let box = AsyncBox<[MacScreenFrameDto]>()
 
         Task.detached {
             do {
                 let shareable = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                guard let display = shareable.displays.first else {
+                guard !shareable.displays.isEmpty else {
                     throw MacAdapterError.internalFailure("No active display available.")
                 }
 
-                let srcWidth = max(1, display.width)
-                let srcHeight = max(1, display.height)
-                let targetWidth = min(srcWidth, clampedMaxWidth)
-                let targetHeight = max(1, Int((Double(srcHeight) * Double(targetWidth) / Double(srcWidth)).rounded()))
-
-                let filter = SCContentFilter(display: display, excludingWindows: [])
-                let config = SCStreamConfiguration()
-                config.width = targetWidth
-                config.height = targetHeight
-                config.showsCursor = false
-
-                let cgImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
-                let phash = computeDifferenceHash64(from: cgImage)
-                guard let pngData = encodePng(from: cgImage) else {
-                    throw MacAdapterError.internalFailure("Failed encoding CGImage as PNG.")
+                let foregroundBounds = foregroundWindowBounds()
+                var foregroundDisplayId: CGDirectDisplayID? = nil
+                if let bounds = foregroundBounds {
+                    var bestArea: CGFloat = 0
+                    for display in shareable.displays {
+                        let area = intersectionArea(display.frame, bounds)
+                        if area > bestArea {
+                            bestArea = area
+                            foregroundDisplayId = display.displayID
+                        }
+                    }
+                }
+                if foregroundDisplayId == nil {
+                    foregroundDisplayId = CGMainDisplayID()
                 }
 
-                let dto = MacScreenFrameDto(
-                    width: cgImage.width,
-                    height: cgImage.height,
-                    perceptualHash: phash,
-                    pngBase64: pngData.base64EncodedString()
-                )
-                box.value = .success(dto)
+                var frames: [MacScreenFrameDto] = []
+                for (index, display) in shareable.displays.enumerated() {
+                    let srcWidth = max(1, display.width)
+                    let srcHeight = max(1, display.height)
+                    let targetWidth = min(srcWidth, clampedMaxWidth)
+                    let targetHeight = max(1, Int((Double(srcHeight) * Double(targetWidth) / Double(srcWidth)).rounded()))
+
+                    let filter = SCContentFilter(display: display, excludingWindows: [])
+                    let config = SCStreamConfiguration()
+                    config.width = targetWidth
+                    config.height = targetHeight
+                    config.showsCursor = false
+
+                    let cgImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                    let phash = computeDifferenceHash64(from: cgImage)
+                    guard let pngData = encodePng(from: cgImage) else {
+                        throw MacAdapterError.internalFailure("Failed encoding CGImage as PNG.")
+                    }
+
+                    let frame = display.frame
+                    frames.append(MacScreenFrameDto(
+                        width: cgImage.width,
+                        height: cgImage.height,
+                        perceptualHash: phash,
+                        pngBase64: pngData.base64EncodedString(),
+                        displayId: "display-\(display.displayID)",
+                        displayName: "\(index + 1)",
+                        displayLeft: Int(frame.origin.x.rounded()),
+                        displayTop: Int(frame.origin.y.rounded()),
+                        displayWidth: Int(frame.width.rounded()),
+                        displayHeight: Int(frame.height.rounded()),
+                        isPrimary: display.displayID == CGMainDisplayID(),
+                        isForegroundDisplay: display.displayID == (foregroundDisplayId ?? 0)
+                    ))
+                }
+
+                box.value = .success(frames)
             } catch {
                 box.value = .failure(error)
             }
@@ -153,8 +184,8 @@ enum MacNativeCapabilities {
         }
 
         switch box.value {
-        case .success(let dto):
-            return .success(dto)
+        case .success(let frames):
+            return .success(frames)
         case .failure(let err as MacAdapterError):
             return .failure(err)
         case .failure(let err):
@@ -162,6 +193,41 @@ enum MacNativeCapabilities {
         case .none:
             return .failure(.internalFailure("No capture result produced."))
         }
+    }
+
+    /// Bounds of the frontmost application's first on-screen window, in global display coordinates.
+    private static func foregroundWindowBounds() -> CGRect? {
+        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else {
+            return nil
+        }
+
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let windows = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return nil
+        }
+
+        for window in windows {
+            guard let owner = window[kCGWindowOwnerPID as String] as? pid_t, owner == pid else {
+                continue
+            }
+            guard let boundsDictionary = window[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: boundsDictionary),
+                  bounds.width > 1,
+                  bounds.height > 1 else {
+                continue
+            }
+            return bounds
+        }
+
+        return nil
+    }
+
+    private static func intersectionArea(_ lhs: CGRect, _ rhs: CGRect) -> CGFloat {
+        let rect = lhs.intersection(rhs)
+        if rect.isNull || rect.isEmpty {
+            return 0
+        }
+        return rect.width * rect.height
     }
 
     static func extractText(pidOrWindowId: Int64, pngBase64: String?) -> Result<MacExtractedTextDto, MacAdapterError> {

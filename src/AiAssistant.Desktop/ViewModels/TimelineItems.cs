@@ -41,6 +41,15 @@ public sealed class TimelineEventItem(ActivityEvent activityEvent)
 
     public bool HasMedia => Event.MediaRef is not null;
 
+    /// <summary>Which monitor the frame came from, when the capture adapter recorded one.</summary>
+    public string? DisplayText =>
+        Event.Metadata.TryGetValue(Application.Ports.ScreenCaptureMetadata.DisplayName, out var name) &&
+        !string.IsNullOrWhiteSpace(name)
+            ? $"显示器 {name}"
+            : null;
+
+    public bool HasDisplayText => DisplayText is not null;
+
     public string CapturedTimeText => Event.Timestamp.ToCapturedLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.CurrentCulture);
 
     public string MediaSizeText => Event.MediaRef is null ? string.Empty : $"{Event.MediaRef.PlaintextLength / 1024d:F1} KB · 仅在选中时解密";

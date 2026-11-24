@@ -61,7 +61,7 @@ public sealed class WaylandScreenCapture(
         }
     }
 
-    public async Task<ScreenCaptureFrame?> CaptureFrameAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<ScreenCaptureFrame>> CaptureDisplaysAsync(ScreenCaptureTarget target, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         try
@@ -69,7 +69,7 @@ public sealed class WaylandScreenCapture(
             var session = await sessionManager.EnsureSessionAsync(ct);
             if (session is null)
             {
-                return null;
+                return [];
             }
 
             if (pipeWireStream is not null && (pipeWireOptions?.EnablePipeWire ?? true))
@@ -87,7 +87,8 @@ public sealed class WaylandScreenCapture(
                         frame.Height,
                         frame.Width * 4);
                     var framePng = PngCodec.EncodeBgra32(frame.Bgra32, frame.Width, frame.Height);
-                    return new ScreenCaptureFrame(clock.Now(), frame.Width, frame.Height, frameHash, framePng);
+                    // The portal stream is chosen by the compositor; it may cover one or all displays.
+                    return [new ScreenCaptureFrame(clock.Now(), frame.Width, frame.Height, frameHash, framePng, IsForegroundDisplay: true)];
                 }
             }
 
@@ -95,21 +96,21 @@ public sealed class WaylandScreenCapture(
             var png = await portalClient.CaptureScreenshotAsync(ct);
             if (!PngCodec.TryDecodeToBgra32(png, out var bgra, out var width, out var height, out var hash) || bgra is null)
             {
-                return null;
+                return [];
             }
 
-            return new ScreenCaptureFrame(clock.Now(), width, height, hash, png);
+            return [new ScreenCaptureFrame(clock.Now(), width, height, hash, png, IsForegroundDisplay: true)];
         }
         catch (XdgPortalRequestException)
         {
             await ResetStreamAsync();
             await sessionManager.InvalidateAsync(clearRestoreToken: true, ct);
-            return null;
+            return [];
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning("Wayland portal capture skipped after {ExceptionType}.", ex.GetType().Name);
-            return null;
+            return [];
         }
     }
 
@@ -198,10 +199,10 @@ public sealed class LinuxScreenCapture : IScreenCapture
         ? CapabilityState.Unavailable(CapabilityKind.ScreenCapture, "Linux 采集在当前主机不可用")
         : _backend.Decision.Backend == LinuxDisplayBackendKind.Wayland ? _wayland.Capability : _x11.Capability;
 
-    public Task<ScreenCaptureFrame?> CaptureFrameAsync(CancellationToken ct) =>
+    public Task<IReadOnlyList<ScreenCaptureFrame>> CaptureDisplaysAsync(ScreenCaptureTarget target, CancellationToken ct) =>
         _backend.Decision.Backend == LinuxDisplayBackendKind.Wayland
-            ? _wayland.CaptureFrameAsync(ct)
-            : _x11.CaptureFrameAsync(ct);
+            ? _wayland.CaptureDisplaysAsync(target, ct)
+            : _x11.CaptureDisplaysAsync(target, ct);
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
@@ -254,16 +255,24 @@ public sealed class LinuxWindowActivitySource(
             // Only X11 attaches continuous screen frames; Wayland portal capture is user-triggered to avoid recurring prompts.
             if (!isWayland && x11ScreenCapture.Capability.IsOperational)
             {
-                var frame = await x11ScreenCapture.CaptureFrameAsync(ct);
-                if (frame is not null)
+                var frames = await x11ScreenCapture.CaptureDisplaysAsync(
+                    new ScreenCaptureTarget(current.NativeWindowHandle),
+                    ct);
+                if (frames.Count > 0)
                 {
-                    yield return current with
+                    foreach (var frame in frames)
                     {
-                        Source = SourceKind.ScreenFrame,
-                        RawMediaBytes = frame.EncodedPngBytes,
-                        MediaKind = ContentKind.ScreenshotPng,
-                        PerceptualHash = frame.PerceptualHash
-                    };
+                        yield return current with
+                        {
+                            Timestamp = frame.Timestamp,
+                            Source = SourceKind.ScreenFrame,
+                            RawMediaBytes = frame.EncodedPngBytes,
+                            MediaKind = ContentKind.ScreenshotPng,
+                            PerceptualHash = frame.PerceptualHash,
+                            Metadata = ScreenCaptureMetadata.FromDisplay(frame)
+                        };
+                    }
+
                     continue;
                 }
             }

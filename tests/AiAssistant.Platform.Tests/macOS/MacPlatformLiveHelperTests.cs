@@ -115,7 +115,7 @@ public sealed class MacPlatformLiveHelperTests : IDisposable
         if (permissions.ScreenRecording != MacPermissionGrant.Granted)
         {
             // Denied capture must degrade to "no frame", never to an exception or a restart.
-            Assert.Null(await screen.CaptureFrameAsync(CancellationToken.None));
+            Assert.Empty(await screen.CaptureDisplaysAsync(new ScreenCaptureTarget(), CancellationToken.None));
             Assert.Equal(MacHelperSupervisorStatus.Healthy, supervisor.Status);
         }
 

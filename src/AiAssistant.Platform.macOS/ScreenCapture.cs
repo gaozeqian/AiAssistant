@@ -10,7 +10,8 @@ using AiAssistant.Platform.macOS.Ipc;
 namespace AiAssistant.Platform.macOS;
 
 /// <summary>
-/// macOS ScreenCaptureKit adapter over versioned Swift Helper IPC (ADR-0005, S3).
+/// macOS ScreenCaptureKit adapter over versioned Swift Helper IPC (ADR-0005, S3). The helper
+/// captures every connected display and flags the one hosting the frontmost window.
 /// </summary>
 public sealed class ScreenCapture(IMacHelperSupervisor supervisor, IClock clock) : IScreenCapture
 {
@@ -18,42 +19,76 @@ public sealed class ScreenCapture(IMacHelperSupervisor supervisor, IClock clock)
         supervisor,
         CapabilityKind.ScreenCapture,
         supervisor.Permissions.ScreenRecording,
-        "ScreenCaptureKit（Swift Helper，≤1280px PNG + 感知哈希）",
+        "ScreenCaptureKit（Swift Helper，逐显示器 ≤1280px PNG + 感知哈希）",
         "请在「系统设置 > 隐私与安全性 > 屏幕与系统音频录制」中启用 AiAssistant。");
 
-    public async Task<ScreenCaptureFrame?> CaptureFrameAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<ScreenCaptureFrame>> CaptureDisplaysAsync(ScreenCaptureTarget target, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var response = await supervisor.InvokeAsync(
             new MacIpcRequest(string.Empty, MacHelperProtocol.Methods.ScreenCapture, MaxWidth: 1280),
             ct);
 
-        if (!response.Ok || response.ScreenFrame is null || string.IsNullOrWhiteSpace(response.ScreenFrame.PngBase64))
+        if (!response.Ok)
         {
-            return null;
+            return [];
         }
 
-        byte[] pngBytes;
-        try
+        var dtos = response.ScreenFrames is { Count: > 0 }
+            ? response.ScreenFrames
+            : response.ScreenFrame is null ? [] : [response.ScreenFrame];
+
+        var frames = new List<ScreenCaptureFrame>(dtos.Count);
+        foreach (var dto in dtos)
         {
-            pngBytes = Convert.FromBase64String(response.ScreenFrame.PngBase64);
-        }
-        catch (FormatException)
-        {
-            return null;
+            if (string.IsNullOrWhiteSpace(dto.PngBase64))
+            {
+                continue;
+            }
+
+            byte[] pngBytes;
+            try
+            {
+                pngBytes = Convert.FromBase64String(dto.PngBase64);
+            }
+            catch (FormatException)
+            {
+                continue;
+            }
+
+            if (pngBytes.Length == 0)
+            {
+                continue;
+            }
+
+            DisplayInfo? display = null;
+            if (!string.IsNullOrWhiteSpace(dto.DisplayId) &&
+                dto.DisplayLeft is { } left &&
+                dto.DisplayTop is { } top &&
+                dto.DisplayWidth is { } width &&
+                dto.DisplayHeight is { } height)
+            {
+                display = new DisplayInfo(
+                    dto.DisplayId,
+                    string.IsNullOrWhiteSpace(dto.DisplayName) ? dto.DisplayId : dto.DisplayName,
+                    left,
+                    top,
+                    width,
+                    height,
+                    dto.IsPrimary ?? false);
+            }
+
+            frames.Add(new ScreenCaptureFrame(
+                clock.Now(),
+                dto.Width,
+                dto.Height,
+                dto.PerceptualHash,
+                pngBytes,
+                display,
+                dto.IsForegroundDisplay ?? (display is null)));
         }
 
-        if (pngBytes.Length == 0)
-        {
-            return null;
-        }
-
-        return new ScreenCaptureFrame(
-            clock.Now(),
-            response.ScreenFrame.Width,
-            response.ScreenFrame.Height,
-            response.ScreenFrame.PerceptualHash,
-            pngBytes);
+        return frames;
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

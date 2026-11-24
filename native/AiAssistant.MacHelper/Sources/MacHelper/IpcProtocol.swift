@@ -40,6 +40,14 @@ struct MacScreenFrameDto: Codable, Sendable {
     let height: Int
     let perceptualHash: UInt64
     let pngBase64: String
+    var displayId: String? = nil
+    var displayName: String? = nil
+    var displayLeft: Int? = nil
+    var displayTop: Int? = nil
+    var displayWidth: Int? = nil
+    var displayHeight: Int? = nil
+    var isPrimary: Bool? = nil
+    var isForegroundDisplay: Bool? = nil
 }
 
 struct MacExtractedTextDto: Codable, Sendable {
@@ -68,6 +76,7 @@ struct MacIpcResponse: Codable, Sendable {
     var permissions: MacPermissionsDto? = nil
     var window: MacForegroundWindowDto? = nil
     var screenFrame: MacScreenFrameDto? = nil
+    var screenFrames: [MacScreenFrameDto]? = nil
     var extractedText: MacExtractedTextDto? = nil
     var fileChanges: [MacFileChangeDto]? = nil
     var audioChunk: MacAudioChunkDto? = nil
