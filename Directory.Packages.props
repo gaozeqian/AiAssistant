@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Storage and Security">
-    <PackageVersion Include="Microsoft.Data.Sqlite.Core" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.Data.Sqlite.Core" Version="11.0.0" />
     <PackageVersion Include="SQLite3MC.PCLRaw.bundle" Version="2.7.1" />
     <PackageVersion Include="HiraokaHyperTools.sqlite-vec" Version="0.1.9" />
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.15" />
