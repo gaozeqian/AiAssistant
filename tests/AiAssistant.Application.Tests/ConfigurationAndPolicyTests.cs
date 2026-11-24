@@ -73,10 +73,13 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
         var resolver = new FakeSecretResolver(new Dictionary<string, string> { ["intranet-key"] = "secret-value" });
         var configuration = await new ModelsConfigurationLoader(resolver).LoadAsync(path, CancellationToken.None);
 
-        Assert.Equal(2, configuration.Endpoints.Count);
+        // Schema 1 still loads: the default-tier endpoint becomes the active chat endpoint and the
+        // chat endpoint's embedding model becomes the active embedding model.
         Assert.Equal(ModelEndpointTier.CorporateIntranet, configuration.Policy.DefaultTier);
-        Assert.Equal("secret-value", configuration.Endpoints.Single(item => item.Tier == ModelEndpointTier.CorporateIntranet).ApiKey);
-        Assert.NotNull(configuration.Endpoints.Single(item => item.Tier == ModelEndpointTier.CorporateIntranet).Proxy);
+        Assert.Equal("corp-chat", configuration.Chat.ChatModel);
+        Assert.Equal("secret-value", configuration.Chat.ApiKey);
+        Assert.NotNull(configuration.Chat.Proxy);
+        Assert.Equal("corp-embedding", configuration.Embedding.EmbeddingModel);
 
         await File.WriteAllTextAsync(path, """{"schemaVersion":99,"endpoints":[]}""");
         await Assert.ThrowsAsync<ModelConfigurationException>(() =>
@@ -232,7 +235,7 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
         var cache = new ModelCapabilityCache(Path.Combine(_tempRoot, "capabilities.json"));
         using (cache)
         using (var prober = new ModelCapabilityProber(
-                   [endpoint],
+                   [new ModelProbeTarget(ModelEndpointRole.Chat, endpoint)],
                    cache,
                    NullLogger<ModelCapabilityProber>.Instance,
                    _ => new HttpClient(handler) { BaseAddress = endpoint.BaseAddress }))
@@ -254,7 +257,73 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
     }
 
     [Fact]
-    public async Task ModelConfigurationAdmin_UpdatesLocalOfflineEndpoint_AndPreservesOthers()
+    public async Task ModelsConfiguration_LoadsSchema2_WithoutAnyLocalEndpoint()
+    {
+        // Local models are optional: a public-cloud-only configuration must load and route.
+        var path = Path.Combine(_tempRoot, "models-v2.json");
+        await File.WriteAllTextAsync(path, """
+            {
+              "schemaVersion": 2,
+              "chat": {
+                "tier": "PublicCloud",
+                "provider": "openai",
+                "baseUrl": "https://api.deepseek.com",
+                "model": "deepseek-chat",
+                "apiKeySecret": "chat-key",
+                "allowRemoteEndpoint": true
+              },
+              "embedding": {
+                "tier": "PublicCloud",
+                "provider": "openai",
+                "baseUrl": "https://api.siliconflow.cn",
+                "model": "BAAI/bge-m3",
+                "apiKeySecret": "embed-key",
+                "allowRemoteEndpoint": true
+              }
+            }
+            """);
+        var resolver = new FakeSecretResolver(new Dictionary<string, string>
+        {
+            ["chat-key"] = "sk-chat",
+            ["embed-key"] = "sk-embed"
+        });
+
+        var configuration = await new ModelsConfigurationLoader(resolver).LoadAsync(path, CancellationToken.None);
+
+        Assert.Equal(2, configuration.SchemaVersion);
+        Assert.Equal(ModelEndpointTier.PublicCloud, configuration.Chat.Tier);
+        Assert.Equal("deepseek-chat", configuration.Chat.ChatModel);
+        Assert.Equal("sk-chat", configuration.Chat.ApiKey);
+        Assert.Equal("chat-key", configuration.Chat.ApiKeySecret);
+        Assert.Equal("BAAI/bge-m3", configuration.Embedding.EmbeddingModel);
+        Assert.Equal("sk-embed", configuration.Embedding.ApiKey);
+        Assert.Equal(ModelEndpointTier.PublicCloud, configuration.Policy.DefaultTier);
+        Assert.True(configuration.Policy.AllowPublicCloud);
+        Assert.False(configuration.Policy.RequirePublicCloudConsent);
+    }
+
+    [Fact]
+    public async Task ModelsConfiguration_Schema2_DerivesEmbeddingFromChat_WhenAbsent()
+    {
+        var path = Path.Combine(_tempRoot, "models-chat-only.json");
+        await File.WriteAllTextAsync(path, """
+            {
+              "schemaVersion": 2,
+              "chat": { "tier": "LocalOffline", "provider": "ollama", "baseUrl": "http://127.0.0.1:11434", "model": "gemma4:12b" }
+            }
+            """);
+
+        var configuration = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+            .LoadAsync(path, CancellationToken.None);
+
+        Assert.Equal("gemma4:12b", configuration.Chat.ChatModel);
+        Assert.Equal("http://127.0.0.1:11434/", configuration.Embedding.BaseAddress.ToString());
+        Assert.Equal(ModelDefaults.EmbeddingModel, configuration.Embedding.EmbeddingModel);
+        Assert.Equal(ModelEndpointTier.LocalOffline, configuration.Embedding.Tier);
+    }
+
+    [Fact]
+    public async Task ModelConfigurationAdmin_SavesOnlyActiveChatAndEmbedding()
     {
         var path = Path.Combine(_tempRoot, "models.json");
         await File.WriteAllTextAsync(path, """
@@ -283,14 +352,18 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
                 new ModelEndpointView("http://127.0.0.1:11434", "embeddinggemma-2:740m", "LocalOffline")),
             CancellationToken.None);
 
+        var json = await File.ReadAllTextAsync(path);
+        Assert.DoesNotContain("CorporateIntranet", json, StringComparison.Ordinal);
+        Assert.Contains("\"schemaVersion\": 2", json, StringComparison.Ordinal);
+
         var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
             .LoadAsync(path, CancellationToken.None);
-        var local = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.LocalOffline);
-        Assert.Equal("gemma4:12b-mlx", local.ChatModel);
-        Assert.True(local.Think);
-        Assert.Equal("medium", local.ThinkingLevel);
-        var corp = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.CorporateIntranet);
-        Assert.Equal("corp-chat", corp.ChatModel);
+        Assert.Equal("gemma4:12b-mlx", reloaded.Chat.ChatModel);
+        Assert.True(reloaded.Chat.Think);
+        Assert.Equal("medium", reloaded.Chat.ThinkingLevel);
+        Assert.Equal("embeddinggemma-2:740m", reloaded.Embedding.EmbeddingModel);
+        // The in-memory snapshot follows the save, so a second save does not resurrect old values.
+        Assert.Equal("gemma4:12b-mlx", admin.Current.Chat.Model);
     }
 
     [Fact]
@@ -320,9 +393,9 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
 
         var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
             .LoadAsync(path, CancellationToken.None);
-        var local = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.LocalOffline);
-        Assert.Equal(ModelProviderKind.OpenAiCompatible, local.Provider);
-        Assert.Equal("local-chat-2", local.ChatModel);
+        Assert.Equal(ModelProviderKind.OpenAiCompatible, reloaded.Chat.Provider);
+        Assert.Equal("local-chat-2", reloaded.Chat.ChatModel);
+        Assert.Equal("local-embed-2", reloaded.Embedding.EmbeddingModel);
     }
 
     [Fact]
@@ -358,14 +431,13 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
             CancellationToken.None);
         var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
             .LoadAsync(path, CancellationToken.None);
-        var corp = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.CorporateIntranet);
-        Assert.Equal("corp-chat", corp.ChatModel);
-        Assert.True(corp.AllowRemoteEndpoint);
-        Assert.Equal(ModelProviderKind.OpenAiCompatible, corp.Provider);
-        // LocalOffline safety fallback is preserved.
-        Assert.Contains(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.LocalOffline);
-        // Default tier now routes to the configured intranet endpoint.
+        Assert.Equal("corp-chat", reloaded.Chat.ChatModel);
+        Assert.Equal(ModelEndpointTier.CorporateIntranet, reloaded.Chat.Tier);
+        Assert.True(reloaded.Chat.AllowRemoteEndpoint);
+        Assert.Equal(ModelProviderKind.OpenAiCompatible, reloaded.Chat.Provider);
+        // The default tier follows the chat endpoint; the embedding endpoint stays local.
         Assert.Equal(ModelEndpointTier.CorporateIntranet, reloaded.Policy.DefaultTier);
+        Assert.Equal(ModelEndpointTier.LocalOffline, reloaded.Embedding.Tier);
     }
 
     [Fact]
@@ -396,13 +468,15 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
         Assert.True(reloaded.Policy.AllowPublicCloud);
         Assert.False(reloaded.Policy.RequirePublicCloudConsent);
         Assert.Equal(ModelEndpointTier.PublicCloud, reloaded.Policy.DefaultTier);
-        var cloud = Assert.Single(reloaded.Endpoints, item => item.Tier == ModelEndpointTier.PublicCloud);
-        Assert.True(cloud.AllowRemoteEndpoint);
+        Assert.True(reloaded.Chat.AllowRemoteEndpoint);
+        Assert.True(reloaded.Embedding.AllowRemoteEndpoint);
     }
 
     [Fact]
-    public async Task ModelConfigurationAdmin_StoresIndependentEmbeddingEndpoint_WhenTiersDiffer()
+    public async Task ModelConfigurationAdmin_KeepsIndependentEmbedding_WhenTiersMatchButAddressesDiffer()
     {
+        // Regression: the old writer dropped the embedding document whenever chat and embedding
+        // shared a tier, so the embedding call silently went to the chat address and model.
         var path = Path.Combine(_tempRoot, "models.json");
         await File.WriteAllTextAsync(path, """
             {
@@ -417,21 +491,87 @@ public sealed class ConfigurationAndPolicyTests : IDisposable
             .LoadAsync(path, CancellationToken.None);
         var admin = new ModelConfigurationAdmin(path, configuration);
 
-        // Chat on local, embedding on a separate intranet endpoint.
         await admin.SaveAsync(
             new ModelConfigurationView(
-                new ModelEndpointView("http://127.0.0.1:11434", "gemma4:12b", "LocalOffline"),
-                new ModelEndpointView("https://embed.corp.example/v1", "corp-embed-v2", "CorporateIntranet")),
+                new ModelEndpointView("https://api.deepseek.com", "deepseek-chat", "PublicCloud"),
+                new ModelEndpointView("https://api.siliconflow.cn", "BAAI/bge-m3", "PublicCloud")),
             CancellationToken.None);
 
         var reloaded = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
             .LoadAsync(path, CancellationToken.None);
-        Assert.NotNull(reloaded.EmbeddingEndpoint);
-        Assert.Equal(ModelEndpointTier.CorporateIntranet, reloaded.EmbeddingEndpoint!.Tier);
-        Assert.Equal("corp-embed-v2", reloaded.EmbeddingEndpoint.EmbeddingModel);
-        Assert.Equal("https://embed.corp.example/v1", reloaded.EmbeddingEndpoint.BaseAddress.ToString().TrimEnd('/'));
-        // Chat default tier is unchanged (local).
-        Assert.Equal(ModelEndpointTier.LocalOffline, reloaded.Policy.DefaultTier);
+        Assert.Equal("deepseek-chat", reloaded.Chat.ChatModel);
+        Assert.Equal("https://api.deepseek.com/", reloaded.Chat.BaseAddress.ToString());
+        Assert.Equal("BAAI/bge-m3", reloaded.Embedding.EmbeddingModel);
+        Assert.Equal("https://api.siliconflow.cn/", reloaded.Embedding.BaseAddress.ToString());
+    }
+
+    [Fact]
+    public async Task ModelConfigurationAdmin_StoresApiKeyInEncryptedStore_AndWritesOnlyTheReference()
+    {
+        var path = Path.Combine(_tempRoot, "models.json");
+        await File.WriteAllTextAsync(path, """
+            {
+              "schemaVersion": 1,
+              "policy": { "defaultTier": "LocalOffline" },
+              "endpoints": [
+                { "tier": "LocalOffline", "provider": "ollama", "baseUrl": "http://127.0.0.1:11434", "chatModel": "gemma4:12b", "embeddingModel": "embeddinggemma-2:740m" }
+              ]
+            }
+            """);
+        var secretStore = new ProtectedModelSecretStore(
+            Path.Combine(_tempRoot, "secrets"),
+            new StaticKeyStore(new byte[32]));
+        using (secretStore)
+        {
+            var secretAdmin = new ModelSecretAdmin(secretStore);
+            var configuration = await new ModelsConfigurationLoader(new FakeSecretResolver(new Dictionary<string, string>()))
+                .LoadAsync(path, CancellationToken.None);
+            var admin = new ModelConfigurationAdmin(path, configuration, secretAdmin);
+
+            await admin.SaveAsync(
+                new ModelConfigurationView(
+                    new ModelEndpointView(
+                        "https://api.deepseek.com",
+                        "deepseek-chat",
+                        "PublicCloud",
+                        ApiKey: "sk-chat-secret"),
+                    new ModelEndpointView(
+                        "https://api.siliconflow.cn",
+                        "BAAI/bge-m3",
+                        "PublicCloud",
+                        ApiKey: "sk-embed-secret")),
+                CancellationToken.None);
+
+            var json = await File.ReadAllTextAsync(path);
+            Assert.DoesNotContain("sk-chat-secret", json, StringComparison.Ordinal);
+            Assert.DoesNotContain("sk-embed-secret", json, StringComparison.Ordinal);
+            Assert.Contains(ModelConfigurationAdmin.ChatSecretName, json, StringComparison.Ordinal);
+            Assert.Contains(ModelConfigurationAdmin.EmbeddingSecretName, json, StringComparison.Ordinal);
+
+            var reloaded = await new ModelsConfigurationLoader(new ModelSecretResolver(secretStore))
+                .LoadAsync(path, CancellationToken.None);
+            Assert.Equal("sk-chat-secret", reloaded.Chat.ApiKey);
+            Assert.Equal("sk-embed-secret", reloaded.Embedding.ApiKey);
+
+            // Clearing removes both the reference and the encrypted value.
+            await admin.SaveAsync(
+                new ModelConfigurationView(
+                    new ModelEndpointView(
+                        "https://api.deepseek.com",
+                        "deepseek-chat",
+                        "PublicCloud",
+                        ClearApiKey: true),
+                    new ModelEndpointView(
+                        "https://api.siliconflow.cn",
+                        "BAAI/bge-m3",
+                        "PublicCloud",
+                        ClearApiKey: true)),
+                CancellationToken.None);
+            var clearedJson = await File.ReadAllTextAsync(path);
+            Assert.DoesNotContain(ModelConfigurationAdmin.ChatSecretName, clearedJson, StringComparison.Ordinal);
+            Assert.DoesNotContain(ModelConfigurationAdmin.EmbeddingSecretName, clearedJson, StringComparison.Ordinal);
+            Assert.Empty(await secretAdmin.ListNamesAsync(CancellationToken.None));
+        }
     }
 
     private sealed class FakeSecretResolver(IReadOnlyDictionary<string, string> values) : IModelSecretResolver

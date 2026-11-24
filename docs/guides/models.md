@@ -77,12 +77,13 @@ tts/  model.onnx tokens.txt lexicon.txt *.fst dict/
 
 ## 4. 从 UI 配置模型
 
-诊断页「模型配置」可独立设置对话与向量端点：来源（本机/内网/公网）、模型名、Base URL、思考开关与强度。
+诊断页「模型配置」可独立设置对话与向量端点：来源（本机/内网/公网）、模型名、Base URL、接口密钥、思考开关与强度。
 
-- 本机端点必须 loopback；内网/公网允许远程地址。
-- 公网选择即视为显式同意；内网/公网失败不会自动回落到本机。
-- 保存写入 `<数据目录>/models.json`（对话端点 + 独立 `embedding` 文档），重启生效。
-- 端点密钥用 `--import-model-secret` 写入加密库，`models.json` 只保存 `apiKeySecret` 名称。
+- 两个模型完全独立：同档位也可以使用不同地址、不同模型与不同密钥。
+- 本机端点必须 loopback；内网/公网允许远程地址，失败不会自动回落到本机。
+- 接口密钥在对应端点输入框填写，写入加密库（名称固定为 `chat-endpoint-key` / `embedding-endpoint-key`），`models.json` 只保存 `apiKeySecret` 引用；勾选「清除已保存密钥」可删除。
+- 保存写入 `<数据目录>/models.json`，只保留当前在用的对话与向量模型（schema 2），重启生效。
+- 也可用 `--import-model-secret <名称>` 预先写入密钥，再在 `apiKeySecret` 中引用该名称。
 
 ## 5. Linux 桌面图标与托盘
 

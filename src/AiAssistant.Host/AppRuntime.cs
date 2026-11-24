@@ -143,10 +143,12 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton(options);
         services.AddSingleton<IDiagnosticLogReader>(structuredLogProvider);
         services.AddSingleton<IKeyStore>(keyStore);
-        services.AddSingleton<IModelSecretAdmin>(new ModelSecretAdmin(secretStore));
+        var modelSecretAdmin = new ModelSecretAdmin(secretStore);
+        services.AddSingleton<IModelSecretAdmin>(modelSecretAdmin);
         services.AddSingleton<IModelConfigurationAdmin>(new ModelConfigurationAdmin(
             Path.GetFullPath(modelsConfigPath),
-            modelsConfiguration));
+            modelsConfiguration,
+            modelSecretAdmin));
         services.AddSingleton(connectionFactory);
         services.AddSingleton<IMediaStore>(mediaStore);
         services.AddSingleton(mediaStore);
@@ -250,9 +252,7 @@ public sealed class AppRuntime : IAsyncDisposable
             configuration.Policy.DefaultTier));
         services.AddSingleton<IReportRasterizer, SkiaReportRasterizer>();
         services.AddSingleton<RangeReportUseCase>();
-        var configuredEmbeddingModel = configuration.Endpoints
-            .FirstOrDefault(endpoint => endpoint.Tier == ModelEndpointTier.LocalOffline)
-            ?.EmbeddingModel ?? string.Empty;
+        var configuredEmbeddingModel = configuration.Embedding.EmbeddingModel;
         var queryPrefix = EmbeddingProfile.ResolveQueryPrefix(
             configuredEmbeddingModel,
             Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingQueryPrefix));

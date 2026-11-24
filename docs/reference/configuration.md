@@ -29,24 +29,35 @@
 
 默认路径 `<数据目录>/models.json`，覆盖 `AIASSISTANT_MODELS_CONFIG`。示例见 `samples/models.example.json`。
 
+Schema 2 只保存当前在用的两个模型，二者完全独立（可同档位、不同地址、不同密钥）：
+
+```json
+{
+  "schemaVersion": 2,
+  "chat":      { "tier": "PublicCloud", "provider": "openai", "baseUrl": "https://api.deepseek.com", "model": "deepseek-chat", "apiKeySecret": "chat-endpoint-key", "allowRemoteEndpoint": true },
+  "embedding": { "tier": "PublicCloud", "provider": "openai", "baseUrl": "https://api.siliconflow.cn", "model": "BAAI/bge-m3", "apiKeySecret": "embedding-endpoint-key", "allowRemoteEndpoint": true }
+}
+```
+
 | 配置键 | 含义 |
 |---|---|
-| `schemaVersion` | 配置 schema 版本（当前 `1`） |
-| `policy.defaultTier` | 默认档位：`LocalOffline` / `CorporateIntranet` / `PublicCloud` |
-| `policy.allowIntranet` | 是否允许企业内网端点 |
-| `policy.allowPublicCloud` | 是否允许公网端点 |
-| `policy.requirePublicCloudConsent` | 公网是否必须运行时显式同意 |
-| `policy.allowLocalFallback` | 内网/公网失败时是否允许本机兜底 |
-| `endpoints[].tier` | 端点档位 |
-| `endpoints[].provider` | 提供方（本机默认 `ollama`） |
-| `endpoints[].baseUrl` | 端点地址；loopback 端点绕过系统代理 |
-| `endpoints[].chatModel` | 对话模型 |
-| `endpoints[].embeddingModel` | 向量模型 |
-| `endpoints[].think` / `thinkingLevel` | 思考开关与强度（`low`/`medium`/`high`） |
-| `endpoints[].apiKeySecret` | 加密密钥库中的名称；禁止明文 |
-| `embedding` | 可选的独立向量端点文档（同 tier 时复用对话端点） |
+| `schemaVersion` | 配置 schema 版本（当前 `2`；`1` 仍可读取，保存时升级为 `2`） |
+| `chat` | 当前对话模型端点（必填） |
+| `embedding` | 当前向量模型端点（可选；缺省时继承 `chat` 的地址与密钥，模型取默认 embedding） |
+| `*.tier` | 端点档位：`LocalOffline` / `CorporateIntranet` / `PublicCloud` |
+| `*.provider` | `ollama` 或 `openai`（OpenAI 兼容，含 LM Studio/vLLM/云厂商） |
+| `*.baseUrl` | 端点地址；loopback 端点绕过系统代理 |
+| `*.model` | 模型名（对话或向量） |
+| `*.apiKeySecret` | 加密密钥库中的名称；禁止明文 |
+| `*.think` / `thinkingLevel` | 思考开关与强度（仅对话端点，`low`/`medium`/`high`） |
+| `*.timeoutSeconds` / `proxyUrl` / `enterpriseCaPath` / 客户端证书 | 企业端点可选项 |
 
-企业端点还支持 `enterpriseCaPath`、客户端证书路径、`proxyUrl` 与 `timeoutSeconds`。公网档即使配置，也必须 `allowPublicCloud=true` 且运行时显式同意。
+规则：
+
+- 本地模型不是必须项；不再要求 `LocalOffline` 端点或 `defaultTier`。
+- 档位即策略：选择 `PublicCloud` 视为显式同意公网，选择 `CorporateIntranet` 即允许内网；`defaultTier` 始终跟随 `chat.tier`。
+- `LocalOffline` 端点必须是 loopback；内网/公网端点必须 `allowRemoteEndpoint=true`（UI 保存时自动写入）。
+- 未使用的档位与端点不会写入文件。
 
 ## 4. 默认模型
 

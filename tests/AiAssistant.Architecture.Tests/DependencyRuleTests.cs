@@ -288,8 +288,9 @@ public sealed class DependencyRuleTests
             "SlidingWindowRateLimiter", "SchemaMigrator", "VoiceCommandParser",
             "CommandAudioWavEncoder", "RapidOcrCtcDecoder", "RapidOcrDetPostProcessor",
             "RapidOcrImage", "EnergyTurnDiarizationEngine",
-            "DailyReportStats", "ModelsFileDocument", "EmbeddingEndpointDocument",
-            "ModelPolicyDocument", "ModelEndpointDocument", "PendingDeletion"
+            "DailyReportStats", "ModelsFileDocument", "ModelsFileDocumentV1",
+            "ModelPolicyDocumentV1", "ModelEndpointDocument", "ModelEndpointDocumentV1",
+            "EmbeddingEndpointDocumentV1", "PendingDeletion"
         ];
 
         foreach (var name in internalOnly)

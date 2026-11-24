@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace AiAssistant.Models;
 
 public sealed record DetailedEndpointProbe(
+    ModelEndpointRole Role,
     ModelEndpointTier Tier,
     string BaseUrl,
     string ChatModel,
@@ -19,6 +20,9 @@ public sealed record DetailedEndpointProbe(
     bool ToolCallingAvailable,
     string Diagnostic,
     DateTimeOffset ProbedAtUtc);
+
+/// <summary>One endpoint to probe, tagged with the capability it serves.</summary>
+public sealed record ModelProbeTarget(ModelEndpointRole Role, ModelEndpointSettings Endpoint);
 
 public sealed class ModelCapabilityCache(string filePath) : IDisposable
 {
@@ -84,26 +88,27 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
 {
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(24);
     private static readonly string[] EmbeddingProbeInput = ["capability probe"];
-    private readonly IReadOnlyList<ModelEndpointSettings> _endpoints;
+    private readonly IReadOnlyList<ModelProbeTarget> _targets;
     private readonly ModelCapabilityCache _cache;
     private readonly ILogger<ModelCapabilityProber> _logger;
     private readonly IClock _clock;
-    private readonly Dictionary<ModelEndpointTier, HttpClient> _clients = [];
+    private readonly Dictionary<ModelEndpointRole, HttpClient> _clients = [];
 
     public ModelCapabilityProber(
-        IReadOnlyList<ModelEndpointSettings> endpoints,
+        IReadOnlyList<ModelProbeTarget> targets,
         ModelCapabilityCache cache,
         ILogger<ModelCapabilityProber> logger,
         Func<ModelEndpointSettings, HttpClient>? clientFactory = null,
         IClock? clock = null)
     {
-        _endpoints = endpoints;
+        _targets = targets;
         _cache = cache;
         _logger = logger;
         _clock = clock ?? new SystemClock();
-        foreach (var endpoint in endpoints)
+        foreach (var target in targets)
         {
-            _clients[endpoint.Tier] = (clientFactory ?? ModelHttpClientFactory.Create)(endpoint);
+            // Keyed by role: chat and embedding may share a tier but never an HttpClient.
+            _clients[target.Role] = (clientFactory ?? ModelHttpClientFactory.Create)(target.Endpoint);
         }
     }
 
@@ -111,12 +116,15 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
     {
         var cached = forceRefresh ? [] : await _cache.LoadAsync(ct);
         var results = new List<DetailedEndpointProbe>();
-        foreach (var endpoint in _endpoints)
+        foreach (var target in _targets)
         {
             ct.ThrowIfCancellationRequested();
+            var endpoint = target.Endpoint;
             var existing = cached.FirstOrDefault(item =>
+                item.Role == target.Role &&
                 item.Tier == endpoint.Tier &&
                 item.ChatModel == endpoint.ChatModel &&
+                item.EmbeddingModel == endpoint.EmbeddingModel &&
                 string.Equals(item.BaseUrl, endpoint.BaseAddress.ToString(), StringComparison.OrdinalIgnoreCase) &&
                 _clock.UtcNow - item.ProbedAtUtc < CacheTtl);
             if (existing is not null)
@@ -125,11 +133,12 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
                 continue;
             }
 
-            results.Add(await ProbeEndpointAsync(endpoint, ct));
+            results.Add(await ProbeEndpointAsync(target, ct));
         }
 
         await _cache.SaveAsync(results, ct);
         return results.Select(item => new ModelEndpointCapability(
+            item.Role,
             item.Tier,
             item.BaseUrl,
             item.ChatModel,
@@ -153,24 +162,33 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
         _clients.Clear();
     }
 
-    private async Task<DetailedEndpointProbe> ProbeEndpointAsync(ModelEndpointSettings endpoint, CancellationToken ct)
+    private async Task<DetailedEndpointProbe> ProbeEndpointAsync(ModelProbeTarget target, CancellationToken ct)
     {
-        var client = _clients[endpoint.Tier];
-        var chat = await TryChatAsync(client, endpoint, ct);
+        var endpoint = target.Endpoint;
+        var client = _clients[target.Role];
+        var isEmbeddingEndpoint = target.Role == ModelEndpointRole.Embedding;
+        var chat = !isEmbeddingEndpoint && await TryChatAsync(client, endpoint, ct);
         var streaming = chat && await TryStreamingAsync(client, endpoint, ct);
         var embeddings = await TryEmbeddingsAsync(client, endpoint, ct);
         var structured = chat && await TryStructuredAsync(client, endpoint, ct);
         var tools = chat && await TryToolsAsync(client, endpoint, ct);
-        var diagnostic = string.Create(
-            System.Globalization.CultureInfo.InvariantCulture,
-            $"对话={chat}, 流式={streaming}, 向量={embeddings}, 结构化={structured}, 工具={tools}");
-        if (!chat)
+        var diagnostic = isEmbeddingEndpoint
+            ? $"向量={(embeddings ? "可用" : "不可用")}"
+            : string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"对话={chat}, 流式={streaming}, 向量={embeddings}, 结构化={structured}, 工具={tools}");
+        if (!isEmbeddingEndpoint && !chat)
         {
             diagnostic += "；端点或对话模型不可用";
         }
+        else if (isEmbeddingEndpoint && !embeddings)
+        {
+            diagnostic += "；端点或向量模型不可用";
+        }
 
-        _logger.LogInformation("Model capability probe {Tier}: {Diagnostic}", endpoint.Tier, diagnostic);
+        _logger.LogInformation("Model capability probe {Role} {Tier}: {Diagnostic}", target.Role, endpoint.Tier, diagnostic);
         return new DetailedEndpointProbe(
+            target.Role,
             endpoint.Tier,
             endpoint.BaseAddress.ToString(),
             endpoint.ChatModel,

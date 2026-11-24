@@ -17,9 +17,15 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
     private ModelTierOption _chatTier = new("LocalOffline", "本机");
     private bool _chatThink;
     private ModelThinkingLevelOption _chatThinkingLevel = new("low", "低");
+    private string _chatApiKey = string.Empty;
+    private bool _clearChatApiKey;
+    private string? _chatApiKeySecret;
     private string _embeddingBaseUrl = ModelDefaults.OllamaBaseUrl;
     private string _embeddingModel = string.Empty;
     private ModelTierOption _embeddingTier = new("LocalOffline", "本机");
+    private string _embeddingApiKey = string.Empty;
+    private bool _clearEmbeddingApiKey;
+    private string? _embeddingApiKeySecret;
     private string _modelConfigStatus = "保存后需重启应用生效。";
 
     public ModelConfigurationEditorViewModel(IModelConfigurationAdmin? modelConfiguration)
@@ -35,9 +41,11 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
             _chatThinkingLevel = ThinkingLevelOptions.FirstOrDefault(option =>
                                         option.Value == (view.Chat.ThinkingLevel ?? "low"))
                                     ?? ThinkingLevelOptions[0];
+            _chatApiKeySecret = view.Chat.ApiKeySecret;
             _embeddingBaseUrl = view.Embedding.BaseUrl;
             _embeddingModel = view.Embedding.Model;
             _embeddingTier = TierOptions.First(option => option.Value == view.Embedding.Tier);
+            _embeddingApiKeySecret = view.Embedding.ApiKeySecret;
         }
 
         SaveModelConfigurationCommand = new AsyncRelayCommand(SaveAsync);
@@ -62,14 +70,29 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
         get => _chatTier;
         set
         {
-            if (SetProperty(ref _chatTier, value) &&
-                value.Value != "LocalOffline" &&
-                string.IsNullOrWhiteSpace(ChatBaseUrl))
+            if (SetProperty(ref _chatTier, value))
             {
-                ChatBaseUrl = "https://";
+                ChatBaseUrl = SuggestBaseUrl(value.Value, ChatBaseUrl);
             }
         }
     }
+
+    /// <summary>Write-only; an empty value keeps the stored secret.</summary>
+    public string ChatApiKey
+    {
+        get => _chatApiKey;
+        set => SetProperty(ref _chatApiKey, value);
+    }
+
+    public bool ClearChatApiKey
+    {
+        get => _clearChatApiKey;
+        set => SetProperty(ref _clearChatApiKey, value);
+    }
+
+    public string ChatApiKeyHint => string.IsNullOrWhiteSpace(_chatApiKeySecret)
+        ? "未保存接口密钥；公网/内网端点通常需要。"
+        : $"已保存密钥「{_chatApiKeySecret}」（值不可读取）。";
 
     public string EmbeddingBaseUrl
     {
@@ -88,14 +111,29 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
         get => _embeddingTier;
         set
         {
-            if (SetProperty(ref _embeddingTier, value) &&
-                value.Value != "LocalOffline" &&
-                string.IsNullOrWhiteSpace(EmbeddingBaseUrl))
+            if (SetProperty(ref _embeddingTier, value))
             {
-                EmbeddingBaseUrl = "https://";
+                EmbeddingBaseUrl = SuggestBaseUrl(value.Value, EmbeddingBaseUrl);
             }
         }
     }
+
+    /// <summary>Write-only; an empty value keeps the stored secret.</summary>
+    public string EmbeddingApiKey
+    {
+        get => _embeddingApiKey;
+        set => SetProperty(ref _embeddingApiKey, value);
+    }
+
+    public bool ClearEmbeddingApiKey
+    {
+        get => _clearEmbeddingApiKey;
+        set => SetProperty(ref _clearEmbeddingApiKey, value);
+    }
+
+    public string EmbeddingApiKeyHint => string.IsNullOrWhiteSpace(_embeddingApiKeySecret)
+        ? "未保存接口密钥；公网/内网端点通常需要。"
+        : $"已保存密钥「{_embeddingApiKeySecret}」（值不可读取）。";
 
     public IReadOnlyList<ModelTierOption> TierOptions { get; } =
     [
@@ -133,6 +171,24 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
 
     public IAsyncRelayCommand SaveModelConfigurationCommand { get; }
 
+    /// <summary>
+    /// Switching tiers should not leave a loopback address on a remote tier (or an https address on
+    /// the local tier); only the obvious placeholder cases are rewritten, a real user URL is kept.
+    /// </summary>
+    private static string SuggestBaseUrl(string tier, string current)
+    {
+        var isEmpty = string.IsNullOrWhiteSpace(current);
+        if (tier != "LocalOffline")
+        {
+            var isLoopback = Uri.TryCreate(current, UriKind.Absolute, out var uri) && uri.IsLoopback;
+            return isEmpty || isLoopback ? "https://" : current;
+        }
+
+        var isHttps = Uri.TryCreate(current, UriKind.Absolute, out var httpsUri) &&
+                      httpsUri.Scheme == Uri.UriSchemeHttps;
+        return isEmpty || isHttps ? ModelDefaults.OllamaBaseUrl : current;
+    }
+
     private async Task SaveAsync()
     {
         if (_modelConfiguration is null)
@@ -150,10 +206,29 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
                         ChatModel,
                         ChatTier.Value,
                         ChatThink,
-                        ChatThinkingLevel.Value),
-                    new ModelEndpointView(EmbeddingBaseUrl, EmbeddingModel, EmbeddingTier.Value)),
+                        ChatThinkingLevel.Value,
+                        _chatApiKeySecret,
+                        ChatApiKey,
+                        ClearChatApiKey),
+                    new ModelEndpointView(
+                        EmbeddingBaseUrl,
+                        EmbeddingModel,
+                        EmbeddingTier.Value,
+                        ApiKeySecret: _embeddingApiKeySecret,
+                        ApiKey: EmbeddingApiKey,
+                        ClearApiKey: ClearEmbeddingApiKey)),
                 CancellationToken.None);
-            ModelConfigStatus = "已保存到 models.json；重启应用后生效。";
+
+            // Clear the write-only inputs and refresh the "stored secret" hints from the admin.
+            ChatApiKey = string.Empty;
+            EmbeddingApiKey = string.Empty;
+            ClearChatApiKey = false;
+            ClearEmbeddingApiKey = false;
+            _chatApiKeySecret = _modelConfiguration.Current.Chat.ApiKeySecret;
+            _embeddingApiKeySecret = _modelConfiguration.Current.Embedding.ApiKeySecret;
+            OnPropertyChanged(nameof(ChatApiKeyHint));
+            OnPropertyChanged(nameof(EmbeddingApiKeyHint));
+            ModelConfigStatus = "已保存到 models.json（仅保留当前对话与向量模型）；重启应用后生效。";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {

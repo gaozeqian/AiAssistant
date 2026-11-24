@@ -174,6 +174,76 @@ public sealed partial class DesktopViewModelTests
         }
     }
 
+    [Fact]
+    public async Task ModelConfigEditor_PassesWriteOnlyApiKeyAndKeepsHintsInSync()
+    {
+        var admin = new RecordingModelConfigurationAdmin();
+        var editor = new ModelConfigurationEditorViewModel(admin)
+        {
+            ChatApiKey = "sk-chat-123",
+            EmbeddingApiKey = "sk-embed-456"
+        };
+
+        await editor.SaveModelConfigurationCommand.ExecuteAsync(null);
+
+        Assert.NotNull(admin.Saved);
+        Assert.Equal("sk-chat-123", admin.Saved!.Chat.ApiKey);
+        Assert.Equal("sk-embed-456", admin.Saved.Embedding.ApiKey);
+        Assert.Equal(string.Empty, editor.ChatApiKey);
+        Assert.Equal(string.Empty, editor.EmbeddingApiKey);
+        Assert.Contains("chat-endpoint-key", editor.ChatApiKeyHint, StringComparison.Ordinal);
+        Assert.Contains("embedding-endpoint-key", editor.EmbeddingApiKeyHint, StringComparison.Ordinal);
+        Assert.Contains("仅保留当前对话与向量模型", editor.ModelConfigStatus, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModelConfigEditor_SwitchingTierReplacesLoopbackPlaceholder()
+    {
+        var editor = new ModelConfigurationEditorViewModel(new RecordingModelConfigurationAdmin());
+        Assert.Equal("http://127.0.0.1:11434", editor.ChatBaseUrl);
+
+        // Local → public must not keep a loopback address on a remote tier.
+        editor.ChatTier = editor.TierOptions.First(option => option.Value == "PublicCloud");
+        Assert.Equal("https://", editor.ChatBaseUrl);
+
+        // A real user URL survives tier switches.
+        editor.ChatBaseUrl = "https://api.deepseek.com";
+        editor.ChatTier = editor.TierOptions.First(option => option.Value == "CorporateIntranet");
+        Assert.Equal("https://api.deepseek.com", editor.ChatBaseUrl);
+
+        // Remote → local restores the Ollama default instead of keeping an https address.
+        editor.ChatTier = editor.TierOptions.First(option => option.Value == "LocalOffline");
+        Assert.Equal("http://127.0.0.1:11434", editor.ChatBaseUrl);
+    }
+
+    private sealed class RecordingModelConfigurationAdmin : IModelConfigurationAdmin
+    {
+        private string? _chatSecret;
+        private string? _embeddingSecret;
+
+        public ModelConfigurationView? Saved { get; private set; }
+
+        public ModelConfigurationView Current => new(
+            new ModelEndpointView("http://127.0.0.1:11434", "gemma4:12b", "LocalOffline", ApiKeySecret: _chatSecret),
+            new ModelEndpointView("http://127.0.0.1:11434", "embeddinggemma-2:740m", "LocalOffline", ApiKeySecret: _embeddingSecret));
+
+        public Task SaveAsync(ModelConfigurationView update, CancellationToken ct)
+        {
+            Saved = update;
+            if (update.Chat.ApiKey is { Length: > 0 })
+            {
+                _chatSecret = "chat-endpoint-key";
+            }
+
+            if (update.Embedding.ApiKey is { Length: > 0 })
+            {
+                _embeddingSecret = "embedding-endpoint-key";
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
     private static ShellViewModel CreateShellWithVoice(VoiceControlViewModel voice)
     {
         var repository = new InMemoryEventRepository();

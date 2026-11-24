@@ -9,7 +9,7 @@ namespace AiAssistant.Desktop.ViewModels;
 internal static class DiagnosticsDisplayFormatter
 {
     public static string FormatEndpoint(ModelEndpointCapability endpoint) =>
-        $"{TierLabel(endpoint.Tier)}：对话={(endpoint.ChatAvailable ? "可用" : "不可用")} · " +
+        $"{RoleLabel(endpoint.Role)} · {TierLabel(endpoint.Tier)}：对话={(endpoint.ChatAvailable ? "可用" : "不可用")} · " +
         $"流式={(endpoint.StreamingAvailable ? "可用" : "不可用")} · " +
         $"向量={(endpoint.EmbeddingsAvailable ? "可用" : "不可用")} · " +
         $"结构化={(endpoint.StructuredOutputAvailable ? "可用" : "不可用")} · " +
@@ -43,6 +43,13 @@ internal static class DiagnosticsDisplayFormatter
             target.Add(item);
         }
     }
+
+    private static string RoleLabel(ModelEndpointRole role) => role switch
+    {
+        ModelEndpointRole.Chat => "对话端点",
+        ModelEndpointRole.Embedding => "向量端点",
+        _ => role.ToString()
+    };
 
     private static string TierLabel(ModelEndpointTier tier) => tier switch
     {

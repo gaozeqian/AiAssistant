@@ -48,11 +48,11 @@
           <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding ModelConfig.HasModelConfiguration}">
             <StackPanel Spacing="8">
               <TextBlock Text="模型配置" FontWeight="SemiBold" />
-              <TextBlock Text="对话与向量模型可独立配置端点（本机/内网/公网），保存后重启应用生效。" FontSize="12"
-                         Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+              <TextBlock Text="对话与向量模型各自独立配置来源、地址、模型名与接口密钥；models.json 只保存当前在用的两个模型，保存后重启应用生效。"
+                         FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
 
               <TextBlock Text="对话模型" FontWeight="SemiBold" />
-              <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+              <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                 <TextBlock Text="模型来源" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                 <ComboBox Grid.Column="1" ItemsSource="{Binding ModelConfig.TierOptions}" SelectedItem="{Binding ModelConfig.ChatTier}"
                           HorizontalAlignment="Stretch" Margin="0,0,0,6">
@@ -80,10 +80,20 @@
                     </DataTemplate>
                   </ComboBox.ItemTemplate>
                 </ComboBox>
+                <TextBlock Grid.Row="5" Text="接口密钥" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding ModelConfig.ChatApiKey}" PasswordChar="●"
+                         PlaceholderText="留空表示不修改" Margin="0,0,0,6"
+                         automation:AutomationProperties.Name="对话模型接口密钥" />
+                <StackPanel Grid.Row="6" Grid.Column="1" Spacing="2" Margin="0,0,0,6">
+                  <TextBlock Text="{Binding ModelConfig.ChatApiKeyHint}" FontSize="11"
+                             Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                  <CheckBox Content="清除已保存密钥" IsChecked="{Binding ModelConfig.ClearChatApiKey}"
+                            automation:AutomationProperties.Name="清除对话模型密钥" />
+                </StackPanel>
               </Grid>
 
               <TextBlock Text="向量模型（Embedding）" FontWeight="SemiBold" />
-              <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+              <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
                 <TextBlock Text="模型来源" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                 <ComboBox Grid.Column="1" ItemsSource="{Binding ModelConfig.TierOptions}" SelectedItem="{Binding ModelConfig.EmbeddingTier}"
                           HorizontalAlignment="Stretch" Margin="0,0,0,6">
@@ -97,6 +107,16 @@
                 <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ModelConfig.EmbeddingModel}" PlaceholderText="例如 embeddinggemma-2:740m" Margin="0,0,0,6" />
                 <TextBlock Grid.Row="2" Text="接口地址" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                 <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ModelConfig.EmbeddingBaseUrl}" PlaceholderText="http://127.0.0.1:11434" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="3" Text="接口密钥" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding ModelConfig.EmbeddingApiKey}" PasswordChar="●"
+                         PlaceholderText="留空表示不修改" Margin="0,0,0,6"
+                         automation:AutomationProperties.Name="向量模型接口密钥" />
+                <StackPanel Grid.Row="4" Grid.Column="1" Spacing="2" Margin="0,0,0,6">
+                  <TextBlock Text="{Binding ModelConfig.EmbeddingApiKeyHint}" FontSize="11"
+                             Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                  <CheckBox Content="清除已保存密钥" IsChecked="{Binding ModelConfig.ClearEmbeddingApiKey}"
+                            automation:AutomationProperties.Name="清除向量模型密钥" />
+                </StackPanel>
               </Grid>
 
               <WrapPanel>

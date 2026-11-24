@@ -166,32 +166,29 @@ internal static class DomainRegistrations
         services.AddSingleton<IModelAuditSink>(auditSink);
         services.AddSingleton<ITextRedactor>(redactor);
 
-        var endpointGateways = new Dictionary<ModelEndpointTier, IModelGateway>();
-        foreach (var endpoint in configuration.Endpoints)
+        // Chat endpoint: a single active model, so the tier router holds exactly one gateway.
+        var chatClient = ModelHttpClientFactory.Create(configuration.Chat);
+        services.AddSingleton(chatClient);
+        var chatBackend = new HttpModelBackend(chatClient, new ModelGatewayOptions
         {
-            var client = ModelHttpClientFactory.Create(endpoint);
-            services.AddSingleton(client);
-            var backendOptions = new ModelGatewayOptions
-            {
-                Provider = endpoint.Provider,
-                BaseAddress = endpoint.BaseAddress,
-                ChatModel = endpoint.ChatModel,
-                EmbeddingModel = endpoint.EmbeddingModel,
-                Think = endpoint.Think,
-                ThinkingLevel = endpoint.ThinkingLevel,
-                ApiKey = endpoint.ApiKey,
-                RequestTimeout = endpoint.Timeout,
-                AllowRemoteEndpoint = true
-            };
-            var backend = new HttpModelBackend(client, backendOptions);
-            services.AddSingleton(backend);
-            endpointGateways[endpoint.Tier] = new EndpointModelGateway(
-                backend,
-                endpoint,
-                Microsoft.Extensions.Logging.Abstractions.NullLogger<EndpointModelGateway>.Instance);
-        }
-
-        var chatRouter = new TierRoutingModelGateway(endpointGateways, configuration.Policy);
+            Provider = configuration.Chat.Provider,
+            BaseAddress = configuration.Chat.BaseAddress,
+            ChatModel = configuration.Chat.ChatModel,
+            EmbeddingModel = configuration.Chat.EmbeddingModel,
+            Think = configuration.Chat.Think,
+            ThinkingLevel = configuration.Chat.ThinkingLevel,
+            ApiKey = configuration.Chat.ApiKey,
+            RequestTimeout = configuration.Chat.Timeout,
+            AllowRemoteEndpoint = true
+        });
+        services.AddSingleton(chatBackend);
+        var chatEndpointGateway = new EndpointModelGateway(
+            chatBackend,
+            configuration.Chat,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<EndpointModelGateway>.Instance);
+        var chatRouter = new TierRoutingModelGateway(
+            new Dictionary<ModelEndpointTier, IModelGateway> { [configuration.Chat.Tier] = chatEndpointGateway },
+            configuration.Policy);
         var chatGateway = new AuditedModelGateway(
             new PolicyEnforcedModelGateway(
                 new ThreeGateModelGateway(chatRouter, redactor),
@@ -200,26 +197,23 @@ internal static class DomainRegistrations
             auditSink,
             clock);
 
-        // Embedding may target an independent endpoint (different tier/address/model). When no
-        // dedicated embedding endpoint is configured, reuse the default tier's endpoint.
-        var defaultTierEndpoint = configuration.Endpoints.First(item => item.Tier == configuration.Policy.DefaultTier);
-        var embeddingEndpoint = configuration.EmbeddingEndpoint ?? defaultTierEndpoint;
-        var embeddingClient = ModelHttpClientFactory.Create(embeddingEndpoint);
+        // Embedding endpoint is fully independent: its own tier, address, model and secret.
+        var embeddingClient = ModelHttpClientFactory.Create(configuration.Embedding);
         services.AddSingleton(embeddingClient);
         var embeddingBackend = new HttpModelBackend(embeddingClient, new ModelGatewayOptions
         {
-            Provider = embeddingEndpoint.Provider,
-            BaseAddress = embeddingEndpoint.BaseAddress,
-            ChatModel = embeddingEndpoint.ChatModel,
-            EmbeddingModel = embeddingEndpoint.EmbeddingModel,
-            ApiKey = embeddingEndpoint.ApiKey,
-            RequestTimeout = embeddingEndpoint.Timeout,
+            Provider = configuration.Embedding.Provider,
+            BaseAddress = configuration.Embedding.BaseAddress,
+            ChatModel = configuration.Embedding.ChatModel,
+            EmbeddingModel = configuration.Embedding.EmbeddingModel,
+            ApiKey = configuration.Embedding.ApiKey,
+            RequestTimeout = configuration.Embedding.Timeout,
             AllowRemoteEndpoint = true
         });
         services.AddSingleton(embeddingBackend);
         var embeddingEndpointGateway = new EndpointModelGateway(
             embeddingBackend,
-            embeddingEndpoint,
+            configuration.Embedding,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<EndpointModelGateway>.Instance);
         var embeddingGateway = new AuditedModelGateway(
             new PolicyEnforcedModelGateway(
@@ -229,7 +223,7 @@ internal static class DomainRegistrations
             auditSink,
             clock);
 
-        var gateway = new SplitChatEmbeddingGateway(chatGateway, embeddingGateway, embeddingEndpoint.Tier);
+        var gateway = new SplitChatEmbeddingGateway(chatGateway, embeddingGateway, configuration.Embedding.Tier);
         services.AddSingleton(gateway);
         services.AddSingleton<IModelGateway>(gateway);
         var standardClient = new GatewayChatClient(gateway, configuration.Policy.DefaultTier);
@@ -238,18 +232,19 @@ internal static class DomainRegistrations
 
         var capabilityCache = new ModelCapabilityCache(Path.Combine(dataDirectory, "model-capabilities.json"));
         services.AddSingleton(capabilityCache);
-        var probeEndpoints = configuration.Endpoints
-            .Where(endpoint => endpoint.Tier switch
-            {
-                ModelEndpointTier.LocalOffline => true,
-                ModelEndpointTier.CorporateIntranet => configuration.Policy.AllowIntranet,
-                ModelEndpointTier.PublicCloud => configuration.Policy.AllowPublicCloud &&
-                                                 (!configuration.Policy.RequirePublicCloudConsent || consent.IsGranted),
-                _ => false
-            })
-            .ToArray();
+        var probeTargets = new List<ModelProbeTarget>();
+        if (IsTierAllowed(configuration.Chat.Tier, configuration.Policy, consent))
+        {
+            probeTargets.Add(new ModelProbeTarget(ModelEndpointRole.Chat, configuration.Chat));
+        }
+
+        if (IsTierAllowed(configuration.Embedding.Tier, configuration.Policy, consent))
+        {
+            probeTargets.Add(new ModelProbeTarget(ModelEndpointRole.Embedding, configuration.Embedding));
+        }
+
         services.AddSingleton<IModelCapabilityProber>(new ModelCapabilityProber(
-            probeEndpoints,
+            probeTargets,
             capabilityCache,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ModelCapabilityProber>.Instance,
             clock: clock));
@@ -257,11 +252,8 @@ internal static class DomainRegistrations
         services.AddSingleton<IReportRepository, SqliteReportRepository>();
         services.AddSingleton(new ReportGenerationOptions { DefaultTier = configuration.Policy.DefaultTier });
         services.AddSingleton<IReportGenerationRunner, ReportGenerationRunner>();
-        var localEmbeddingModel = configuration.Endpoints
-            .FirstOrDefault(endpoint => endpoint.Tier == ModelEndpointTier.LocalOffline)
-            ?.EmbeddingModel ?? string.Empty;
         var documentStyle = EmbeddingProfile.ResolveDocumentStyle(
-            localEmbeddingModel,
+            configuration.Embedding.EmbeddingModel,
             Environment.GetEnvironmentVariable(EnvironmentNames.EmbeddingDocumentStyle));
         services.AddSingleton(provider => new EventEmbeddingIndexer(
             provider.GetRequiredService<IEventRepository>(),
@@ -290,6 +282,19 @@ internal static class DomainRegistrations
         });
         services.AddSingleton<ReportJobWorker>();
     }
+
+    private static bool IsTierAllowed(
+        ModelEndpointTier tier,
+        ModelPolicy policy,
+        PublicCloudConsentGate consent) =>
+        tier switch
+        {
+            ModelEndpointTier.LocalOffline => true,
+            ModelEndpointTier.CorporateIntranet => policy.AllowIntranet,
+            ModelEndpointTier.PublicCloud => policy.AllowPublicCloud &&
+                                             (!policy.RequirePublicCloudConsent || consent.IsGranted),
+            _ => false
+        };
 
     internal static float ReadFloatEnvironment(string name, float fallback, float min, float max)
     {

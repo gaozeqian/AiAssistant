@@ -1,44 +1,18 @@
 {
-  "schemaVersion": 1,
-  "policy": {
-    "allowIntranet": true,
-    "allowPublicCloud": false,
-    "defaultTier": "LocalOffline",
-    "allowLocalFallback": true,
-    "requirePublicCloudConsent": true
+  "schemaVersion": 2,
+  "chat": {
+    "tier": "LocalOffline",
+    "provider": "ollama",
+    "baseUrl": "http://127.0.0.1:11434",
+    "model": "gemma4:12b",
+    "timeoutSeconds": 120,
+    "think": false
   },
-  "endpoints": [
-    {
-      "tier": "LocalOffline",
-      "provider": "ollama",
-      "baseUrl": "http://127.0.0.1:11434",
-      "chatModel": "gemma4:12b",
-      "embeddingModel": "embeddinggemma-2:740m",
-      "timeoutSeconds": 120,
-      "think": false,
-      "thinkingLevel": null
-    },
-    {
-      "tier": "CorporateIntranet",
-      "provider": "openai",
-      "baseUrl": "https://llm.intranet.example/v1",
-      "chatModel": "corp-chat-model",
-      "embeddingModel": "corp-embedding-model",
-      "timeoutSeconds": 60,
-      "allowRemoteEndpoint": true,
-      "apiKeySecret": "intranet-api-key",
-      "enterpriseCaPath": "/etc/ssl/certs/company-root-ca.pem",
-      "proxyUrl": "http://proxy.intranet.example:8080"
-    },
-    {
-      "tier": "PublicCloud",
-      "provider": "openai",
-      "baseUrl": "https://api.example.com/v1",
-      "chatModel": "public-chat-model",
-      "embeddingModel": "public-embedding-model",
-      "timeoutSeconds": 60,
-      "allowRemoteEndpoint": true,
-      "apiKeySecret": "public-api-key"
-    }
-  ]
+  "embedding": {
+    "tier": "LocalOffline",
+    "provider": "ollama",
+    "baseUrl": "http://127.0.0.1:11434",
+    "model": "embeddinggemma-2:740m",
+    "timeoutSeconds": 120
+  }
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
@@ -5,15 +6,20 @@ using AiAssistant.Core.Domain;
 namespace AiAssistant.Models;
 
 /// <summary>
-/// Reads the current chat / embedding endpoint settings for the UI and persists edits back to
-/// models.json. Chat and embedding are configured independently; the chat endpoint lives in the
-/// per-tier Endpoints list while the embedding endpoint is stored as the optional Embedding document.
-/// Policy and any endpoint not being edited are preserved.
+/// Reads the active chat / embedding endpoint settings for the UI and persists edits back to
+/// models.json schema 2. Chat and embedding are independent documents, so they may share a tier
+/// while pointing at different addresses, models and keys. Only the two models in use are stored.
 /// </summary>
 public sealed class ModelConfigurationAdmin(
     string modelsConfigPath,
-    ModelsConfiguration current) : IModelConfigurationAdmin
+    ModelsConfiguration current,
+    IModelSecretAdmin? secrets = null) : IModelConfigurationAdmin
 {
+    /// <summary>Stable secret names so re-saving a key overwrites the same encrypted entry.</summary>
+    public const string ChatSecretName = "chat-endpoint-key";
+
+    public const string EmbeddingSecretName = "embedding-endpoint-key";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -23,36 +29,21 @@ public sealed class ModelConfigurationAdmin(
     };
 
     private readonly string _modelsConfigPath = Path.GetFullPath(modelsConfigPath);
+    private ModelsConfiguration _current = current ?? throw new ArgumentNullException(nameof(current));
 
-    public ModelConfigurationView Current
-    {
-        get
-        {
-            var chatEndpoint = current.Endpoints[0];
-            for (var i = 0; i < current.Endpoints.Count; i++)
-            {
-                if (current.Endpoints[i].Tier == current.Policy.DefaultTier)
-                {
-                    chatEndpoint = current.Endpoints[i];
-                    break;
-                }
-            }
-
-            var embeddingEndpoint = current.EmbeddingEndpoint ?? chatEndpoint;
-
-            return new ModelConfigurationView(
-                new ModelEndpointView(
-                    chatEndpoint.BaseAddress.ToString(),
-                    chatEndpoint.ChatModel,
-                    chatEndpoint.Tier.ToString(),
-                    chatEndpoint.Think,
-                    chatEndpoint.ThinkingLevel),
-                new ModelEndpointView(
-                    embeddingEndpoint.BaseAddress.ToString(),
-                    embeddingEndpoint.EmbeddingModel,
-                    embeddingEndpoint.Tier.ToString()));
-        }
-    }
+    public ModelConfigurationView Current => new(
+        new ModelEndpointView(
+            _current.Chat.BaseAddress.ToString(),
+            _current.Chat.ChatModel,
+            _current.Chat.Tier.ToString(),
+            _current.Chat.Think,
+            _current.Chat.ThinkingLevel,
+            _current.Chat.ApiKeySecret),
+        new ModelEndpointView(
+            _current.Embedding.BaseAddress.ToString(),
+            _current.Embedding.EmbeddingModel,
+            _current.Embedding.Tier.ToString(),
+            ApiKeySecret: _current.Embedding.ApiKeySecret));
 
     public async Task SaveAsync(ModelConfigurationView update, CancellationToken ct)
     {
@@ -63,90 +54,156 @@ public sealed class ModelConfigurationAdmin(
         var embeddingTier = ParseTier(update.Embedding.Tier);
         ValidateEndpoint(update.Embedding, embeddingTier, isEmbedding: true);
 
-        var document = await LoadDocumentAsync(ct);
-
-        // Chat endpoint lives in the per-tier Endpoints list.
-        var endpoints = new List<ModelEndpointDocument>(document.Endpoints);
-        var chatTierName = chatTier.ToString();
-        var chatIndex = endpoints.FindIndex(item => item.Tier == chatTierName);
-        var chatEndpoint = chatIndex < 0 ? new ModelEndpointDocument() : endpoints[chatIndex];
         var chatBaseUrl = ParseUri(update.Chat.BaseUrl).TrimEnd('/');
-        var updatedChat = chatEndpoint with
+        var embeddingBaseUrl = ParseUri(update.Embedding.BaseUrl).TrimEnd('/');
+
+        var chatSecret = await ApplySecretAsync(
+            update.Chat,
+            ChatSecretName,
+            _current.Chat.ApiKeySecret,
+            _current.Chat.ApiKey,
+            ct);
+        var embeddingSecret = await ApplySecretAsync(
+            update.Embedding,
+            EmbeddingSecretName,
+            _current.Embedding.ApiKeySecret,
+            _current.Embedding.ApiKey,
+            ct);
+
+        var chatProvider = chatTier == ModelEndpointTier.LocalOffline
+            ? await ResolveLocalProviderAsync(chatBaseUrl, _current.Chat.Provider, ct)
+            : ModelProviderKind.OpenAiCompatible;
+        var embeddingProvider = embeddingTier == ModelEndpointTier.LocalOffline
+            ? await ResolveLocalProviderAsync(embeddingBaseUrl, _current.Embedding.Provider, ct)
+            : ModelProviderKind.OpenAiCompatible;
+
+        var chat = _current.Chat with
         {
-            Tier = chatTierName,
-            // Local endpoints are not necessarily Ollama: keep the configured provider, otherwise
-            // probe once and fall back to an OpenAI-compatible endpoint.
-            Provider = chatTier == ModelEndpointTier.LocalOffline
-                ? await ResolveLocalProviderAsync(chatBaseUrl, chatIndex < 0 ? null : chatEndpoint.Provider, ct)
-                : "openai",
-            BaseUrl = chatBaseUrl,
+            Tier = chatTier,
+            Provider = chatProvider,
+            BaseAddress = new Uri(chatBaseUrl),
             ChatModel = update.Chat.Model.Trim(),
+            EmbeddingModel = string.Empty,
             Think = update.Chat.Think,
             ThinkingLevel = string.IsNullOrWhiteSpace(update.Chat.ThinkingLevel)
                 ? null
                 : update.Chat.ThinkingLevel.ToLowerInvariant(),
-            AllowRemoteEndpoint = chatTier != ModelEndpointTier.LocalOffline || chatEndpoint.AllowRemoteEndpoint
+            AllowRemoteEndpoint = chatTier != ModelEndpointTier.LocalOffline || _current.Chat.AllowRemoteEndpoint,
+            ApiKey = chatSecret.ApiKey,
+            ApiKeySecret = chatSecret.SecretReference
         };
-        if (chatIndex < 0)
+        var embedding = _current.Embedding with
         {
-            endpoints.Insert(0, updatedChat);
-        }
-        else
-        {
-            endpoints[chatIndex] = updatedChat;
-        }
+            Tier = embeddingTier,
+            Provider = embeddingProvider,
+            BaseAddress = new Uri(embeddingBaseUrl),
+            ChatModel = string.Empty,
+            EmbeddingModel = update.Embedding.Model.Trim(),
+            Think = false,
+            ThinkingLevel = null,
+            AllowRemoteEndpoint = embeddingTier != ModelEndpointTier.LocalOffline || _current.Embedding.AllowRemoteEndpoint,
+            ApiKey = embeddingSecret.ApiKey,
+            ApiKeySecret = embeddingSecret.SecretReference
+        };
 
-        // Embedding endpoint stored as the optional Embedding document. When embedding uses the same
-        // tier as chat, keep it absent so it reuses the chat endpoint (simplest config).
-        EmbeddingEndpointDocument? embedding = embeddingTier == chatTier
-            ? null
-            : new EmbeddingEndpointDocument
+        var document = new ModelsFileDocument
+        {
+            SchemaVersion = ModelsConfigurationLoader.SupportedSchemaVersion,
+            Chat = ToDocument(chat, chat.ChatModel),
+            Embedding = ToDocument(embedding, embedding.EmbeddingModel)
+        };
+
+        await SaveDocumentAsync(document, ct);
+
+        // Keep the in-memory snapshot in sync so a second save in the same session starts from
+        // what was just written instead of the configuration loaded at startup.
+        _current = new ModelsConfiguration(
+            ModelsConfigurationLoader.SupportedSchemaVersion,
+            _current.Policy with
             {
-                Tier = embeddingTier.ToString(),
-                Provider = embeddingTier == ModelEndpointTier.LocalOffline
-                    ? await ResolveLocalProviderAsync(
-                        ParseUri(update.Embedding.BaseUrl).TrimEnd('/'),
-                        document.Embedding?.Provider,
-                        ct)
-                    : "openai",
-                BaseUrl = ParseUri(update.Embedding.BaseUrl).TrimEnd('/'),
-                Model = update.Embedding.Model.Trim(),
-                AllowRemoteEndpoint = embeddingTier != ModelEndpointTier.LocalOffline
-            };
+                DefaultTier = chatTier,
+                AllowIntranet = chatTier == ModelEndpointTier.CorporateIntranet ||
+                                embeddingTier == ModelEndpointTier.CorporateIntranet,
+                AllowPublicCloud = chatTier == ModelEndpointTier.PublicCloud ||
+                                   embeddingTier == ModelEndpointTier.PublicCloud,
+                RequirePublicCloudConsent = false,
+                AllowLocalFallback = false
+            },
+            chat,
+            embedding);
+    }
 
-        // Update policy: default tier follows chat tier; public cloud unlocks on explicit selection.
-        var policy = document.Policy;
-        if (chatTier == ModelEndpointTier.PublicCloud || embeddingTier == ModelEndpointTier.PublicCloud)
+    private static ModelEndpointDocument ToDocument(ModelEndpointSettings settings, string model) =>
+        new()
         {
-            policy = policy with { AllowPublicCloud = true, RequirePublicCloudConsent = false };
+            Tier = settings.Tier.ToString(),
+            Provider = settings.Provider == ModelProviderKind.Ollama ? "ollama" : "openai",
+            BaseUrl = settings.BaseAddress.ToString().TrimEnd('/'),
+            Model = model,
+            TimeoutSeconds = Math.Clamp((int)Math.Round(settings.Timeout.TotalSeconds), 1, 600),
+            ApiKeySecret = settings.ApiKeySecret,
+            ClientCertificatePath = settings.ClientCertificatePath,
+            ClientCertificateKeyPath = settings.ClientCertificateKeyPath,
+            ClientCertificatePasswordSecret = settings.ClientCertificatePasswordSecret,
+            EnterpriseCaPath = settings.EnterpriseCaPath,
+            ProxyUrl = settings.Proxy?.ToString(),
+            AllowRemoteEndpoint = settings.AllowRemoteEndpoint,
+            Think = settings.Think,
+            ThinkingLevel = settings.ThinkingLevel
+        };
+
+    /// <summary>
+    /// Stores a newly typed key in the encrypted secret store and returns the reference to persist.
+    /// An empty input keeps the existing reference; <see cref="ModelEndpointView.ClearApiKey"/> removes it.
+    /// </summary>
+    private async Task<(string? SecretReference, string? ApiKey)> ApplySecretAsync(
+        ModelEndpointView view,
+        string secretName,
+        string? currentReference,
+        string? currentApiKey,
+        CancellationToken ct)
+    {
+        if (view.ClearApiKey)
+        {
+            if (secrets is not null)
+            {
+                await secrets.DeleteAsync(secretName, ct);
+            }
+
+            return (null, null);
         }
 
-        policy = policy with { DefaultTier = chatTierName };
+        if (string.IsNullOrWhiteSpace(view.ApiKey))
+        {
+            return (currentReference, currentApiKey);
+        }
 
-        await SaveDocumentAsync(document with { Endpoints = endpoints, Embedding = embedding, Policy = policy }, ct);
+        if (secrets is null)
+        {
+            throw new ModelConfigurationException("当前会话无法访问加密密钥库，接口密钥未保存。");
+        }
+
+        var value = view.ApiKey.Trim();
+        await secrets.SetAsync(secretName, value, ct);
+        return (secretName, value);
     }
 
     /// <summary>
     /// "本机" is not tied to a specific runtime. Keep an existing provider, otherwise probe
     /// Ollama's /api/tags once and fall back to the OpenAI-compatible API (LM Studio, vLLM, ...).
     /// </summary>
-    private static async Task<string> ResolveLocalProviderAsync(
+    private static async Task<ModelProviderKind> ResolveLocalProviderAsync(
         string baseUrl,
-        string? existingProvider,
+        ModelProviderKind existingProvider,
         CancellationToken ct)
     {
-        if (!string.IsNullOrWhiteSpace(existingProvider))
-        {
-            return existingProvider;
-        }
-
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
             using var response = await http.GetAsync(new Uri(new Uri(baseUrl), "/api/tags"), ct);
             if (response.IsSuccessStatusCode)
             {
-                return "ollama";
+                return ModelProviderKind.Ollama;
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or UriFormatException)
@@ -155,7 +212,7 @@ public sealed class ModelConfigurationAdmin(
             AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Models.ModelConfigurationAdmin.ResolveLocalProviderAsync", ex);
         }
 
-        return "openai";
+        return existingProvider == ModelProviderKind.Ollama ? ModelProviderKind.OpenAiCompatible : existingProvider;
     }
 
     private static void ValidateEndpoint(ModelEndpointView view, ModelEndpointTier tier, bool isEmbedding)
@@ -190,32 +247,27 @@ public sealed class ModelConfigurationAdmin(
             _ => throw new ModelConfigurationException($"未知模型来源 '{tier}'。")
         };
 
-    private async Task<ModelsFileDocument> LoadDocumentAsync(CancellationToken ct)
-    {
-        if (!File.Exists(_modelsConfigPath))
-        {
-            return new ModelsFileDocument();
-        }
-
-        await using var stream = new FileStream(_modelsConfigPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var document = await JsonSerializer.DeserializeAsync<ModelsFileDocument>(stream, JsonOptions, ct);
-        if (document is null)
-        {
-            throw new ModelConfigurationException("models.json 为空，无法保存。");
-        }
-
-        return document;
-    }
-
     private async Task SaveDocumentAsync(ModelsFileDocument document, CancellationToken ct)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_modelsConfigPath)!);
-        var tempPath = _modelsConfigPath + ".tmp";
-        await using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        var tempPath = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{_modelsConfigPath}.{Guid.NewGuid():N}.tmp");
+        try
         {
-            await JsonSerializer.SerializeAsync(stream, document, JsonOptions, ct);
-        }
+            await using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                await JsonSerializer.SerializeAsync(stream, document, JsonOptions, ct);
+            }
 
-        File.Move(tempPath, _modelsConfigPath, overwrite: true);
+            File.Move(tempPath, _modelsConfigPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
     }
 }
