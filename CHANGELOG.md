@@ -4,7 +4,9 @@
 
 版本号以仓库根 `Directory.Build.props` 的 `VersionPrefix` 为准，本文件首条必须与之一致。
 
-## [Unreleased]
+## [0.1.1] - 2026-11-24
+
+工程标准化收口与依赖升级。三平台交付物形态、安装与升级方式不变。
 
 ### Added
 
@@ -30,6 +32,8 @@
 - UI 拆分：`MainWindow.axaml` 拆为共享样式 + 7 个 Tab UserControl；Diagnostics/Timeline ViewModel 抽出无状态映射，单文件 ≤350 行。
 - 重型模块拆分：MCP 传输/鉴权/生命周期、采集样本处理/控制审计、macOS 采集适配器、语音音频/反馈/日志、PipeWire 回调、Application 端口与 Swift 原生能力按职责拆分。
 - 文档从 44 篇收敛为 25 篇：架构合并为 `overview.md`，开发规范与测试聚合，发布/安全/合规/路线图重写；删除归档、空壳索引与手工状态抄写。
+- 依赖升级：`Microsoft.Extensions.AI` 11.0.1、`Microsoft.Extensions.Hosting` 11.0.0、`Microsoft.Data.Sqlite.Core` 11.0.0、`org.k2fsa.sherpa.onnx` 2.0.3；随包原生 ONNX Runtime 保持 1.28.2，与托管绑定 `Microsoft.ML.OnnxRuntime.Managed` 1.28.0 的 ABI 对齐。
+- CI：GitHub Actions 统一升到 Node 24 运行时（`checkout` 7.0.1、`setup-dotnet` 6.1.0、`cache` 6.1.0、`upload-artifact` 7.0.2、`download-artifact` 8.0.2、`action-gh-release` 3.0.4），上传与下载产物两端同步升级。
 
 ### Fixed
 
@@ -45,6 +49,8 @@
 - 模型配置：`models.json` 升级为 schema 2，仅保存当前在用的对话与向量模型且二者完全独立（同档位不同地址不再丢失向量配置）；本地模型不再强制，schema 1 仍可读取并在保存时升级。
 - 模型配置：UI 新增对话/向量接口密钥输入（只写不读，写入加密库并以 `apiKeySecret` 引用），修复公网/内网端点无法配置密钥的问题。
 - 测试基建：修复 headless UI 测试在 `await` 之后吞掉断言异常的问题（`Func<Task>` 绑定到同步重载返回 `Task<Task>`），并让测试宿主加载真实 Fluent 主题，窗口视觉树才会生成。
+- CI：修正流水线触发分支为实际默认分支 `master`。此前 `on.push` / `on.pull_request` 误写为 `main`，而仓库不存在 `main`，导致推送与 PR 均不触发 CI。
+- 工程：仓库规范审计脚本的 29 处 `&& pass || fail` 改为显式 if/then/else（`pass` 返回非零时 `fail` 会被连带执行）；macOS 自签名脚本的钥匙串参数改用数组传递，路径含空格不再被拆断。
 
 ## [0.1.0] - 2026-11-22
 

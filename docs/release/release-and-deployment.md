@@ -1,6 +1,6 @@
 # 发布与部署
 
-> **状态**：living ｜ **最后更新**：2026-11-23 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：交付矩阵、签名、安装/升级/回滚流程或 CI 发布作业变化时
+> **状态**：living ｜ **最后更新**：2026-11-24 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：交付矩阵、签名、安装/升级/回滚流程或 CI 发布作业变化时
 
 本文件合并原 `release/delivery-matrix.md`、`release/release-checklist.md`、`release/upgrade-and-uninstall.md` 与 `release/rollback.md`。
 
@@ -66,7 +66,7 @@
 **Windows**
 
 ```powershell
-msiexec /i AiAssistant-0.1.0-windows-x64.msi
+msiexec /i AiAssistant-0.1.1-windows-x64.msi
 # 或解压 portable zip 后直接运行 AiAssistant.exe
 ```
 
@@ -75,7 +75,7 @@ MSI 为 perMachine，需管理员；数据目录 `%LOCALAPPDATA%\AiAssistant` �
 **macOS**
 
 ```bash
-sudo installer -pkg AiAssistant-0.1.0-macos-arm64.pkg -target /
+sudo installer -pkg AiAssistant-0.1.1-macos-arm64.pkg -target /
 # 或解压 .app.zip 后拖入 /Applications
 ```
 
@@ -84,10 +84,10 @@ sudo installer -pkg AiAssistant-0.1.0-macos-arm64.pkg -target /
 **Linux**
 
 ```bash
-sudo apt install ./aiassistant_0.1.0_amd64.deb
+sudo apt install ./aiassistant_0.1.1_amd64.deb
 # 或
-tar -xzf aiassistant-0.1.0-linux-x64.tar.gz
-cd aiassistant-0.1.0-linux-x64 && ./aiassistant
+tar -xzf aiassistant-0.1.1-linux-x64.tar.gz
+cd aiassistant-0.1.1-linux-x64 && ./aiassistant
 ```
 
 便携包含顶层目录，不会向当前目录散落文件；启动器/二进制使用相对路径寻址。
