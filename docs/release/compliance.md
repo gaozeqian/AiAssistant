@@ -32,14 +32,14 @@
 | `SQLite3MC.PCLRaw.bundle` | 2.7.1 | MIT | SQLite 加密 |
 | `HiraokaHyperTools.sqlite-vec` | 0.1.9 | MIT | 向量检索 |
 | `System.Security.Cryptography.ProtectedData` | 10.0.15 | MIT | Windows DPAPI |
-| `Microsoft.Extensions.AI` | 10.11.0 | MIT | AI 抽象 |
-| `Microsoft.Extensions.AI.Abstractions` | 10.11.0 | MIT | AI 抽象 |
-| `Microsoft.Extensions.DependencyInjection` | 10.0.15 | MIT | DI |
-| `Microsoft.Extensions.DependencyInjection.Abstractions` | 10.0.15 | MIT | DI 抽象 |
-| `Microsoft.Extensions.Hosting` | 10.0.15 | MIT | 宿主生命周期 |
-| `Microsoft.Extensions.Hosting.Abstractions` | 10.0.15 | MIT | 宿主抽象 |
-| `Microsoft.Extensions.Logging.Abstractions` | 10.0.15 | MIT | 日志抽象 |
-| `System.Numerics.Tensors` | 10.0.15 | MIT | 向量运算 |
+| `Microsoft.Extensions.AI` | 11.0.1 | MIT | AI 抽象 |
+| `Microsoft.Extensions.AI.Abstractions` | 11.0.1 | MIT | AI 抽象 |
+| `Microsoft.Extensions.DependencyInjection` | 11.0.0 | MIT | DI |
+| `Microsoft.Extensions.DependencyInjection.Abstractions` | 11.0.0 | MIT | DI 抽象 |
+| `Microsoft.Extensions.Hosting` | 11.0.0 | MIT | 宿主生命周期 |
+| `Microsoft.Extensions.Hosting.Abstractions` | 11.0.0 | MIT | 宿主抽象 |
+| `Microsoft.Extensions.Logging.Abstractions` | 11.0.0 | MIT | 日志抽象 |
+| `System.Numerics.Tensors` | 11.0.0 | MIT | 向量运算 |
 | `org.k2fsa.sherpa.onnx` | 2.0.2 | Apache-2.0 | 语音识别/唤醒/TTS |
 | `Whisper.net` | 1.9.1 | MIT | 可选 ASR |
 | `Whisper.net.Runtime` | 1.9.1 | MIT | Whisper 原生运行时 |
