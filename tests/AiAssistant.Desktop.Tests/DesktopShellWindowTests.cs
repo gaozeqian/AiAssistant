@@ -12,6 +12,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 namespace AiAssistant.Desktop.Tests;
@@ -201,9 +202,22 @@ public sealed partial class DesktopViewModelTests
     private static readonly HeadlessUnitTestSession SharedHeadlessSession =
         HeadlessUnitTestSession.GetOrStartForAssembly(typeof(DesktopViewModelTests).Assembly);
 
+    /// <summary>
+    /// Dispatches onto the shared headless UI thread. The <c>Func&lt;Task&lt;int&gt;&gt;</c> shape is
+    /// deliberate: passing a bare <c>Func&lt;Task&gt;</c> binds to the synchronous
+    /// <c>Dispatch&lt;TResult&gt;(Func&lt;TResult&gt;)</c> overload, which returns <c>Task&lt;Task&gt;</c>.
+    /// Awaiting that only awaits the outer task, so the test body keeps running unobserved and its
+    /// assertions never fail the run.
+    /// </summary>
     private static async Task RunInHeadlessSession(Func<Task> test)
     {
-        await SharedHeadlessSession.Dispatch(test, CancellationToken.None).ConfigureAwait(false);
+        await SharedHeadlessSession.Dispatch(
+            async () =>
+            {
+                await test().ConfigureAwait(true);
+                return 0;
+            },
+            CancellationToken.None).ConfigureAwait(false);
     }
 
     private static ActivityEvent CreateEvent(string id, OccurredTimestamp timestamp, string? contentId = null) =>
@@ -222,9 +236,13 @@ public sealed partial class DesktopViewModelTests
         var deadline = DateTime.UtcNow.AddSeconds(2);
         while (!condition() && DateTime.UtcNow < deadline)
         {
+            // Headless sessions have no running main loop, so pending layout/render jobs only
+            // execute when pumped explicitly; Task.Delay alone never materializes the visual tree.
+            Dispatcher.UIThread.RunJobs();
             await Task.Delay(20);
         }
 
+        Dispatcher.UIThread.RunJobs();
         Assert.True(condition());
     }
 
