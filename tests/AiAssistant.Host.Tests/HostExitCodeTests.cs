@@ -93,7 +93,7 @@ public sealed class HostExitCodeTests
 
         var hostDll = Path.Combine(
             directory.FullName,
-            "artifacts",
+            ArtifactPaths.DefaultRootName,
             "bin",
             "AiAssistant.Host",
             "release",
