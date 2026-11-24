@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
 
 # 最小权限：除显式提权的 job 外，GITHUB_TOKEN 只读。
 permissions:
