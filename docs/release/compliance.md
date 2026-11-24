@@ -28,7 +28,7 @@
 | `SkiaSharp` | 3.119.4 | MIT | PNG/PDF 光栅化 |
 | `SkiaSharp.NativeAssets.Linux` | 3.119.4 | MIT | Linux 原生资产 |
 | `PDFsharp` | 6.1.1 | MIT | PDF 导出 |
-| `Microsoft.Data.Sqlite.Core` | 10.0.15 | MIT | SQLite 访问 |
+| `Microsoft.Data.Sqlite.Core` | 11.0.0 | MIT | SQLite 访问 |
 | `SQLite3MC.PCLRaw.bundle` | 2.7.1 | MIT | SQLite 加密 |
 | `HiraokaHyperTools.sqlite-vec` | 0.1.9 | MIT | 向量检索 |
 | `System.Security.Cryptography.ProtectedData` | 10.0.15 | MIT | Windows DPAPI |
