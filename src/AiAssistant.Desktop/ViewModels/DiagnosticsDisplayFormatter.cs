@@ -29,19 +29,6 @@ internal static class DiagnosticsDisplayFormatter
             : $"{RoleLabel(endpoint.Role)} · {TierLabel(endpoint.Tier)}：{capabilities} · {endpoint.Diagnostic}";
     }
 
-    public static string FormatPermissionGuidance(IReadOnlyList<CapabilityState> capabilities)
-    {
-        var needsAttention = capabilities
-            .Where(item => item.Status is not CapabilityStatus.Supported)
-            .ToArray();
-        return needsAttention.Length == 0
-            ? "当前平台权限齐全，无需额外授权。"
-            : string.Join(
-                Environment.NewLine,
-                needsAttention.Select(item =>
-                    $"{CapabilityItem.KindLabel(item.Kind)}：{item.RemediationHint ?? item.Summary}"));
-    }
-
     public static string FormatMcpStatus(LocalMcpSnapshot snapshot) => snapshot switch
     {
         { Enabled: false } => "默认关闭（仅监听 127.0.0.1）",

@@ -116,13 +116,19 @@ public sealed partial class DesktopViewModelTests
         await shell.InitializeAsync();
 
         shell.SelectedSectionIndex = 3; // 语音
-        await WaitUntilAsync(() => HasButton(window, "启用语音"));
-        Click(window, "启用语音");
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<ToggleSwitch>()
+            .Any(ts => AutomationProperties.GetName(ts) == "启用语音"));
+
+        var toggle = window.GetVisualDescendants().OfType<ToggleSwitch>()
+            .Single(ts => AutomationProperties.GetName(ts) == "启用语音");
+        Assert.NotNull(toggle.Command);
+
+        toggle.Command!.Execute(toggle.CommandParameter);
         await WaitUntilAsync(() => voice.IsEnabled);
         Assert.Equal("正在聆听", voice.StatusText);
-        Assert.True(HasButton(window, "关闭语音"));
+        Assert.True(toggle.IsChecked);
 
-        Click(window, "关闭语音");
+        toggle.Command.Execute(toggle.CommandParameter);
         await WaitUntilAsync(() => !voice.IsEnabled);
         Assert.Equal("语音休眠", voice.StatusText);
         window.Close();

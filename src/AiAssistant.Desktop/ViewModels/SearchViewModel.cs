@@ -133,11 +133,17 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _isBusy, value);
     }
 
+    /// <summary>Clears the loading flag when leaving the panel so a frozen indeterminate bar does not persist.</summary>
+    public void ResetBusy() => IsBusy = false;
+
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
     public bool HasAnswer => _lastAnswer is not null;
 
     public bool HasWeeklyReport => _weeklyReport is not null;
+
+    /// <summary>Save-file dialog, wired by the shell after the window exists; null falls back to the export directory.</summary>
+    public ISaveFilePicker? SaveFilePicker { get; set; }
 
     public void Dispose()
     {
@@ -214,7 +220,24 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
 
         await RunAsync(async ct =>
         {
-            var path = await _search.ExportAnswerAsync(_lastAnswer, _exportDirectory, ct);
+            string path;
+            if (SaveFilePicker is not null)
+            {
+                var picked = await SaveFilePicker.PickSavePathAsync(
+                    $"AiAssistant-问答-{_clock.LocalNow:yyyyMMdd-HHmmss}.md",
+                    [new SaveFileType("Markdown", "md")]);
+                if (picked is null)
+                {
+                    return;
+                }
+
+                path = await EvidenceSearchUseCase.ExportAnswerToAsync(_lastAnswer, picked, ct);
+            }
+            else
+            {
+                path = await _search.ExportAnswerAsync(_lastAnswer, _exportDirectory, ct);
+            }
+
             StatusMessage = $"已导出问答证据：{path}";
         });
     }
@@ -250,9 +273,52 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
 
         await RunAsync(async ct =>
         {
-            var export = await _range.ExportAsync(_weeklyReport, _exportDirectory, ct);
-            StatusMessage = $"已导出周报（Markdown / SVG / PNG / PDF / 统计 JSON）：{export.MarkdownPath}";
+            var report = _weeklyReport;
+            if (SaveFilePicker is not null)
+            {
+                var types = new List<SaveFileType>
+                {
+                    new("Markdown", "md"),
+                    new("SVG 图表", "svg"),
+                    new("统计 JSON", "json")
+                };
+                if (_range.SupportsRasterization)
+                {
+                    types.Add(new("PNG 图片", "png"));
+                    types.Add(new("PDF 文档", "pdf"));
+                }
+
+                var picked = await SaveFilePicker.PickSavePathAsync(
+                    $"AiAssistant-周报-{report.FromDate:yyyyMMdd}-{report.ToDate:yyyyMMdd}.md",
+                    types);
+                if (picked is null)
+                {
+                    return;
+                }
+
+                var path = await _range.ExportSingleAsync(report, ResolveRangeFormat(picked), picked, ct);
+                StatusMessage = $"已导出周报：{path}";
+            }
+            else
+            {
+                var export = await _range.ExportAsync(report, _exportDirectory, ct);
+                StatusMessage = $"已导出周报（Markdown / SVG / PNG / PDF / 统计 JSON）：{export.MarkdownPath}";
+            }
         });
+    }
+
+    private static RangeExportFormat ResolveRangeFormat(string path)
+    {
+        var extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+        return extension switch
+        {
+            "md" or "markdown" => RangeExportFormat.Markdown,
+            "json" => RangeExportFormat.StatsJson,
+            "svg" => RangeExportFormat.Svg,
+            "png" => RangeExportFormat.Png,
+            "pdf" => RangeExportFormat.Pdf,
+            _ => RangeExportFormat.Markdown
+        };
     }
 
     private async Task RunAsync(Func<CancellationToken, Task> action)

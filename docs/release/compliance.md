@@ -23,6 +23,7 @@
 | `Avalonia.Fonts.Inter` | 12.1.6 | MIT | Inter 字体 |
 | `Avalonia.Headless` | 12.1.6 | MIT | Headless 测试 |
 | `Avalonia.Wayland` | 12.1.6 | MIT | Wayland 后端 |
+| `Markdown.Avalonia` | 12.0.2 | MIT | Markdown 预览渲染 |
 | `Tmds.DBus.Protocol` | 0.95.2 | MIT | Linux portal/AT-SPI |
 | `CommunityToolkit.Mvvm` | 8.4.2 | MIT | MVVM |
 | `SkiaSharp` | 3.119.4 | MIT | PNG/PDF 光栅化 |

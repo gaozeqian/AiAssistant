@@ -48,6 +48,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         {
             Search.NavigationRequested += OnEvidenceNavigationRequested;
         }
+
+        Diagnostics.ModelConfig.RestartRequested += OnRestartRequested;
     }
 
     public TimelineViewModel Timeline { get; }
@@ -75,6 +77,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public IRelayCommand RequestExitCommand { get; }
 
     public event EventHandler? ExitRequested;
+
+    public event Action? RestartRequested;
 
     public event Action<ThemeVariant>? ThemeVariantChanged;
 
@@ -104,7 +108,23 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public int SelectedSectionIndex
     {
         get => _selectedSectionIndex;
-        set => SetProperty(ref _selectedSectionIndex, value);
+        set
+        {
+            if (SetProperty(ref _selectedSectionIndex, value))
+            {
+                ResetInactiveLoadingStates();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Clearing the loading flag of panels not currently shown avoids the Avalonia indeterminate
+    /// ProgressBar freezing after a tab is hidden and re-shown.
+    /// </summary>
+    private void ResetInactiveLoadingStates()
+    {
+        Search?.ResetBusy();
+        Reports?.ResetBusy();
     }
 
     public string CaptureStatus
@@ -229,4 +249,6 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         IsExitRequested = true;
         ExitRequested?.Invoke(this, EventArgs.Empty);
     }
+
+    private void OnRestartRequested() => RestartRequested?.Invoke();
 }

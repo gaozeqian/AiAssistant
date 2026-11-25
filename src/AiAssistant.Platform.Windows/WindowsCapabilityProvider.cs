@@ -11,7 +11,7 @@ public sealed class WindowsCapabilityProvider(
     IKeyStore keyStore,
     IAutoStartService autoStartService) : ICapabilityProvider
 {
-    public string PlatformName => "Windows (win-x64)";
+    public string PlatformName => "Windows";
 
     public IReadOnlyList<CapabilityState> GetCapabilities() =>
     [

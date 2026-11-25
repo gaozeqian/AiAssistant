@@ -98,9 +98,7 @@ public sealed class CapabilityProvider : ICapabilityProvider
         _supervisor = supervisor;
     }
 
-    public string PlatformName => _supervisor is null
-        ? "macOS (Apple Silicon)"
-        : $"macOS (Apple Silicon · Helper {_supervisor.Status}, restarts={_supervisor.RestartCount.ToString(CultureInfo.InvariantCulture)})";
+    public string PlatformName => "macOS";
 
     public IReadOnlyList<CapabilityState> GetCapabilities()
     {

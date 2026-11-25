@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:AiAssistant.Desktop.ViewModels"
+             xmlns:md="using:Markdown.Avalonia"
              xmlns:automation="using:Avalonia.Automation"
              x:Class="AiAssistant.Desktop.Views.Tabs.SearchTabView"
              x:DataType="vm:ShellViewModel">
@@ -105,8 +106,7 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <TextBox Text="{Binding WeeklyMarkdown}" IsReadOnly="True" AcceptsReturn="True"
-                     MaxHeight="190" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+            <md:MarkdownScrollViewer Markdown="{Binding WeeklyMarkdown}" MaxHeight="220" />
           </StackPanel>
         </Border>
       </Grid>

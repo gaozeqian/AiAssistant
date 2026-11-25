@@ -60,14 +60,7 @@ public sealed class LinuxCapabilityProvider : ICapabilityProvider
         _backend = backend;
     }
 
-    public string PlatformName
-    {
-        get
-        {
-            var desktop = string.IsNullOrWhiteSpace(_backend.Session.Desktop) ? "unknown desktop" : _backend.Session.Desktop;
-            return $"Linux ({_backend.Decision.Summary}; {desktop})";
-        }
-    }
+    public string PlatformName => "Linux";
 
     public IReadOnlyList<CapabilityState> GetCapabilities()
     {

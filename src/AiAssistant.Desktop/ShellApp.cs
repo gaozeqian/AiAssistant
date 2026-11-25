@@ -41,6 +41,20 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             desktop.MainWindow = window;
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
+            // Wire the save-file dialog into export-capable view models once a TopLevel exists.
+            var storage = TopLevel.GetTopLevel(window)?.StorageProvider;
+            if (storage is not null)
+            {
+                var picker = new AvaloniaSaveFilePicker(storage);
+                shell.Reports.SaveFilePicker = picker;
+                if (shell.Search is not null)
+                {
+                    shell.Search.SaveFilePicker = picker;
+                }
+
+                shell.Diagnostics.SaveFilePicker = picker;
+            }
+
             // Wayland resolves the dock/top-bar icon by matching app_id to <app_id>.desktop;
             // X11 uses StartupWMClass=AiAssistant.Host from the same desktop entry.
             if (OperatingSystem.IsLinux())
@@ -94,6 +108,7 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
 
             ConfigureTray(desktop, window, shell, icon);
             shell.ExitRequested += (_, _) => desktop.Shutdown();
+            shell.RestartRequested += () => Restart(desktop);
             desktop.ShutdownRequested += (_, _) =>
             {
                 Dispose();
@@ -131,6 +146,33 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
             Trace.TraceError("UI E2E runner failed ({0}).", ex.GetType().Name);
             desktop.Shutdown(2);
         }
+    }
+
+    /// <summary>Relaunches the process and shuts the current instance down so model config can apply.</summary>
+    private void Restart(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        // Release the single-instance socket before relaunching so the new process starts fresh.
+        _singleInstance?.Dispose();
+        _singleInstance = null;
+
+        var executable = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(executable))
+        {
+            desktop.Shutdown();
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(executable) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            // Restart failed; still shut down so the user can relaunch manually.
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Desktop.ShellApp.Restart", ex);
+        }
+
+        desktop.Shutdown();
     }
 
     private static async Task<Exception?> InitializeShellSafelyAsync(ShellViewModel shell)

@@ -391,7 +391,6 @@ public sealed class AppRuntime : IAsyncDisposable
                 _services.GetRequiredService<DiagnosticsUseCase>(),
                 _services.GetRequiredService<ILocalMcpControl>(),
                 Path.Combine(_dataDirectory, "reports"),
-                _services.GetRequiredService<IModelSecretAdmin>(),
                 _services.GetRequiredService<IModelConfigurationAdmin>(),
                 Services.Clock),
             new ReportsViewModel(

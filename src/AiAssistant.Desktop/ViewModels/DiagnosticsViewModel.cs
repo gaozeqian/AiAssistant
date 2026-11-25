@@ -30,7 +30,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string _mcpStatusText = "本地 MCP 默认关闭";
     private string _mcpTokenText = "点击“显示令牌”获取本地凭据";
     private bool _mcpEnabled;
-    private string _permissionGuidanceText = "尚未检查平台权限";
     private string _exportStatusText = string.Empty;
     private bool _isLoading;
 
@@ -38,7 +37,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
         DiagnosticsUseCase diagnostics,
         ILocalMcpControl? mcp = null,
         string? exportDirectory = null,
-        IModelSecretAdmin? secrets = null,
         IModelConfigurationAdmin? modelConfiguration = null,
         IClock? clock = null)
     {
@@ -46,7 +44,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
         _clock = clock ?? new SystemClock();
         _mcp = mcp;
         _exportDirectory = exportDirectory;
-        Secrets = new ModelSecretAdminViewModel(secrets);
         ModelConfig = new ModelConfigurationEditorViewModel(modelConfiguration);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
@@ -54,6 +51,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
         RevealMcpTokenCommand = new AsyncRelayCommand(RevealMcpTokenAsync);
         RotateMcpTokenCommand = new AsyncRelayCommand(RotateMcpTokenAsync);
         ToggleMcpEnabledCommand = new AsyncRelayCommand(ToggleMcpEnabledAsync);
+        OpenSettingsCommand = new RelayCommand(OpenSystemSettings);
         _mcpEnabled = _mcp?.GetSnapshot().Enabled ?? false;
     }
 
@@ -62,8 +60,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
     public ObservableCollection<ReportJobItem> RecentJobs { get; } = [];
 
     public ObservableCollection<DiagnosticLogItem> RecentLogs { get; } = [];
-
-    public ModelSecretAdminViewModel Secrets { get; }
 
     public ModelConfigurationEditorViewModel ModelConfig { get; }
 
@@ -79,7 +75,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
 
     public IAsyncRelayCommand ToggleMcpEnabledCommand { get; }
 
+    public IRelayCommand OpenSettingsCommand { get; }
+
     public bool HasMcpControl => _mcp is not null;
+
+    /// <summary>Save-file dialog, wired by the shell after the window exists; null falls back to the export directory.</summary>
+    public ISaveFilePicker? SaveFilePicker { get; set; }
 
     public string PlatformName
     {
@@ -169,12 +170,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
         private set => SetProperty(ref _mcpTokenText, value);
     }
 
-    public string PermissionGuidanceText
-    {
-        get => _permissionGuidanceText;
-        private set => SetProperty(ref _permissionGuidanceText, value);
-    }
-
     public string ExportStatusText
     {
         get => _exportStatusText;
@@ -216,7 +211,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
                     snapshot.ModelEndpoints.Select(DiagnosticsDisplayFormatter.FormatEndpoint))
                 : "尚未探测端点能力";
 
-            DiagnosticsDisplayFormatter.Replace(Capabilities, snapshot.Capabilities.Select(capability => new CapabilityItem(capability)));
+            DiagnosticsDisplayFormatter.Replace(Capabilities, snapshot.Capabilities.Select(capability => new CapabilityItem(capability, OpenSettingsCommand)));
             DiagnosticsDisplayFormatter.Replace(RecentJobs, snapshot.RecentJobs.Select(job => new ReportJobItem(job)));
             DiagnosticsDisplayFormatter.Replace(RecentLogs, snapshot.RecentLogs?.Select(log => new DiagnosticLogItem(log)) ?? []);
 
@@ -230,9 +225,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
                 McpEnabled = mcpSnapshot.Enabled;
                 McpStatusText = DiagnosticsDisplayFormatter.FormatMcpStatus(mcpSnapshot);
             }
-            await Secrets.RefreshAsync(updateStatus: false);
-            PermissionGuidanceText = DiagnosticsDisplayFormatter.FormatPermissionGuidance(snapshot.Capabilities);
-            LastRefreshText = $"最后刷新：{_clock.LocalNow:HH:mm:ss} · 诊断不包含正文、密钥或完整文件路径";
+            LastRefreshText = $"最后刷新：{_clock.LocalNow:yyyy-MM-dd HH:mm:ss} · 诊断不包含正文、密钥或完整文件路径";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
         {
@@ -310,23 +303,66 @@ public sealed class DiagnosticsViewModel : ObservableObject
             : $"{summary} · {model.Diagnostic}";
     }
 
-    private async Task ExportPreviewAsync()
+    private static void OpenSystemSettings()
     {
-        if (string.IsNullOrWhiteSpace(_exportDirectory))
+        if (!OperatingSystem.IsWindows())
         {
-            ErrorMessage = "未配置导出目录。";
             return;
         }
 
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // 无法打开系统设置时静默降级。
+        }
+        catch (InvalidOperationException)
+        {
+            // 环境缺少默认应用关联时静默降级。
+        }
+    }
+
+    private async Task ExportPreviewAsync()
+    {
         IsLoading = true;
         ErrorMessage = string.Empty;
         try
         {
             var preview = await _diagnostics.BuildSanitizedExportPreviewAsync();
-            Directory.CreateDirectory(_exportDirectory);
-            var path = Path.Combine(
-                _exportDirectory,
-                $"AiAssistant-诊断导出-{_clock.LocalNow:yyyyMMdd-HHmmss}.json");
+            string path;
+            if (SaveFilePicker is not null)
+            {
+                var picked = await SaveFilePicker.PickSavePathAsync(
+                    $"AiAssistant-诊断导出-{_clock.LocalNow:yyyyMMdd-HHmmss}.json",
+                    [new SaveFileType("JSON", "json")]);
+                if (picked is null)
+                {
+                    ExportPreviewJson = preview;
+                    ExportStatusText = "已生成预览，未选择保存位置。";
+                    return;
+                }
+
+                path = picked;
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(_exportDirectory))
+                {
+                    ErrorMessage = "未配置导出目录。";
+                    return;
+                }
+
+                Directory.CreateDirectory(_exportDirectory);
+                path = Path.Combine(
+                    _exportDirectory,
+                    $"AiAssistant-诊断导出-{_clock.LocalNow:yyyyMMdd-HHmmss}.json");
+            }
+
             await _diagnostics.ExportConfirmedPreviewAsync(path, preview, CancellationToken.None);
             ExportPreviewJson = preview;
             ExportStatusText = $"已导出脱敏诊断：{path}";

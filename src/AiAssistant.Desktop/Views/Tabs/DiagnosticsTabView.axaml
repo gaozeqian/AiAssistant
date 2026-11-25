@@ -48,7 +48,7 @@
           <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding ModelConfig.HasModelConfiguration}">
             <StackPanel Spacing="8">
               <TextBlock Text="模型配置" FontWeight="SemiBold" />
-              <TextBlock Text="对话与向量模型各自独立配置来源、地址、模型名与接口密钥；仅保留当前在用的两个模型，保存后重启应用生效。"
+              <TextBlock Text="对话与向量模型各自独立配置来源、地址、模型名与接口密钥，保存后重启应用生效。"
                          FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
 
               <TextBlock Text="对话模型" FontWeight="SemiBold" />
@@ -120,7 +120,7 @@
               </Grid>
 
               <WrapPanel>
-                <Button Classes="primary" Content="保存模型配置" Command="{Binding ModelConfig.SaveModelConfigurationCommand}" />
+                <Button Classes="primary" Content="保存并重启" Command="{Binding ModelConfig.SaveModelConfigurationCommand}" />
               </WrapPanel>
               <TextBlock Text="{Binding ModelConfig.ModelConfigStatus}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
             </StackPanel>
@@ -144,36 +144,11 @@
           </WrapPanel>
         </StackPanel>
       </Border>
-      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding Secrets.HasSecretAdmin}">
-        <StackPanel Spacing="8">
-          <TextBlock Text="模型端点密钥" FontWeight="SemiBold" />
-          <TextBlock Text="密钥以加密形式保存在本机；写入后不可读取，仅供对应端点引用。"
-                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-          <Grid ColumnDefinitions="*,*">
-            <TextBox Text="{Binding Secrets.SecretName}" PlaceholderText="密钥名称，例如 corp-api-key" Margin="0,0,6,0" />
-            <TextBox Grid.Column="1" Text="{Binding Secrets.SecretValue}" PasswordChar="●" PlaceholderText="密钥值" Margin="6,0,0,0" />
-          </Grid>
-          <WrapPanel>
-            <Button Classes="primary" Content="保存密钥" Command="{Binding Secrets.SaveSecretCommand}" Margin="0,0,8,8" />
-            <Button Classes="secondary" Content="刷新列表" Command="{Binding Secrets.RefreshSecretsCommand}" Margin="0,0,8,8" />
-            <Button Classes="secondary" Content="删除选中" Command="{Binding Secrets.DeleteSecretCommand}" Margin="0,0,8,8" />
-          </WrapPanel>
-          <ListBox ItemsSource="{Binding Secrets.SecretNames}" SelectedItem="{Binding Secrets.SelectedSecret}"
-                   MaxHeight="120" Background="Transparent" BorderThickness="0" />
-          <TextBlock Text="{Binding Secrets.SecretStatus}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-        </StackPanel>
-      </Border>
       <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasExportPreview}">
         <StackPanel Spacing="8">
           <TextBlock Text="诊断导出预览（仅元数据，用户确认前不写外部文件）" FontWeight="SemiBold" />
           <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180" FontFamily="Consolas" FontSize="12" />
           <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-        </StackPanel>
-      </Border>
-      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
-        <StackPanel Spacing="8">
-          <TextBlock Text="权限引导" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding PermissionGuidanceText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
         </StackPanel>
       </Border>
       <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
@@ -183,11 +158,14 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:CapabilityItem">
                 <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,9">
-                  <Grid ColumnDefinitions="130,85,*,260">
+                  <Grid ColumnDefinitions="130,85,*,260,Auto">
                     <TextBlock Text="{Binding KindText}" FontWeight="SemiBold" />
                     <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{DynamicResource AccentBrush}" />
                     <TextBlock Grid.Column="2" Text="{Binding Summary}" TextWrapping="Wrap" Margin="8,0" />
                     <TextBlock Grid.Column="3" Text="{Binding RemediationHint}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                    <Button Grid.Column="4" Classes="secondary" Content="{Binding ActionLabel}"
+                            Command="{Binding OpenSettingsCommand}" IsVisible="{Binding NeedsAction}"
+                            Margin="8,0,0,0" VerticalAlignment="Center" />
                   </Grid>
                 </Border>
               </DataTemplate>
@@ -221,10 +199,16 @@
       <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
         <StackPanel Spacing="10">
           <TextBlock Text="最近脱敏结构化日志" FontWeight="SemiBold" />
+          <Grid ColumnDefinitions="120,90,150,*">
+            <TextBlock Text="时间" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="1" Text="级别" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="2" Text="类别" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="3" Text="消息" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+          </Grid>
           <ItemsControl ItemsSource="{Binding RecentLogs}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:DiagnosticLogItem">
-                <Grid ColumnDefinitions="80,90,150,*" Margin="0,4">
+                <Grid ColumnDefinitions="120,90,150,*" Margin="0,4">
                   <TextBlock Text="{Binding TimeText}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                   <TextBlock Grid.Column="1" Text="{Binding LevelText}" FontSize="12" FontWeight="SemiBold" />
                   <TextBlock Grid.Column="2" Text="{Binding CategoryText}" FontSize="12" Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis" />

@@ -96,31 +96,6 @@ public sealed partial class DesktopViewModelTests
     });
 
     [Fact]
-    public Task Diagnostics_SecretAdminSavesAndDeletesWithoutEchoingValue() => RunInHeadlessSession(async () =>
-    {
-        var admin = new FakeSecretAdmin();
-        var diagnostics = new DiagnosticsUseCase(
-            new FakeCapabilityProvider(),
-            new FakeMaintenanceService(),
-            new FakeCaptureCoordinator(),
-            new FakeReportJobQueue());
-        var viewModel = new DiagnosticsViewModel(diagnostics, mcp: null, exportDirectory: null, secrets: admin);
-
-        viewModel.Secrets.SecretName = "corp-key";
-        viewModel.Secrets.SecretValue = "secret-value";
-        await viewModel.Secrets.SaveSecretCommand.ExecuteAsync(null);
-
-        Assert.Contains("corp-key", viewModel.Secrets.SecretNames);
-        Assert.Equal(string.Empty, viewModel.Secrets.SecretValue);
-        Assert.DoesNotContain("secret-value", viewModel.Secrets.SecretStatus, StringComparison.Ordinal);
-
-        viewModel.Secrets.SelectedSecret = "corp-key";
-        await viewModel.Secrets.DeleteSecretCommand.ExecuteAsync(null);
-        Assert.Empty(viewModel.Secrets.SecretNames);
-    });
-
-
-    [Fact]
     public Task FullWindow_DataDeletionRequiresTwoStepConfirmation() => RunInHeadlessSession(async () =>
     {
         using var shell = CreateShell(out var data);
@@ -193,7 +168,7 @@ public sealed partial class DesktopViewModelTests
         Assert.Equal(string.Empty, editor.EmbeddingApiKey);
         Assert.Contains("chat-endpoint-key", editor.ChatApiKeyHint, StringComparison.Ordinal);
         Assert.Contains("embedding-endpoint-key", editor.EmbeddingApiKeyHint, StringComparison.Ordinal);
-        Assert.Contains("重启应用后生效", editor.ModelConfigStatus, StringComparison.Ordinal);
+        Assert.Contains("正在重启应用", editor.ModelConfigStatus, StringComparison.Ordinal);
     }
 
     [Fact]

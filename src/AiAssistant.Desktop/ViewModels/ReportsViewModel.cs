@@ -105,9 +105,15 @@ public sealed class ReportsViewModel : ObservableObject
         private set => SetProperty(ref _isBusy, value);
     }
 
+    /// <summary>Clears the loading flag when leaving the panel so a frozen indeterminate bar does not persist.</summary>
+    public void ResetBusy() => IsBusy = false;
+
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
     public bool HasReport => SelectedVersion is not null;
+
+    /// <summary>Save-file dialog, wired by the shell after the window exists; null falls back to the export directory.</summary>
+    public ISaveFilePicker? SaveFilePicker { get; set; }
 
     public string VersionText => SelectedVersion is null
         ? string.Empty
@@ -203,7 +209,25 @@ public sealed class ReportsViewModel : ObservableObject
 
         try
         {
-            var path = await ReportUseCase.ExportMarkdownAsync(SelectedVersion.Report, _exportDirectory);
+            var report = SelectedVersion.Report;
+            string path;
+            if (SaveFilePicker is not null)
+            {
+                var picked = await SaveFilePicker.PickSavePathAsync(
+                    $"AiAssistant-日报-{report.LocalDate:yyyyMMdd}-v{report.Version}.md",
+                    [new SaveFileType("Markdown", "md")]);
+                if (picked is null)
+                {
+                    return;
+                }
+
+                path = await ReportUseCase.ExportMarkdownToAsync(report, picked);
+            }
+            else
+            {
+                path = await ReportUseCase.ExportMarkdownAsync(report, _exportDirectory);
+            }
+
             StatusMessage = $"已导出：{path}";
             ErrorMessage = string.Empty;
         }

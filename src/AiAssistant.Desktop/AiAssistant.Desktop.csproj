@@ -12,6 +12,7 @@
     <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Markdown.Avalonia" />
   </ItemGroup>
   <ItemGroup>
     <!-- 唯一图标源在 build/package/assets；此处只做链接嵌入，避免重复二进制资产。 -->

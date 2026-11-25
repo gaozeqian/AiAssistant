@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:AiAssistant.Desktop.ViewModels"
+             xmlns:md="using:Markdown.Avalonia"
              x:Class="AiAssistant.Desktop.Views.Tabs.ReportsTabView"
              x:DataType="vm:ShellViewModel">
   <Grid DataContext="{Binding Reports}" x:DataType="vm:ReportsViewModel"
@@ -49,9 +50,7 @@
           </StackPanel>
         </Border>
         <ScrollViewer Grid.Row="2">
-          <TextBox Text="{Binding Markdown}" IsReadOnly="True" AcceptsReturn="True"
-                   TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"
-                   Background="Transparent" BorderThickness="0" MinHeight="360" />
+          <md:MarkdownScrollViewer Markdown="{Binding Markdown}" />
         </ScrollViewer>
       </Grid>
     </Border>

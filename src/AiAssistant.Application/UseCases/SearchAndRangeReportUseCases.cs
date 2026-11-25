@@ -11,6 +11,15 @@ public sealed record RangeReportExport(
     string? PngPath = null,
     string? PdfPath = null);
 
+public enum RangeExportFormat
+{
+    Markdown = 0,
+    StatsJson = 1,
+    Svg = 2,
+    Png = 3,
+    Pdf = 4
+}
+
 /// <summary>Weekly / arbitrary-range aggregation plus Markdown + stats export for the reports panel.</summary>
 public sealed class RangeReportUseCase(
     IRangeReportService service,
@@ -69,6 +78,52 @@ public sealed class RangeReportUseCase(
 
         return new RangeReportExport(markdownPath, statsPath, svgPath, pngPath, pdfPath);
     }
+
+    /// <summary>Whether PNG/PDF export is available (requires a rasterizer).</summary>
+    public bool SupportsRasterization => rasterizer is not null;
+
+    /// <summary>Writes a single format to the exact destination path chosen by the user.</summary>
+    public async Task<string> ExportSingleAsync(
+        RangeReport report,
+        RangeExportFormat format,
+        string destinationPath,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        switch (format)
+        {
+            case RangeExportFormat.Markdown:
+                await File.WriteAllTextAsync(destinationPath, report.Markdown, ct);
+                break;
+            case RangeExportFormat.StatsJson:
+                await File.WriteAllTextAsync(destinationPath, report.StatsJson, ct);
+                break;
+            case RangeExportFormat.Svg:
+                await File.WriteAllTextAsync(destinationPath, RangeReportSvgRenderer.Render(report), ct);
+                break;
+            case RangeExportFormat.Png:
+                if (rasterizer is null)
+                {
+                    throw new InvalidOperationException("PNG 导出需要图形渲染器。");
+                }
+
+                await File.WriteAllBytesAsync(destinationPath, rasterizer.RenderPng(report), ct);
+                break;
+            case RangeExportFormat.Pdf:
+                if (rasterizer is null)
+                {
+                    throw new InvalidOperationException("PDF 导出需要图形渲染器。");
+                }
+
+                await File.WriteAllBytesAsync(destinationPath, rasterizer.RenderPdf(report), ct);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(format));
+        }
+
+        return destinationPath;
+    }
 }
 
 /// <summary>Shared entry point for timeline search, panel Q&amp;A and voice Q&amp;A so all three cite the same evidence.</summary>
@@ -115,6 +170,28 @@ public sealed class EvidenceSearchUseCase(
         ArgumentNullException.ThrowIfNull(answer);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationDirectory);
         Directory.CreateDirectory(destinationDirectory);
+        var fileName = string.Create(
+            CultureInfo.InvariantCulture,
+            $"AiAssistant-问答-{clock.UtcNow.ToLocalTime():yyyyMMdd-HHmmss}.md");
+        var path = Path.Combine(destinationDirectory, fileName);
+        await File.WriteAllTextAsync(path, BuildAnswerMarkdown(answer), ct);
+        return path;
+    }
+
+    /// <summary>Writes the Q&amp;A markdown to the exact destination path chosen by the user.</summary>
+    public static async Task<string> ExportAnswerToAsync(
+        EvidenceQaAnswer answer,
+        string destinationPath,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        await File.WriteAllTextAsync(destinationPath, BuildAnswerMarkdown(answer), ct);
+        return destinationPath;
+    }
+
+    private static string BuildAnswerMarkdown(EvidenceQaAnswer answer)
+    {
         var builder = new StringBuilder();
         builder.AppendLine(CultureInfo.InvariantCulture, $"# 证据问答：{answer.Question}");
         builder.AppendLine();
@@ -132,11 +209,6 @@ public sealed class EvidenceSearchUseCase(
         builder.AppendLine("---");
         builder.AppendLine(CultureInfo.InvariantCulture,
             $"模型 `{answer.ModelId}` · 引用 {string.Join(",", answer.CitedEvidenceIds)} · {(answer.Degraded ? $"降级：{answer.DegradedReason}" : "证据充分")}");
-        var fileName = string.Create(
-            CultureInfo.InvariantCulture,
-            $"AiAssistant-问答-{clock.UtcNow.ToLocalTime():yyyyMMdd-HHmmss}.md");
-        var path = Path.Combine(destinationDirectory, fileName);
-        await File.WriteAllTextAsync(path, builder.ToString(), ct);
-        return path;
+        return builder.ToString();
     }
 }

@@ -59,16 +59,8 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     public bool IsEnabled
     {
         get => _isEnabled;
-        private set
-        {
-            if (SetProperty(ref _isEnabled, value))
-            {
-                OnPropertyChanged(nameof(ToggleButtonText));
-            }
-        }
+        private set => SetProperty(ref _isEnabled, value);
     }
-
-    public string ToggleButtonText => IsEnabled ? "关闭语音" : "启用语音";
 
     public bool IsBusy
     {
@@ -156,6 +148,8 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         catch (Exception ex) when (ex is InvalidOperationException or IOException or AiAssistant.Core.Exceptions.AiAssistantDomainException)
         {
             ErrorMessage = "语音切换失败，请检查麦克风权限和模型资产。";
+            // Revert the optimistic toggle so the switch reflects the real (unchanged) state.
+            OnPropertyChanged(nameof(IsEnabled));
         }
         finally
         {

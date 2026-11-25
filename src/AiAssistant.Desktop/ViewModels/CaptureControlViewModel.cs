@@ -14,7 +14,9 @@ public sealed class CaptureControlViewModel : ObservableObject, IDisposable
     private bool _isBusy;
     private bool _autoStartEnabled;
     private string _blacklistText = string.Empty;
-    private string _statusMessage = "采集仅保存在本机加密数据库中";
+    private string _captureStatusMessage = "采集仅保存在本机加密数据库中";
+    private string _blacklistStatusMessage = string.Empty;
+    private string _autoStartStatusMessage = string.Empty;
     private string _metricsText = string.Empty;
     private string _autoStartText = "尚未启用开机自启";
     private bool _disposed;
@@ -83,10 +85,22 @@ public sealed class CaptureControlViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _blacklistText, value);
     }
 
-    public string StatusMessage
+    public string CaptureStatusMessage
     {
-        get => _statusMessage;
-        private set => SetProperty(ref _statusMessage, value);
+        get => _captureStatusMessage;
+        private set => SetProperty(ref _captureStatusMessage, value);
+    }
+
+    public string BlacklistStatusMessage
+    {
+        get => _blacklistStatusMessage;
+        private set => SetProperty(ref _blacklistStatusMessage, value);
+    }
+
+    public string AutoStartStatusMessage
+    {
+        get => _autoStartStatusMessage;
+        private set => SetProperty(ref _autoStartStatusMessage, value);
     }
 
     public string MetricsText
@@ -124,8 +138,8 @@ public sealed class CaptureControlViewModel : ObservableObject, IDisposable
         {
             await _capture.TogglePauseAsync();
             ApplyMetrics(_capture.GetMetrics());
-            StatusMessage = IsPaused ? "已暂停，恢复后不会补采此期间的数据" : "已恢复本机采集";
-        });
+            CaptureStatusMessage = IsPaused ? "已暂停，恢复后不会补采此期间的数据" : "已恢复本机采集";
+        }, message => CaptureStatusMessage = message);
     }
 
     private async Task SaveBlacklistAsync()
@@ -135,8 +149,8 @@ public sealed class CaptureControlViewModel : ObservableObject, IDisposable
             var patterns = BlacklistText.Split(['\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             await _capture.UpdateBlacklistAsync(patterns);
             BlacklistText = string.Join(Environment.NewLine, _capture.BlacklistedPatterns);
-            StatusMessage = "黑名单已生效；匹配的应用或窗口不会写入事件";
-        });
+            BlacklistStatusMessage = "黑名单已生效；匹配的应用或窗口不会写入事件";
+        }, message => BlacklistStatusMessage = message);
     }
 
     private async Task CaptureSnapshotAsync()
@@ -144,22 +158,38 @@ public sealed class CaptureControlViewModel : ObservableObject, IDisposable
         await RunSafelyAsync(async () =>
         {
             await _capture.CaptureSnapshotNowAsync();
-            StatusMessage = IsPaused ? "当前已暂停，未生成快照" : "快照已提交，返回时间线刷新即可查看";
-        });
+            CaptureStatusMessage = IsPaused ? "当前已暂停，未生成快照" : "快照已提交，返回时间线刷新即可查看";
+        }, message => CaptureStatusMessage = message);
     }
 
     private async Task ToggleAutoStartAsync()
     {
-        await RunSafelyAsync(async () =>
+        if (_disposed || IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
         {
             var enabled = !AutoStartEnabled;
             await _capture.SetAutoStartEnabledAsync(enabled);
             AutoStartEnabled = await _capture.IsAutoStartEnabledAsync();
-            StatusMessage = AutoStartEnabled == enabled ? "开机自启设置已更新" : "平台未应用该设置，请查看能力诊断";
-        });
+            AutoStartStatusMessage = AutoStartEnabled == enabled ? "开机自启设置已更新" : "平台未应用该设置，请查看能力诊断";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or AiAssistantDomainException)
+        {
+            // Revert the optimistic toggle so the switch reflects the real (unchanged) state.
+            AutoStartEnabled = await _capture.IsAutoStartEnabledAsync();
+            AutoStartStatusMessage = "操作未完成，请检查平台权限、剩余磁盘空间或查看诊断页";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
-    private async Task RunSafelyAsync(Func<Task> action)
+    private async Task RunSafelyAsync(Func<Task> action, Action<string> onError)
     {
         if (_disposed || IsBusy)
         {
@@ -173,7 +203,7 @@ public sealed class CaptureControlViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or AiAssistantDomainException)
         {
-            StatusMessage = "操作未完成，请检查平台权限、剩余磁盘空间或查看诊断页";
+            onError("操作未完成，请检查平台权限、剩余磁盘空间或查看诊断页");
         }
         finally
         {

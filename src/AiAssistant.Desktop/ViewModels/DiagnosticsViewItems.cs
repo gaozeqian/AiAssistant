@@ -2,10 +2,11 @@ using System.Globalization;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
+using CommunityToolkit.Mvvm.Input;
 
 namespace AiAssistant.Desktop.ViewModels;
 
-public sealed class CapabilityItem(CapabilityState capability)
+public sealed class CapabilityItem(CapabilityState capability, IRelayCommand? openSettingsCommand = null)
 {
     public string KindText => KindLabel(capability.Kind);
 
@@ -42,6 +43,13 @@ public sealed class CapabilityItem(CapabilityState capability)
     public string RemediationHint => capability.RemediationHint ?? "无需额外操作";
 
     public bool NeedsAttention => capability.Status is not CapabilityStatus.Supported;
+
+    /// <summary>Whether an actionable button should be offered (permission / broken / reduced capability).</summary>
+    public bool NeedsAction => capability.Status is CapabilityStatus.PermissionRequired or CapabilityStatus.Unavailable or CapabilityStatus.Degraded;
+
+    public string ActionLabel => capability.Status == CapabilityStatus.PermissionRequired ? "去授权" : "打开系统设置";
+
+    public IRelayCommand? OpenSettingsCommand { get; } = openSettingsCommand;
 }
 
 public sealed class ReportJobItem(ReportJob job)
@@ -65,7 +73,7 @@ public sealed class ReportJobItem(ReportJob job)
 
 public sealed class DiagnosticLogItem(DiagnosticLogEntry entry)
 {
-    public string TimeText => entry.TimestampUtc.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture);
+    public string TimeText => entry.TimestampUtc.ToLocalTime().ToString("MM-dd HH:mm:ss", CultureInfo.CurrentCulture);
     public string LevelText => entry.Level switch
     {
         "Information" or "Info" => "信息",

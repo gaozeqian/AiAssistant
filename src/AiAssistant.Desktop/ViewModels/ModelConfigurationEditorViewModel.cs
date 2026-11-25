@@ -51,6 +51,9 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
         SaveModelConfigurationCommand = new AsyncRelayCommand(SaveAsync);
     }
 
+    /// <summary>Raised after a successful save, so the shell can relaunch to apply the change.</summary>
+    public event Action? RestartRequested;
+
     public bool HasModelConfiguration => _modelConfiguration is not null;
 
     public string ChatBaseUrl
@@ -228,7 +231,8 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
             _embeddingApiKeySecret = _modelConfiguration.Current.Embedding.ApiKeySecret;
             OnPropertyChanged(nameof(ChatApiKeyHint));
             OnPropertyChanged(nameof(EmbeddingApiKeyHint));
-            ModelConfigStatus = "已保存模型配置；重启应用后生效。";
+            ModelConfigStatus = "已保存模型配置，正在重启应用…";
+            RestartRequested?.Invoke();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {

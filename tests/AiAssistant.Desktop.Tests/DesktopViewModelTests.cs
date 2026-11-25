@@ -273,22 +273,6 @@ public sealed partial class DesktopViewModelTests
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
-    private sealed class FakeSecretAdmin : IModelSecretAdmin
-    {
-        private readonly List<string> _names = [];
-
-        public Task<IReadOnlyList<string>> ListNamesAsync(CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<string>>(_names.ToArray());
-
-        public Task SetAsync(string name, string value, CancellationToken ct)
-        {
-            _names.Add(name);
-            return Task.CompletedTask;
-        }
-
-        public Task<bool> DeleteAsync(string name, CancellationToken ct) => Task.FromResult(_names.Remove(name));
-    }
-
     private sealed class FakeDataDeletionService : IDataDeletionService
     {
         public int Calls { get; private set; }

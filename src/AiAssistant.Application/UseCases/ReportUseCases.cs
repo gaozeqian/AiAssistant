@@ -77,4 +77,16 @@ public sealed class ReportUseCase(
         await File.WriteAllTextAsync(path, report.Markdown, ct);
         return path;
     }
+
+    /// <summary>Writes the daily report markdown to the exact destination path chosen by the user.</summary>
+    public static async Task<string> ExportMarkdownToAsync(
+        DailyReport report,
+        string destinationPath,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        await File.WriteAllTextAsync(destinationPath, report.Markdown, ct);
+        return destinationPath;
+    }
 }
