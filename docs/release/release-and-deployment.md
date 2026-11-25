@@ -66,7 +66,7 @@
 **Windows**
 
 ```powershell
-msiexec /i AiAssistant-0.1.1-windows-x64.msi
+msiexec /i AiAssistant-0.1.2-windows-x64.msi
 # 或解压 portable zip 后直接运行 AiAssistant.exe
 ```
 
@@ -75,7 +75,7 @@ MSI 为 perMachine，需管理员；数据目录 `%LOCALAPPDATA%\AiAssistant` �
 **macOS**
 
 ```bash
-sudo installer -pkg AiAssistant-0.1.1-macos-arm64.pkg -target /
+sudo installer -pkg AiAssistant-0.1.2-macos-arm64.pkg -target /
 # 或解压 .app.zip 后拖入 /Applications
 ```
 
@@ -84,10 +84,10 @@ sudo installer -pkg AiAssistant-0.1.1-macos-arm64.pkg -target /
 **Linux**
 
 ```bash
-sudo apt install ./aiassistant_0.1.1_amd64.deb
+sudo apt install ./aiassistant_0.1.2_amd64.deb
 # 或
-tar -xzf aiassistant-0.1.1-linux-x64.tar.gz
-cd aiassistant-0.1.1-linux-x64 && ./aiassistant
+tar -xzf aiassistant-0.1.2-linux-x64.tar.gz
+cd aiassistant-0.1.2-linux-x64 && ./aiassistant
 ```
 
 便携包含顶层目录，不会向当前目录散落文件；启动器/二进制使用相对路径寻址。
