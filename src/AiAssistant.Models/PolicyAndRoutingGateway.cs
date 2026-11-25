@@ -30,7 +30,13 @@ public sealed class SplitChatEmbeddingGateway(
     public Task<ModelEmbeddingResult> EmbedAsync(ModelEmbeddingRequest request, CancellationToken ct) =>
         embedding.EmbedAsync(request with { Tier = embeddingTier }, ct);
 
-    public Task<ModelCapabilitySnapshot> ProbeAsync(CancellationToken ct) => chat.ProbeAsync(ct);
+    public async Task<ModelCapabilitySnapshot> ProbeAsync(CancellationToken ct)
+    {
+        // The chat endpoint's snapshot has an empty EmbeddingModel; the embedding endpoint owns the
+        // vector model name, so surface it on the combined snapshot for the diagnostics summary.
+        var snapshot = await chat.ProbeAsync(ct);
+        return snapshot with { EmbeddingModel = embedding.EmbeddingModelId };
+    }
 }
 
 /// <summary>Explicit runtime consent for public-cloud use; configuration alone is never sufficient.</summary>

@@ -2,11 +2,12 @@ using AiAssistant.Application.Ports;
 
 namespace AiAssistant.LocalApi;
 
-/// <summary>Diagnostics surface for the opt-in MCP endpoint: status, token reveal and token rotation.</summary>
+/// <summary>Diagnostics surface for the opt-in MCP endpoint: status, token reveal, token rotation and enable toggle.</summary>
 public sealed class LocalMcpControl(
     LoopbackMcpServer server,
     LocalMcpTokenStore tokens,
-    McpServerOptions options) : ILocalMcpControl
+    McpServerOptions options,
+    McpEnabledStore store) : ILocalMcpControl
 {
     public LocalMcpSnapshot GetSnapshot()
     {
@@ -28,5 +29,20 @@ public sealed class LocalMcpControl(
         }
 
         return token;
+    }
+
+    /// <summary>Persists the opt-in flag and starts or stops the loopback listener to match.</summary>
+    public async Task SetEnabledAsync(bool enabled, CancellationToken ct)
+    {
+        options.Enabled = enabled;
+        await store.SaveAsync(enabled, ct);
+        if (enabled)
+        {
+            await server.StartAsync(ct);
+        }
+        else
+        {
+            await server.StopAsync(ct);
+        }
     }
 }

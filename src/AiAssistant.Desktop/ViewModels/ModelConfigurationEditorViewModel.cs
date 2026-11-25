@@ -228,7 +228,7 @@ public sealed class ModelConfigurationEditorViewModel : ObservableObject
             _embeddingApiKeySecret = _modelConfiguration.Current.Embedding.ApiKeySecret;
             OnPropertyChanged(nameof(ChatApiKeyHint));
             OnPropertyChanged(nameof(EmbeddingApiKeyHint));
-            ModelConfigStatus = "已保存到 models.json（仅保留当前对话与向量模型）；重启应用后生效。";
+            ModelConfigStatus = "已保存模型配置；重启应用后生效。";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {

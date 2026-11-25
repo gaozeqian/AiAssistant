@@ -29,6 +29,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string _errorMessage = string.Empty;
     private string _mcpStatusText = "本地 MCP 默认关闭";
     private string _mcpTokenText = "点击“显示令牌”获取本地凭据";
+    private bool _mcpEnabled;
     private string _permissionGuidanceText = "尚未检查平台权限";
     private string _exportStatusText = string.Empty;
     private bool _isLoading;
@@ -52,6 +53,8 @@ public sealed class DiagnosticsViewModel : ObservableObject
         ExportPreviewCommand = new AsyncRelayCommand(ExportPreviewAsync);
         RevealMcpTokenCommand = new AsyncRelayCommand(RevealMcpTokenAsync);
         RotateMcpTokenCommand = new AsyncRelayCommand(RotateMcpTokenAsync);
+        ToggleMcpEnabledCommand = new AsyncRelayCommand(ToggleMcpEnabledAsync);
+        _mcpEnabled = _mcp?.GetSnapshot().Enabled ?? false;
     }
 
     public ObservableCollection<CapabilityItem> Capabilities { get; } = [];
@@ -73,6 +76,8 @@ public sealed class DiagnosticsViewModel : ObservableObject
     public IAsyncRelayCommand RevealMcpTokenCommand { get; }
 
     public IAsyncRelayCommand RotateMcpTokenCommand { get; }
+
+    public IAsyncRelayCommand ToggleMcpEnabledCommand { get; }
 
     public bool HasMcpControl => _mcp is not null;
 
@@ -152,6 +157,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
         private set => SetProperty(ref _mcpStatusText, value);
     }
 
+    public bool McpEnabled
+    {
+        get => _mcpEnabled;
+        private set => SetProperty(ref _mcpEnabled, value);
+    }
+
     public string McpTokenText
     {
         get => _mcpTokenText;
@@ -190,7 +201,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
             var snapshot = await _diagnostics.GetSnapshotAsync();
             PlatformName = snapshot.PlatformName;
             DatabaseText = snapshot.DatabaseHealth.IsHealthy
-                ? $"正常 · 数据库结构 v{snapshot.DatabaseHealth.SchemaVersion.Number} · {snapshot.DatabaseHealth.EventCount} 条事件 · {snapshot.DatabaseHealth.EncryptedBlobCount} 个加密媒体"
+                ? $"正常 · {snapshot.DatabaseHealth.EventCount} 条事件 · {snapshot.DatabaseHealth.EncryptedBlobCount} 个加密媒体"
                 : "数据库健康检查未通过";
             PipelineText = $"队列 {snapshot.PipelineMetrics.QueuedDataItems} / 已保存 {snapshot.PipelineMetrics.PersistedEvents} / 控制命令 {snapshot.PipelineMetrics.ControlCommandsProcessed}";
             RetentionText = snapshot.RetentionMetrics is null
@@ -198,7 +209,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
                 : $"已扫描 {snapshot.RetentionMetrics.TotalSweeps} 次 · 安全擦除过期媒体 {snapshot.RetentionMetrics.TotalPurgedBlobs} 个";
             ModelText = snapshot.ModelCapability is null
                 ? "未配置模型网关"
-                : $"{(snapshot.ModelCapability.ChatAvailable ? "可用" : "降级")} · 对话 {snapshot.ModelCapability.ChatModel ?? "未配置"} · 向量 {snapshot.ModelCapability.EmbeddingModel} · {snapshot.ModelCapability.Diagnostic}";
+                : FormatModelSummary(snapshot.ModelCapability);
             ModelEndpointsText = snapshot.ModelEndpoints is { Count: > 0 }
                 ? string.Join(
                     Environment.NewLine,
@@ -209,9 +220,16 @@ public sealed class DiagnosticsViewModel : ObservableObject
             DiagnosticsDisplayFormatter.Replace(RecentJobs, snapshot.RecentJobs.Select(job => new ReportJobItem(job)));
             DiagnosticsDisplayFormatter.Replace(RecentLogs, snapshot.RecentLogs?.Select(log => new DiagnosticLogItem(log)) ?? []);
 
-            McpStatusText = _mcp is null
-                ? "本地 MCP 未接入"
-                : DiagnosticsDisplayFormatter.FormatMcpStatus(_mcp.GetSnapshot());
+            if (_mcp is null)
+            {
+                McpStatusText = "本地 MCP 未接入";
+            }
+            else
+            {
+                var mcpSnapshot = _mcp.GetSnapshot();
+                McpEnabled = mcpSnapshot.Enabled;
+                McpStatusText = DiagnosticsDisplayFormatter.FormatMcpStatus(mcpSnapshot);
+            }
             await Secrets.RefreshAsync(updateStatus: false);
             PermissionGuidanceText = DiagnosticsDisplayFormatter.FormatPermissionGuidance(snapshot.Capabilities);
             LastRefreshText = $"最后刷新：{_clock.LocalNow:HH:mm:ss} · 诊断不包含正文、密钥或完整文件路径";
@@ -259,6 +277,37 @@ public sealed class DiagnosticsViewModel : ObservableObject
         {
             ErrorMessage = "无法轮换本地 MCP 令牌，请检查系统密钥库权限。";
         }
+    }
+
+    private async Task ToggleMcpEnabledAsync()
+    {
+        if (_mcp is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _mcp.SetEnabledAsync(!McpEnabled, CancellationToken.None);
+            McpEnabled = _mcp.GetSnapshot().Enabled;
+            McpStatusText = DiagnosticsDisplayFormatter.FormatMcpStatus(_mcp.GetSnapshot());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.Cryptography.CryptographicException)
+        {
+            ErrorMessage = "无法更新本地 MCP 开关，请检查权限或端口占用。";
+            // Revert the optimistic toggle so the control reflects the real (unchanged) state.
+            OnPropertyChanged(nameof(McpEnabled));
+        }
+    }
+
+    private static string FormatModelSummary(ModelCapabilitySnapshot model)
+    {
+        var chat = string.IsNullOrWhiteSpace(model.ChatModel) ? "未配置" : model.ChatModel;
+        var embedding = string.IsNullOrWhiteSpace(model.EmbeddingModel) ? "未配置" : model.EmbeddingModel;
+        var summary = $"{(model.ChatAvailable ? "可用" : "降级")} · 对话 {chat} · 向量 {embedding}";
+        return model.ChatAvailable
+            ? summary
+            : $"{summary} · {model.Diagnostic}";
     }
 
     private async Task ExportPreviewAsync()

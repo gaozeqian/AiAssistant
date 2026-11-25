@@ -172,19 +172,11 @@ public sealed class ModelCapabilityProber : IModelCapabilityProber, IDisposable
         var embeddings = await TryEmbeddingsAsync(client, endpoint, ct);
         var structured = chat && await TryStructuredAsync(client, endpoint, ct);
         var tools = chat && await TryToolsAsync(client, endpoint, ct);
+        // Diagnostic is a short human-readable note only; the capability flags are surfaced
+        // separately by the caller, so no boolean dump is duplicated here.
         var diagnostic = isEmbeddingEndpoint
-            ? $"向量={(embeddings ? "可用" : "不可用")}"
-            : string.Create(
-                System.Globalization.CultureInfo.InvariantCulture,
-                $"对话={chat}, 流式={streaming}, 向量={embeddings}, 结构化={structured}, 工具={tools}");
-        if (!isEmbeddingEndpoint && !chat)
-        {
-            diagnostic += "；端点或对话模型不可用";
-        }
-        else if (isEmbeddingEndpoint && !embeddings)
-        {
-            diagnostic += "；端点或向量模型不可用";
-        }
+            ? (embeddings ? string.Empty : "端点或向量模型不可用")
+            : (chat ? string.Empty : "端点或对话模型不可用");
 
         _logger.LogInformation("Model capability probe {Role} {Tier}: {Diagnostic}", target.Role, endpoint.Tier, diagnostic);
         return new DetailedEndpointProbe(

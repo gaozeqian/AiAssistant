@@ -193,7 +193,7 @@ public sealed partial class DesktopViewModelTests
         Assert.Equal(string.Empty, editor.EmbeddingApiKey);
         Assert.Contains("chat-endpoint-key", editor.ChatApiKeyHint, StringComparison.Ordinal);
         Assert.Contains("embedding-endpoint-key", editor.EmbeddingApiKeyHint, StringComparison.Ordinal);
-        Assert.Contains("仅保留当前对话与向量模型", editor.ModelConfigStatus, StringComparison.Ordinal);
+        Assert.Contains("重启应用后生效", editor.ModelConfigStatus, StringComparison.Ordinal);
     }
 
     [Fact]

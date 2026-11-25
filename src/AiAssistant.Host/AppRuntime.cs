@@ -294,7 +294,9 @@ public sealed class AppRuntime : IAsyncDisposable
             configuration.Policy.DefaultTier));
         services.AddSingleton<EvidenceSearchUseCase>();
 
-        services.AddSingleton(CreateMcpOptions());
+        var mcpEnabledStore = new McpEnabledStore(dataDirectory);
+        services.AddSingleton(mcpEnabledStore);
+        services.AddSingleton(CreateMcpOptions(mcpEnabledStore));
         services.AddSingleton(new LocalMcpTokenStore(Path.Combine(dataDirectory, "security"), keyStore));
         services.AddSingleton(provider => new McpToolCatalog(
             provider.GetRequiredService<IEventRepository>(),
@@ -304,15 +306,24 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<ILocalMcpControl, LocalMcpControl>();
     }
 
-    private static McpServerOptions CreateMcpOptions() => new()
+    private static McpServerOptions CreateMcpOptions(McpEnabledStore store) => new()
     {
-        Enabled = string.Equals(
-            Environment.GetEnvironmentVariable(EnvironmentNames.McpEnabled),
-            "true",
-            StringComparison.OrdinalIgnoreCase),
+        Enabled = ResolveMcpEnabled(store),
         Port = ParseBoundedInt(Environment.GetEnvironmentVariable(EnvironmentNames.McpPort), 47831, 0, 65535),
         MaxRequestsPerMinute = ParseBoundedInt(Environment.GetEnvironmentVariable(EnvironmentNames.McpRpm), 60, 1, 10_000)
     };
+
+    /// <summary>
+    /// The explicit environment variable always wins (headless/CLI modes); otherwise the persisted
+    /// diagnostics-panel toggle is honoured so the choice survives a restart.
+    /// </summary>
+    private static bool ResolveMcpEnabled(McpEnabledStore store)
+    {
+        var envEnabled = Environment.GetEnvironmentVariable(EnvironmentNames.McpEnabled);
+        return envEnabled is null
+            ? store.Load()
+            : string.Equals(envEnabled, "true", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static int ParseBoundedInt(string? raw, int fallback, int min, int max) =>
         int.TryParse(raw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value)

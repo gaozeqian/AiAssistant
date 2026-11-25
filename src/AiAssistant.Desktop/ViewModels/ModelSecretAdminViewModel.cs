@@ -15,7 +15,7 @@ public sealed class ModelSecretAdminViewModel : ObservableObject
     private string _secretName = string.Empty;
     private string _secretValue = string.Empty;
     private string? _selectedSecret;
-    private string _secretStatus = "密钥值写入后不可读取；models.json 通过 apiKeySecret 引用名称。";
+    private string _secretStatus = "密钥值写入后不可读取，仅供对应端点引用。";
 
     public ModelSecretAdminViewModel(IModelSecretAdmin? secrets)
     {

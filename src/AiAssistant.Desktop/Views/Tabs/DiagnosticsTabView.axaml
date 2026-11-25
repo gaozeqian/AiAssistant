@@ -48,7 +48,7 @@
           <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding ModelConfig.HasModelConfiguration}">
             <StackPanel Spacing="8">
               <TextBlock Text="模型配置" FontWeight="SemiBold" />
-              <TextBlock Text="对话与向量模型各自独立配置来源、地址、模型名与接口密钥；models.json 只保存当前在用的两个模型，保存后重启应用生效。"
+              <TextBlock Text="对话与向量模型各自独立配置来源、地址、模型名与接口密钥；仅保留当前在用的两个模型，保存后重启应用生效。"
                          FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
 
               <TextBlock Text="对话模型" FontWeight="SemiBold" />
@@ -129,7 +129,11 @@
       </Border>
       <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasMcpControl}">
         <StackPanel Spacing="8">
-          <TextBlock Text="只读本地 MCP（默认关闭）" FontWeight="SemiBold" />
+          <TextBlock Text="只读本地 MCP" FontWeight="SemiBold" />
+          <ToggleSwitch IsChecked="{Binding McpEnabled, Mode=OneWay}"
+                        Command="{Binding ToggleMcpEnabledCommand}"
+                        OnContent="已启用" OffContent="已关闭"
+                        automation:AutomationProperties.Name="启用本地 MCP" />
           <TextBlock Text="{Binding McpStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
           <TextBlock Text="仅暴露 search_events、activity_stats、list_reports、get_report 四个只读工具；无写工具，强制 loopback 与本地令牌。"
                      TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
@@ -143,7 +147,7 @@
       <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding Secrets.HasSecretAdmin}">
         <StackPanel Spacing="8">
           <TextBlock Text="模型端点密钥" FontWeight="SemiBold" />
-          <TextBlock Text="密钥以 AES-GCM 加密保存在本机；写入后不可读取，models.json 通过 apiKeySecret 引用名称。"
+          <TextBlock Text="密钥以加密形式保存在本机；写入后不可读取，仅供对应端点引用。"
                      TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
           <Grid ColumnDefinitions="*,*">
             <TextBox Text="{Binding Secrets.SecretName}" PlaceholderText="密钥名称，例如 corp-api-key" Margin="0,0,6,0" />
@@ -194,6 +198,12 @@
       <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
         <StackPanel Spacing="10">
           <TextBlock Text="最近后台任务" FontWeight="SemiBold" />
+          <Grid ColumnDefinitions="120,120,100,*">
+            <TextBlock Text="报告日期" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="1" Text="状态" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="2" Text="尝试" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="3" Text="创建时间" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+          </Grid>
           <ItemsControl ItemsSource="{Binding RecentJobs}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ReportJobItem">
