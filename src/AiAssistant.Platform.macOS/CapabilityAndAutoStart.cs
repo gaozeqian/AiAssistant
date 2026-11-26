@@ -134,7 +134,7 @@ public sealed class CapabilityProvider : ICapabilityProvider
             CapabilityState.Degraded(
                 CapabilityKind.WakeWord,
                 "语音为可选功能，请在「语音」页开启",
-                "需要在 AIASSISTANT_SHERPA_MODEL_DIR 下提供 sherpa-onnx KWS/TTS 模型。")
+                "需要安装语音唤醒与合成模型后才能启用；可在「语音」页查看状态。")
         ];
     }
 }

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using AiAssistant.Application.Ports;
 using AiAssistant.Export;
 using SkiaSharp;
@@ -37,6 +38,51 @@ public sealed class SkiaReportRasterizerTests
         }
         Assert.True(pdf.AsSpan(0, 4).SequenceEqual("%PDF"u8));
         Assert.Contains("%%EOF", Encoding.ASCII.GetString(pdf), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderPdf_ExtractsDetailSectionsAndSpreadsThemAcrossPages()
+    {
+        var longSummary = string.Join(' ', Enumerable.Repeat(
+            "该区间共记录大量本地活动，主要应用为 Rider 与浏览器，工作日活跃度高于周末，摘要仅依据本机统计生成。",
+            12));
+        var report = CreateReport(days: 31) with
+        {
+            Markdown = $"""
+                # 活动报告
+                ## 总结
+                {longSummary}
+                ## 每日统计
+                | 日期 | 事件数 | 活跃分钟 | 主要应用 |
+                |---|---|---|---|
+                | 2026-11-16 | 5 | 30 | Rider |
+                ## 应用分布
+                - Rider: 21 条
+                - 浏览器: 8 条
+                ## 代表性记录
+                - 2026-11-16 Rider：完成迁移
+                - 2026-11-17 浏览器：查阅文档
+                ---
+                模型 `gemma4:12b` · 已应用本地脱敏
+                """
+        };
+
+        var sections = RangeReportMarkdownSections.Parse(report.Markdown);
+        Assert.Contains("该区间共记录", sections.Summary, StringComparison.Ordinal);
+        Assert.Equal(2, sections.Apps.Count);
+        Assert.Equal(21, sections.Apps[0].Count);
+        Assert.Equal(2, sections.Highlights.Count);
+
+        var pdf = new SkiaReportRasterizer().RenderPdf(report);
+        var ascii = Encoding.ASCII.GetString(pdf);
+        Assert.True(pdf.AsSpan(0, 4).SequenceEqual("%PDF"u8));
+        Assert.True(pdf.Length < 1_000_000, $"pdf unexpectedly large (font embedding?): {pdf.Length}");
+        if (PdfSharpReportRenderer.IsSearchableFontAvailable)
+        {
+            var pageCount = Regex.Count(ascii, @"/Type\s*/Page\b");
+            Assert.True(pageCount >= 2, $"expected a multi-page document, got {pageCount} pages");
+            Assert.Contains("/ToUnicode", ascii, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

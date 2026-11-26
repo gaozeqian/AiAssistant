@@ -62,10 +62,24 @@ public sealed class SkiaReportRasterizer : IReportRasterizer
             var canvas = document.BeginPage(Width, Height);
             Draw(canvas, report, vectorText: true);
             document.EndPage();
+
+            // No embeddable CJK TrueType font: be explicit that the detailed pages are unavailable.
+            canvas = document.BeginPage(Width, Height);
+            DrawDegradedNotice(canvas);
+            document.EndPage();
             document.Close();
         }
 
         return stream.ToArray();
+    }
+
+    private static void DrawDegradedNotice(SKCanvas canvas)
+    {
+        using var matched = SKFontManager.Default.MatchCharacter('时');
+        using var font = new SKFont(matched ?? SKTypeface.Default, 14);
+        using var paint = new SKPaint { Color = MutedColor, IsAntialias = true };
+        DrawText(canvas, "未找到可嵌入的中文字体，PDF 已降级为仅图表。", 48, 70, SKTextAlign.Left, font, paint, true);
+        DrawText(canvas, "如需完整正文，请导出 Markdown 版本。", 48, 104, SKTextAlign.Left, font, paint, true);
     }
 
     private static void Draw(SKCanvas canvas, RangeReport report, bool vectorText)

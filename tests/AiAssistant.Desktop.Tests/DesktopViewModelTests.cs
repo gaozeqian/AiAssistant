@@ -350,4 +350,77 @@ public sealed partial class DesktopViewModelTests
         public Task ExportConfirmedPreviewAsync(string destinationPath, string confirmedJsonPreview, CancellationToken ct) =>
             Task.CompletedTask;
     }
+
+    private sealed class ActionCapabilityProvider : ICapabilityProvider
+    {
+        public string PlatformName => "Windows";
+
+        public IReadOnlyList<CapabilityState> GetCapabilities() =>
+        [
+            CapabilityState.PermissionRequired(
+                CapabilityKind.ScreenCapture,
+                "需要屏幕录制权限",
+                "请在系统隐私设置中授予屏幕录制。"),
+            CapabilityState.Degraded(CapabilityKind.WakeWord, "语音可选", "请安装语音模型。"),
+            CapabilityState.Degraded(CapabilityKind.Ocr, "Windows.Media.Ocr 按需兜底")
+        ];
+    }
+
+    private sealed class ConfiguredMcpControl : ILocalMcpControl
+    {
+        public LocalMcpSnapshot GetSnapshot() => LocalMcpSnapshot.Disabled;
+        public Task<string> RevealTokenAsync(CancellationToken ct) => Task.FromResult("token");
+        public Task<string> RotateTokenAsync(CancellationToken ct) => Task.FromResult("token");
+        public Task SetEnabledAsync(bool enabled, CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private sealed class ConfiguredModelsAdmin : IModelConfigurationAdmin
+    {
+        public ModelConfigurationView Current => new(
+            new ModelEndpointView("http://127.0.0.1:11434", "gemma4:12b", "LocalOffline"),
+            new ModelEndpointView("http://127.0.0.1:11434", "embeddinggemma-2:740m", "LocalOffline"));
+        public Task SaveAsync(ModelConfigurationView update, CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private sealed class RecordingDiagnosticLogReader : IDiagnosticLogReader
+    {
+        public string? ConfirmedJson { get; private set; }
+
+        public IReadOnlyList<DiagnosticLogEntry> GetRecentEntries(int maxCount = 50) => [];
+
+        public Task ExportConfirmedPreviewAsync(string destinationPath, string confirmedJsonPreview, CancellationToken ct)
+        {
+            ConfirmedJson = confirmedJsonPreview;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TwentyJobsQueue : IReportJobQueue
+    {
+        public int LastRequestedLimit { get; private set; }
+
+        public Task<EnqueueResult> EnqueueAsync(ReportJobRequest request, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<int> RecoverInterruptedJobsAsync(CancellationToken ct) => Task.FromResult(0);
+
+        public Task<ReportJob?> ClaimNextPendingAsync(CancellationToken ct) => Task.FromResult<ReportJob?>(null);
+
+        public Task UpdateAsync(ReportJob job, CancellationToken ct) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<ReportJob>> ListRecentJobsAsync(int limit, CancellationToken ct)
+        {
+            LastRequestedLimit = limit;
+            var jobs = Enumerable.Range(0, 20)
+                .Select(index => new ReportJob(
+                    $"job-{index}",
+                    new DateOnly(2026, 11, 1).AddDays(index),
+                    ReportTriggerSource.ScheduledDaily,
+                    false,
+                    DateTimeOffset.UtcNow,
+                    ReportJobStatus.Completed))
+                .Cast<ReportJob>()
+                .ToArray();
+            return Task.FromResult<IReadOnlyList<ReportJob>>(jobs);
+        }
+    }
 }

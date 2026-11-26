@@ -6,19 +6,35 @@
              x:DataType="vm:ShellViewModel">
   <ScrollViewer DataContext="{Binding Diagnostics}" x:DataType="vm:DiagnosticsViewModel" Margin="0,12,0,0">
     <StackPanel Spacing="12">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+      <Grid ColumnDefinitions="*,Auto">
         <StackPanel>
           <TextBlock Text="系统健康与能力矩阵" FontSize="18" FontWeight="SemiBold" />
           <TextBlock Text="{Binding PlatformName}" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
         </StackPanel>
-        <Button Grid.Column="1" Classes="secondary" Content="生成脱敏导出预览" Command="{Binding GeneratePreviewCommand}" Margin="0,0,8,0" />
-        <Button Grid.Column="2" Classes="secondary" Content="确认导出" Command="{Binding ExportPreviewCommand}" Margin="0,0,8,0" />
-        <Button Grid.Column="3" Classes="primary" Content="重新检查" Command="{Binding RefreshCommand}"
+        <Button Grid.Column="1" Classes="primary" Content="重新检查" Command="{Binding RefreshCommand}"
                 automation:AutomationProperties.Name="重新检查平台能力" />
       </Grid>
       <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" />
       <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="14" IsVisible="{Binding HasError}">
         <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
+      </Border>
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
+        <StackPanel Spacing="8">
+          <TextBlock Text="诊断导出（脱敏）" FontWeight="SemiBold" />
+          <TextBlock Text="先生成预览，确认后再保存。导出内容只有平台、数据库健康、采集管道、能力状态、最近任务与脱敏日志等元数据，不含活动正文、密钥或完整文件路径。"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+          <WrapPanel>
+            <Button Classes="secondary" Content="生成预览" Command="{Binding GeneratePreviewCommand}" Margin="0,0,8,0"
+                    automation:AutomationProperties.Name="生成脱敏导出预览" />
+            <Button Classes="secondary" Content="保存为 JSON…" Command="{Binding ExportPreviewCommand}"
+                    IsEnabled="{Binding CanExportPreview}" Margin="0,0,8,0"
+                    automation:AutomationProperties.Name="确认导出脱敏预览" />
+          </WrapPanel>
+          <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180"
+                   FontFamily="Consolas" FontSize="12" IsVisible="{Binding HasExportPreview}" />
+          <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{DynamicResource MutedBrush}"
+                     TextWrapping="Wrap" IsVisible="{Binding HasExportStatus}" />
+        </StackPanel>
       </Border>
       <Grid ColumnDefinitions="*,*,*">
         <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,6,0">
@@ -144,17 +160,10 @@
           </WrapPanel>
         </StackPanel>
       </Border>
-      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasExportPreview}">
-        <StackPanel Spacing="8">
-          <TextBlock Text="诊断导出预览（仅元数据，用户确认前不写外部文件）" FontWeight="SemiBold" />
-          <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180" FontFamily="Consolas" FontSize="12" />
-          <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-        </StackPanel>
-      </Border>
       <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
         <StackPanel Spacing="10">
           <TextBlock Text="平台能力" FontWeight="SemiBold" />
-          <Grid ColumnDefinitions="130,85,*,260,110">
+          <Grid ColumnDefinitions="130,85,*,260,120">
             <TextBlock Text="能力" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
             <TextBlock Grid.Column="1" Text="状态" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
             <TextBlock Grid.Column="2" Text="说明" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="8,0" />
@@ -165,14 +174,15 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:CapabilityItem">
                 <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,9">
-                  <Grid ColumnDefinitions="130,85,*,260,110">
+                  <Grid ColumnDefinitions="130,85,*,260,120">
                     <TextBlock Text="{Binding KindText}" FontWeight="SemiBold" />
                     <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{DynamicResource AccentBrush}" />
                     <TextBlock Grid.Column="2" Text="{Binding Summary}" TextWrapping="Wrap" Margin="8,0" />
                     <TextBlock Grid.Column="3" Text="{Binding RemediationHint}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                     <Button Grid.Column="4" Classes="secondary" Content="{Binding ActionLabel}"
-                            Command="{Binding OpenSettingsCommand}" IsVisible="{Binding NeedsAction}"
-                            Margin="8,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                            Command="{Binding ActionCommand}" CommandParameter="{Binding Action}"
+                            IsVisible="{Binding NeedsAction}" Padding="10,6" FontSize="12"
+                            Margin="2,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" />
                   </Grid>
                 </Border>
               </DataTemplate>
@@ -183,6 +193,7 @@
       <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
         <StackPanel Spacing="10">
           <TextBlock Text="最近后台任务" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding RecentJobsSummary}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
           <Grid ColumnDefinitions="120,120,100,*">
             <TextBlock Text="报告日期" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
             <TextBlock Grid.Column="1" Text="状态" FontSize="12" Foreground="{DynamicResource MutedBrush}" />

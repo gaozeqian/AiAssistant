@@ -104,7 +104,7 @@ public sealed class SherpaOnnxWakeWordDetector : IWakeWordDetector
             : CapabilityState.PermissionRequired(
                 CapabilityKind.WakeWord,
                 "唤醒词模型资产未安装",
-                "请在 AIASSISTANT_SHERPA_MODEL_DIR 下提供 KWS encoder/decoder/joiner/tokens 与 keywords.txt。");
+                "请安装唤醒词模型（含 encoder、decoder、joiner、tokens 与关键词表）后重试。");
 
     public IReadOnlyList<WakeWordDetection> Accept(AudioFrame frame)
     {
@@ -231,7 +231,7 @@ public sealed class SherpaOnnxTtsService : ITtsService
             : CapabilityState.PermissionRequired(
                 CapabilityKind.WakeWord,
                 "语音合成模型资产未安装",
-                "请在 AIASSISTANT_SHERPA_MODEL_DIR 下提供语音合成模型、tokens 与 lexicon。");
+                "请安装语音合成模型（含 tokens 与 lexicon）后重试。");
 
     public async Task<SpeechSynthesisResult> SynthesizeAsync(
         SpeechSynthesisRequest request,

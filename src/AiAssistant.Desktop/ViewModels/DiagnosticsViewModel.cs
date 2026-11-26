@@ -14,6 +14,9 @@ namespace AiAssistant.Desktop.ViewModels;
 /// </summary>
 public sealed class DiagnosticsViewModel : ObservableObject
 {
+    /// <summary>Diagnostics is an overview, not a job history browser; keep the list scannable.</summary>
+    public const int RecentJobDisplayLimit = 5;
+
     private readonly DiagnosticsUseCase _diagnostics;
     private readonly IClock _clock;
     private readonly ILocalMcpControl? _mcp;
@@ -31,6 +34,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private string _mcpTokenText = "点击“显示令牌”获取本地凭据";
     private bool _mcpEnabled;
     private string _exportStatusText = string.Empty;
+    private string _recentJobsSummary = "尚未刷新";
     private bool _isLoading;
 
     public DiagnosticsViewModel(
@@ -51,13 +55,19 @@ public sealed class DiagnosticsViewModel : ObservableObject
         RevealMcpTokenCommand = new AsyncRelayCommand(RevealMcpTokenAsync);
         RotateMcpTokenCommand = new AsyncRelayCommand(RotateMcpTokenAsync);
         ToggleMcpEnabledCommand = new AsyncRelayCommand(ToggleMcpEnabledAsync);
-        OpenSettingsCommand = new RelayCommand(OpenSystemSettings);
+        ExecuteCapabilityCommand = new RelayCommand<CapabilityAction?>(ExecuteCapabilityAction);
         _mcpEnabled = _mcp?.GetSnapshot().Enabled ?? false;
     }
 
     public ObservableCollection<CapabilityItem> Capabilities { get; } = [];
 
     public ObservableCollection<ReportJobItem> RecentJobs { get; } = [];
+
+    public string RecentJobsSummary
+    {
+        get => _recentJobsSummary;
+        private set => SetProperty(ref _recentJobsSummary, value);
+    }
 
     public ObservableCollection<DiagnosticLogItem> RecentLogs { get; } = [];
 
@@ -75,7 +85,10 @@ public sealed class DiagnosticsViewModel : ObservableObject
 
     public IAsyncRelayCommand ToggleMcpEnabledCommand { get; }
 
-    public IRelayCommand OpenSettingsCommand { get; }
+    public IRelayCommand<CapabilityAction?> ExecuteCapabilityCommand { get; }
+
+    /// <summary>Raised when a capability hint asks the user to continue on the voice page.</summary>
+    public event EventHandler? VoicePageRequested;
 
     public bool HasMcpControl => _mcp is not null;
 
@@ -126,11 +139,15 @@ public sealed class DiagnosticsViewModel : ObservableObject
             if (SetProperty(ref _exportPreviewJson, value))
             {
                 OnPropertyChanged(nameof(HasExportPreview));
+                OnPropertyChanged(nameof(CanExportPreview));
             }
         }
     }
 
     public bool HasExportPreview => !string.IsNullOrEmpty(ExportPreviewJson);
+
+    /// <summary>Only allow writing a file after the user has actually seen a generated preview.</summary>
+    public bool CanExportPreview => HasExportPreview && !IsLoading;
 
     public string LastRefreshText
     {
@@ -173,13 +190,27 @@ public sealed class DiagnosticsViewModel : ObservableObject
     public string ExportStatusText
     {
         get => _exportStatusText;
-        private set => SetProperty(ref _exportStatusText, value);
+        private set
+        {
+            if (SetProperty(ref _exportStatusText, value))
+            {
+                OnPropertyChanged(nameof(HasExportStatus));
+            }
+        }
     }
+
+    public bool HasExportStatus => !string.IsNullOrEmpty(ExportStatusText);
 
     public bool IsLoading
     {
         get => _isLoading;
-        private set => SetProperty(ref _isLoading, value);
+        private set
+        {
+            if (SetProperty(ref _isLoading, value))
+            {
+                OnPropertyChanged(nameof(CanExportPreview));
+            }
+        }
     }
 
     public async Task RefreshAsync()
@@ -211,8 +242,18 @@ public sealed class DiagnosticsViewModel : ObservableObject
                     snapshot.ModelEndpoints.Select(DiagnosticsDisplayFormatter.FormatEndpoint))
                 : "尚未探测端点能力";
 
-            DiagnosticsDisplayFormatter.Replace(Capabilities, snapshot.Capabilities.Select(capability => new CapabilityItem(capability, OpenSettingsCommand)));
-            DiagnosticsDisplayFormatter.Replace(RecentJobs, snapshot.RecentJobs.Select(job => new ReportJobItem(job)));
+            DiagnosticsDisplayFormatter.Replace(
+                Capabilities,
+                snapshot.Capabilities.Select(capability => new CapabilityItem(
+                    capability,
+                    CapabilityActionResolver.Resolve(capability),
+                    ExecuteCapabilityCommand)));
+            DiagnosticsDisplayFormatter.Replace(
+                RecentJobs,
+                snapshot.RecentJobs.Take(RecentJobDisplayLimit).Select(job => new ReportJobItem(job)));
+            RecentJobsSummary = snapshot.RecentJobs.Count > RecentJobDisplayLimit
+                ? $"共 {snapshot.RecentJobs.Count} 条，仅显示最近 {RecentJobDisplayLimit} 条；完整记录见脱敏导出。"
+                : $"共 {snapshot.RecentJobs.Count} 条。";
             DiagnosticsDisplayFormatter.Replace(RecentLogs, snapshot.RecentLogs?.Select(log => new DiagnosticLogItem(log)) ?? []);
 
             if (_mcp is null)
@@ -303,16 +344,32 @@ public sealed class DiagnosticsViewModel : ObservableObject
             : $"{summary} · {model.Diagnostic}";
     }
 
-    private static void OpenSystemSettings()
+    private void ExecuteCapabilityAction(CapabilityAction? action)
     {
-        if (!OperatingSystem.IsWindows())
+        switch (action?.Kind)
+        {
+            case CapabilityActionKind.OpenPermissionSettings:
+                OpenSettingsUri(CapabilityActionResolver.SettingsUri(action.PermissionTarget));
+                break;
+            case CapabilityActionKind.OpenVoicePage:
+                VoicePageRequested?.Invoke(this, EventArgs.Empty);
+                break;
+            case CapabilityActionKind.RetryDiagnostics:
+                _ = RefreshCommand.ExecuteAsync(null);
+                break;
+        }
+    }
+
+    private static void OpenSettingsUri(string? uri)
+    {
+        if (string.IsNullOrWhiteSpace(uri))
         {
             return;
         }
 
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:")
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri)
             {
                 UseShellExecute = true
             });
@@ -329,11 +386,18 @@ public sealed class DiagnosticsViewModel : ObservableObject
 
     private async Task ExportPreviewAsync()
     {
+        if (!HasExportPreview)
+        {
+            ErrorMessage = "请先生成脱敏导出预览。";
+            return;
+        }
+
         IsLoading = true;
         ErrorMessage = string.Empty;
         try
         {
-            var preview = await _diagnostics.BuildSanitizedExportPreviewAsync();
+            // Write exactly the JSON the user reviewed; rebuilding here could export a different snapshot.
+            var preview = ExportPreviewJson;
             string path;
             if (SaveFilePicker is not null)
             {
@@ -342,8 +406,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
                     [new SaveFileType("JSON", "json")]);
                 if (picked is null)
                 {
-                    ExportPreviewJson = preview;
-                    ExportStatusText = "已生成预览，未选择保存位置。";
+                    ExportStatusText = "已取消保存，预览仍保留。";
                     return;
                 }
 
@@ -364,7 +427,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
             }
 
             await _diagnostics.ExportConfirmedPreviewAsync(path, preview, CancellationToken.None);
-            ExportPreviewJson = preview;
             ExportStatusText = $"已导出脱敏诊断：{path}";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
@@ -389,6 +451,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
         try
         {
             ExportPreviewJson = await _diagnostics.BuildSanitizedExportPreviewAsync();
+            ExportStatusText = "预览已生成，确认后点击「保存为 JSON…」写盘。";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
         {

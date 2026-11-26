@@ -3,6 +3,9 @@
     <Description>PNG/PDF rasterization for range reports using the SkiaSharp build already shipped with Avalonia.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="AiAssistant.Report.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\AiAssistant.Application\AiAssistant.Application.csproj" />
     <ProjectReference Include="..\AiAssistant.Core\AiAssistant.Core.csproj" />
   </ItemGroup>

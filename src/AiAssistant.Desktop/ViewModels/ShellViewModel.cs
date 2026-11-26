@@ -50,6 +50,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         }
 
         Diagnostics.ModelConfig.RestartRequested += OnRestartRequested;
+        Diagnostics.VoicePageRequested += OnVoicePageRequested;
     }
 
     public TimelineViewModel Timeline { get; }
@@ -144,6 +145,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         SelectedSectionIndex = 1;
     }
 
+    public void ShowVoice()
+    {
+        SelectedSectionIndex = 3;
+    }
+
     public void ShowDiagnostics()
     {
         SelectedSectionIndex = 5;
@@ -195,6 +201,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
             Search.Dispose();
         }
 
+        Diagnostics.VoicePageRequested -= OnVoicePageRequested;
         Timeline.Dispose();
         Capture.Dispose();
         Reports.Dispose();
@@ -209,6 +216,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     private void OnTimelineRequested(object? sender, EventArgs e) => ShowTimeline();
 
     private void OnReportsRequested(object? sender, EventArgs e) => ShowReports();
+
+    private void OnVoicePageRequested(object? sender, EventArgs e) => ShowVoice();
 
     private void OnEvidenceNavigationRequested(object? sender, EvidenceNavigationRequest request)
     {

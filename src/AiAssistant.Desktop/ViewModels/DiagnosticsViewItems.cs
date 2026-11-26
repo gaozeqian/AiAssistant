@@ -6,7 +6,10 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AiAssistant.Desktop.ViewModels;
 
-public sealed class CapabilityItem(CapabilityState capability, IRelayCommand? openSettingsCommand = null)
+public sealed class CapabilityItem(
+    CapabilityState capability,
+    CapabilityAction? action = null,
+    IRelayCommand? executeCommand = null)
 {
     public string KindText => KindLabel(capability.Kind);
 
@@ -44,12 +47,14 @@ public sealed class CapabilityItem(CapabilityState capability, IRelayCommand? op
 
     public bool NeedsAttention => capability.Status is not CapabilityStatus.Supported;
 
-    /// <summary>Whether an actionable button should be offered (permission / broken / reduced capability).</summary>
-    public bool NeedsAction => capability.Status is CapabilityStatus.PermissionRequired or CapabilityStatus.Unavailable or CapabilityStatus.Degraded;
+    public CapabilityAction? Action { get; } = action;
 
-    public string ActionLabel => capability.Status == CapabilityStatus.PermissionRequired ? "去授权" : "打开系统设置";
+    /// <summary>Only offer a button when the follow-up can actually be carried out on this platform.</summary>
+    public bool NeedsAction => Action is not null && CapabilityActionResolver.IsAvailable(Action);
 
-    public IRelayCommand? OpenSettingsCommand { get; } = openSettingsCommand;
+    public string ActionLabel => Action?.Label ?? string.Empty;
+
+    public IRelayCommand? ActionCommand { get; } = executeCommand;
 }
 
 public sealed class ReportJobItem(ReportJob job)

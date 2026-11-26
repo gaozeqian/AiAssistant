@@ -10,8 +10,10 @@ using AiAssistant.Testing.Common;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 namespace AiAssistant.Desktop.Tests;
@@ -42,6 +44,127 @@ public sealed partial class DesktopViewModelTests
         await viewModel.GeneratePreviewCommand.ExecuteAsync(null);
         Assert.True(viewModel.HasExportPreview);
         Assert.Contains("capturePipeline", viewModel.ExportPreviewJson);
+    });
+
+    [Fact]
+    public void CapabilityActions_MatchRemediationInsteadOfAlwaysOpeningSettings()
+    {
+        var permission = CapabilityActionResolver.Resolve(
+            CapabilityState.PermissionRequired(CapabilityKind.ScreenCapture, "需要权限", "请授予屏幕录制。"));
+        Assert.NotNull(permission);
+        Assert.Equal("去授权", permission!.Label);
+        Assert.Equal(CapabilityActionKind.OpenPermissionSettings, permission.Kind);
+        Assert.NotNull(CapabilityActionResolver.SettingsUri(permission.PermissionTarget));
+
+        var voice = CapabilityActionResolver.Resolve(
+            CapabilityState.Degraded(CapabilityKind.WakeWord, "语音可选", "请安装模型。"));
+        Assert.NotNull(voice);
+        Assert.Equal("前往语音", voice!.Label);
+        Assert.Equal(CapabilityActionKind.OpenVoicePage, voice.Kind);
+
+        // No remediation hint means there is nothing actionable; an unconditional settings button was wrong.
+        Assert.Null(CapabilityActionResolver.Resolve(
+            CapabilityState.Degraded(CapabilityKind.Ocr, "按需兜底")));
+
+        var keyStore = CapabilityActionResolver.Resolve(
+            CapabilityState.PermissionRequired(CapabilityKind.KeyStore, "已锁定", "解锁后重试。"));
+        Assert.Equal(CapabilityActionKind.RetryDiagnostics, keyStore!.Kind);
+    }
+
+    [Fact]
+    public async Task Diagnostics_ExportsExactlyThePreviewTheUserConfirmed()
+    {
+        var logs = new RecordingDiagnosticLogReader();
+        var useCase = new DiagnosticsUseCase(
+            new FakeCapabilityProvider(),
+            new FakeMaintenanceService(),
+            new FakeCaptureCoordinator(),
+            new FakeReportJobQueue(),
+            logReader: logs);
+        var viewModel = new DiagnosticsViewModel(
+            useCase,
+            exportDirectory: TempArtifactDirectory.CreatePath("diag-export"));
+
+        Assert.False(viewModel.CanExportPreview);
+        await viewModel.ExportPreviewCommand.ExecuteAsync(null);
+        Assert.Null(logs.ConfirmedJson);
+
+        await viewModel.GeneratePreviewCommand.ExecuteAsync(null);
+        Assert.True(viewModel.CanExportPreview);
+        var preview = viewModel.ExportPreviewJson;
+        Assert.Contains("预览已生成", viewModel.ExportStatusText, StringComparison.Ordinal);
+
+        await viewModel.ExportPreviewCommand.ExecuteAsync(null);
+        Assert.Equal(preview, logs.ConfirmedJson);
+    }
+
+    [Fact]
+    public async Task Diagnostics_RecentJobsDisplayIsCappedButExportKeepsTheFullTail()
+    {
+        var queue = new TwentyJobsQueue();
+        var useCase = new DiagnosticsUseCase(
+            new FakeCapabilityProvider(),
+            new FakeMaintenanceService(),
+            new FakeCaptureCoordinator(),
+            queue);
+        var viewModel = new DiagnosticsViewModel(useCase);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        Assert.Equal(DiagnosticsViewModel.RecentJobDisplayLimit, viewModel.RecentJobs.Count);
+        Assert.Contains("共 20 条", viewModel.RecentJobsSummary, StringComparison.Ordinal);
+        Assert.Equal(20, queue.LastRequestedLimit);
+    }
+
+    [Fact]
+    public Task DiagnosticsLayout_ExportCardIsAdjacentAndActionLabelsAreNotClipped() => RunInHeadlessSession(async () =>
+    {
+        var clock = new SystemClock();
+        var coordinator = new FakeCaptureCoordinator();
+        var diagnostics = new DiagnosticsViewModel(
+            new DiagnosticsUseCase(
+                new ActionCapabilityProvider(),
+                new FakeMaintenanceService(),
+                coordinator,
+                new TwentyJobsQueue()),
+            mcp: new ConfiguredMcpControl(),
+            modelConfiguration: new ConfiguredModelsAdmin());
+        var shell = new ShellViewModel(
+            new TimelineViewModel(new TimelineUseCase(new InMemoryEventRepository(), new FakeMediaStore(), clock)),
+            new CaptureControlViewModel(new CaptureControlUseCase(coordinator, new FakeAutoStartService())),
+            diagnostics,
+            new ReportsViewModel(
+                new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
+                TempArtifactDirectory.CreatePath("diag-layout")),
+            data: new DataManagementViewModel(new FakeDataDeletionService()));
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 5;
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
+            .Any(button => button.Content?.ToString() == "去授权"));
+        await diagnostics.GeneratePreviewCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var buttons = window.GetVisualDescendants().OfType<Button>().ToList();
+        var generate = buttons.First(button => button.Content?.ToString() == "生成预览");
+        var cardTitle = window.GetVisualDescendants().OfType<TextBlock>()
+            .First(block => block.Text?.StartsWith("诊断导出（脱敏）", StringComparison.Ordinal) == true);
+        var gap = Math.Abs(
+            cardTitle.TransformToVisual(window)!.Value.Transform(new Point(0, 0)).Y
+            - generate.TransformToVisual(window)!.Value.Transform(new Point(0, 0)).Y);
+        Assert.InRange(gap, 0, 300);
+
+        foreach (var button in buttons.Where(button => button.Content?.ToString() is "去授权" or "前往语音"))
+        {
+            var presenter = button.GetVisualDescendants().OfType<ContentPresenter>().First();
+            Assert.True(
+                button.Bounds.Width >= presenter.DesiredSize.Width - 1,
+                $"操作按钮文字被裁剪：{button.Content} / {button.Bounds.Width} vs {presenter.DesiredSize.Width}");
+        }
+
+        Assert.Equal(DiagnosticsViewModel.RecentJobDisplayLimit, diagnostics.RecentJobs.Count);
+        window.Close();
     });
 
     [Fact]
