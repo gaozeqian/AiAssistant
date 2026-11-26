@@ -31,12 +31,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 NAMESPACE = uuid.UUID("6f9619ff-8b86-d011-b42d-00c04fc964ff")
-ALLOWED_LICENSES = frozenset({"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause"})
+ALLOWED_LICENSES = frozenset({"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "MS-PL"})
 
 # Some packages declare license by file/URL instead of an SPDX expression.
 # Each override must be justified here and re-reviewed when the package version changes.
 LICENSE_OVERRIDES: dict[str, tuple[str, str]] = {
     "avalonia.angle.windows.natives": ("BSD-3-Clause", "ANGLE LICENSE file, 3-clause redistribution terms"),
+    "htmlagilitypack": ("MIT", "nuspec licenseUrl = github.com/zzzprojects/html-agility-pack/LICENSE (MIT License)"),
     "microsoft.ml.onnxruntime.managed": ("MIT", "LICENSE.txt starts with 'MIT License'"),
     "microsoft.testing.extensions.codecoverage": ("MIT", "Microsoft .NET Library terms (MIT-equivalent)"),
     "mono.cecil": ("MIT", "nuspec licenseUrl = opensource.org/licenses/mit-license.php"),

@@ -46,7 +46,7 @@ dotnet test --solution AiAssistant.sln -c Release
 
 - 目标框架 `net10.0`、`Nullable` 开启、警告视为错误（`Directory.Build.props` 已集中设定）。
 - 包版本只在 `Directory.Packages.props` 维护（中央包管理），子工程不得写 `Version=`。
-- 依赖只允许 MIT / Apache-2.0 / BSD-2-Clause / BSD-3-Clause；引入新依赖需同步 [合规文档](docs/release/compliance.md)。
+- 依赖只允许 MIT / Apache-2.0 / BSD-2-Clause / BSD-3-Clause / MS-PL；引入新依赖需同步 [合规文档](docs/release/compliance.md)。
 - 环境变量只通过 `AiAssistant.Core.Configuration.EnvironmentNames` 常量引用，不在代码里写字面量。
 - 平台名称在文档与注释中统一写作 `macOS`；`OperatingSystem.IsMacOS()` 与 Apple bundle 的 `Contents/MacOS` 属于不可改标识。
 - 产物路径只通过 `ArtifactPaths` 解析，不在代码里拼接 `"artifacts"`。

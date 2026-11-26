@@ -6,7 +6,7 @@
 
 ## 1. 依赖原则
 
-- 仅使用宽松开源许可证（MIT / Apache-2.0 / BSD-2/3-Clause）。
+- 仅使用宽松开源许可证（MIT / Apache-2.0 / BSD-2/3-Clause / MS-PL）。
 - 包版本集中在 `Directory.Packages.props`；生产代码不新增未登记依赖。
 - NuGet 审计模式 `all`、级别 `low`；`--warnaserror` 阻止已知漏洞与警告进入构建。
 - 原生依赖只保留当前 RID；ONNX Runtime 由 sherpa-onnx 提供，禁止另引 `Microsoft.ML.OnnxRuntime` 覆盖 SONAME。
@@ -24,6 +24,12 @@
 | `Avalonia.Headless` | 12.1.6 | MIT | Headless 测试 |
 | `Avalonia.Wayland` | 12.1.6 | MIT | Wayland 后端 |
 | `Markdown.Avalonia` | 12.0.2 | MIT | Markdown 预览渲染 |
+| `Markdown.Avalonia.Html` | 12.0.2 | MIT | Markdown HTML 内联渲染（传递） |
+| `Markdown.Avalonia.Svg` | 12.0.2 | MIT | Markdown SVG 内联渲染（传递） |
+| `Markdown.Avalonia.SyntaxHigh` | 12.0.2 | MIT | Markdown 代码高亮（传递） |
+| `Markdown.Avalonia.Tight` | 12.0.2 | MIT | Markdown 紧凑渲染（传递） |
+| `HtmlAgilityPack` | 1.11.42 | MIT | HTML 解析（经 `Markdown.Avalonia.Html` 传递；nuspec 以 GitHub LICENSE URL 声明 MIT，SBOM override 已登记） |
+| `Svg.Custom` | 4.1.0 | MS-PL | SVG 渲染（经 `Markdown.Avalonia.Svg → Svg.Model/SceneGraph` 传递；Microsoft Public License，OSI 批准的宽松许可证） |
 | `Tmds.DBus.Protocol` | 0.95.2 | MIT | Linux portal/AT-SPI |
 | `CommunityToolkit.Mvvm` | 8.4.2 | MIT | MVVM |
 | `SkiaSharp` | 3.119.4 | MIT | PNG/PDF 光栅化 |
