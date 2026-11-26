@@ -54,7 +54,17 @@ public sealed partial class DesktopViewModelTests
         Assert.NotNull(permission);
         Assert.Equal("去授权", permission!.Label);
         Assert.Equal(CapabilityActionKind.OpenPermissionSettings, permission.Kind);
-        Assert.NotNull(CapabilityActionResolver.SettingsUri(permission.PermissionTarget));
+        // Linux has no cross-desktop deep link, so the button is intentionally hidden there.
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+        {
+            Assert.NotNull(CapabilityActionResolver.SettingsUri(permission.PermissionTarget));
+            Assert.True(CapabilityActionResolver.IsAvailable(permission));
+        }
+        else
+        {
+            Assert.Null(CapabilityActionResolver.SettingsUri(permission.PermissionTarget));
+            Assert.False(CapabilityActionResolver.IsAvailable(permission));
+        }
 
         var voice = CapabilityActionResolver.Resolve(
             CapabilityState.Degraded(CapabilityKind.WakeWord, "语音可选", "请安装模型。"));
@@ -141,8 +151,9 @@ public sealed partial class DesktopViewModelTests
         window.Show();
         await shell.InitializeAsync();
         shell.SelectedSectionIndex = 5;
+        // 前往语音 is available on every OS; 去授权 is hidden on Linux where no deep link exists.
         await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
-            .Any(button => button.Content?.ToString() == "去授权"));
+            .Any(button => button.IsVisible && button.Content?.ToString() == "前往语音"));
         await diagnostics.GeneratePreviewCommand.ExecuteAsync(null);
         Dispatcher.UIThread.RunJobs();
 
@@ -155,11 +166,16 @@ public sealed partial class DesktopViewModelTests
             - generate.TransformToVisual(window)!.Value.Transform(new Point(0, 0)).Y);
         Assert.InRange(gap, 0, 300);
 
-        foreach (var button in buttons.Where(button => button.Content?.ToString() is "去授权" or "前往语音"))
+        var actionButtons = buttons
+            .Where(button => button.IsVisible && button.Content?.ToString() is "去授权" or "前往语音")
+            .ToList();
+        Assert.NotEmpty(actionButtons);
+        foreach (var button in actionButtons)
         {
-            var presenter = button.GetVisualDescendants().OfType<ContentPresenter>().First();
+            var presenter = button.GetVisualDescendants().OfType<ContentPresenter>().FirstOrDefault();
+            Assert.NotNull(presenter);
             Assert.True(
-                button.Bounds.Width >= presenter.DesiredSize.Width - 1,
+                button.Bounds.Width >= presenter!.DesiredSize.Width - 1,
                 $"操作按钮文字被裁剪：{button.Content} / {button.Bounds.Width} vs {presenter.DesiredSize.Width}");
         }
 
