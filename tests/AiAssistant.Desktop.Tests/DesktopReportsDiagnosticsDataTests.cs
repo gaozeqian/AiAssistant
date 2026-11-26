@@ -11,8 +11,10 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 
@@ -180,6 +182,32 @@ public sealed partial class DesktopViewModelTests
         }
 
         Assert.Equal(DiagnosticsViewModel.RecentJobDisplayLimit, diagnostics.RecentJobs.Count);
+        window.Close();
+    });
+
+    [Fact]
+    public Task DiagnosticsHeader_RefreshButtonStaysClearOfVerticalScrollBar() => RunInHeadlessSession(async () =>
+    {
+        using var shell = CreateShell();
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 5;
+        await WaitUntilAsync(() => HasButton(window, "重新检查"));
+
+        var refresh = ButtonByText(window, "重新检查");
+        var scrollViewer = refresh.GetVisualAncestors().OfType<ScrollViewer>().First();
+        var scrollBar = scrollViewer.GetVisualDescendants().OfType<ScrollBar>()
+            .FirstOrDefault(bar => bar.Orientation == Orientation.Vertical
+                && bar.GetVisualAncestors().OfType<ScrollViewer>().FirstOrDefault() == scrollViewer);
+        Assert.NotNull(scrollBar);
+        Assert.True(scrollBar!.IsVisible && scrollBar.Bounds.Width > 0, "诊断页应出现垂直滚动条");
+
+        var buttonRight = refresh.TransformToVisual(window)!.Value.Transform(new Point(refresh.Bounds.Width, 0)).X;
+        var barLeft = scrollBar.TransformToVisual(window)!.Value.Transform(new Point(0, 0)).X;
+        Assert.True(
+            buttonRight <= barLeft - 1,
+            $"「重新检查」按钮右缘 {buttonRight:F1} 应位于滚动条左缘 {barLeft:F1} 左侧");
         window.Close();
     });
 

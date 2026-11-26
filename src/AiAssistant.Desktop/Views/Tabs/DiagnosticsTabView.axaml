@@ -6,7 +6,8 @@
              x:DataType="vm:ShellViewModel">
   <ScrollViewer DataContext="{Binding Diagnostics}" x:DataType="vm:DiagnosticsViewModel" Margin="0,12,0,0">
     <StackPanel Spacing="12">
-      <Grid ColumnDefinitions="*,Auto">
+      <!-- 右侧预留滚动条宽度（Fluent ScrollBarSize=16），避免「重新检查」按钮被覆盖层滚动条遮挡。 -->
+      <Grid ColumnDefinitions="*,Auto" Margin="0,0,18,0">
         <StackPanel>
           <TextBlock Text="系统健康与能力矩阵" FontSize="18" FontWeight="SemiBold" />
           <TextBlock Text="{Binding PlatformName}" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
@@ -17,24 +18,6 @@
       <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" />
       <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="14" IsVisible="{Binding HasError}">
         <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
-      </Border>
-      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
-        <StackPanel Spacing="8">
-          <TextBlock Text="诊断导出（脱敏）" FontWeight="SemiBold" />
-          <TextBlock Text="先生成预览，确认后再保存为 Markdown / SVG / PNG / PDF / JSON。导出内容只有平台、数据库健康、采集管道、能力状态、最近任务与脱敏日志等元数据，不含活动正文、密钥或完整文件路径。"
-                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-          <WrapPanel>
-            <Button Classes="secondary" Content="生成预览" Command="{Binding GeneratePreviewCommand}" Margin="0,0,8,0"
-                    automation:AutomationProperties.Name="生成脱敏导出预览" />
-            <Button Classes="secondary" Content="保存为…" Command="{Binding ExportPreviewCommand}"
-                    IsEnabled="{Binding CanExportPreview}" Margin="0,0,8,0"
-                    automation:AutomationProperties.Name="确认导出脱敏预览" />
-          </WrapPanel>
-          <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180"
-                   FontFamily="Consolas" FontSize="12" IsVisible="{Binding HasExportPreview}" />
-          <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{DynamicResource MutedBrush}"
-                     TextWrapping="Wrap" IsVisible="{Binding HasExportStatus}" />
-        </StackPanel>
       </Border>
       <Grid ColumnDefinitions="*,*,*">
         <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,6,0">
@@ -235,6 +218,24 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+        </StackPanel>
+      </Border>
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
+        <StackPanel Spacing="8">
+          <TextBlock Text="诊断导出（脱敏）" FontWeight="SemiBold" />
+          <TextBlock Text="先生成预览，确认后再保存为 Markdown / SVG / PNG / PDF / JSON。导出内容只有平台、数据库健康、采集管道、能力状态、最近任务与脱敏日志等元数据，不含活动正文、密钥或完整文件路径。"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+          <WrapPanel>
+            <Button Classes="secondary" Content="生成预览" Command="{Binding GeneratePreviewCommand}" Margin="0,0,8,0"
+                    automation:AutomationProperties.Name="生成脱敏导出预览" />
+            <Button Classes="secondary" Content="保存为…" Command="{Binding ExportPreviewCommand}"
+                    IsEnabled="{Binding CanExportPreview}" Margin="0,0,8,0"
+                    automation:AutomationProperties.Name="确认导出脱敏预览" />
+          </WrapPanel>
+          <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180"
+                   FontFamily="Consolas" FontSize="12" IsVisible="{Binding HasExportPreview}" />
+          <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{DynamicResource MutedBrush}"
+                     TextWrapping="Wrap" IsVisible="{Binding HasExportStatus}" />
         </StackPanel>
       </Border>
       <TextBlock Text="{Binding LastRefreshText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,12" />
