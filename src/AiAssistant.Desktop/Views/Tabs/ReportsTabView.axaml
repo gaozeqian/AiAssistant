@@ -8,7 +8,7 @@
   <Grid DataContext="{Binding Reports}" x:DataType="vm:ReportsViewModel"
         ColumnDefinitions="360,*" Margin="0,12,0,0">
     <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,12,0">
-      <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <TextBlock Text="日报与站会" FontSize="18" FontWeight="SemiBold" />
         <DatePicker Grid.Row="1" SelectedDate="{Binding SelectedDate}" Margin="0,14,0,10" Initialized="OnDatePickerInitialized" />
         <WrapPanel Grid.Row="2" Margin="0,0,0,12">
@@ -16,7 +16,38 @@
           <Button Classes="secondary" Content="强制重生成" Command="{Binding RegenerateCommand}" Margin="0,0,8,8" />
           <Button Classes="secondary" Content="刷新" Command="{Binding RefreshCommand}" Margin="0,0,8,8" />
         </WrapPanel>
-        <Grid Grid.Row="3">
+        <Border Grid.Row="3" Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12"
+                Margin="0,0,0,12" IsVisible="{Binding HasScheduleSettings}">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="2">
+                <TextBlock Text="自动日报" FontWeight="SemiBold" />
+                <TextBlock Text="检查前一天，有活动才生成" FontSize="11"
+                           Foreground="{DynamicResource MutedBrush}" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding ScheduleEnabled, Mode=TwoWay}"
+                            OnContent="开" OffContent="关" VerticalAlignment="Center"
+                            automation:AutomationProperties.Name="启用自动日报" />
+            </Grid>
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Text="每天" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <TimePicker Grid.Column="1" SelectedTime="{Binding ScheduleTime, Mode=TwoWay}"
+                          ClockIdentifier="24HourClock" MinuteIncrement="1" HorizontalAlignment="Stretch"
+                          automation:AutomationProperties.Name="自动日报检查时间" />
+            </Grid>
+            <TextBlock Text="启动时也会检查前一天。无日报且有活动记录时生成；已有日报但之后有新活动时自动追加新版本。"
+                       FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{Binding ScheduleStatusMessage}" FontSize="11"
+                         Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                         VerticalAlignment="Center" Margin="0,0,8,0" />
+              <Button Grid.Column="1" Classes="secondary" Content="保存"
+                      Command="{Binding SaveScheduleCommand}" IsEnabled="{Binding !IsScheduleSaving}"
+                      automation:AutomationProperties.Name="保存自动日报设置" />
+            </Grid>
+          </StackPanel>
+        </Border>
+        <Grid Grid.Row="4">
           <ListBox ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}"
                    Background="Transparent" BorderThickness="0">
             <ListBox.ItemTemplate>
@@ -27,7 +58,7 @@
           </ListBox>
           <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" VerticalAlignment="Top" IsVisible="{Binding IsBusy}" />
         </Grid>
-        <StackPanel Grid.Row="4" Spacing="5" Margin="0,12,0,0">
+        <StackPanel Grid.Row="5" Spacing="5" Margin="0,12,0,0">
           <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
         </StackPanel>

@@ -1,6 +1,6 @@
 # 环境变量
 
-> **状态**：living ｜ **最后更新**：2026-11-23 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：新增/删除环境变量或改默认值时
+> **状态**：living ｜ **最后更新**：2026-11-26 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：新增/删除环境变量或改默认值时
 
 本文件是全部环境变量的唯一权威。代码只能通过 `AiAssistant.Core.Configuration.EnvironmentNames` 常量引用，禁止字面量散落（审计 R9）。
 
@@ -48,8 +48,10 @@
 
 | 变量 | 作用 | 默认 |
 |---|---|---|
-| `AIASSISTANT_REPORT_TIME` | 每日日报时间 `HH:mm` | `18:30` |
-| `AIASSISTANT_REPORT_DISABLE_SCHEDULE` | `true` 关闭定时日报 | 定时开启 |
+| `AIASSISTANT_REPORT_TIME` | 每日自动检查时间 `HH:mm`（仅在没有 UI 保存的 `report-schedule.json` 时作为初始值） | `00:30` |
+| `AIASSISTANT_REPORT_DISABLE_SCHEDULE` | `true` 关闭自动检查（同上，仅作初始值） | 自动检查开启 |
+
+> 推荐在桌面端「日报与站会」页的「自动日报」卡片中设置；保存后会写入 `<数据目录>/report-schedule.json`，并优先于上述环境变量。
 
 ## 本地 MCP
 

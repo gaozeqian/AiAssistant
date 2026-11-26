@@ -77,6 +77,7 @@ Scheduler / Export / LocalApi  ← 适配器与能力实现
 
 - 统一时间模型：UTC 时刻 + 本地日期 + 时区（[ADR-0009](../adr/0009-utc-local-date-timezone-model.md)）；生产代码只通过 `IClock` 取时。
 - 日报任务持久化、幂等，启动时恢复中断任务；日报按版本追加而非覆盖（[ADR-0010](../adr/0010-idempotent-jobs-and-report-versioning.md)）。
+- 自动检查针对前一天：每天配置时间（默认 00:30）或启动时触发；无活动不生成，已有日报后又有活动则追加版本（[ADR-0011](../adr/0011-previous-day-report-schedule.md)）。
 - 采集暂停会清空待处理队列，恢复后不补采暂停区间；重复帧按 pHash + 窗口键在时间窗内合并。
 
 ## 7. 跨平台策略

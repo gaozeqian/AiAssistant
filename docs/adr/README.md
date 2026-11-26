@@ -1,6 +1,6 @@
 # 架构决策记录（ADR）
 
-> **状态**：living ｜ **最后更新**：2026-11-22 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：新增 ADR 时
+> **状态**：living ｜ **最后更新**：2026-11-26 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：新增 ADR 时
 
 采用 [ADR](https://adr.github.io/) 记录重要架构决策。新决策请用 `NNNN-kebab-case.md`（四位数递增），并在此登记。
 
@@ -16,5 +16,6 @@
 | [0008](0008-meai-gateway-and-tier-decorators.md) | M.E.AI 统一网关与三档策略装饰器 |
 | [0009](0009-utc-local-date-timezone-model.md) | UTC 时刻 + 本地日期 + 时区的混合时间模型 |
 | [0010](0010-idempotent-jobs-and-report-versioning.md) | 任务持久幂等、启动补偿与版本化日报 |
+| [0011](0011-previous-day-report-schedule.md) | 前一天日报的自动检查与版本追加 |
 
 旧决策**不修改**，用新 ADR 取代；被取代的决策在正文标注状态。

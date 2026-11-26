@@ -264,20 +264,11 @@ internal static class DomainRegistrations
             configuration.Policy.DefaultTier,
             clock));
 
-        var scheduleTime = TimeOnly.TryParse(
-            Environment.GetEnvironmentVariable(EnvironmentNames.ReportTime),
-            out var parsedTime)
-            ? parsedTime
-            : new TimeOnly(18, 30);
-        services.AddSingleton(new ReportScheduleOptions
-        {
-            DailyLocalTime = scheduleTime,
-            EnableScheduledDaily = !string.Equals(
-                Environment.GetEnvironmentVariable(EnvironmentNames.ReportDisableSchedule),
-                "true",
-                StringComparison.OrdinalIgnoreCase),
-            EnableStartupCatchUp = true
-        });
+        // UI-saved schedule wins; environment variables only seed the first launch.
+        var scheduleSettingsStore = new ReportScheduleSettingsStore(dataDirectory);
+        services.AddSingleton<IReportScheduleSettingsStore>(scheduleSettingsStore);
+        services.AddSingleton(new ReportScheduleSettingsUseCase(scheduleSettingsStore));
+        services.AddSingleton(new ReportScheduleOptions { EnableStartupCatchUp = true });
         services.AddSingleton<ReportJobWorker>();
     }
 

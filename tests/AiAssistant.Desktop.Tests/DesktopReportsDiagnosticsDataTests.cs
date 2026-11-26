@@ -245,6 +245,55 @@ public sealed partial class DesktopViewModelTests
 
 
     [Fact]
+    public Task ReportsPanel_LoadsAndSavesAutomaticSchedule() => RunInHeadlessSession(async () =>
+    {
+        var store = new RecordingScheduleSettingsStore(
+            new ReportScheduleSettings(new TimeOnly(0, 30), Enabled: true));
+        var viewModel = new ReportsViewModel(
+            new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), new SystemClock()),
+            TempArtifactDirectory.CreatePath("reports-schedule"),
+            scheduleSettings: new ReportScheduleSettingsUseCase(store));
+
+        await viewModel.InitializeAsync();
+        Assert.True(viewModel.HasScheduleSettings);
+        Assert.Equal(TimeSpan.FromMinutes(30), viewModel.ScheduleTime);
+        Assert.True(viewModel.ScheduleEnabled);
+
+        viewModel.ScheduleTime = new TimeSpan(2, 15, 0);
+        viewModel.ScheduleEnabled = false;
+        await viewModel.SaveScheduleCommand.ExecuteAsync(null);
+
+        Assert.Equal(new TimeOnly(2, 15), store.Settings.DailyLocalTime);
+        Assert.False(store.Settings.Enabled);
+        Assert.Contains("已关闭", viewModel.ScheduleStatusMessage, StringComparison.Ordinal);
+    });
+
+    [Fact]
+    public Task ReportsPanel_ExposesScheduleTimePickerAndToggle() => RunInHeadlessSession(async () =>
+    {
+        var store = new RecordingScheduleSettingsStore(
+            new ReportScheduleSettings(new TimeOnly(0, 30), Enabled: true));
+        using var voice = new VoiceControlViewModel(new FakeVoiceSession());
+        using var shell = CreateShellWithVoice(
+            voice,
+            new ReportScheduleSettingsUseCase(store));
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 6;
+
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<TimePicker>().Any());
+        var picker = window.GetVisualDescendants().OfType<TimePicker>().Single();
+        Assert.Equal(TimeSpan.FromMinutes(30), picker.SelectedTime);
+
+        var toggle = window.GetVisualDescendants().OfType<ToggleSwitch>()
+            .SingleOrDefault(item => AutomationProperties.GetName(item) == "启用自动日报");
+        Assert.NotNull(toggle);
+        Assert.True(toggle!.IsChecked);
+        window.Close();
+    });
+
+    [Fact]
     public Task DataManagement_RequiresTwoStepsBeforeDeleting() => RunInHeadlessSession(async () =>
     {
         var deletion = new FakeDataDeletionService();
@@ -386,7 +435,22 @@ public sealed partial class DesktopViewModelTests
         }
     }
 
-    private static ShellViewModel CreateShellWithVoice(VoiceControlViewModel voice)
+    private sealed class RecordingScheduleSettingsStore(ReportScheduleSettings initial) : IReportScheduleSettingsStore
+    {
+        public ReportScheduleSettings Settings { get; private set; } = initial;
+
+        public ReportScheduleSettings Load() => Settings;
+
+        public Task SaveAsync(ReportScheduleSettings settings, CancellationToken ct)
+        {
+            Settings = settings;
+            return Task.CompletedTask;
+        }
+    }
+
+    private static ShellViewModel CreateShellWithVoice(
+        VoiceControlViewModel voice,
+        ReportScheduleSettingsUseCase? scheduleSettings = null)
     {
         var repository = new InMemoryEventRepository();
         var clock = new SystemClock();
@@ -402,7 +466,8 @@ public sealed partial class DesktopViewModelTests
             new DiagnosticsViewModel(diagnostics),
             new ReportsViewModel(
                 new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
-                TempArtifactDirectory.CreatePath("reports-ui")),
+                TempArtifactDirectory.CreatePath("reports-ui"),
+                scheduleSettings: scheduleSettings),
             voice: voice,
             voiceNavigation: null,
             search: null,

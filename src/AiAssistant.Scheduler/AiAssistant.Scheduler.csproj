@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>Three-channel report trigger, persistent job queue worker, and startup catch-up.</Description>
+    <Description>Previous-day report schedule, persistent job queue worker, and startup catch-up.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AiAssistant.Application\AiAssistant.Application.csproj" />

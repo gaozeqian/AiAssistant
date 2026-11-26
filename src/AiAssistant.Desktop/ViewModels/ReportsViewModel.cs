@@ -13,6 +13,7 @@ namespace AiAssistant.Desktop.ViewModels;
 public sealed class ReportsViewModel : ObservableObject, IDisposable
 {
     private readonly ReportUseCase _reports;
+    private readonly ReportScheduleSettingsUseCase? _scheduleSettings;
     private readonly string _exportDirectory;
     private readonly IClock _clock;
     private DateTimeOffset? _selectedDate;
@@ -21,21 +22,31 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     private string _standupText = "尚无站会数据";
     private string _statusMessage = "选择日期后可生成或查看日报";
     private string _errorMessage = string.Empty;
+    private TimeSpan? _scheduleTime;
+    private bool _scheduleEnabled = true;
+    private string _scheduleStatusMessage = string.Empty;
+    private bool _isScheduleSaving;
     private bool _isBusy;
     private double _progressPulseValue;
     private readonly ProgressPulseController _progressPulse;
 
-    public ReportsViewModel(ReportUseCase reports, string exportDirectory, IClock? clock = null)
+    public ReportsViewModel(
+        ReportUseCase reports,
+        string exportDirectory,
+        IClock? clock = null,
+        ReportScheduleSettingsUseCase? scheduleSettings = null)
     {
         _reports = reports ?? throw new ArgumentNullException(nameof(reports));
         _exportDirectory = exportDirectory ?? throw new ArgumentNullException(nameof(exportDirectory));
         _clock = clock ?? new SystemClock();
+        _scheduleSettings = scheduleSettings;
         _progressPulse = new ProgressPulseController(value => ProgressPulse = value);
         _selectedDate = _clock.LocalNow.Date;
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GenerateCommand = new AsyncRelayCommand(() => GenerateAsync(forceOverwrite: false));
         RegenerateCommand = new AsyncRelayCommand(() => GenerateAsync(forceOverwrite: true));
         ExportCommand = new AsyncRelayCommand(ExportAsync);
+        SaveScheduleCommand = new AsyncRelayCommand(SaveScheduleAsync);
     }
 
     public ObservableCollection<ReportVersionItem> Versions { get; } = [];
@@ -44,6 +55,34 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     public IAsyncRelayCommand GenerateCommand { get; }
     public IAsyncRelayCommand RegenerateCommand { get; }
     public IAsyncRelayCommand ExportCommand { get; }
+    public IAsyncRelayCommand SaveScheduleCommand { get; }
+
+    public bool HasScheduleSettings => _scheduleSettings is not null;
+
+    /// <summary>Local wall-clock time for the automatic previous-day check.</summary>
+    public TimeSpan? ScheduleTime
+    {
+        get => _scheduleTime;
+        set => SetProperty(ref _scheduleTime, value);
+    }
+
+    public bool ScheduleEnabled
+    {
+        get => _scheduleEnabled;
+        set => SetProperty(ref _scheduleEnabled, value);
+    }
+
+    public bool IsScheduleSaving
+    {
+        get => _isScheduleSaving;
+        private set => SetProperty(ref _isScheduleSaving, value);
+    }
+
+    public string ScheduleStatusMessage
+    {
+        get => _scheduleStatusMessage;
+        private set => SetProperty(ref _scheduleStatusMessage, value);
+    }
 
     public DateTimeOffset? SelectedDate
     {
@@ -132,7 +171,68 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         ? string.Empty
         : $"v{SelectedVersion.Report.Version} · {SelectedVersion.Report.ModelId} · {SelectedVersion.Report.GeneratedAtUtc.ToLocalTime():MM-dd HH:mm}";
 
-    public async Task InitializeAsync() => await RefreshAsync();
+    public async Task InitializeAsync()
+    {
+        LoadScheduleSettings();
+        await RefreshAsync();
+    }
+
+    private void LoadScheduleSettings()
+    {
+        if (_scheduleSettings is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = _scheduleSettings.Get();
+            ScheduleTime = settings.DailyLocalTime.ToTimeSpan();
+            ScheduleEnabled = settings.Enabled;
+            ScheduleStatusMessage = settings.Enabled
+                ? "已启用：" + DescribeSchedule(settings)
+                : DescribeSchedule(settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            ScheduleStatusMessage = "读取自动日报设置失败。";
+        }
+    }
+
+    private async Task SaveScheduleAsync()
+    {
+        if (_scheduleSettings is null || IsScheduleSaving)
+        {
+            return;
+        }
+
+        if (ScheduleTime is null)
+        {
+            ScheduleStatusMessage = "请选择自动检查时间。";
+            return;
+        }
+
+        IsScheduleSaving = true;
+        try
+        {
+            var time = TimeOnly.FromTimeSpan(ScheduleTime.Value);
+            await _scheduleSettings.SaveAsync(time, ScheduleEnabled);
+            ScheduleStatusMessage = "已保存。" + DescribeSchedule(new ReportScheduleSettings(time, ScheduleEnabled));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException)
+        {
+            ScheduleStatusMessage = "保存自动日报设置失败，请检查数据目录权限。";
+        }
+        finally
+        {
+            IsScheduleSaving = false;
+        }
+    }
+
+    private static string DescribeSchedule(ReportScheduleSettings settings) =>
+        settings.Enabled
+            ? $"每天 {settings.DailyLocalTime.ToString("HH:mm", CultureInfo.InvariantCulture)} 检查前一天日报"
+            : "自动检查已关闭；仍可手动生成日报";
 
     private async Task RefreshAsync()
     {

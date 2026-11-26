@@ -398,7 +398,8 @@ public sealed class AppRuntime : IAsyncDisposable
             new ReportsViewModel(
                 _services.GetRequiredService<ReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports"),
-                Services.Clock),
+                Services.Clock,
+                _services.GetRequiredService<ReportScheduleSettingsUseCase>()),
             new VoiceControlViewModel(_services.GetRequiredService<IVoiceSession>()),
             _services.GetRequiredService<VoiceNavigationHub>(),
             new SearchViewModel(

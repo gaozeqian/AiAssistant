@@ -243,36 +243,203 @@ public sealed class ReportGenerationTests
 [Trait("Category", "Unit")]
 public sealed class ReportWorkerTests
 {
+    private static readonly DateOnly TargetDate = new(2026, 11, 19);
+    private static readonly DateTimeOffset LocalMorning = new(2026, 11, 20, 9, 0, 0, TimeSpan.Zero);
+
     [Fact]
-    public async Task Worker_StartupCatchUp_AndQueuedJob_AreProcessedBySingleConsumer()
+    public async Task Worker_Startup_GeneratesPreviousDayReport_WhenActivityExists()
     {
         var queue = new FakeReportQueue();
         var runner = new FakeRunner();
         var reports = new InMemoryReportRepository();
-        // Fixed at 09:00 local so the "today after 18:30" branch never fires; the test asserts only the catch-up job.
-        var clock = new FixedClock(new DateTimeOffset(2026, 11, 20, 9, 0, 0, TimeSpan.Zero));
-        var worker = new ReportJobWorker(
+        var events = new FakeEventRepository(
+            [Event("e1", new DateTimeOffset(2026, 11, 19, 10, 0, 0, TimeSpan.Zero))]);
+        var worker = CreateWorker(queue, runner, reports, events, new FixedClock(LocalMorning));
+
+        await worker.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => queue.Jobs.Count > 0 && runner.Calls > 0 &&
+            queue.Jobs.All(job => job.Status is ReportJobStatus.Completed or ReportJobStatus.SkippedAlreadyExists));
+        await worker.DisposeAsync();
+
+        var job = Assert.Single(queue.Jobs);
+        Assert.Equal(TargetDate, job.TargetDate);
+        Assert.Equal(ReportTriggerSource.StartupCatchUp, job.TriggerSource);
+        Assert.False(job.ForceOverwrite);
+        Assert.Equal(1, runner.Calls);
+    }
+
+    [Fact]
+    public async Task Worker_Startup_ChecksPreviousDayBeforeConfiguredTime()
+    {
+        var queue = new FakeReportQueue();
+        var runner = new FakeRunner();
+        var events = new FakeEventRepository(
+            [Event("e1", new DateTimeOffset(2026, 11, 19, 10, 0, 0, TimeSpan.Zero))]);
+        // 00:10 is before the 00:30 scheduled time, so only the startup check can enqueue.
+        var clock = new FixedClock(new DateTimeOffset(2026, 11, 20, 0, 10, 0, TimeSpan.Zero));
+        var worker = CreateWorker(queue, runner, new InMemoryReportRepository(), events, clock);
+
+        await worker.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => queue.Jobs.Count > 0 && runner.Calls > 0);
+        await worker.DisposeAsync();
+
+        var job = Assert.Single(queue.Jobs);
+        Assert.Equal(TargetDate, job.TargetDate);
+        Assert.Equal(ReportTriggerSource.StartupCatchUp, job.TriggerSource);
+    }
+
+    [Fact]
+    public async Task Worker_Startup_SkipsReport_WhenDateHasNoActivity()
+    {
+        var queue = new FakeReportQueue();
+        var runner = new FakeRunner();
+        var worker = CreateWorker(
             queue,
             runner,
-            reports,
+            new InMemoryReportRepository(),
+            new FakeEventRepository([]),
+            new FixedClock(LocalMorning));
+
+        await worker.StartAsync(CancellationToken.None);
+        await Task.Delay(200);
+        await worker.DisposeAsync();
+
+        Assert.Empty(queue.Jobs);
+        Assert.Equal(0, runner.Calls);
+    }
+
+    [Fact]
+    public async Task Worker_Startup_Regenerates_WhenActivityArrivedAfterLatestReport()
+    {
+        var reportTime = new DateTimeOffset(2026, 11, 19, 18, 0, 0, TimeSpan.Zero);
+        var queue = new FakeReportQueue();
+        var runner = new FakeRunner();
+        var reports = new InMemoryReportRepository([Report(TargetDate, reportTime)]);
+        var events = new FakeEventRepository(
+        [
+            Event("e1", reportTime.AddHours(-2)),
+            Event("e2", reportTime.AddHours(2))
+        ]);
+        var worker = CreateWorker(queue, runner, reports, events, new FixedClock(LocalMorning));
+
+        await worker.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => queue.Jobs.Count > 0 && runner.Calls > 0 &&
+            queue.Jobs.All(job => job.Status is ReportJobStatus.Completed or ReportJobStatus.SkippedAlreadyExists));
+        await worker.DisposeAsync();
+
+        var job = Assert.Single(queue.Jobs);
+        Assert.True(job.ForceOverwrite);
+        Assert.Equal(ReportTriggerSource.StartupCatchUp, job.TriggerSource);
+    }
+
+    [Fact]
+    public async Task Worker_Startup_SkipsRegeneration_WhenNoActivityAfterLatestReport()
+    {
+        var reportTime = new DateTimeOffset(2026, 11, 19, 21, 0, 0, TimeSpan.Zero);
+        var queue = new FakeReportQueue();
+        var runner = new FakeRunner();
+        var reports = new InMemoryReportRepository([Report(TargetDate, reportTime)]);
+        var events = new FakeEventRepository([Event("e1", reportTime.AddHours(-1))]);
+        var worker = CreateWorker(queue, runner, reports, events, new FixedClock(LocalMorning));
+
+        await worker.StartAsync(CancellationToken.None);
+        await Task.Delay(200);
+        await worker.DisposeAsync();
+
+        Assert.Empty(queue.Jobs);
+        Assert.Equal(0, runner.Calls);
+    }
+
+    [Fact]
+    public async Task Worker_ScheduledCheck_TargetsPreviousDayAtConfiguredTime()
+    {
+        var queue = new FakeReportQueue();
+        var runner = new FakeRunner();
+        var events = new FakeEventRepository(
+            [Event("e1", new DateTimeOffset(2026, 11, 19, 10, 0, 0, TimeSpan.Zero))]);
+        var clock = new FixedClock(new DateTimeOffset(2026, 11, 20, 0, 30, 0, TimeSpan.Zero));
+        var worker = CreateWorker(
+            queue,
+            runner,
+            new InMemoryReportRepository(),
+            events,
             clock,
             new ReportScheduleOptions
             {
-                EnableScheduledDaily = false,
-                EnableStartupCatchUp = true,
+                EnableStartupCatchUp = false,
                 PollInterval = TimeSpan.FromMilliseconds(10)
-            },
-            NullLogger<ReportJobWorker>.Instance);
+            });
 
         await worker.StartAsync(CancellationToken.None);
-        await WaitUntilAsync(() => queue.Jobs.Count > 0);
-        await WaitUntilAsync(() => runner.Calls > 0 && queue.Jobs.All(job => job.Status is ReportJobStatus.Completed or ReportJobStatus.SkippedAlreadyExists));
+        await WaitUntilAsync(() => queue.Jobs.Count > 0 && runner.Calls > 0);
         await worker.DisposeAsync();
 
-        Assert.Equal(1, runner.Calls);
-        Assert.Equal(new DateOnly(2026, 11, 19), queue.Jobs[0].TargetDate);
-        Assert.Equal(ReportTriggerSource.StartupCatchUp, queue.Jobs[0].TriggerSource);
+        var job = Assert.Single(queue.Jobs);
+        Assert.Equal(TargetDate, job.TargetDate);
+        Assert.Equal(ReportTriggerSource.ScheduledDaily, job.TriggerSource);
     }
+
+    [Fact]
+    public async Task Worker_AutomaticChecks_SkipWhenDisabled()
+    {
+        var queue = new FakeReportQueue();
+        var runner = new FakeRunner();
+        var events = new FakeEventRepository(
+            [Event("e1", new DateTimeOffset(2026, 11, 19, 10, 0, 0, TimeSpan.Zero))]);
+        var worker = CreateWorker(
+            queue,
+            runner,
+            new InMemoryReportRepository(),
+            events,
+            new FixedClock(LocalMorning),
+            settings: new ReportScheduleSettings(new TimeOnly(0, 30), Enabled: false));
+
+        await worker.StartAsync(CancellationToken.None);
+        await Task.Delay(200);
+        await worker.DisposeAsync();
+
+        Assert.Empty(queue.Jobs);
+        Assert.Equal(0, runner.Calls);
+    }
+
+    private static ReportJobWorker CreateWorker(
+        FakeReportQueue queue,
+        FakeRunner runner,
+        InMemoryReportRepository reports,
+        FakeEventRepository events,
+        FixedClock clock,
+        ReportScheduleOptions? options = null,
+        ReportScheduleSettings? settings = null) =>
+        new(
+            queue,
+            runner,
+            reports,
+            events,
+            clock,
+            new FakeScheduleSettings(settings ?? ReportScheduleSettings.Default),
+            options ?? new ReportScheduleOptions { PollInterval = TimeSpan.FromMilliseconds(10) },
+            NullLogger<ReportJobWorker>.Instance);
+
+    private static ActivityEvent Event(string id, DateTimeOffset occurredAtUtc) =>
+        new(
+            id,
+            OccurredTimestamp.FromInstant(occurredAtUtc, TimeZoneInfo.Utc),
+            SourceKind.WindowActivity,
+            "Rider",
+            "Main.cs");
+
+    private static DailyReport Report(DateOnly date, DateTimeOffset generatedAtUtc) =>
+        new(
+            $"rpt_{date:yyyyMMdd}",
+            date,
+            1,
+            "# report",
+            "{}",
+            "fake",
+            ModelEndpointTier.LocalOffline,
+            false,
+            ReportTriggerSource.Manual,
+            generatedAtUtc);
 
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 4000)
     {
@@ -301,8 +468,10 @@ public sealed class ReportWorkerTests
         {
             lock (_sync)
             {
-                var existing = Jobs.FirstOrDefault(job => job.TargetDate == request.TargetDate &&
-                                                          job.Status == ReportJobStatus.Pending);
+                var existing = !request.ForceOverwrite
+                    ? Jobs.FirstOrDefault(job => job.TargetDate == request.TargetDate &&
+                                                 job.Status is ReportJobStatus.Pending or ReportJobStatus.Running)
+                    : null;
                 if (existing is not null)
                 {
                     return Task.FromResult(new EnqueueResult(existing.Id, true));
@@ -336,6 +505,54 @@ public sealed class ReportWorkerTests
             Task.FromResult<IReadOnlyList<ReportJob>>(Jobs.TakeLast(limit).ToArray());
     }
 
+    private sealed class FakeScheduleSettings(ReportScheduleSettings settings) : IReportScheduleSettingsStore
+    {
+        public ReportScheduleSettings Settings { get; private set; } = settings;
+
+        public ReportScheduleSettings Load() => Settings;
+
+        public Task SaveAsync(ReportScheduleSettings settings, CancellationToken ct)
+        {
+            Settings = settings;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeEventRepository(IReadOnlyList<ActivityEvent> events) : IEventRepository
+    {
+        public Task AppendBatchAsync(IReadOnlyList<ActivityEvent> items, CancellationToken ct) => Task.CompletedTask;
+
+        public Task AppendWithMediaBatchAsync(IReadOnlyList<EventWithMediaWrite> items, CancellationToken ct) =>
+            Task.CompletedTask;
+
+        public async IAsyncEnumerable<ActivityEvent> QueryAsync(
+            EventQuery query,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        {
+            await Task.Yield();
+            var matches = events.Where(item => query.LocalDate is null || item.Timestamp.LocalDate == query.LocalDate);
+            if (query.FromUtc is { } fromUtc)
+            {
+                matches = matches.Where(item => item.Timestamp.OccurredAtUtc >= fromUtc);
+            }
+
+            foreach (var item in matches.Take(query.Limit))
+            {
+                yield return item;
+            }
+        }
+
+        public Task<ActivityEvent?> GetByIdAsync(string eventId, CancellationToken ct) =>
+            Task.FromResult(events.FirstOrDefault(item => item.Id == eventId));
+
+        public Task<IReadOnlyList<DateOnly>> ListActiveDatesAsync(CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<DateOnly>>(events.Select(item => item.Timestamp.LocalDate).Distinct().ToArray());
+
+        public Task<bool> DeleteEventAsync(string eventId, CancellationToken ct) => Task.FromResult(false);
+
+        public Task<int> PurgeDateAsync(DateOnly localDate, CancellationToken ct) => Task.FromResult(0);
+    }
+
     private sealed class FakeRunner : IReportGenerationRunner
     {
         private int _calls;
@@ -359,11 +576,20 @@ public sealed class ReportWorkerTests
         }
     }
 
-    private sealed class InMemoryReportRepository : IReportRepository
+    private sealed class InMemoryReportRepository(IEnumerable<DailyReport>? initial = null) : IReportRepository
     {
-        public Task<DailyReport?> GetLatestAsync(DateOnly localDate, CancellationToken ct) => Task.FromResult<DailyReport?>(null);
+        private readonly List<DailyReport> _reports = initial?.ToList() ?? [];
+
+        public Task<DailyReport?> GetLatestAsync(DateOnly localDate, CancellationToken ct) =>
+            Task.FromResult(_reports.Where(report => report.LocalDate == localDate)
+                .OrderByDescending(report => report.Version)
+                .FirstOrDefault());
+
         public Task<IReadOnlyList<DailyReport>> ListVersionsAsync(DateOnly localDate, CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<DailyReport>>([]);
+            Task.FromResult<IReadOnlyList<DailyReport>>(_reports.Where(report => report.LocalDate == localDate)
+                .OrderByDescending(report => report.Version)
+                .ToArray());
+
         public Task<DailyReport> AppendAsync(
             DateOnly localDate,
             string markdown,
@@ -373,6 +599,25 @@ public sealed class ReportWorkerTests
             bool redactionApplied,
             ReportTriggerSource triggerSource,
             DateTimeOffset generatedAtUtc,
-            CancellationToken ct) => throw new NotSupportedException();
+            CancellationToken ct)
+        {
+            var version = _reports.Where(report => report.LocalDate == localDate)
+                .Select(report => report.Version)
+                .DefaultIfEmpty(0)
+                .Max() + 1;
+            var report = new DailyReport(
+                $"rpt_{version}",
+                localDate,
+                version,
+                markdown,
+                statsJson,
+                modelId,
+                endpointTier,
+                redactionApplied,
+                triggerSource,
+                generatedAtUtc);
+            _reports.Add(report);
+            return Task.FromResult(report);
+        }
     }
 }

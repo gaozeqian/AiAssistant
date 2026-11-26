@@ -1,6 +1,6 @@
 # 配置
 
-> **状态**：living ｜ **最后更新**：2026-11-23 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：数据目录、配置键、默认模型、保留策略或端点策略变化时
+> **状态**：living ｜ **最后更新**：2026-11-26 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：数据目录、配置键、默认模型、保留策略或端点策略变化时
 
 本文件是数据目录、`models.json` 与默认值的唯一权威；环境变量见 [environment-variables.md](environment-variables.md)，命令行见 [cli.md](cli.md)。
 
@@ -12,7 +12,7 @@
 | macOS | `~/Library/Application Support/AiAssistant` |
 | Linux | `~/.local/share/AiAssistant` |
 
-覆盖：`AIASSISTANT_DATA_DIRECTORY`。目录内存放加密数据库、系统密钥库引用、媒体库、向量索引、语音日志与 `models.json`。
+覆盖：`AIASSISTANT_DATA_DIRECTORY`。目录内存放加密数据库、系统密钥库引用、媒体库、向量索引、语音日志、`models.json` 与 `report-schedule.json`（日报定时设置）。
 
 ## 2. 加密与保留
 
@@ -21,9 +21,22 @@
 | 数据库 | SQLite3MC 加密；master key 由系统密钥库保护 |
 | 媒体 | AES-GCM；默认保留 30 天，每小时扫描一次过期媒体 |
 | 命令音频 | 默认不落盘；开启后默认保留 7 天（1–365） |
-| 日报 | 每日 18:30 生成；版本追加，不覆盖历史 |
+| 日报 | 每日 00:30（可在「日报与站会」页修改）或应用启动时检查前一天：无日报且有活动记录时生成；已有日报但生成后又有活动记录时自动追加新版本 |
 
 数据删除、备份与恢复见 [运维指南](../guides/operations.md)。
+
+### 日报定时设置
+
+桌面端「日报与站会」页的「自动日报」卡片保存到 `<数据目录>/report-schedule.json`：
+
+```json
+{
+  "time": "00:30",
+  "enabled": true
+}
+```
+
+`time` 为本地时间 `HH:mm`，检查目标固定为前一天。删除该文件后会回退到 `AIASSISTANT_REPORT_TIME` / `AIASSISTANT_REPORT_DISABLE_SCHEDULE` 的初始值。
 
 ## 3. `models.json`
 
