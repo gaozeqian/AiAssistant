@@ -54,8 +54,13 @@ public sealed partial class DesktopViewModelTests
 
         await viewModel.ToggleCommand.ExecuteAsync(null);
         Assert.True(viewModel.IsEnabled);
-        Assert.Equal("正在聆听", viewModel.StatusText);
+        Assert.Equal(VoiceSessionState.Sleeping, session.State);
+        Assert.Equal("已启用 · 待唤醒", viewModel.StatusText);
         Assert.Contains("fake KWS", viewModel.CapabilityText, StringComparison.Ordinal);
+
+        // The real controller only enters Listening after the wake word is detected.
+        session.SimulateWake();
+        Assert.Equal("正在聆听", viewModel.StatusText);
 
         await viewModel.ToggleCommand.ExecuteAsync(null);
         Assert.False(viewModel.IsEnabled);
@@ -125,7 +130,7 @@ public sealed partial class DesktopViewModelTests
 
         toggle.Command!.Execute(toggle.CommandParameter);
         await WaitUntilAsync(() => voice.IsEnabled);
-        Assert.Equal("正在聆听", voice.StatusText);
+        Assert.Equal("已启用 · 待唤醒", voice.StatusText);
         Assert.True(toggle.IsChecked);
 
         toggle.Command.Execute(toggle.CommandParameter);

@@ -11,6 +11,7 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     private readonly IVoiceSession _session;
     private bool _isEnabled;
     private bool _isBusy;
+    private VoiceSessionState _lastState = VoiceSessionState.Sleeping;
     private string _statusText = "语音休眠";
     private string _capabilityText = "尚未检查语音能力";
     private string _lastTranscript = "尚无语音命令";
@@ -59,7 +60,15 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     public bool IsEnabled
     {
         get => _isEnabled;
-        private set => SetProperty(ref _isEnabled, value);
+        private set
+        {
+            if (SetProperty(ref _isEnabled, value))
+            {
+                // Enabling does not change the session state (it stays Sleeping until the wake word),
+                // so the label must be refreshed here to distinguish "off" from "armed".
+                UpdateStatus(_lastState);
+            }
+        }
     }
 
     public bool IsBusy
@@ -249,9 +258,10 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
 
     private void UpdateStatus(VoiceSessionState state)
     {
+        _lastState = state;
         StatusText = state switch
         {
-            VoiceSessionState.Sleeping => "语音休眠",
+            VoiceSessionState.Sleeping => IsEnabled ? "已启用 · 待唤醒" : "语音休眠",
             VoiceSessionState.Listening => "正在聆听",
             VoiceSessionState.Processing => "正在处理",
             VoiceSessionState.Responding => "正在反馈",

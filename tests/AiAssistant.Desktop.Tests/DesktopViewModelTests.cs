@@ -315,16 +315,26 @@ public sealed partial class DesktopViewModelTests
 
         public Task StartAsync(CancellationToken ct)
         {
+            // Mirrors the real controller: enabling only arms wake-word detection and the session
+            // stays Sleeping (no StateChanged) until the wake word is detected.
+            Interaction?.Invoke(this, new VoiceInteraction(State, "你好时光", string.Empty, "语音已启用，说“你好时光”唤醒。", DateTimeOffset.UtcNow));
+            return Task.CompletedTask;
+        }
+
+        public void SimulateWake()
+        {
             State = VoiceSessionState.Listening;
             StateChanged?.Invoke(this, State);
-            Interaction?.Invoke(this, new VoiceInteraction(State, "你好时光", string.Empty, "我在听", DateTimeOffset.UtcNow));
-            return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken ct)
         {
-            State = VoiceSessionState.Sleeping;
-            StateChanged?.Invoke(this, State);
+            if (State != VoiceSessionState.Sleeping)
+            {
+                State = VoiceSessionState.Sleeping;
+                StateChanged?.Invoke(this, State);
+            }
+
             return Task.CompletedTask;
         }
 
