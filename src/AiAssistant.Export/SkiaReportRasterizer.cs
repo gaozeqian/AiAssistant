@@ -115,7 +115,15 @@ public sealed class SkiaReportRasterizer : IReportRasterizer
 
         if (report.DailyStats.Count == 0 || report.TotalEvents == 0)
         {
-            DrawText(canvas, "该区间没有可用的本地活动记录", Width / 2f, 220, SKTextAlign.Center, subtitleFont, mutedPaint, vectorText);
+            DrawText(
+                canvas,
+                IsSingleDay(report) ? "该日期没有可用的本地活动记录" : "该区间没有可用的本地活动记录",
+                Width / 2f,
+                220,
+                SKTextAlign.Center,
+                subtitleFont,
+                mutedPaint,
+                vectorText);
         }
         else
         {
@@ -207,7 +215,7 @@ public sealed class SkiaReportRasterizer : IReportRasterizer
     /// PDF output draws glyph outlines instead of text runs, avoiding multi-megabyte CJK font embedding.
     /// PNG keeps normal text rendering for better hinting.
     /// </summary>
-    private static void DrawText(
+    internal static void DrawText(
         SKCanvas canvas,
         string text,
         float x,
@@ -258,10 +266,16 @@ public sealed class SkiaReportRasterizer : IReportRasterizer
         canvas.DrawPath(path, paint);
     }
 
+    private static bool IsSingleDay(RangeReport report) => report.FromDate == report.ToDate;
+
     private static string Title(RangeReport report) =>
-        string.Create(
-            System.Globalization.CultureInfo.InvariantCulture,
-            $"{report.FromDate:yyyy年MM月dd日} – {report.ToDate:yyyy年MM月dd日} 活动报告");
+        IsSingleDay(report)
+            ? string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{report.FromDate:yyyy年MM月dd日} 活动日报")
+            : string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{report.FromDate:yyyy年MM月dd日} – {report.ToDate:yyyy年MM月dd日} 活动报告");
 
     private static string Subtitle(RangeReport report) =>
         string.Create(

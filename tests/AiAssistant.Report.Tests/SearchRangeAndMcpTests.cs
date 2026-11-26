@@ -8,6 +8,7 @@ using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
+using AiAssistant.Export;
 using AiAssistant.LocalApi;
 using AiAssistant.Processing;
 using AiAssistant.Summarization;
@@ -285,7 +286,7 @@ public sealed class RangeReportTests
         Assert.NotNull(export.PdfPath);
         Assert.True(File.Exists(export.PngPath));
         Assert.True(File.Exists(export.PdfPath));
-        Assert.EndsWith(".stats.json", export.StatsPath, StringComparison.Ordinal);
+        Assert.EndsWith(".json", export.StatsPath, StringComparison.Ordinal);
         Assert.EndsWith(".svg", export.SvgPath, StringComparison.Ordinal);
         Assert.Contains("20261116-20261122", export.MarkdownPath, StringComparison.Ordinal);
         Assert.Contains("每日统计", await File.ReadAllTextAsync(export.MarkdownPath), StringComparison.Ordinal);
@@ -293,6 +294,130 @@ public sealed class RangeReportTests
         Assert.Contains("<svg", svg, StringComparison.Ordinal);
         Assert.Contains("<rect", svg, StringComparison.Ordinal);
         Assert.Contains("2026年11月16日", svg, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DailyReportExport_WritesAllFiveFormats()
+    {
+        var date = new DateOnly(2026, 11, 26);
+        var report = new DailyReport(
+            "rpt_daily",
+            date,
+            1,
+            """
+            # 2026年11月26日 活动日报
+            ## 概览
+            完成报告导出格式统一。
+            ## 关键成果
+            - 日报支持五种格式。
+            ## 项目进展
+            | 项目 | 进展 | 时长 |
+            |---|---|---|
+            | AiAssistant | 统一导出 | 60 分钟 |
+            ## 时间线
+            - `09:00` 开发
+            ## 站会视图
+            - **昨天完成**：导出
+            - **今天计划**：测试
+            - **阻塞项**：无
+            """,
+            """{"LocalDate":"2026-11-26","EventCount":5,"SegmentCount":2,"ActiveMinutes":30,"AppCounts":{"Rider":5},"Standup":{"Yesterday":"","Today":"","Blockers":[]},"ModelId":"gemma4:12b","EndpointTier":"LocalOffline","RedactionApplied":true}""",
+            "gemma4:12b",
+            ModelEndpointTier.LocalOffline,
+            true,
+            ReportTriggerSource.Manual,
+            DateTimeOffset.UtcNow);
+        var directory = TestDirectories.Create("daily-export");
+        var useCase = new ReportUseCase(
+            new NoopReportJobQueue(),
+            new InMemoryReportRepository(),
+            new SystemClock(),
+            new FakeReportRasterizer());
+
+        var export = await useCase.ExportAsync(report, directory);
+
+        Assert.True(File.Exists(export.MarkdownPath));
+        Assert.True(File.Exists(export.JsonPath));
+        Assert.True(File.Exists(export.SvgPath));
+        Assert.NotNull(export.PngPath);
+        Assert.NotNull(export.PdfPath);
+        Assert.True(File.Exists(export.PngPath));
+        Assert.True(File.Exists(export.PdfPath));
+        Assert.EndsWith(".json", export.JsonPath, StringComparison.Ordinal);
+        Assert.EndsWith(".svg", export.SvgPath, StringComparison.Ordinal);
+        Assert.Contains("活动日报", await File.ReadAllTextAsync(export.SvgPath), StringComparison.Ordinal);
+        Assert.Contains("完成报告导出格式统一", await File.ReadAllTextAsync(export.MarkdownPath), StringComparison.Ordinal);
+
+        var pngPath = await useCase.ExportSingleAsync(
+            report,
+            ReportExportFormat.Png,
+            Path.Combine(directory, "single.png"));
+        var pdfPath = await useCase.ExportSingleAsync(
+            report,
+            ReportExportFormat.Pdf,
+            Path.Combine(directory, "single.pdf"));
+        var jsonPath = await useCase.ExportSingleAsync(
+            report,
+            ReportExportFormat.Json,
+            Path.Combine(directory, "single.json"));
+        Assert.True(File.Exists(pngPath));
+        Assert.True(File.Exists(pdfPath));
+        Assert.True(File.Exists(jsonPath));
+        Assert.Equal(ReportExportFormat.Png, ReportExportFormatExtensions.FromPath("REPORT.PNG"));
+        Assert.Equal(ReportExportFormat.Json, ReportExportFormatExtensions.FromPath("report.json"));
+    }
+
+    [Fact]
+    public async Task AnswerExport_WritesAllFiveFormats()
+    {
+        var answer = new EvidenceQaAnswer(
+            "本周完成了什么？",
+            "完成了报告导出格式统一。",
+            [
+                new EvidenceReference(
+                    "E1",
+                    "evt_1",
+                    new DateOnly(2026, 11, 26),
+                    new DateTimeOffset(2026, 11, 26, 1, 0, 0, TimeSpan.Zero),
+                    "Rider",
+                    "导出格式",
+                    "统一五种格式",
+                    false,
+                    "keyword",
+                    0.9)
+            ],
+            ["E1"],
+            "gemma4:12b",
+            ModelEndpointTier.LocalOffline,
+            false,
+            null);
+        var directory = TestDirectories.Create("answer-export");
+        var useCase = new EvidenceSearchUseCase(
+            null!,
+            null!,
+            new SystemClock(),
+            new SkiaReportDocumentRenderer());
+
+        var export = await useCase.ExportAnswerAllAsync(answer, directory);
+
+        Assert.True(File.Exists(export.MarkdownPath));
+        Assert.True(File.Exists(export.JsonPath));
+        Assert.NotNull(export.SvgPath);
+        Assert.NotNull(export.PngPath);
+        Assert.NotNull(export.PdfPath);
+        Assert.True(File.Exists(export.SvgPath));
+        Assert.True(File.Exists(export.PngPath));
+        Assert.True(File.Exists(export.PdfPath));
+        Assert.Contains("证据问答", await File.ReadAllTextAsync(export.SvgPath), StringComparison.Ordinal);
+        Assert.Contains("本周完成了什么", await File.ReadAllTextAsync(export.JsonPath), StringComparison.Ordinal);
+        Assert.Contains("完成了报告导出格式统一", await File.ReadAllTextAsync(export.MarkdownPath), StringComparison.Ordinal);
+
+        var pdfPath = await useCase.ExportAnswerSingleAsync(
+            answer,
+            ReportExportFormat.Pdf,
+            Path.Combine(directory, "single.pdf"));
+        Assert.True(File.Exists(pdfPath));
+        Assert.True((await File.ReadAllBytesAsync(pdfPath)).AsSpan(0, 4).SequenceEqual("%PDF"u8));
     }
 
     [Fact]
@@ -648,6 +773,22 @@ internal sealed class FakeReportRasterizer : IReportRasterizer
     public byte[] RenderPng(RangeReport report) => [0x89, 0x50, 0x4E, 0x47];
 
     public byte[] RenderPdf(RangeReport report) => "%PDF-fake"u8.ToArray();
+}
+
+internal sealed class NoopReportJobQueue : IReportJobQueue
+{
+    public Task<EnqueueResult> EnqueueAsync(ReportJobRequest request, CancellationToken ct) =>
+        Task.FromResult(new EnqueueResult("job", false));
+
+    public Task<int> RecoverInterruptedJobsAsync(CancellationToken ct) => Task.FromResult(0);
+
+    public Task<ReportJob?> ClaimNextPendingAsync(CancellationToken ct) =>
+        Task.FromResult<ReportJob?>(null);
+
+    public Task UpdateAsync(ReportJob job, CancellationToken ct) => Task.CompletedTask;
+
+    public Task<IReadOnlyList<ReportJob>> ListRecentJobsAsync(int limit, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<ReportJob>>([]);
 }
 
 internal sealed class FakeRangeReportService : IRangeReportService

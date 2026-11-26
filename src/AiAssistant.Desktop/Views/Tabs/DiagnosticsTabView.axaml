@@ -21,12 +21,12 @@
       <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
         <StackPanel Spacing="8">
           <TextBlock Text="诊断导出（脱敏）" FontWeight="SemiBold" />
-          <TextBlock Text="先生成预览，确认后再保存。导出内容只有平台、数据库健康、采集管道、能力状态、最近任务与脱敏日志等元数据，不含活动正文、密钥或完整文件路径。"
+          <TextBlock Text="先生成预览，确认后再保存为 Markdown / SVG / PNG / PDF / JSON。导出内容只有平台、数据库健康、采集管道、能力状态、最近任务与脱敏日志等元数据，不含活动正文、密钥或完整文件路径。"
                      TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
           <WrapPanel>
             <Button Classes="secondary" Content="生成预览" Command="{Binding GeneratePreviewCommand}" Margin="0,0,8,0"
                     automation:AutomationProperties.Name="生成脱敏导出预览" />
-            <Button Classes="secondary" Content="保存为 JSON…" Command="{Binding ExportPreviewCommand}"
+            <Button Classes="secondary" Content="保存为…" Command="{Binding ExportPreviewCommand}"
                     IsEnabled="{Binding CanExportPreview}" Margin="0,0,8,0"
                     automation:AutomationProperties.Name="确认导出脱敏预览" />
           </WrapPanel>

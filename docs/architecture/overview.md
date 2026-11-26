@@ -43,7 +43,7 @@ Scheduler / Export / LocalApi  ← 适配器与能力实现
 | `AiAssistant.Summarization` | 活动分段、检索、证据问答、日报生成 |
 | `AiAssistant.Scheduler` | 持久任务队列、补偿与单消费者 Worker |
 | `AiAssistant.Voice` | 唤醒、命令解析、单路 AudioHub、TTS 反馈 |
-| `AiAssistant.Export` | Markdown/SVG/PNG/PDF 导出与中文字体回退 |
+| `AiAssistant.Export` | 报告图表与结构化文档的 Markdown/SVG/PNG/PDF/JSON 导出、中文字体回退 |
 | `AiAssistant.LocalApi` | 只读 Loopback MCP（HTTP/JSON-RPC/SSE） |
 | `AiAssistant.Platform.Windows/macOS/Linux` | 平台采集、权限、自启与能力矩阵；三者互不引用 |
 | `AiAssistant.Desktop` | Avalonia 12 视图、ViewModel、导航与主题 |

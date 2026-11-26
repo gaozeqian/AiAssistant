@@ -25,6 +25,7 @@ public sealed record RuntimeServices(
     IAsrEngine AsrEngine,
     IWakeWordDetector WakeWordDetector,
     IModelCapabilityProber ModelCapabilityProber,
+    IReportDocumentRenderer DocumentRenderer,
     IMacHelperSupervisor? MacHelperSupervisor,
     ICapabilityProvider? Capabilities,
     IImageOcrRecognizer? OcrRecognizer);

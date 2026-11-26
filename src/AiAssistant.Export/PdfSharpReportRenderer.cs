@@ -74,10 +74,14 @@ public static class PdfSharpReportRenderer
         }
     }
 
+    private static bool IsSingleDay(RangeReport report) => report.FromDate == report.ToDate;
+
     private static string Title(RangeReport report) =>
-        string.Create(
-            CultureInfo.InvariantCulture,
-            $"{report.FromDate:yyyy年MM月dd日} – {report.ToDate:yyyy年MM月dd日} 活动报告");
+        IsSingleDay(report)
+            ? string.Create(CultureInfo.InvariantCulture, $"{report.FromDate:yyyy年MM月dd日} 活动日报")
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"{report.FromDate:yyyy年MM月dd日} – {report.ToDate:yyyy年MM月dd日} 活动报告");
 
     private static string Subtitle(RangeReport report) =>
         string.Create(
@@ -236,41 +240,68 @@ public static class PdfSharpReportRenderer
         public void Render(RangeReport report)
         {
             var sections = RangeReportMarkdownSections.Parse(report.Markdown);
+            var isSingleDay = IsSingleDay(report);
             BeginPage();
             DrawTitle(report);
             DrawKpis(report);
 
             DrawHeading("活动概览");
             DrawParagraph(string.IsNullOrWhiteSpace(sections.Summary)
-                ? "该区间没有可用的总结文本。"
+                ? (isSingleDay ? "该日期没有可用的总结文本。" : "该区间没有可用的总结文本。")
                 : sections.Summary);
 
-            DrawHeading("每日活动");
+            // Daily reports list achievements before the chart; range reports keep highlights at the end.
+            if (isSingleDay && sections.Highlights.Count > 0)
+            {
+                DrawHeading("关键成果");
+                DrawList(sections.Highlights);
+            }
+
+            DrawHeading(isSingleDay ? "活动图表" : "每日活动");
             if (report.DailyStats.Count > 0 && report.TotalEvents > 0)
             {
                 DrawChart(report);
             }
             else
             {
-                DrawParagraph("该区间没有可用的本地活动记录。");
+                DrawParagraph(isSingleDay ? "该日期没有可用的本地活动记录。" : "该区间没有可用的本地活动记录。");
             }
 
             if (report.DailyStats.Count > 0)
             {
-                DrawHeading("每日统计");
+                DrawHeading(isSingleDay ? "当日统计" : "每日统计");
                 DrawDailyTable(report.DailyStats);
             }
 
-            if (sections.Apps.Count > 0)
+            var apps = sections.Apps.Count > 0 ? sections.Apps : DeriveApps(report);
+            if (apps.Count > 0)
             {
                 DrawHeading("应用分布");
-                DrawApps(sections.Apps);
+                DrawApps(apps);
             }
 
-            if (sections.Highlights.Count > 0)
+            if (sections.Projects.Count > 0)
+            {
+                DrawHeading("项目进展");
+                DrawProjects(sections.Projects);
+            }
+
+            if (sections.Timeline.Count > 0)
+            {
+                DrawHeading("时间线");
+                DrawList(sections.Timeline);
+            }
+
+            if (sections.Standup.Count > 0)
+            {
+                DrawHeading("站会视图");
+                DrawList(sections.Standup);
+            }
+
+            if (!isSingleDay && sections.Highlights.Count > 0)
             {
                 DrawHeading("代表性记录");
-                DrawHighlights(sections.Highlights);
+                DrawList(sections.Highlights);
             }
 
             _graphics.Dispose();
@@ -540,10 +571,29 @@ public static class PdfSharpReportRenderer
             }
         }
 
-        private void DrawHighlights(IReadOnlyList<string> highlights)
+        private void DrawProjects(IReadOnlyList<ProjectProgressItem> projects)
+        {
+            var columns = new[] { 90d, ContentWidth - 160, 70d };
+            var headers = new[] { "项目", "进展", "时长" };
+            DrawTableRow(headers, columns, _smallFont, SectionColor, subtle: true);
+            foreach (var project in projects)
+            {
+                EnsureSpace(22);
+                DrawTableRow(
+                    [project.Name, project.Summary, project.Duration],
+                    columns,
+                    _smallFont,
+                    BodyColor,
+                    subtle: false);
+            }
+
+            _y += 6;
+        }
+
+        private void DrawList(IReadOnlyList<string> items)
         {
             var brush = new XSolidBrush(BodyColor);
-            foreach (var item in highlights.Take(15))
+            foreach (var item in items.Take(30))
             {
                 EnsureSpace(15);
                 _graphics.DrawString(
@@ -554,6 +604,25 @@ public static class PdfSharpReportRenderer
                     XStringFormats.BaseLineLeft);
                 _y += 14;
             }
+        }
+
+        /// <summary>Daily stats carry app counts even when the Markdown has no explicit distribution section.</summary>
+        private static AppDistributionItem[] DeriveApps(RangeReport report)
+        {
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var day in report.DailyStats)
+            {
+                foreach (var pair in day.AppCounts)
+                {
+                    counts[pair.Key] = counts.GetValueOrDefault(pair.Key) + pair.Value;
+                }
+            }
+
+            return counts
+                .OrderByDescending(pair => pair.Value)
+                .Select(pair => new AppDistributionItem(pair.Key, pair.Value))
+                .Take(10)
+                .ToArray();
         }
 
         private IEnumerable<string> Wrap(string text, XFont font, double maxWidth)

@@ -61,6 +61,7 @@ public sealed class AppRuntime : IAsyncDisposable
             services.GetRequiredService<IAsrEngine>(),
             services.GetRequiredService<IWakeWordDetector>(),
             services.GetRequiredService<IModelCapabilityProber>(),
+            services.GetRequiredService<IReportDocumentRenderer>(),
             services.GetService<IMacHelperSupervisor>(),
             services.GetService<ICapabilityProvider>(),
             services.GetService<IImageOcrRecognizer>()));
@@ -251,6 +252,7 @@ public sealed class AppRuntime : IAsyncDisposable
             provider.GetRequiredService<ILogger<ActivityRangeReportService>>(),
             configuration.Policy.DefaultTier));
         services.AddSingleton<IReportRasterizer, SkiaReportRasterizer>();
+        services.AddSingleton<IReportDocumentRenderer, SkiaReportDocumentRenderer>();
         services.AddSingleton<RangeReportUseCase>();
         var configuredEmbeddingModel = configuration.Embedding.EmbeddingModel;
         var queryPrefix = EmbeddingProfile.ResolveQueryPrefix(

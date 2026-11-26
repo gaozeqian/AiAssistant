@@ -86,6 +86,49 @@ public sealed class SkiaReportRasterizerTests
     }
 
     [Fact]
+    public void DailyMarkdown_ParsesAndRendersDailySections()
+    {
+        const string markdown = """
+            # 2026年11月26日 活动日报
+            ## 概览
+            完成报告导出格式统一。
+            ## 关键成果
+            - 日报支持五种格式。
+            ## 项目进展
+            | 项目 | 进展 | 时长 |
+            |---|---|---|
+            | AiAssistant | 统一导出 | 60 分钟 |
+            ## 时间线
+            - `09:00` 开发
+            ## 站会视图
+            - **昨天完成**：导出
+            - **今天计划**：测试
+            - **阻塞项**：无
+            """;
+
+        var sections = RangeReportMarkdownSections.Parse(markdown);
+        Assert.Contains("完成报告导出格式统一", sections.Summary, StringComparison.Ordinal);
+        Assert.Single(sections.Highlights);
+        var project = Assert.Single(sections.Projects);
+        Assert.Equal("AiAssistant", project.Name);
+        Assert.Equal("统一导出", project.Summary);
+        Assert.Equal("60 分钟", project.Duration);
+        Assert.Single(sections.Timeline);
+        Assert.Equal(3, sections.Standup.Count);
+
+        var report = CreateReport(days: 1) with { Markdown = markdown };
+        var pdf = new SkiaReportRasterizer().RenderPdf(report);
+        Assert.True(pdf.AsSpan(0, 4).SequenceEqual("%PDF"u8));
+        Assert.True(pdf.Length < 1_000_000, $"pdf unexpectedly large (font embedding?): {pdf.Length}");
+        if (PdfSharpReportRenderer.IsSearchableFontAvailable)
+        {
+            var ascii = Encoding.ASCII.GetString(pdf);
+            Assert.Contains("/ToUnicode", ascii, StringComparison.Ordinal);
+            Assert.True(Regex.Count(ascii, @"/Type\s*/Page\b") >= 1);
+        }
+    }
+
+    [Fact]
     public void PdfWithoutText_DoesNotEmbedFonts()
     {
         using var stream = new MemoryStream();

@@ -1,3 +1,5 @@
+using AiAssistant.Application.UseCases;
+
 namespace AiAssistant.Host.Commands;
 
 internal sealed class ReportRangeCommand : ICliCommand
@@ -19,7 +21,7 @@ internal sealed class ReportRangeCommand : ICliCommand
             $"model={report.ModelId} degraded={report.Degraded}");
         Console.WriteLine($"markdown={export.MarkdownPath}");
         Console.WriteLine($"svg={export.SvgPath}");
-        Console.WriteLine($"stats={export.StatsPath}");
+        Console.WriteLine($"json={export.StatsPath}");
         if (export.PngPath is not null)
         {
             Console.WriteLine($"png={export.PngPath}");
@@ -56,9 +58,13 @@ internal sealed class AskCommand : ICliCommand
 
         if (CliSupport.TryGetOption(context.Args, "--output", out var exportDirectory))
         {
+            var format = CliSupport.TryGetOption(context.Args, "--format", out var formatText)
+                ? ReportExportFormatExtensions.FromExtension(formatText)
+                : ReportExportFormat.Markdown;
             var path = await context.Services.EvidenceSearch.ExportAnswerAsync(
                 answer,
                 Path.GetFullPath(exportDirectory),
+                format,
                 ct);
             Console.WriteLine($"export={path}");
         }

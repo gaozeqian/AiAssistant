@@ -19,10 +19,10 @@
 
 | 参数 | 说明 |
 |---|---|
-| `--report-range [--from yyyy-MM-dd] [--to yyyy-MM-dd] [--output <目录>]` | 生成 Markdown/SVG/PNG/PDF/stats；缺省近 7 天 |
-| `--ask "<问题>" [--days 7] [--output <目录>]` | 基于近 N 天本地证据问答；可选导出 |
+| `--report-range [--from yyyy-MM-dd] [--to yyyy-MM-dd] [--output <目录>]` | 生成 Markdown/SVG/PNG/PDF/JSON；缺省近 7 天 |
+| `--ask "<问题>" [--days 7] [--output <目录>] [--format md\|svg\|png\|pdf\|json]` | 基于近 N 天本地证据问答；可选导出，默认 Markdown |
 
-默认输出目录为 `artifacts/test-results/reports/`（可用 `--output` 覆盖）。
+默认输出目录为 `artifacts/test-results/reports/`（可用 `--output` 覆盖）。除数据备份 ZIP 外，报告、问答、诊断与模型基准均支持 Markdown/SVG/PNG/PDF/JSON。
 
 ## 3. 维护
 
@@ -39,7 +39,7 @@
 
 | 参数 | 说明 |
 |---|---|
-| `--benchmark-model [--output <路径>]` | 固定三用例对话基准；默认 `artifacts/test-results/benchmarks/` |
+| `--benchmark-model [--output <路径>] [--format md\|svg\|png\|pdf\|json]` | 固定三用例对话基准；默认 Markdown，输出到 `artifacts/test-results/benchmarks/` |
 | `--probe-model` | 打印各档位 chat/stream/embed/json/tools 能力 |
 | `--import-model-secret <名称>` | 从标准输入读取密钥并加密存储 |
 | `--list-model-secrets` | 列出密钥名（不显示值） |

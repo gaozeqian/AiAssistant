@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using AiAssistant.Application.Ports;
 
 namespace AiAssistant.Application.UseCases;
@@ -11,16 +13,46 @@ public sealed record RangeReportExport(
     string? PngPath = null,
     string? PdfPath = null);
 
-public enum RangeExportFormat
+/// <summary>Single-file formats offered by every report export surface.</summary>
+public enum ReportExportFormat
 {
     Markdown = 0,
-    StatsJson = 1,
+    Json = 1,
     Svg = 2,
     Png = 3,
     Pdf = 4
 }
 
-/// <summary>Weekly / arbitrary-range aggregation plus Markdown + stats export for the reports panel.</summary>
+public static class ReportExportFormatExtensions
+{
+    /// <summary>Maps a user-selected save path to a report format; unknown extensions fall back to Markdown.</summary>
+    public static ReportExportFormat FromPath(string path) => FromExtension(Path.GetExtension(path));
+
+    /// <summary>Maps a save-dialog file type extension to a report format.</summary>
+    public static ReportExportFormat FromExtension(string extension) =>
+        extension.Trim().TrimStart('.').ToLowerInvariant() switch
+        {
+            "md" or "markdown" => ReportExportFormat.Markdown,
+            "json" => ReportExportFormat.Json,
+            "svg" => ReportExportFormat.Svg,
+            "png" => ReportExportFormat.Png,
+            "pdf" => ReportExportFormat.Pdf,
+            _ => ReportExportFormat.Markdown
+        };
+
+    /// <summary>Canonical file extension for a report format.</summary>
+    public static string ToExtension(this ReportExportFormat format) => format switch
+    {
+        ReportExportFormat.Markdown => "md",
+        ReportExportFormat.Json => "json",
+        ReportExportFormat.Svg => "svg",
+        ReportExportFormat.Png => "png",
+        ReportExportFormat.Pdf => "pdf",
+        _ => throw new ArgumentOutOfRangeException(nameof(format))
+    };
+}
+
+/// <summary>Weekly / arbitrary-range aggregation plus Markdown/JSON/SVG/PNG/PDF export.</summary>
 public sealed class RangeReportUseCase(
     IRangeReportService service,
     IClock clock,
@@ -60,7 +92,7 @@ public sealed class RangeReportUseCase(
             CultureInfo.InvariantCulture,
             $"AiAssistant-区间报告-{report.FromDate:yyyyMMdd}-{report.ToDate:yyyyMMdd}");
         var markdownPath = Path.Combine(destinationDirectory, stem + ".md");
-        var statsPath = Path.Combine(destinationDirectory, stem + ".stats.json");
+        var statsPath = Path.Combine(destinationDirectory, stem + ".json");
         var svgPath = Path.Combine(destinationDirectory, stem + ".svg");
         await File.WriteAllTextAsync(markdownPath, report.Markdown, ct);
         await File.WriteAllTextAsync(statsPath, report.StatsJson, ct);
@@ -79,13 +111,10 @@ public sealed class RangeReportUseCase(
         return new RangeReportExport(markdownPath, statsPath, svgPath, pngPath, pdfPath);
     }
 
-    /// <summary>Whether PNG/PDF export is available (requires a rasterizer).</summary>
-    public bool SupportsRasterization => rasterizer is not null;
-
     /// <summary>Writes a single format to the exact destination path chosen by the user.</summary>
     public async Task<string> ExportSingleAsync(
         RangeReport report,
-        RangeExportFormat format,
+        ReportExportFormat format,
         string destinationPath,
         CancellationToken ct = default)
     {
@@ -93,16 +122,16 @@ public sealed class RangeReportUseCase(
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
         switch (format)
         {
-            case RangeExportFormat.Markdown:
+            case ReportExportFormat.Markdown:
                 await File.WriteAllTextAsync(destinationPath, report.Markdown, ct);
                 break;
-            case RangeExportFormat.StatsJson:
+            case ReportExportFormat.Json:
                 await File.WriteAllTextAsync(destinationPath, report.StatsJson, ct);
                 break;
-            case RangeExportFormat.Svg:
+            case ReportExportFormat.Svg:
                 await File.WriteAllTextAsync(destinationPath, RangeReportSvgRenderer.Render(report), ct);
                 break;
-            case RangeExportFormat.Png:
+            case ReportExportFormat.Png:
                 if (rasterizer is null)
                 {
                     throw new InvalidOperationException("PNG 导出需要图形渲染器。");
@@ -110,7 +139,7 @@ public sealed class RangeReportUseCase(
 
                 await File.WriteAllBytesAsync(destinationPath, rasterizer.RenderPng(report), ct);
                 break;
-            case RangeExportFormat.Pdf:
+            case ReportExportFormat.Pdf:
                 if (rasterizer is null)
                 {
                     throw new InvalidOperationException("PDF 导出需要图形渲染器。");
@@ -126,12 +155,26 @@ public sealed class RangeReportUseCase(
     }
 }
 
+public sealed record AnswerExport(
+    string MarkdownPath,
+    string JsonPath,
+    string? SvgPath = null,
+    string? PngPath = null,
+    string? PdfPath = null);
+
 /// <summary>Shared entry point for timeline search, panel Q&amp;A and voice Q&amp;A so all three cite the same evidence.</summary>
 public sealed class EvidenceSearchUseCase(
     IEvidenceSearch search,
     IEvidenceQuestionAnswerer answerer,
-    IClock clock)
+    IClock clock,
+    IReportDocumentRenderer? documentRenderer = null)
 {
+    private static readonly JsonSerializerOptions AnswerJsonOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     public DateOnly Today => clock.Now().LocalDate;
 
     public (DateOnly From, DateOnly To) DefaultRange(int days = 7)
@@ -178,6 +221,96 @@ public sealed class EvidenceSearchUseCase(
         return path;
     }
 
+    /// <summary>Writes every available Q&amp;A format into the directory.</summary>
+    public async Task<AnswerExport> ExportAnswerAllAsync(
+        EvidenceQaAnswer answer,
+        string destinationDirectory,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationDirectory);
+        Directory.CreateDirectory(destinationDirectory);
+        var stem = BuildAnswerStem();
+        var markdownPath = Path.Combine(destinationDirectory, stem + ".md");
+        var jsonPath = Path.Combine(destinationDirectory, stem + ".json");
+        await File.WriteAllTextAsync(markdownPath, BuildAnswerMarkdown(answer), ct);
+        await File.WriteAllTextAsync(jsonPath, BuildAnswerJson(answer), ct);
+
+        string? svgPath = null;
+        string? pngPath = null;
+        string? pdfPath = null;
+        if (documentRenderer is not null)
+        {
+            var document = BuildAnswerDocument(answer);
+            svgPath = Path.Combine(destinationDirectory, stem + ".svg");
+            await File.WriteAllTextAsync(svgPath, documentRenderer.RenderSvg(document), ct);
+            pngPath = Path.Combine(destinationDirectory, stem + ".png");
+            await File.WriteAllBytesAsync(pngPath, documentRenderer.RenderPng(document), ct);
+            pdfPath = Path.Combine(destinationDirectory, stem + ".pdf");
+            await File.WriteAllBytesAsync(pdfPath, documentRenderer.RenderPdf(document), ct);
+        }
+
+        return new AnswerExport(markdownPath, jsonPath, svgPath, pngPath, pdfPath);
+    }
+
+    /// <summary>Writes one Q&amp;A format into the directory using a timestamped filename.</summary>
+    public Task<string> ExportAnswerAsync(
+        EvidenceQaAnswer answer,
+        string destinationDirectory,
+        ReportExportFormat format,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationDirectory);
+        Directory.CreateDirectory(destinationDirectory);
+        var path = Path.Combine(
+            destinationDirectory,
+            BuildAnswerStem() + "." + format.ToExtension());
+        return ExportAnswerSingleAsync(answer, format, path, ct);
+    }
+
+    /// <summary>Writes one Q&amp;A format to the exact destination path chosen by the user.</summary>
+    public async Task<string> ExportAnswerSingleAsync(
+        EvidenceQaAnswer answer,
+        ReportExportFormat format,
+        string destinationPath,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        switch (format)
+        {
+            case ReportExportFormat.Markdown:
+                await File.WriteAllTextAsync(destinationPath, BuildAnswerMarkdown(answer), ct);
+                break;
+            case ReportExportFormat.Json:
+                await File.WriteAllTextAsync(destinationPath, BuildAnswerJson(answer), ct);
+                break;
+            case ReportExportFormat.Svg:
+                await File.WriteAllTextAsync(
+                    destinationPath,
+                    RequireDocumentRenderer().RenderSvg(BuildAnswerDocument(answer)),
+                    ct);
+                break;
+            case ReportExportFormat.Png:
+                await File.WriteAllBytesAsync(
+                    destinationPath,
+                    RequireDocumentRenderer().RenderPng(BuildAnswerDocument(answer)),
+                    ct);
+                break;
+            case ReportExportFormat.Pdf:
+                await File.WriteAllBytesAsync(
+                    destinationPath,
+                    RequireDocumentRenderer().RenderPdf(BuildAnswerDocument(answer)),
+                    ct);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(format));
+        }
+
+        return destinationPath;
+    }
+
     /// <summary>Writes the Q&amp;A markdown to the exact destination path chosen by the user.</summary>
     public static async Task<string> ExportAnswerToAsync(
         EvidenceQaAnswer answer,
@@ -189,6 +322,64 @@ public sealed class EvidenceSearchUseCase(
         await File.WriteAllTextAsync(destinationPath, BuildAnswerMarkdown(answer), ct);
         return destinationPath;
     }
+
+    private string BuildAnswerStem() =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"AiAssistant-问答-{clock.UtcNow.ToLocalTime():yyyyMMdd-HHmmss}");
+
+    private IReportDocumentRenderer RequireDocumentRenderer() =>
+        documentRenderer ?? throw new InvalidOperationException("SVG/PNG/PDF 导出需要文档渲染器。");
+
+    private static string BuildAnswerJson(EvidenceQaAnswer answer)
+    {
+        var payload = new
+        {
+            question = answer.Question,
+            answer = answer.Answer,
+            evidence = answer.Evidence.Select(item => new
+            {
+                evidenceId = item.EvidenceId,
+                eventId = item.EventId,
+                localDate = item.LocalDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                occurredAtUtc = item.OccurredAtUtc,
+                appName = item.AppName,
+                title = item.Title,
+                excerpt = item.Excerpt,
+                hasMedia = item.HasMedia,
+                matchedBy = item.MatchedBy,
+                score = item.Score
+            }),
+            citedEvidenceIds = answer.CitedEvidenceIds,
+            modelId = answer.ModelId,
+            endpointTier = answer.EndpointTier.ToString(),
+            degraded = answer.Degraded,
+            degradedReason = answer.DegradedReason
+        };
+        return JsonSerializer.Serialize(payload, AnswerJsonOptions);
+    }
+
+    private static ReportDocument BuildAnswerDocument(EvidenceQaAnswer answer) =>
+        new(
+            "证据问答",
+            $"问题：{answer.Question} · 模型 {answer.ModelId} · {(answer.Degraded ? $"降级：{answer.DegradedReason}" : "证据充分")}",
+            [
+                new ReportParagraphSection("回答", [answer.Answer]),
+                new ReportBulletSection(
+                    "证据",
+                    answer.Evidence.Select(item => string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"[{item.EvidenceId}] {item.LocalDate:yyyy-MM-dd} {item.OccurredAtUtc.ToLocalTime():HH:mm} {item.AppName} | {item.Title} | {item.Excerpt}"))
+                        .ToArray()),
+                new ReportFieldSection(
+                    "元数据",
+                    [
+                        new ReportField("引用", string.Join(",", answer.CitedEvidenceIds)),
+                        new ReportField("模型", answer.ModelId),
+                        new ReportField("端点档位", answer.EndpointTier.ToString()),
+                        new ReportField("状态", answer.Degraded ? $"降级：{answer.DegradedReason}" : "证据充分")
+                    ])
+            ]);
 
     private static string BuildAnswerMarkdown(EvidenceQaAnswer answer)
     {

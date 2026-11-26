@@ -18,7 +18,7 @@
 - **汇总**：定时 / 空闲 / 关机补偿三段触发；日报版本化保留历史。
 - **模型**：本机 / 内网 / 公网三档策略，统一走 OpenAI 兼容协议（默认对接本机 Ollama）；默认对话 `gemma4:12b`、embedding `embeddinggemma-2:740m`。
 - **语音**：唤醒词「你好时光」→ Paraformer ASR → 指令执行；MeloTTS 播报。
-- **导出**：Markdown / SVG / PNG / PDF 区间报告 + stats JSON。
+- **导出**：日报、周报/区间报告、问答、诊断与模型基准统一支持 Markdown / SVG / PNG / PDF / JSON；数据备份为独立 ZIP。
 - **本地 MCP**：默认关闭的只读 Loopback 端点，Bearer 令牌 + Origin/Host 白名单 + 限流。
 
 ## 5 分钟跑起来

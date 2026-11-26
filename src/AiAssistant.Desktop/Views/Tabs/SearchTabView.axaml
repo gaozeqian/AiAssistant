@@ -30,8 +30,9 @@
                   automation:AutomationProperties.Name="检索证据" />
           <Button Classes="secondary" Content="提问" Command="{Binding AskCommand}" Margin="0,0,8,8"
                   automation:AutomationProperties.Name="基于证据提问" />
-          <Button Classes="secondary" Content="导出问答" Command="{Binding ExportAnswerCommand}"
-                  IsEnabled="{Binding HasAnswer}" Margin="0,0,8,8" />
+          <Button Classes="secondary" Content="导出问答…" Command="{Binding ExportAnswerCommand}"
+                  IsEnabled="{Binding HasAnswer}" Margin="0,0,8,8"
+                  automation:AutomationProperties.Name="导出问答" />
         </WrapPanel>
         <ProgressBar Grid.Row="3" Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsBusy}" />
         <StackPanel Grid.Row="4" Spacing="5" Margin="0,8,0,0">

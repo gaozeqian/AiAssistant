@@ -224,27 +224,44 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         {
             var report = SelectedVersion.Report;
             string path;
+            string successMessage;
             if (SaveFilePicker is not null)
             {
-                var picked = await SaveFilePicker.PickSavePathAsync(
+                var types = new List<SaveFileType>
+                {
+                    new("Markdown", "md"),
+                    new("SVG 图表", "svg"),
+                    new("PNG 图片", "png"),
+                    new("PDF 文档", "pdf"),
+                    new("JSON", "json")
+                };
+                var picked = await SaveFilePicker.PickSaveFileAsync(
                     $"AiAssistant-日报-{report.LocalDate:yyyyMMdd}-v{report.Version}.md",
-                    [new SaveFileType("Markdown", "md")]);
+                    types);
                 if (picked is null)
                 {
                     return;
                 }
 
-                path = await ReportUseCase.ExportMarkdownToAsync(report, picked);
+                path = await _reports.ExportSingleAsync(
+                    report,
+                    ReportExportFormatExtensions.FromExtension(picked.Extension),
+                    picked.Path);
+                successMessage = $"已导出：{path}";
             }
             else
             {
-                path = await ReportUseCase.ExportMarkdownAsync(report, _exportDirectory);
+                var export = await _reports.ExportAsync(report, _exportDirectory);
+                path = export.MarkdownPath;
+                successMessage = export.PngPath is null
+                    ? $"已导出日报（Markdown / SVG / JSON）：{path}"
+                    : $"已导出日报（Markdown / SVG / PNG / PDF / JSON）：{path}";
             }
 
-            StatusMessage = $"已导出：{path}";
+            StatusMessage = successMessage;
             ErrorMessage = string.Empty;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             ErrorMessage = "导出失败，请检查目标目录权限。";
         }

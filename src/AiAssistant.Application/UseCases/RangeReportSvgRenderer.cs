@@ -23,7 +23,7 @@ public static class RangeReportSvgRenderer
         var builder = new StringBuilder();
         builder.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
         builder.AppendLine(CultureInfo.InvariantCulture,
-            $"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{Width}\" height=\"{Height}\" viewBox=\"0 0 {Width} {Height}\" role=\"img\" aria-label=\"区间活动报告\">");
+            $"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{Width}\" height=\"{Height}\" viewBox=\"0 0 {Width} {Height}\" role=\"img\" aria-label=\"{(IsSingleDay(report) ? "活动日报" : "区间活动报告")}\">");
         builder.AppendLine("  <rect width=\"100%\" height=\"100%\" fill=\"#FFFFFF\"/>");
         builder.AppendLine(CultureInfo.InvariantCulture,
             $"  <text x=\"48\" y=\"48\" font-family=\"Segoe UI, PingFang SC, sans-serif\" font-size=\"24\" font-weight=\"600\" fill=\"#111C36\">{Escape(Title(report))}</text>");
@@ -33,7 +33,7 @@ public static class RangeReportSvgRenderer
         if (report.DailyStats.Count == 0 || report.TotalEvents == 0)
         {
             builder.AppendLine(CultureInfo.InvariantCulture,
-                $"  <text x=\"{Width / 2}\" y=\"220\" text-anchor=\"middle\" font-family=\"Segoe UI, PingFang SC, sans-serif\" font-size=\"16\" fill=\"#64748B\">该区间没有可用的本地活动记录</text>");
+                $"  <text x=\"{Width / 2}\" y=\"220\" text-anchor=\"middle\" font-family=\"Segoe UI, PingFang SC, sans-serif\" font-size=\"16\" fill=\"#64748B\">{(IsSingleDay(report) ? "该日期没有可用的本地活动记录" : "该区间没有可用的本地活动记录")}</text>");
         }
         else
         {
@@ -89,10 +89,14 @@ public static class RangeReportSvgRenderer
             $"  <line x1=\"{ChartLeft}\" y1=\"{ChartBottom}\" x2=\"{ChartRight}\" y2=\"{ChartBottom}\" stroke=\"#94A3B8\" stroke-width=\"1\"/>");
     }
 
+    private static bool IsSingleDay(RangeReport report) => report.FromDate == report.ToDate;
+
     private static string Title(RangeReport report) =>
-        string.Create(
-            CultureInfo.InvariantCulture,
-            $"{report.FromDate:yyyy年MM月dd日} – {report.ToDate:yyyy年MM月dd日} 活动报告");
+        IsSingleDay(report)
+            ? string.Create(CultureInfo.InvariantCulture, $"{report.FromDate:yyyy年MM月dd日} 活动日报")
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"{report.FromDate:yyyy年MM月dd日} – {report.ToDate:yyyy年MM月dd日} 活动报告");
 
     private static string Subtitle(RangeReport report) =>
         string.Create(

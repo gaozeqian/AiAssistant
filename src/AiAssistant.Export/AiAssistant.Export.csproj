@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>PNG/PDF rasterization for range reports using the SkiaSharp build already shipped with Avalonia.</Description>
+    <Description>SVG/PNG/PDF rendering for report charts and structured documents using the SkiaSharp build already shipped with Avalonia.</Description>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AiAssistant.Report.Tests" />

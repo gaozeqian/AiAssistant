@@ -396,21 +396,33 @@ public sealed class DiagnosticsViewModel : ObservableObject
         ErrorMessage = string.Empty;
         try
         {
-            // Write exactly the JSON the user reviewed; rebuilding here could export a different snapshot.
+            // Derive every format from the exact preview the user reviewed; JSON is written verbatim.
             var preview = ExportPreviewJson;
             string path;
             if (SaveFilePicker is not null)
             {
-                var picked = await SaveFilePicker.PickSavePathAsync(
+                var types = new List<SaveFileType>
+                {
+                    new("Markdown", "md"),
+                    new("SVG 图表", "svg"),
+                    new("PNG 图片", "png"),
+                    new("PDF 文档", "pdf"),
+                    new("JSON", "json")
+                };
+                var picked = await SaveFilePicker.PickSaveFileAsync(
                     $"AiAssistant-诊断导出-{_clock.LocalNow:yyyyMMdd-HHmmss}.json",
-                    [new SaveFileType("JSON", "json")]);
+                    types);
                 if (picked is null)
                 {
                     ExportStatusText = "已取消保存，预览仍保留。";
                     return;
                 }
 
-                path = picked;
+                path = await _diagnostics.ExportPreviewAsAsync(
+                    picked.Path,
+                    preview,
+                    ReportExportFormatExtensions.FromExtension(picked.Extension),
+                    CancellationToken.None);
             }
             else
             {
@@ -420,13 +432,17 @@ public sealed class DiagnosticsViewModel : ObservableObject
                     return;
                 }
 
-                Directory.CreateDirectory(_exportDirectory);
-                path = Path.Combine(
+                var export = await _diagnostics.ExportPreviewAsync(
                     _exportDirectory,
-                    $"AiAssistant-诊断导出-{_clock.LocalNow:yyyyMMdd-HHmmss}.json");
+                    preview,
+                    CancellationToken.None);
+                path = export.MarkdownPath;
+                ExportStatusText = export.SvgPath is null
+                    ? $"已导出脱敏诊断（Markdown / JSON）：{path}"
+                    : $"已导出脱敏诊断（Markdown / SVG / PNG / PDF / JSON）：{path}";
+                return;
             }
 
-            await _diagnostics.ExportConfirmedPreviewAsync(path, preview, CancellationToken.None);
             ExportStatusText = $"已导出脱敏诊断：{path}";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
@@ -451,7 +467,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
         try
         {
             ExportPreviewJson = await _diagnostics.BuildSanitizedExportPreviewAsync();
-            ExportStatusText = "预览已生成，确认后点击「保存为 JSON…」写盘。";
+            ExportStatusText = "预览已生成，确认后点击「保存为…」选择格式写盘。";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
         {

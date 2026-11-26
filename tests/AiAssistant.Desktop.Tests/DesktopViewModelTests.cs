@@ -6,6 +6,7 @@ using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Desktop.Views;
+using AiAssistant.Testing.Common;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -18,6 +19,63 @@ namespace AiAssistant.Desktop.Tests;
 [Trait("Category", "UI")]
 public sealed partial class DesktopViewModelTests
 {
+    [Fact]
+    public async Task DiagnosticsExport_SupportsAllFormatsFromTheSamePreview()
+    {
+        var renderer = new FakeReportDocumentRenderer();
+        var useCase = new DiagnosticsUseCase(
+            new FakeCapabilityProvider(),
+            new FakeMaintenanceService(),
+            new FakeCaptureCoordinator(),
+            new FakeReportJobQueue(),
+            documentRenderer: renderer);
+        var preview = await useCase.BuildSanitizedExportPreviewAsync();
+        var directory = TempArtifactDirectory.CreatePath("diag-export-all");
+
+        var export = await useCase.ExportPreviewAsync(directory, preview);
+
+        Assert.True(File.Exists(export.MarkdownPath));
+        Assert.True(File.Exists(export.JsonPath));
+        Assert.NotNull(export.SvgPath);
+        Assert.NotNull(export.PngPath);
+        Assert.NotNull(export.PdfPath);
+        Assert.True(File.Exists(export.SvgPath));
+        Assert.True(File.Exists(export.PngPath));
+        Assert.True(File.Exists(export.PdfPath));
+        Assert.Contains("本地诊断报告", await File.ReadAllTextAsync(export.MarkdownPath), StringComparison.Ordinal);
+        Assert.Contains("平台能力", renderer.LastDocument!.Sections.Select(section => section.Heading));
+        Assert.Contains("Headless test platform", await File.ReadAllTextAsync(export.MarkdownPath), StringComparison.Ordinal);
+
+        var svgPath = await useCase.ExportPreviewAsAsync(
+            Path.Combine(directory, "single.svg"),
+            preview,
+            ReportExportFormat.Svg);
+        Assert.True(File.Exists(svgPath));
+    }
+
+    private sealed class FakeReportDocumentRenderer : IReportDocumentRenderer
+    {
+        public ReportDocument? LastDocument { get; private set; }
+
+        public string RenderSvg(ReportDocument document)
+        {
+            LastDocument = document;
+            return "<svg/>";
+        }
+
+        public byte[] RenderPng(ReportDocument document)
+        {
+            LastDocument = document;
+            return [0x89, 0x50, 0x4E, 0x47];
+        }
+
+        public byte[] RenderPdf(ReportDocument document)
+        {
+            LastDocument = document;
+            return "%PDF-fake"u8.ToArray();
+        }
+    }
+
     private sealed class InMemoryEventRepository : IEventRepository
     {
         public List<ActivityEvent> Events { get; } = [];

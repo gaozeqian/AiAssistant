@@ -91,7 +91,7 @@ public sealed class DataManagementViewModel : ObservableObject
         "删除后原始媒体无法恢复，问答与周报只会引用仍存在的结构化证据。";
 
     public string ExportNotice { get; } =
-        "导出入口：日报页导出 Markdown、检索页导出问答与周报、诊断页生成脱敏导出预览并确认写出。所有导出都在本机生成。";
+        "导出入口：日报、周报、问答与诊断均支持 Markdown / SVG / PNG / PDF / JSON；数据备份为独立 ZIP。所有导出都在本机生成。";
 
     private async Task DeleteDateAsync()
     {

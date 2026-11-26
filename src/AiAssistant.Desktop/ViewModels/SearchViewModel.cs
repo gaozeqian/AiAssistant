@@ -237,19 +237,36 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
             string path;
             if (SaveFilePicker is not null)
             {
-                var picked = await SaveFilePicker.PickSavePathAsync(
+                var types = new List<SaveFileType>
+                {
+                    new("Markdown", "md"),
+                    new("SVG 图表", "svg"),
+                    new("PNG 图片", "png"),
+                    new("PDF 文档", "pdf"),
+                    new("JSON", "json")
+                };
+                var picked = await SaveFilePicker.PickSaveFileAsync(
                     $"AiAssistant-问答-{_clock.LocalNow:yyyyMMdd-HHmmss}.md",
-                    [new SaveFileType("Markdown", "md")]);
+                    types);
                 if (picked is null)
                 {
                     return;
                 }
 
-                path = await EvidenceSearchUseCase.ExportAnswerToAsync(_lastAnswer, picked, ct);
+                path = await _search.ExportAnswerSingleAsync(
+                    _lastAnswer,
+                    ReportExportFormatExtensions.FromExtension(picked.Extension),
+                    picked.Path,
+                    ct);
             }
             else
             {
-                path = await _search.ExportAnswerAsync(_lastAnswer, _exportDirectory, ct);
+                var export = await _search.ExportAnswerAllAsync(_lastAnswer, _exportDirectory, ct);
+                path = export.MarkdownPath;
+                StatusMessage = export.SvgPath is null
+                    ? $"已导出问答证据（Markdown / JSON）：{path}"
+                    : $"已导出问答证据（Markdown / SVG / PNG / PDF / JSON）：{path}";
+                return;
             }
 
             StatusMessage = $"已导出问答证据：{path}";
@@ -274,7 +291,7 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
                 CultureInfo.InvariantCulture,
                 $"{report.FromDate:MM-dd} ~ {report.ToDate:MM-dd} · {report.TotalEvents} 条 · 活跃 {report.TotalActiveMinutes} 分钟 · {(report.Degraded ? $"统计模式（{report.DegradedReason}）" : "本地模型摘要")}");
             OnPropertyChanged(nameof(HasWeeklyReport));
-            StatusMessage = "周报已生成，可导出 Markdown 与统计 JSON。";
+            StatusMessage = "周报已生成，可导出 Markdown / SVG / PNG / PDF / JSON。";
         });
     }
 
@@ -294,15 +311,12 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
                 {
                     new("Markdown", "md"),
                     new("SVG 图表", "svg"),
-                    new("统计 JSON", "json")
+                    new("PNG 图片", "png"),
+                    new("PDF 文档", "pdf"),
+                    new("JSON", "json")
                 };
-                if (_range.SupportsRasterization)
-                {
-                    types.Add(new("PNG 图片", "png"));
-                    types.Add(new("PDF 文档", "pdf"));
-                }
 
-                var picked = await SaveFilePicker.PickSavePathAsync(
+                var picked = await SaveFilePicker.PickSaveFileAsync(
                     $"AiAssistant-周报-{report.FromDate:yyyyMMdd}-{report.ToDate:yyyyMMdd}.md",
                     types);
                 if (picked is null)
@@ -310,29 +324,21 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
                     return;
                 }
 
-                var path = await _range.ExportSingleAsync(report, ResolveRangeFormat(picked), picked, ct);
+                var path = await _range.ExportSingleAsync(
+                    report,
+                    ReportExportFormatExtensions.FromExtension(picked.Extension),
+                    picked.Path,
+                    ct);
                 StatusMessage = $"已导出周报：{path}";
             }
             else
             {
                 var export = await _range.ExportAsync(report, _exportDirectory, ct);
-                StatusMessage = $"已导出周报（Markdown / SVG / PNG / PDF / 统计 JSON）：{export.MarkdownPath}";
+                StatusMessage = export.PngPath is null
+                    ? $"已导出周报（Markdown / SVG / JSON）：{export.MarkdownPath}"
+                    : $"已导出周报（Markdown / SVG / PNG / PDF / JSON）：{export.MarkdownPath}";
             }
         });
-    }
-
-    private static RangeExportFormat ResolveRangeFormat(string path)
-    {
-        var extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
-        return extension switch
-        {
-            "md" or "markdown" => RangeExportFormat.Markdown,
-            "json" => RangeExportFormat.StatsJson,
-            "svg" => RangeExportFormat.Svg,
-            "png" => RangeExportFormat.Png,
-            "pdf" => RangeExportFormat.Pdf,
-            _ => RangeExportFormat.Markdown
-        };
     }
 
     private async Task RunAsync(Func<CancellationToken, Task> action)

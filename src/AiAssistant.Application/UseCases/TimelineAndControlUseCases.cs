@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
@@ -123,6 +124,13 @@ public sealed record SystemDiagnosticsSnapshot(
     IReadOnlyList<ModelAuditEntry>? ModelAudit = null,
     IReadOnlyList<ModelEndpointCapability>? ModelEndpoints = null);
 
+public sealed record DiagnosticExport(
+    string MarkdownPath,
+    string JsonPath,
+    string? SvgPath = null,
+    string? PngPath = null,
+    string? PdfPath = null);
+
 public sealed class DiagnosticsUseCase(
     ICapabilityProvider capabilityProvider,
     IDatabaseMaintenanceService maintenanceService,
@@ -133,11 +141,13 @@ public sealed class DiagnosticsUseCase(
     IModelGateway? modelGateway = null,
     IModelAuditSink? modelAuditSink = null,
     IModelCapabilityProber? modelCapabilityProber = null,
-    IClock? clock = null)
+    IClock? clock = null,
+    IReportDocumentRenderer? documentRenderer = null)
 {
     private static readonly JsonSerializerOptions PreviewJsonOptions = new()
     {
-        WriteIndented = true
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
     private readonly IClock _clock = clock ?? new SystemClock();
 
@@ -254,4 +264,224 @@ public sealed class DiagnosticsUseCase(
 
         await File.WriteAllTextAsync(destinationPath, confirmedJsonPreview, ct);
     }
+
+    /// <summary>Writes every available diagnostics format into the directory.</summary>
+    public async Task<DiagnosticExport> ExportPreviewAsync(
+        string destinationDirectory,
+        string confirmedJsonPreview,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationDirectory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(confirmedJsonPreview);
+        Directory.CreateDirectory(destinationDirectory);
+        var stem = string.Create(
+            CultureInfo.InvariantCulture,
+            $"AiAssistant-诊断导出-{_clock.LocalNow:yyyyMMdd-HHmmss}");
+        var markdownPath = Path.Combine(destinationDirectory, stem + ".md");
+        var jsonPath = Path.Combine(destinationDirectory, stem + ".json");
+        var document = BuildDiagnosticDocument(confirmedJsonPreview);
+        await File.WriteAllTextAsync(markdownPath, ReportDocumentMarkdownRenderer.Render(document), ct);
+        await ExportConfirmedPreviewAsync(jsonPath, confirmedJsonPreview, ct);
+
+        string? svgPath = null;
+        string? pngPath = null;
+        string? pdfPath = null;
+        if (documentRenderer is not null)
+        {
+            svgPath = Path.Combine(destinationDirectory, stem + ".svg");
+            await File.WriteAllTextAsync(svgPath, documentRenderer.RenderSvg(document), ct);
+            pngPath = Path.Combine(destinationDirectory, stem + ".png");
+            await File.WriteAllBytesAsync(pngPath, documentRenderer.RenderPng(document), ct);
+            pdfPath = Path.Combine(destinationDirectory, stem + ".pdf");
+            await File.WriteAllBytesAsync(pdfPath, documentRenderer.RenderPdf(document), ct);
+        }
+
+        return new DiagnosticExport(markdownPath, jsonPath, svgPath, pngPath, pdfPath);
+    }
+
+    /// <summary>Writes one diagnostics format to the exact destination path chosen by the user.</summary>
+    public async Task<string> ExportPreviewAsAsync(
+        string destinationPath,
+        string confirmedJsonPreview,
+        ReportExportFormat format,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(confirmedJsonPreview);
+        if (format == ReportExportFormat.Json)
+        {
+            await ExportConfirmedPreviewAsync(destinationPath, confirmedJsonPreview, ct);
+            return destinationPath;
+        }
+
+        var document = BuildDiagnosticDocument(confirmedJsonPreview);
+        switch (format)
+        {
+            case ReportExportFormat.Markdown:
+                await File.WriteAllTextAsync(
+                    destinationPath,
+                    ReportDocumentMarkdownRenderer.Render(document),
+                    ct);
+                break;
+            case ReportExportFormat.Svg:
+                await File.WriteAllTextAsync(
+                    destinationPath,
+                    RequireDocumentRenderer().RenderSvg(document),
+                    ct);
+                break;
+            case ReportExportFormat.Png:
+                await File.WriteAllBytesAsync(
+                    destinationPath,
+                    RequireDocumentRenderer().RenderPng(document),
+                    ct);
+                break;
+            case ReportExportFormat.Pdf:
+                await File.WriteAllBytesAsync(
+                    destinationPath,
+                    RequireDocumentRenderer().RenderPdf(document),
+                    ct);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(format));
+        }
+
+        return destinationPath;
+    }
+
+    private IReportDocumentRenderer RequireDocumentRenderer() =>
+        documentRenderer ?? throw new InvalidOperationException("SVG/PNG/PDF 导出需要文档渲染器。");
+
+    private static ReportDocument BuildDiagnosticDocument(string json)
+    {
+        try
+        {
+            using var parsed = JsonDocument.Parse(json);
+            var root = parsed.RootElement;
+            var platform = ReadString(root, "platform") ?? "未知平台";
+            var exportedAt = ReadString(root, "exportedAtUtc") ?? string.Empty;
+            var sections = new List<ReportSection>();
+            var overview = new List<ReportField>();
+            foreach (var property in root.EnumerateObject())
+            {
+                switch (property.Value.ValueKind)
+                {
+                    case JsonValueKind.Object:
+                        sections.Add(new ReportFieldSection(
+                            Label(property.Name),
+                            FlattenFields(property.Value)));
+                        break;
+                    case JsonValueKind.Array:
+                        sections.Add(new ReportBulletSection(
+                            Label(property.Name),
+                            FormatArray(property.Value)));
+                        break;
+                    default:
+                        overview.Add(new ReportField(Label(property.Name), FormatValue(property.Value)));
+                        break;
+                }
+            }
+
+            if (overview.Count > 0)
+            {
+                sections.Insert(0, new ReportFieldSection("概要", overview));
+            }
+
+            return new ReportDocument(
+                "本地诊断报告",
+                $"平台 {platform} · 导出时间 {exportedAt} · 仅含脱敏元数据",
+                sections);
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            return new ReportDocument(
+                "本地诊断报告",
+                "预览内容不是有效 JSON",
+                [new ReportCodeSection("原始预览", json)]);
+        }
+    }
+
+    private static List<ReportField> FlattenFields(JsonElement element, string prefix = "")
+    {
+        var fields = new List<ReportField>();
+        foreach (var property in element.EnumerateObject())
+        {
+            var label = string.IsNullOrEmpty(prefix)
+                ? Label(property.Name)
+                : $"{prefix}.{property.Name}";
+            if (property.Value.ValueKind == JsonValueKind.Object)
+            {
+                fields.AddRange(FlattenFields(property.Value, label));
+            }
+            else
+            {
+                fields.Add(new ReportField(label, FormatValue(property.Value)));
+            }
+        }
+
+        return fields;
+    }
+
+    private static List<string> FormatArray(JsonElement array)
+    {
+        var items = new List<string>();
+        foreach (var item in array.EnumerateArray())
+        {
+            items.Add(item.ValueKind == JsonValueKind.Object
+                ? FormatObject(item)
+                : FormatValue(item));
+        }
+
+        return items.Count == 0 ? ["（无）"] : items;
+    }
+
+    private static string FormatObject(JsonElement element) =>
+        string.Join(
+            " · ",
+            element.EnumerateObject().Select(property =>
+                $"{Label(property.Name)}={FormatValue(property.Value)}"));
+
+    private static string FormatValue(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String => value.GetString() ?? string.Empty,
+        JsonValueKind.True => "是",
+        JsonValueKind.False => "否",
+        JsonValueKind.Null or JsonValueKind.Undefined => "—",
+        JsonValueKind.Number => value.GetRawText(),
+        JsonValueKind.Object => FormatObject(value),
+        JsonValueKind.Array => string.Join("、", value.EnumerateArray().Select(FormatValue)),
+        _ => value.GetRawText()
+    };
+
+    private static string? ReadString(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static string Label(string name) => name switch
+    {
+        "exportedAtUtc" => "导出时间",
+        "platform" => "平台",
+        "schemaVersion" => "Schema 版本",
+        "database" => "数据库",
+        "capturePipeline" => "采集管道",
+        "retention" => "保留策略",
+        "capabilities" => "平台能力",
+        "recentJobs" => "最近任务",
+        "recentSanitizedLogs" => "脱敏日志",
+        "isHealthy" => "健康",
+        "cipher" => "加密",
+        "vectorBackend" => "向量后端",
+        "eventCount" => "事件数",
+        "encryptedBlobCount" => "加密媒体数",
+        "kind" => "能力",
+        "status" => "状态",
+        "summary" => "说明",
+        "targetDate" => "日期",
+        "attempts" => "尝试次数",
+        "timestampUtc" or "TimestampUtc" => "时间",
+        "level" or "Level" => "级别",
+        "category" or "Category" => "类别",
+        "sanitizedMessage" or "SanitizedMessage" => "消息",
+        _ => name
+    };
 }
