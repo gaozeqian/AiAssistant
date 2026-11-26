@@ -27,9 +27,11 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
     private string _weeklyMarkdown = string.Empty;
     private string _weeklyStatus = "尚未生成周报";
     private bool _isBusy;
+    private double _progressPulseValue;
     private bool _disposed;
     private EvidenceQaAnswer? _lastAnswer;
     private RangeReport? _weeklyReport;
+    private readonly ProgressPulseController _progressPulse;
 
     public SearchViewModel(
         EvidenceSearchUseCase search,
@@ -41,6 +43,7 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
         _range = range ?? throw new ArgumentNullException(nameof(range));
         _exportDirectory = exportDirectory ?? throw new ArgumentNullException(nameof(exportDirectory));
         _clock = clock ?? new SystemClock();
+        _progressPulse = new ProgressPulseController(value => ProgressPulse = value);
         var (from, to) = _search.DefaultRange();
         _fromDate = new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         _toDate = new DateTimeOffset(to.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
@@ -130,11 +133,21 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
     public bool IsBusy
     {
         get => _isBusy;
-        private set => SetProperty(ref _isBusy, value);
+        private set
+        {
+            if (SetProperty(ref _isBusy, value))
+            {
+                _progressPulse.SetBusy(value);
+            }
+        }
     }
 
-    /// <summary>Clears the loading flag when leaving the panel so a frozen indeterminate bar does not persist.</summary>
-    public void ResetBusy() => IsBusy = false;
+    /// <summary>Determinate 0..100 progress driven while busy, so it keeps advancing across tab switches.</summary>
+    public double ProgressPulse
+    {
+        get => _progressPulseValue;
+        private set => SetProperty(ref _progressPulseValue, value);
+    }
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
@@ -153,6 +166,7 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        _progressPulse.Dispose();
         _disposeCts.Cancel();
         _disposeCts.Dispose();
     }

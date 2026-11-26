@@ -154,18 +154,25 @@
       <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
         <StackPanel Spacing="10">
           <TextBlock Text="平台能力" FontWeight="SemiBold" />
+          <Grid ColumnDefinitions="130,85,*,260,110">
+            <TextBlock Text="能力" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="1" Text="状态" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="2" Text="说明" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="8,0" />
+            <TextBlock Grid.Column="3" Text="处理建议" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="4" Text="操作" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="8,0,0,0" />
+          </Grid>
           <ItemsControl ItemsSource="{Binding Capabilities}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:CapabilityItem">
                 <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,9">
-                  <Grid ColumnDefinitions="130,85,*,260,Auto">
+                  <Grid ColumnDefinitions="130,85,*,260,110">
                     <TextBlock Text="{Binding KindText}" FontWeight="SemiBold" />
                     <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{DynamicResource AccentBrush}" />
                     <TextBlock Grid.Column="2" Text="{Binding Summary}" TextWrapping="Wrap" Margin="8,0" />
                     <TextBlock Grid.Column="3" Text="{Binding RemediationHint}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
                     <Button Grid.Column="4" Classes="secondary" Content="{Binding ActionLabel}"
                             Command="{Binding OpenSettingsCommand}" IsVisible="{Binding NeedsAction}"
-                            Margin="8,0,0,0" VerticalAlignment="Center" />
+                            Margin="8,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" />
                   </Grid>
                 </Border>
               </DataTemplate>

@@ -24,7 +24,7 @@
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
-          <ProgressBar IsIndeterminate="True" VerticalAlignment="Top" IsVisible="{Binding IsBusy}" />
+          <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" VerticalAlignment="Top" IsVisible="{Binding IsBusy}" />
         </Grid>
         <StackPanel Grid.Row="4" Spacing="5" Margin="0,12,0,0">
           <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />

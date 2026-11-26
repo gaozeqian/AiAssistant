@@ -33,7 +33,7 @@
           <Button Classes="secondary" Content="导出问答" Command="{Binding ExportAnswerCommand}"
                   IsEnabled="{Binding HasAnswer}" Margin="0,0,8,8" />
         </WrapPanel>
-        <ProgressBar Grid.Row="3" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+        <ProgressBar Grid.Row="3" Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsBusy}" />
         <StackPanel Grid.Row="4" Spacing="5" Margin="0,8,0,0">
           <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"

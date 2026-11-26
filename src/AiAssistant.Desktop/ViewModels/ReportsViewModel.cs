@@ -10,7 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AiAssistant.Desktop.ViewModels;
 
-public sealed class ReportsViewModel : ObservableObject
+public sealed class ReportsViewModel : ObservableObject, IDisposable
 {
     private readonly ReportUseCase _reports;
     private readonly string _exportDirectory;
@@ -22,12 +22,15 @@ public sealed class ReportsViewModel : ObservableObject
     private string _statusMessage = "选择日期后可生成或查看日报";
     private string _errorMessage = string.Empty;
     private bool _isBusy;
+    private double _progressPulseValue;
+    private readonly ProgressPulseController _progressPulse;
 
     public ReportsViewModel(ReportUseCase reports, string exportDirectory, IClock? clock = null)
     {
         _reports = reports ?? throw new ArgumentNullException(nameof(reports));
         _exportDirectory = exportDirectory ?? throw new ArgumentNullException(nameof(exportDirectory));
         _clock = clock ?? new SystemClock();
+        _progressPulse = new ProgressPulseController(value => ProgressPulse = value);
         _selectedDate = _clock.LocalNow.Date;
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GenerateCommand = new AsyncRelayCommand(() => GenerateAsync(forceOverwrite: false));
@@ -102,11 +105,21 @@ public sealed class ReportsViewModel : ObservableObject
     public bool IsBusy
     {
         get => _isBusy;
-        private set => SetProperty(ref _isBusy, value);
+        private set
+        {
+            if (SetProperty(ref _isBusy, value))
+            {
+                _progressPulse.SetBusy(value);
+            }
+        }
     }
 
-    /// <summary>Clears the loading flag when leaving the panel so a frozen indeterminate bar does not persist.</summary>
-    public void ResetBusy() => IsBusy = false;
+    /// <summary>Determinate 0..100 progress driven while busy, so it keeps advancing across tab switches.</summary>
+    public double ProgressPulse
+    {
+        get => _progressPulseValue;
+        private set => SetProperty(ref _progressPulseValue, value);
+    }
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
@@ -268,6 +281,8 @@ public sealed class ReportsViewModel : ObservableObject
             return "站会数据格式不可用";
         }
     }
+
+    public void Dispose() => _progressPulse.Dispose();
 }
 
 public sealed class ReportVersionItem

@@ -108,23 +108,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public int SelectedSectionIndex
     {
         get => _selectedSectionIndex;
-        set
-        {
-            if (SetProperty(ref _selectedSectionIndex, value))
-            {
-                ResetInactiveLoadingStates();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Clearing the loading flag of panels not currently shown avoids the Avalonia indeterminate
-    /// ProgressBar freezing after a tab is hidden and re-shown.
-    /// </summary>
-    private void ResetInactiveLoadingStates()
-    {
-        Search?.ResetBusy();
-        Reports?.ResetBusy();
+        set => SetProperty(ref _selectedSectionIndex, value);
     }
 
     public string CaptureStatus
@@ -213,6 +197,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
         Timeline.Dispose();
         Capture.Dispose();
+        Reports.Dispose();
         Voice?.Dispose();
     }
 
