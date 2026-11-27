@@ -15,6 +15,13 @@ public interface ISaveFilePicker
     Task<SaveFileSelection?> PickSaveFileAsync(string suggestedFileName, IReadOnlyList<SaveFileType> types);
 }
 
+/// <summary>Abstraction over the platform open-file dialog (restore, import).</summary>
+public interface IOpenFilePicker
+{
+    /// <summary>Returns the chosen local path, or <c>null</c> when the user cancels.</summary>
+    Task<string?> PickOpenFileAsync(string title, IReadOnlyList<SaveFileType> types);
+}
+
 /// <summary>Wraps Avalonia's storage provider. Created in the shell once the window (and thus <c>TopLevel</c>) exists.</summary>
 public sealed class AvaloniaSaveFilePicker(IStorageProvider storageProvider) : ISaveFilePicker
 {
@@ -73,5 +80,31 @@ public sealed class AvaloniaSaveFilePicker(IStorageProvider storageProvider) : I
         }
 
         return new SaveFileSelection(path, extension);
+    }
+}
+
+/// <summary>Open-file counterpart used by the encrypted-backup restore flow.</summary>
+public sealed class AvaloniaOpenFilePicker(IStorageProvider storageProvider) : IOpenFilePicker
+{
+    public async Task<string?> PickOpenFileAsync(string title, IReadOnlyList<SaveFileType> types)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentNullException.ThrowIfNull(types);
+        if (types.Count == 0)
+        {
+            throw new ArgumentException("At least one file type is required.", nameof(types));
+        }
+
+        var choices = types
+            .Select(type => new FilePickerFileType(type.Label) { Patterns = [$"*.{type.Extension}"] })
+            .ToList();
+        var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = choices
+        });
+
+        return files.Count == 0 ? null : files[0].TryGetLocalPath();
     }
 }

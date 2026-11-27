@@ -115,23 +115,10 @@ public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFa
             return;
         }
 
-        var tempDir = Path.Combine(Path.GetTempPath(), $"aiassistant-restore-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
+        var tempDir = CreateRestoreTempDirectory();
         try
         {
-            ZipFile.ExtractToDirectory(backupSourcePath, tempDir);
-            var extractedDb = Path.Combine(tempDir, "database", "aiassistant.enc.db");
-            if (!File.Exists(extractedDb))
-            {
-                throw new StorageIntegrityException("Backup archive does not contain database/aiassistant.enc.db.");
-            }
-
-            // Verify with the backup's own keystore BEFORE touching the live data directory. On this machine
-            // the OS KEK still unwraps the envelope; a backup from another machine fails here cleanly.
-            var tempFactory = new EncryptedSqliteConnectionFactory(
-                new StorageOptions { DataDirectory = tempDir },
-                connectionFactory.KeyStore.CreateForDirectory(tempDir));
-            await VerifyRestorableAsync(tempFactory, Path.Combine(tempDir, "database", "aiassistant.enc.db"), ct);
+            var extractedDb = await ExtractAndVerifyArchiveAsync(backupSourcePath, tempDir, ct);
 
             var dbPath = connectionFactory.Options.DatabasePath;
             Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
@@ -146,10 +133,155 @@ public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFa
         }
         finally
         {
-            if (Directory.Exists(tempDir))
+            TryDeleteDirectory(tempDir);
+        }
+    }
+
+    /// <summary>
+    /// Validates the archive without touching live data, then leaves it next to the database so the
+    /// next start can replace everything while no worker holds the database open.
+    /// </summary>
+    public async Task StageRestoreAsync(string backupSourcePath, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(backupSourcePath);
+        var fullPath = Path.GetFullPath(backupSourcePath);
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("Encrypted backup file does not exist.", fullPath);
+        }
+
+        if (IsZipArchive(fullPath))
+        {
+            var tempDir = CreateRestoreTempDirectory();
+            try
             {
-                Directory.Delete(tempDir, recursive: true);
+                _ = await ExtractAndVerifyArchiveAsync(fullPath, tempDir, ct);
             }
+            finally
+            {
+                TryDeleteDirectory(tempDir);
+            }
+        }
+        else
+        {
+            // A legacy raw database is only readable with the live key envelope.
+            await VerifyRestorableAsync(connectionFactory, fullPath, ct);
+        }
+
+        var stagedPath = StagedRestorePath;
+        Directory.CreateDirectory(connectionFactory.Options.DataDirectory);
+        if (!string.Equals(fullPath, stagedPath, StringComparison.OrdinalIgnoreCase))
+        {
+            File.Copy(fullPath, stagedPath, overwrite: true);
+        }
+    }
+
+    public async Task<bool> ApplyStagedRestoreAsync(CancellationToken ct)
+    {
+        var stagedPath = StagedRestorePath;
+        if (!File.Exists(stagedPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            await RestoreEncryptedAsync(stagedPath, ct);
+            return true;
+        }
+        finally
+        {
+            // Always drop the marker: a failing archive must not block every future start.
+            TryDeleteFile(stagedPath);
+        }
+    }
+
+    public Task<bool> DiscardStagedRestoreAsync(CancellationToken ct)
+    {
+        var stagedPath = StagedRestorePath;
+        if (!File.Exists(stagedPath))
+        {
+            return Task.FromResult(false);
+        }
+
+        TryDeleteFile(stagedPath);
+        return Task.FromResult(!File.Exists(stagedPath));
+    }
+
+    private string StagedRestorePath =>
+        Path.Combine(connectionFactory.Options.DataDirectory, "restore-pending.zip");
+
+    private static string CreateRestoreTempDirectory()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"aiassistant-restore-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        return tempDir;
+    }
+
+    private async Task<string> ExtractAndVerifyArchiveAsync(
+        string backupPath,
+        string tempDir,
+        CancellationToken ct)
+    {
+        ZipFile.ExtractToDirectory(backupPath, tempDir);
+        var extractedDb = Path.Combine(tempDir, "database", "aiassistant.enc.db");
+        if (!File.Exists(extractedDb))
+        {
+            throw new StorageIntegrityException("Backup archive does not contain database/aiassistant.enc.db.");
+        }
+
+        // Verify with the backup's own keystore BEFORE touching the live data directory. On this machine
+        // the OS KEK still unwraps the envelope; a backup from another machine fails here cleanly.
+        var tempFactory = new EncryptedSqliteConnectionFactory(
+            new StorageOptions { DataDirectory = tempDir },
+            connectionFactory.KeyStore.CreateForDirectory(tempDir));
+        await VerifyRestorableAsync(tempFactory, extractedDb, ct);
+        return extractedDb;
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
+            }
+        }
+        catch (IOException ex)
+        {
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace(
+                "Storage.Sqlite.SqliteDatabaseMaintenanceService.TryDeleteDirectory",
+                ex);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace(
+                "Storage.Sqlite.SqliteDatabaseMaintenanceService.TryDeleteDirectory",
+                ex);
+        }
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (IOException ex)
+        {
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace(
+                "Storage.Sqlite.SqliteDatabaseMaintenanceService.TryDeleteFile",
+                ex);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace(
+                "Storage.Sqlite.SqliteDatabaseMaintenanceService.TryDeleteFile",
+                ex);
         }
     }
 

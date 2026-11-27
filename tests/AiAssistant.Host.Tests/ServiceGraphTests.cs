@@ -32,5 +32,11 @@ public sealed class ServiceGraphTests
         Assert.NotNull(runtime.Services.AsrEngine);
         Assert.NotNull(runtime.Services.WakeWordDetector);
         Assert.NotNull(runtime.Services.ModelCapabilityProber);
+
+        // The shell resolves the voice history/player and retention wiring, so building it proves
+        // every new constructor dependency is actually registered.
+        using var shell = runtime.CreateShellViewModel();
+        Assert.NotNull(shell.Voice);
+        Assert.NotNull(shell.Data);
     }
 }

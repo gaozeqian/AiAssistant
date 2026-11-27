@@ -367,29 +367,48 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Reads the standup block out of the persisted stats JSON. The model-facing schema uses
+    /// lowercase field names (yesterday/today/blockers) while older hand-written fixtures use
+    /// PascalCase, so every lookup is case-insensitive.
+    /// </summary>
     private static string FormatStandup(string statsJson)
     {
         try
         {
             using var document = JsonDocument.Parse(statsJson);
-            if (!document.RootElement.TryGetProperty("Standup", out var standup) &&
-                !document.RootElement.TryGetProperty("standup", out standup))
+            if (!TryGetProperty(document.RootElement, "Standup", out var standup))
             {
-                return "尚无站会数据";
+                return "该版本没有站会内容";
             }
 
             static string ReadString(JsonElement element, string property) =>
-                element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
+                TryGetProperty(element, property, out var value) && value.ValueKind == JsonValueKind.String
                     ? value.GetString() ?? string.Empty
                     : string.Empty;
 
-            var blockers = standup.TryGetProperty("Blockers", out var blockerArray) &&
+            var yesterday = ReadString(standup, "Yesterday");
+            var today = ReadString(standup, "Today");
+            var blockers = TryGetProperty(standup, "Blockers", out var blockerArray) &&
                            blockerArray.ValueKind == JsonValueKind.Array
-                ? string.Join("；", blockerArray.EnumerateArray().Select(item => item.GetString()).Where(item => !string.IsNullOrWhiteSpace(item)))
+                ? string.Join(
+                    "；",
+                    blockerArray.EnumerateArray()
+                        .Where(item => item.ValueKind == JsonValueKind.String)
+                        .Select(item => item.GetString())
+                        .Where(item => !string.IsNullOrWhiteSpace(item)))
                 : string.Empty;
+
+            if (string.IsNullOrWhiteSpace(yesterday) &&
+                string.IsNullOrWhiteSpace(today) &&
+                string.IsNullOrWhiteSpace(blockers))
+            {
+                return "该版本没有站会内容";
+            }
+
             var builder = new StringBuilder();
-            builder.AppendLine(CultureInfo.InvariantCulture, $"昨天：{ReadString(standup, "Yesterday")}");
-            builder.AppendLine(CultureInfo.InvariantCulture, $"今天：{ReadString(standup, "Today")}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"昨天：{(string.IsNullOrWhiteSpace(yesterday) ? "未记录" : yesterday)}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"今天：{(string.IsNullOrWhiteSpace(today) ? "未记录" : today)}");
             builder.Append(CultureInfo.InvariantCulture, $"阻塞：{(string.IsNullOrWhiteSpace(blockers) ? "无" : blockers)}");
             return builder.ToString();
         }
@@ -397,6 +416,24 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         {
             return "站会数据格式不可用";
         }
+    }
+
+    private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     public void Dispose() => _progressPulse.Dispose();

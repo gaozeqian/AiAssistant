@@ -1,6 +1,7 @@
 using System.Globalization;
 using AiAssistant.Application.Ports;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -51,6 +52,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
         Diagnostics.ModelConfig.RestartRequested += OnRestartRequested;
         Diagnostics.VoicePageRequested += OnVoicePageRequested;
+        if (Data is not null)
+        {
+            Data.RestartRequested += OnDataRestartRequested;
+        }
     }
 
     public TimelineViewModel Timeline { get; }
@@ -133,6 +138,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         await Timeline.InitializeAsync();
         await Diagnostics.RefreshAsync();
         await Reports.InitializeAsync();
+        if (Voice is not null)
+        {
+            await Voice.InitializeAsync();
+        }
     }
 
     public void ShowTimeline()
@@ -202,6 +211,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         }
 
         Diagnostics.VoicePageRequested -= OnVoicePageRequested;
+        if (Data is not null)
+        {
+            Data.RestartRequested -= OnDataRestartRequested;
+        }
+
         Timeline.Dispose();
         Capture.Dispose();
         Reports.Dispose();
@@ -213,16 +227,32 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         CaptureStatus = Capture.CaptureStateText;
     }
 
-    private void OnTimelineRequested(object? sender, EventArgs e) => ShowTimeline();
+    private void OnTimelineRequested(object? sender, EventArgs e) => RunOnUiThread(ShowTimeline);
 
-    private void OnReportsRequested(object? sender, EventArgs e) => ShowReports();
+    private void OnReportsRequested(object? sender, EventArgs e) => RunOnUiThread(ShowReports);
 
-    private void OnVoicePageRequested(object? sender, EventArgs e) => ShowVoice();
+    private void OnVoicePageRequested(object? sender, EventArgs e) => RunOnUiThread(ShowVoice);
 
     private void OnEvidenceNavigationRequested(object? sender, EvidenceNavigationRequest request)
     {
         SelectedSectionIndex = 0;
         _ = NavigateTimelineAsync(request);
+    }
+
+    /// <summary>
+    /// Voice commands run on the audio session thread; every UI-bound mutation (tab index, exit,
+    /// restart) has to be marshalled or Avalonia throws "Call from invalid thread" and the session dies.
+    /// </summary>
+    private static void RunOnUiThread(Action action)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            action();
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(action);
+        }
     }
 
     private async Task NavigateTimelineAsync(EvidenceNavigationRequest request)
@@ -238,11 +268,13 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void OnExitRequested(object? sender, EventArgs e)
+    private void OnExitRequested(object? sender, EventArgs e) => RunOnUiThread(() =>
     {
         IsExitRequested = true;
         ExitRequested?.Invoke(this, EventArgs.Empty);
-    }
+    });
 
     private void OnRestartRequested() => RestartRequested?.Invoke();
+
+    private void OnDataRestartRequested(object? sender, EventArgs e) => RunOnUiThread(() => RestartRequested?.Invoke());
 }

@@ -35,7 +35,14 @@
         <Border Grid.Column="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="6,0,0,0">
           <StackPanel Spacing="7">
             <TextBlock Text="媒体保留清理" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding RetentionPolicyText}" TextWrapping="Wrap" FontSize="12"
+                       Foreground="{DynamicResource AccentBrush}" />
             <TextBlock Text="{Binding RetentionText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+            <Button Classes="secondary" Content="立即清理" Command="{Binding RunRetentionSweepCommand}"
+                    IsVisible="{Binding HasRetentionSweep}" HorizontalAlignment="Left" Padding="10,4" FontSize="12"
+                    automation:AutomationProperties.Name="立即清理媒体" />
+            <TextBlock Text="{Binding RetentionStatusText}" TextWrapping="Wrap" FontSize="11"
+                       Foreground="{DynamicResource MutedBrush}" IsVisible="{Binding HasRetentionStatus}" />
           </StackPanel>
         </Border>
       </Grid>

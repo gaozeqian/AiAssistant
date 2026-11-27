@@ -91,8 +91,34 @@ internal static class DomainRegistrations
         services.AddSingleton<IAsrEngine, WhisperAsrEngine>();
     }
 
-    internal static void RegisterVoice(IServiceCollection services, string dataDirectory, IClock clock)
+    /// <summary>
+    /// Voice session policy from environment variables. The retention window is only the initial
+    /// value: the retention settings page overwrites the same instance at startup and on save.
+    /// </summary>
+    internal static VoiceSessionOptions CreateVoiceSessionOptions() => new()
     {
+        EnableWakeChime = !string.Equals(
+            Environment.GetEnvironmentVariable(EnvironmentNames.VoiceDisableChime),
+            "true",
+            StringComparison.OrdinalIgnoreCase),
+        RecordCommandAudio = string.Equals(
+            Environment.GetEnvironmentVariable(EnvironmentNames.VoiceRecordCommandAudio),
+            "true",
+            StringComparison.OrdinalIgnoreCase),
+        CommandAudioRetention = TimeSpan.FromDays(ParseBoundedInt(
+            Environment.GetEnvironmentVariable(EnvironmentNames.VoiceAudioRetentionDays),
+            7,
+            1,
+            365))
+    };
+
+    internal static void RegisterVoice(
+        IServiceCollection services,
+        string dataDirectory,
+        IClock clock,
+        VoiceSessionOptions sessionOptions)
+    {
+        ArgumentNullException.ThrowIfNull(sessionOptions);
         var modelDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.SherpaModelDir);
         if (string.IsNullOrWhiteSpace(modelDirectory))
         {
@@ -113,22 +139,6 @@ internal static class DomainRegistrations
             KeywordsScore = ReadFloatEnvironment(EnvironmentNames.KwsScore, voiceDefaults.KeywordsScore, 0.1f, 10f),
             KeywordsThreshold = ReadFloatEnvironment(EnvironmentNames.KwsThreshold, voiceDefaults.KeywordsThreshold, 0.01f, 0.99f)
         };
-        var sessionOptions = new VoiceSessionOptions
-        {
-            EnableWakeChime = !string.Equals(
-                Environment.GetEnvironmentVariable(EnvironmentNames.VoiceDisableChime),
-                "true",
-                StringComparison.OrdinalIgnoreCase),
-            RecordCommandAudio = string.Equals(
-                Environment.GetEnvironmentVariable(EnvironmentNames.VoiceRecordCommandAudio),
-                "true",
-                StringComparison.OrdinalIgnoreCase),
-            CommandAudioRetention = TimeSpan.FromDays(ParseBoundedInt(
-                Environment.GetEnvironmentVariable(EnvironmentNames.VoiceAudioRetentionDays),
-                7,
-                1,
-                365))
-        };
         var navigation = new VoiceNavigationHub();
         services.AddSingleton(voiceOptions);
         services.AddSingleton(sessionOptions);
@@ -137,6 +147,7 @@ internal static class DomainRegistrations
         services.AddSingleton<IWakeWordDetector, SherpaOnnxWakeWordDetector>();
         services.AddSingleton<ITtsService, SherpaOnnxTtsService>();
         services.AddSingleton<IVoiceCommandLog, SqliteVoiceCommandLog>();
+        services.AddSingleton<ICommandAudioPlayer, CommandAudioPlayer>();
         services.AddSingleton<VoiceCommandRouter>();
         services.AddSingleton<IVoiceSession>(provider => new VoiceSessionController(
             provider.GetRequiredService<IAudioHub>(),

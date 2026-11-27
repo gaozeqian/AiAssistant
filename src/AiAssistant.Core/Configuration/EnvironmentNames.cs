@@ -42,6 +42,10 @@ public static class EnvironmentNames
     public const string ReportTime = "AIASSISTANT_REPORT_TIME";
     public const string ReportDisableSchedule = "AIASSISTANT_REPORT_DISABLE_SCHEDULE";
 
+    // 保留与容量
+    public const string MediaRetentionDays = "AIASSISTANT_MEDIA_RETENTION_DAYS";
+    public const string MaxStorageGigabytes = "AIASSISTANT_MAX_STORAGE_GB";
+
     // 本地 MCP
     public const string McpEnabled = "AIASSISTANT_MCP_ENABLED";
     public const string McpPort = "AIASSISTANT_MCP_PORT";

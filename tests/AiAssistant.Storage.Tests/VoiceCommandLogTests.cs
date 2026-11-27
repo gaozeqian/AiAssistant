@@ -79,6 +79,43 @@ public sealed class VoiceCommandLogTests : IDisposable
     }
 
     [Fact]
+    public async Task VoiceCommandLog_ListsNewestFirstWithAudioReference()
+    {
+        var options = new StorageOptions { DataDirectory = Path.Combine(_tempRoot, "voice-list") };
+        var key = RandomNumberGenerator.GetBytes(32);
+        var keyStore = new StaticKeyStore(key);
+        var factory = new EncryptedSqliteConnectionFactory(options, keyStore);
+        var maintenance = new SqliteDatabaseMaintenanceService(factory);
+        var log = new SqliteVoiceCommandLog(factory);
+        await maintenance.InitializeAsync(CancellationToken.None);
+
+        var start = new DateTimeOffset(2026, 11, 20, 9, 0, 0, TimeSpan.Zero);
+        for (var i = 0; i < 3; i++)
+        {
+            await log.AppendAsync(
+                new VoiceCommandLogRecord(
+                    $"cmd_{i}",
+                    start.AddMinutes(i),
+                    "你好时光",
+                    $"命令 {i}",
+                    i == 2 ? "AskQuestion" : "PauseCapture",
+                    "{}",
+                    ModelEndpointTier.LocalOffline,
+                    null,
+                    i == 2 ? "cnt_audio_2" : null),
+                CancellationToken.None);
+        }
+
+        var recent = await log.ListRecentAsync(2, CancellationToken.None);
+
+        Assert.Equal(2, recent.Count);
+        Assert.Equal("cmd_2", recent[0].Id);
+        Assert.Equal("cmd_1", recent[1].Id);
+        Assert.Equal("cnt_audio_2", recent[0].AudioContentId);
+        Assert.Null(recent[1].AudioContentId);
+    }
+
+    [Fact]
     public async Task CommandAudioReference_IsClearedOnExpiry_WhileTextLogRemains()
     {
         var options = new StorageOptions { DataDirectory = Path.Combine(_tempRoot, "voice-audio") };

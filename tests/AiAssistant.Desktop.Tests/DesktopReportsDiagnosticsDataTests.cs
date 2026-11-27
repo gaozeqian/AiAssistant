@@ -39,7 +39,7 @@ public sealed partial class DesktopViewModelTests
         var viewModel = new DiagnosticsViewModel(useCase);
 
         await viewModel.RefreshCommand.ExecuteAsync(null);
-        Assert.Contains("安全擦除过期媒体 3 个", viewModel.RetentionText);
+        Assert.Contains("安全擦除过期或超限媒体 3 个", viewModel.RetentionText);
         Assert.Single(viewModel.RecentLogs);
         Assert.False(viewModel.HasExportPreview);
 
@@ -96,6 +96,17 @@ public sealed partial class DesktopViewModelTests
         var keyStore = CapabilityActionResolver.Resolve(
             CapabilityState.PermissionRequired(CapabilityKind.KeyStore, "已锁定", "解锁后重试。"));
         Assert.Equal(CapabilityActionKind.RetryDiagnostics, keyStore!.Kind);
+
+        // Voice models can be ready while the session is off: the hint must survive as a real action.
+        var disabledVoice = new CapabilityState(
+            CapabilityKind.WakeWord,
+            CapabilityStatus.Supported,
+            "唤醒词与语音命令可用，语音未启用",
+            "在「语音」页启用后才会监听唤醒词。");
+        var voiceAction = CapabilityActionResolver.Resolve(disabledVoice);
+        Assert.Equal(CapabilityActionKind.OpenVoicePage, voiceAction!.Kind);
+        Assert.Equal("前往语音", voiceAction.Label);
+        Assert.Equal("在「语音」页启用后才会监听唤醒词。", new CapabilityItem(disabledVoice).RemediationHint);
     }
 
     [Fact]
@@ -272,6 +283,63 @@ public sealed partial class DesktopViewModelTests
 
 
     [Fact]
+    public Task ReportsPanel_ReadsPersistedLowercaseStandupFields() => RunInHeadlessSession(async () =>
+    {
+        var clock = new SystemClock();
+        var repository = new FakeReportRepository();
+        var date = DateOnly.FromDateTime(DateTime.Today);
+        // Production stats JSON is serialized from DailyReportStats, whose ReportStandup members
+        // carry lowercase [JsonPropertyName] attributes because the same type is the model schema.
+        await repository.AppendAsync(
+            date,
+            "# 今日日报",
+            """
+            {"LocalDate":"2026-11-27","EventCount":12,"SegmentCount":3,"ActiveMinutes":95,
+             "AppCounts":{"Rider":12},
+             "Standup":{"yesterday":"完成模型网关","today":"接入日报面板","blockers":["等待设计评审"]},
+             "ModelId":"gemma4:12b","EndpointTier":"LocalOffline","RedactionApplied":false}
+            """,
+            "gemma4:12b",
+            ModelEndpointTier.LocalOffline,
+            false,
+            ReportTriggerSource.Manual,
+            DateTimeOffset.UtcNow,
+            CancellationToken.None);
+        var viewModel = new ReportsViewModel(
+            new ReportUseCase(new FakeReportJobQueue(), repository, clock),
+            TempArtifactDirectory.CreatePath("reports-standup-lowercase"));
+
+        await viewModel.InitializeAsync();
+
+        Assert.Contains("完成模型网关", viewModel.StandupText, StringComparison.Ordinal);
+        Assert.Contains("接入日报面板", viewModel.StandupText, StringComparison.Ordinal);
+        Assert.Contains("等待设计评审", viewModel.StandupText, StringComparison.Ordinal);
+    });
+
+    [Fact]
+    public Task ReportsPanel_ReportsEmptyStandupInsteadOfBlankLines() => RunInHeadlessSession(async () =>
+    {
+        var repository = new FakeReportRepository();
+        await repository.AppendAsync(
+            DateOnly.FromDateTime(DateTime.Today),
+            "# 今日日报",
+            """{"Standup":{"yesterday":"","today":"","blockers":[]}}""",
+            "gemma4:12b",
+            ModelEndpointTier.LocalOffline,
+            false,
+            ReportTriggerSource.Manual,
+            DateTimeOffset.UtcNow,
+            CancellationToken.None);
+        var viewModel = new ReportsViewModel(
+            new ReportUseCase(new FakeReportJobQueue(), repository, new SystemClock()),
+            TempArtifactDirectory.CreatePath("reports-standup-empty"));
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal("该版本没有站会内容", viewModel.StandupText);
+    });
+
+    [Fact]
     public Task ReportsPanel_LoadsAndSavesAutomaticSchedule() => RunInHeadlessSession(async () =>
     {
         var store = new RecordingScheduleSettingsStore(
@@ -319,6 +387,121 @@ public sealed partial class DesktopViewModelTests
         Assert.True(toggle!.IsChecked);
         window.Close();
     });
+
+    [Fact]
+    public Task FullWindow_DataPageExposesBackupAndRetentionControls() => RunInHeadlessSession(async () =>
+    {
+        var data = new DataManagementViewModel(
+            new FakeDataDeletionService(),
+            maintenance: new RecordingMaintenanceService(),
+            retention: new RecordingRetentionService(),
+            retentionSettings: new RetentionSettingsUseCase(
+                new RecordingRetentionSettingsStore(RetentionSettings.Default)));
+        using var voice = new VoiceControlViewModel(new FakeVoiceSession());
+        using var shell = CreateShellWithVoice(voice, data: data);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 4;
+
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
+            .Any(button => AutomationProperties.GetName(button) == "导出加密备份"));
+
+        Assert.NotNull(window.GetVisualDescendants().OfType<Button>()
+            .SingleOrDefault(button => AutomationProperties.GetName(button) == "从备份恢复"));
+        Assert.NotNull(window.GetVisualDescendants().OfType<Button>()
+            .SingleOrDefault(button => AutomationProperties.GetName(button) == "保存保留设置"));
+
+        var numbers = window.GetVisualDescendants().OfType<NumericUpDown>().ToArray();
+        Assert.Equal(3, numbers.Length);
+        Assert.Equal(30m, numbers[0].Value);
+        Assert.Equal(7m, numbers[1].Value);
+        Assert.Equal(0m, numbers[2].Value);
+
+        // The numeric fields must round-trip into the view model, not just render.
+        numbers[0].Value = 14;
+        await WaitUntilAsync(() => data.MediaRetentionDays == 14);
+        window.Close();
+    });
+
+    [Fact]
+    public async Task DataManagement_ExportsBackupAndStagesRestoreBehindConfirmation()
+    {
+        var maintenance = new RecordingMaintenanceService();
+        var backupPath = Path.Combine(
+            TempArtifactDirectory.CreatePath("backup-export"),
+            "aiassistant-backup-test.zip");
+        var restorePath = Path.Combine(
+            TempArtifactDirectory.CreatePath("backup-restore"),
+            "aiassistant-restore-test.zip");
+        var viewModel = new DataManagementViewModel(
+            new FakeDataDeletionService(),
+            maintenance: maintenance)
+        {
+            SaveFilePicker = new FakeSaveFilePicker(backupPath),
+            OpenFilePicker = new FakeOpenFilePicker(restorePath)
+        };
+
+        await viewModel.BackupCommand.ExecuteAsync(null);
+        Assert.Equal(backupPath, maintenance.BackupPath);
+        Assert.Contains("已导出加密备份", viewModel.StatusMessage, StringComparison.Ordinal);
+
+        // First click picks the archive and asks for confirmation; nothing is staged yet.
+        await viewModel.RestoreCommand.ExecuteAsync(null);
+        Assert.True(viewModel.HasPendingRestore);
+        Assert.Null(maintenance.StagedPath);
+        Assert.Contains("aiassistant-restore-test.zip", viewModel.PendingText, StringComparison.Ordinal);
+
+        await viewModel.RestoreCommand.ExecuteAsync(null);
+        Assert.Equal(restorePath, maintenance.StagedPath);
+        Assert.False(viewModel.HasPending);
+        Assert.True(viewModel.RestartAvailable);
+        Assert.Contains("重启后", viewModel.StatusMessage, StringComparison.Ordinal);
+
+        var restarted = false;
+        viewModel.RestartRequested += (_, _) => restarted = true;
+        viewModel.RestartCommand.Execute(null);
+        Assert.True(restarted);
+
+        // Changing your mind must stop the staged restore from replacing data on the next start.
+        await viewModel.CancelStagedRestoreCommand.ExecuteAsync(null);
+        Assert.True(maintenance.Discarded);
+        Assert.False(viewModel.RestartAvailable);
+        Assert.Contains("已取消", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DataManagement_SavesRetentionPolicyAndRunsSweep()
+    {
+        var retention = new RecordingRetentionService();
+        var store = new RecordingRetentionSettingsStore(RetentionSettings.Default);
+        var viewModel = new DataManagementViewModel(
+            new FakeDataDeletionService(),
+            retention: retention,
+            retentionSettings: new RetentionSettingsUseCase(store));
+
+        Assert.Equal(30, viewModel.MediaRetentionDays);
+        Assert.Contains("媒体保留 30 天", viewModel.RetentionPolicyText, StringComparison.Ordinal);
+        Assert.Contains("命令音频保留 7 天", viewModel.RetentionPolicyText, StringComparison.Ordinal);
+
+        viewModel.MediaRetentionDays = 14;
+        viewModel.CommandAudioRetentionDays = 3;
+        viewModel.MaxStorageGigabytes = 20;
+        await viewModel.SaveRetentionCommand.ExecuteAsync(null);
+
+        Assert.Equal(14, store.Settings.MediaRetentionDays);
+        Assert.Equal(3, store.Settings.CommandAudioRetentionDays);
+        Assert.Equal(20, store.Settings.MaxStorageGigabytes);
+        Assert.Contains("14 天", viewModel.RetentionNotice, StringComparison.Ordinal);
+        Assert.Contains("20 GB", viewModel.RetentionPolicyText, StringComparison.Ordinal);
+        // Saving a lowered cap sweeps immediately so the write gate does not start rejecting blobs.
+        Assert.Equal(1, retention.SweepCount);
+
+        retention.NextPurged = 4;
+        await viewModel.RunRetentionSweepCommand.ExecuteAsync(null);
+        Assert.Equal(2, retention.SweepCount);
+        Assert.Contains("4 个", viewModel.RetentionStatusMessage, StringComparison.Ordinal);
+    }
 
     [Fact]
     public Task DataManagement_RequiresTwoStepsBeforeDeleting() => RunInHeadlessSession(async () =>
@@ -477,7 +660,8 @@ public sealed partial class DesktopViewModelTests
 
     private static ShellViewModel CreateShellWithVoice(
         VoiceControlViewModel voice,
-        ReportScheduleSettingsUseCase? scheduleSettings = null)
+        ReportScheduleSettingsUseCase? scheduleSettings = null,
+        DataManagementViewModel? data = null)
     {
         var repository = new InMemoryEventRepository();
         var clock = new SystemClock();
@@ -498,7 +682,7 @@ public sealed partial class DesktopViewModelTests
             voice: voice,
             voiceNavigation: null,
             search: null,
-            data: new DataManagementViewModel(new FakeDataDeletionService()));
+            data: data ?? new DataManagementViewModel(new FakeDataDeletionService()));
     }
 
 

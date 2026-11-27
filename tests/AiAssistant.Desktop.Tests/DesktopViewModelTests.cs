@@ -160,6 +160,8 @@ public sealed partial class DesktopViewModelTests
         public Task<int> DecrementRefAsync(string contentId, CancellationToken ct) => Task.FromResult(0);
 
         public Task<int> PurgeExpiredAsync(DateTimeOffset nowUtc, CancellationToken ct) => Task.FromResult(0);
+
+        public Task<int> PurgeOverQuotaAsync(long maxBytes, CancellationToken ct) => Task.FromResult(0);
     }
 
     private sealed class FakeCapabilityProvider : ICapabilityProvider
@@ -180,6 +182,88 @@ public sealed partial class DesktopViewModelTests
         public Task BackupEncryptedAsync(string destinationPath, CancellationToken ct) => Task.CompletedTask;
 
         public Task RestoreEncryptedAsync(string backupSourcePath, CancellationToken ct) => Task.CompletedTask;
+
+        public Task StageRestoreAsync(string backupSourcePath, CancellationToken ct) => Task.CompletedTask;
+
+        public Task<bool> ApplyStagedRestoreAsync(CancellationToken ct) => Task.FromResult(false);
+
+        public Task<bool> DiscardStagedRestoreAsync(CancellationToken ct) => Task.FromResult(false);
+    }
+
+    private sealed class RecordingMaintenanceService : IDatabaseMaintenanceService
+    {
+        public string? BackupPath { get; private set; }
+        public string? StagedPath { get; private set; }
+        public bool Discarded { get; private set; }
+
+        public Task InitializeAsync(CancellationToken ct) => Task.CompletedTask;
+
+        public Task<DatabaseHealthReport> CheckHealthAsync(CancellationToken ct) =>
+            Task.FromResult(new DatabaseHealthReport(true, SchemaVersion.Current, "test-cipher", "test-vector", 0, 0, "ok"));
+
+        public Task BackupEncryptedAsync(string destinationPath, CancellationToken ct)
+        {
+            BackupPath = destinationPath;
+            return Task.CompletedTask;
+        }
+
+        public Task RestoreEncryptedAsync(string backupSourcePath, CancellationToken ct) => Task.CompletedTask;
+
+        public Task StageRestoreAsync(string backupSourcePath, CancellationToken ct)
+        {
+            StagedPath = backupSourcePath;
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> ApplyStagedRestoreAsync(CancellationToken ct) => Task.FromResult(false);
+
+        public Task<bool> DiscardStagedRestoreAsync(CancellationToken ct)
+        {
+            Discarded = StagedPath is not null;
+            StagedPath = null;
+            return Task.FromResult(Discarded);
+        }
+    }
+
+    private sealed class FakeSaveFilePicker(string path, string extension = "zip") : ISaveFilePicker
+    {
+        public Task<SaveFileSelection?> PickSaveFileAsync(
+            string suggestedFileName,
+            IReadOnlyList<SaveFileType> types) =>
+            Task.FromResult<SaveFileSelection?>(new SaveFileSelection(path, extension));
+    }
+
+    private sealed class FakeOpenFilePicker(string? path) : IOpenFilePicker
+    {
+        public Task<string?> PickOpenFileAsync(string title, IReadOnlyList<SaveFileType> types) =>
+            Task.FromResult(path);
+    }
+
+    private sealed class FakeVoiceCommandLog : IVoiceCommandLog
+    {
+        public List<VoiceCommandLogRecord> Records { get; } = [];
+
+        public Task AppendAsync(VoiceCommandLogRecord record, CancellationToken ct)
+        {
+            Records.Add(record);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<VoiceCommandLogRecord>> ListRecentAsync(int limit, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<VoiceCommandLogRecord>>(
+                Records.OrderByDescending(record => record.OccurredAtUtc).Take(limit).ToArray());
+    }
+
+    private sealed class FakeCommandAudioPlayer : ICommandAudioPlayer
+    {
+        public string? PlayedContentId { get; private set; }
+        public bool Succeeds { get; init; } = true;
+
+        public Task<bool> PlayAsync(string contentId, CancellationToken ct)
+        {
+            PlayedContentId = contentId;
+            return Task.FromResult(Succeeds);
+        }
     }
 
     private sealed class FakeReportJobQueue : IReportJobQueue
@@ -307,6 +391,7 @@ public sealed partial class DesktopViewModelTests
         public bool RecordsCommandAudio { get; private set; }
         public event EventHandler<VoiceSessionState>? StateChanged;
         public event EventHandler<VoiceInteraction>? Interaction;
+        public event EventHandler<VoiceSessionFault>? Faulted;
 
         public Task SetCommandAudioRecordingAsync(bool enabled, CancellationToken ct)
         {
@@ -327,6 +412,15 @@ public sealed partial class DesktopViewModelTests
         {
             State = VoiceSessionState.Listening;
             StateChanged?.Invoke(this, State);
+        }
+
+        /// <summary>Mirrors an unexpected session exit: the pump is gone and the user must re-enable.</summary>
+        public void SimulateFault(string reason)
+        {
+            IsActive = false;
+            State = VoiceSessionState.Sleeping;
+            StateChanged?.Invoke(this, State);
+            Faulted?.Invoke(this, new VoiceSessionFault(reason, DateTimeOffset.UtcNow));
         }
 
         public Task StopAsync(CancellationToken ct)
@@ -409,6 +503,37 @@ public sealed partial class DesktopViewModelTests
         public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
         public Task<int> RunSweepNowAsync(CancellationToken ct) => Task.FromResult(0);
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class RecordingRetentionService : IRetentionService
+    {
+        public int SweepCount { get; private set; }
+        public int NextPurged { get; set; }
+
+        public MediaRetentionMetrics GetMetricsSnapshot() => new(SweepCount, NextPurged, DateTimeOffset.UtcNow);
+
+        public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+
+        public Task<int> RunSweepNowAsync(CancellationToken ct)
+        {
+            SweepCount++;
+            return Task.FromResult(NextPurged);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class RecordingRetentionSettingsStore(RetentionSettings initial) : IRetentionSettingsStore
+    {
+        public RetentionSettings Settings { get; private set; } = initial;
+
+        public RetentionSettings Load() => Settings;
+
+        public Task SaveAsync(RetentionSettings settings, CancellationToken ct)
+        {
+            Settings = settings;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeDiagnosticLogReader : IDiagnosticLogReader

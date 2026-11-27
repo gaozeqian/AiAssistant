@@ -4,43 +4,106 @@
              xmlns:automation="using:Avalonia.Automation"
              x:Class="AiAssistant.Desktop.Views.Tabs.DataExportTabView"
              x:DataType="vm:ShellViewModel">
-  <Grid DataContext="{Binding Data}" x:DataType="vm:DataManagementViewModel"
-        ColumnDefinitions="*,*" Margin="0,12,0,0">
-    <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,0">
-      <StackPanel Spacing="14">
-        <TextBlock Text="删除本地数据" FontSize="18" FontWeight="SemiBold" />
-        <TextBlock Text="{Binding RetentionNotice}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
-        <DatePicker SelectedDate="{Binding SelectedDate}" Initialized="OnDatePickerInitialized" />
-        <WrapPanel>
-          <Button Classes="secondary" Content="{Binding DeleteDateButtonText}"
-                  Command="{Binding DeleteDateCommand}" Margin="0,0,8,8"
-                  automation:AutomationProperties.Name="{Binding DeleteDateButtonText}" />
-          <Button Classes="secondary" Content="{Binding DeleteAllButtonText}"
-                  Command="{Binding DeleteAllCommand}" Margin="0,0,8,8"
-                  automation:AutomationProperties.Name="{Binding DeleteAllButtonText}" />
-          <Button Classes="secondary" Content="取消" Command="{Binding CancelPendingCommand}"
-                  IsVisible="{Binding HasPending}" Margin="0,0,8,8" />
-        </WrapPanel>
-        <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPending}">
-          <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
-        </Border>
-        <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
-        <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-        <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
-                   IsVisible="{Binding HasError}" />
-      </StackPanel>
-    </Border>
-    <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,0">
-      <StackPanel Spacing="14">
-        <TextBlock Text="导出与保留" FontSize="18" FontWeight="SemiBold" />
-        <TextBlock Text="{Binding ExportNotice}" TextWrapping="Wrap" />
-        <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
-          <TextBlock Text="所有导出均在本机生成，不经过云端。删除数据前请先导出需要保留的日报与问答。"
-                     TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
-        </Border>
-        <TextBlock Text="键盘快捷键：Ctrl+D1…D7 切换页面，Ctrl+F 打开检索，F5 刷新当前页。"
-                   TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-      </StackPanel>
-    </Border>
-  </Grid>
+  <ScrollViewer DataContext="{Binding Data}" x:DataType="vm:DataManagementViewModel" Margin="0,12,0,0">
+    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" Margin="0,0,18,0">
+      <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,12">
+        <StackPanel Spacing="14">
+          <TextBlock Text="删除本地数据" FontSize="18" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding RetentionNotice}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+          <DatePicker SelectedDate="{Binding SelectedDate}" Initialized="OnDatePickerInitialized" />
+          <WrapPanel>
+            <Button Classes="secondary" Content="{Binding DeleteDateButtonText}"
+                    Command="{Binding DeleteDateCommand}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="{Binding DeleteDateButtonText}" />
+            <Button Classes="secondary" Content="{Binding DeleteAllButtonText}"
+                    Command="{Binding DeleteAllCommand}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="{Binding DeleteAllButtonText}" />
+            <Button Classes="secondary" Content="取消" Command="{Binding CancelPendingCommand}"
+                    IsVisible="{Binding HasPendingDeletion}" Margin="0,0,8,8" />
+          </WrapPanel>
+          <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPendingDeletion}">
+            <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
+          </Border>
+          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+          <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
+                     IsVisible="{Binding HasError}" />
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,12">
+        <StackPanel Spacing="14">
+          <TextBlock Text="导出与保留" FontSize="18" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding ExportNotice}" TextWrapping="Wrap" />
+          <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
+            <TextBlock Text="所有导出均在本机生成，不经过云端。删除数据前请先导出需要保留的日报、问答或加密备份。"
+                       TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
+          </Border>
+          <TextBlock Text="键盘快捷键：Ctrl+1…Ctrl+7 切换页面，Ctrl+F 打开检索，F5 刷新当前页。"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10"
+              Padding="24" Margin="0,0,0,12" IsVisible="{Binding HasBackupSupport}">
+        <StackPanel Spacing="12">
+          <TextBlock Text="数据备份与恢复" FontSize="18" FontWeight="SemiBold" />
+          <TextBlock Text="加密备份是独立 ZIP（数据库 + 密钥封装 + 加密媒体），可在同一台机器上恢复。恢复会先校验备份，重启后覆盖当前数据库、密钥与媒体。"
+                     TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+          <WrapPanel>
+            <Button Classes="secondary" Content="导出加密备份…" Command="{Binding BackupCommand}"
+                    IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="导出加密备份" />
+            <Button Classes="secondary" Content="{Binding RestoreButtonText}" Command="{Binding RestoreCommand}"
+                    IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="从备份恢复" />
+            <Button Classes="secondary" Content="取消" Command="{Binding CancelPendingCommand}"
+                    IsVisible="{Binding HasPendingRestore}" Margin="0,0,8,8" />
+            <Button Classes="primary" Content="立即重启" Command="{Binding RestartCommand}"
+                    IsVisible="{Binding RestartAvailable}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="重启应用完成恢复" />
+            <Button Classes="secondary" Content="取消暂存的恢复" Command="{Binding CancelStagedRestoreCommand}"
+                    IsVisible="{Binding RestartAvailable}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="取消暂存的恢复" />
+          </WrapPanel>
+          <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPendingRestore}">
+            <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
+          </Border>
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="2" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10"
+              Padding="24" IsVisible="{Binding HasRetentionSettings}">
+        <StackPanel Spacing="12">
+          <TextBlock Text="保留与清理" FontSize="18" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding RetentionPolicyText}" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" />
+          <Grid ColumnDefinitions="Auto,110,Auto,110,Auto,110" RowDefinitions="Auto" >
+            <TextBlock Text="媒体保留（天）" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+            <NumericUpDown Grid.Column="1" Value="{Binding MediaRetentionDays, Mode=TwoWay}"
+                           Minimum="1" Maximum="365" Increment="1" FormatString="0"
+                           Margin="8,0,16,0" automation:AutomationProperties.Name="媒体保留天数" />
+            <TextBlock Grid.Column="2" Text="命令音频保留（天）" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+            <NumericUpDown Grid.Column="3" Value="{Binding CommandAudioRetentionDays, Mode=TwoWay}"
+                           Minimum="1" Maximum="365" Increment="1" FormatString="0"
+                           Margin="8,0,16,0" automation:AutomationProperties.Name="命令音频保留天数" />
+            <TextBlock Grid.Column="4" Text="存储上限（GB，0=不限）" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+            <NumericUpDown Grid.Column="5" Value="{Binding MaxStorageGigabytes, Mode=TwoWay}"
+                           Minimum="0" Maximum="1000" Increment="1" FormatString="0"
+                           Margin="8,0,0,0" automation:AutomationProperties.Name="存储上限GB" />
+          </Grid>
+          <TextBlock Text="超过存储上限时，从最旧的媒体开始擦除；结构化事件始终保留，只会失去媒体引用。"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+          <WrapPanel>
+            <Button Classes="primary" Content="保存保留设置" Command="{Binding SaveRetentionCommand}"
+                    IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="保存保留设置" />
+            <Button Classes="secondary" Content="立即清理" Command="{Binding RunRetentionSweepCommand}"
+                    IsEnabled="{Binding !IsBusy}" IsVisible="{Binding HasRetentionSweep}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="立即清理媒体" />
+          </WrapPanel>
+          <TextBlock Text="{Binding RetentionStatusMessage}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+    </Grid>
+  </ScrollViewer>
 </UserControl>

@@ -290,7 +290,7 @@ public sealed class DependencyRuleTests
             "RapidOcrImage", "EnergyTurnDiarizationEngine",
             "DailyReportStats", "ModelsFileDocument", "ModelsFileDocumentV1",
             "ModelPolicyDocumentV1", "ModelEndpointDocument", "ModelEndpointDocumentV1",
-            "EmbeddingEndpointDocumentV1", "PendingDeletion"
+            "EmbeddingEndpointDocumentV1", "PendingAction"
         ];
 
         foreach (var name in internalOnly)

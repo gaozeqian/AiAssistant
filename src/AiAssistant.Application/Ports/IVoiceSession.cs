@@ -15,6 +15,10 @@ public interface IVoiceSession : IAsyncDisposable
 
     event EventHandler<VoiceSessionState>? StateChanged;
     event EventHandler<VoiceInteraction>? Interaction;
+
+    /// <summary>Raised when the session stops unexpectedly; the user must re-enable voice.</summary>
+    event EventHandler<VoiceSessionFault>? Faulted;
+
     Task StartAsync(CancellationToken ct);
     Task StopAsync(CancellationToken ct);
     Task SetCommandAudioRecordingAsync(bool enabled, CancellationToken ct);

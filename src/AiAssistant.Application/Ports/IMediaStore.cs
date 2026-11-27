@@ -10,4 +10,10 @@ public interface IMediaStore
     Task<int> IncrementRefAsync(string contentId, CancellationToken ct);
     Task<int> DecrementRefAsync(string contentId, CancellationToken ct);
     Task<int> PurgeExpiredAsync(DateTimeOffset nowUtc, CancellationToken ct);
+
+    /// <summary>
+    /// Erases the oldest encrypted blobs until the media directory fits inside <paramref name="maxBytes"/>.
+    /// Structured events survive; their media reference is cleared exactly like an expired purge.
+    /// </summary>
+    Task<int> PurgeOverQuotaAsync(long maxBytes, CancellationToken ct);
 }

@@ -53,6 +53,12 @@ public sealed class ShellApp : Avalonia.Application, IDisposable
                 }
 
                 shell.Diagnostics.SaveFilePicker = picker;
+                if (shell.Data is not null)
+                {
+                    // Backup writes a file; restore picks one, so the data page needs both dialogs.
+                    shell.Data.SaveFilePicker = picker;
+                    shell.Data.OpenFilePicker = new AvaloniaOpenFilePicker(storage);
+                }
             }
 
             // Wayland resolves the dock/top-bar icon by matching app_id to <app_id>.desktop;

@@ -74,13 +74,21 @@ public sealed class MediaRetentionService : IRetentionService
         {
             var nowUtc = _clock.UtcNow;
             var purged = await _mediaStore.PurgeExpiredAsync(nowUtc, ct);
+
+            // A configured cap evicts oldest-first after expiry has done its part, so "过期或超限"
+            // are both covered by the same sweep the UI triggers.
+            if (_options.MaxStorageQuotaBytes is { } maxBytes)
+            {
+                purged += await _mediaStore.PurgeOverQuotaAsync(maxBytes, ct);
+            }
+
             Interlocked.Increment(ref _totalSweeps);
             Interlocked.Add(ref _totalPurgedBlobs, purged);
             Interlocked.Exchange(ref _lastSweepTicksUtc, nowUtc.UtcTicks);
 
             if (purged > 0)
             {
-                _logger.LogInformation("Retention sweep securely erased {PurgedCount} expired media blobs.", purged);
+                _logger.LogInformation("Retention sweep securely erased {PurgedCount} media blobs.", purged);
             }
 
             return purged;

@@ -18,13 +18,16 @@ public sealed record CapabilityAction(
 /// <summary>
 /// Maps a capability to the action promised by its remediation hint. Informational degradations
 /// deliberately get no button: an action that cannot fix the reported state is worse than none.
+/// A supported capability that still carries a hint (for example voice models ready but the
+/// session not enabled) keeps its follow-up, otherwise the only useful step stays hidden.
 /// </summary>
 internal static class CapabilityActionResolver
 {
     public static CapabilityAction? Resolve(CapabilityState capability) => capability.Status switch
     {
         CapabilityStatus.PermissionRequired => Permission(capability.Kind) ?? Guidance(capability),
-        CapabilityStatus.Degraded or CapabilityStatus.Unavailable => Guidance(capability),
+        CapabilityStatus.Degraded or CapabilityStatus.Unavailable or CapabilityStatus.Supported =>
+            Guidance(capability),
         _ => null
     };
 

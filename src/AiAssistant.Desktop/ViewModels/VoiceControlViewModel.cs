@@ -1,4 +1,6 @@
+using System.Collections.ObjectModel;
 using AiAssistant.Application.Ports;
+using AiAssistant.Application.UseCases;
 using AiAssistant.Core.ValueObjects;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -8,9 +10,16 @@ namespace AiAssistant.Desktop.ViewModels;
 
 public sealed class VoiceControlViewModel : ObservableObject, IDisposable
 {
+    /// <summary>The page is a review surface, not a log browser; keep the list short and scannable.</summary>
+    public const int CommandHistoryLimit = 20;
+
     private readonly IVoiceSession _session;
+    private readonly IVoiceCommandLog? _commandLog;
+    private readonly ICommandAudioPlayer? _commandAudioPlayer;
+    private readonly RetentionSettingsUseCase? _retentionSettings;
     private bool _isEnabled;
     private bool _isBusy;
+    private bool _isReplaying;
     private VoiceSessionState _lastState = VoiceSessionState.Sleeping;
     private string _statusText = "语音休眠";
     private string _capabilityText = "尚未检查语音能力";
@@ -19,25 +28,47 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     private string _errorMessage = string.Empty;
     private bool _recordsCommandAudio;
     private string _commandAudioStatus = "命令音频仅驻留内存，不落盘。";
+    private string _commandHistoryStatus = "尚无命令记录";
+    private int _commandAudioRetentionDays = RetentionSettings.Default.CommandAudioRetentionDays;
+    private bool _refreshingHistory;
+    private bool _historyRefreshPending;
     private bool _disposed;
 
-    public VoiceControlViewModel(IVoiceSession session)
+    public VoiceControlViewModel(
+        IVoiceSession session,
+        IVoiceCommandLog? commandLog = null,
+        ICommandAudioPlayer? commandAudioPlayer = null,
+        RetentionSettingsUseCase? retentionSettings = null)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
+        _commandLog = commandLog;
+        _commandAudioPlayer = commandAudioPlayer;
+        _retentionSettings = retentionSettings;
         ToggleCommand = new AsyncRelayCommand(ToggleAsync);
         ToggleCommandAudioCommand = new AsyncRelayCommand(ToggleCommandAudioAsync);
+        RefreshHistoryCommand = new AsyncRelayCommand(RefreshHistoryAsync);
+        ReplayCommand = new AsyncRelayCommand<VoiceCommandHistoryItem?>(ReplayAsync);
         _session.StateChanged += OnStateChanged;
         _session.Interaction += OnInteraction;
+        _session.Faulted += OnFaulted;
         _isEnabled = _session.IsActive;
+        LoadRetentionDays();
         UpdateStatus(_session.State);
-        CapabilityText = _session.Capability.Summary;
         RecordsCommandAudio = _session.RecordsCommandAudio;
         CommandAudioStatus = DescribeCommandAudio(RecordsCommandAudio);
     }
 
+    public ObservableCollection<VoiceCommandHistoryItem> CommandHistory { get; } = [];
+
     public IAsyncRelayCommand ToggleCommand { get; }
 
     public IAsyncRelayCommand ToggleCommandAudioCommand { get; }
+
+    public IAsyncRelayCommand RefreshHistoryCommand { get; }
+
+    public IAsyncRelayCommand<VoiceCommandHistoryItem?> ReplayCommand { get; }
+
+    public bool HasCommandHistory => CommandHistory.Count > 0;
 
     /// <summary>Explicit opt-in reflected from the session; command audio is never persisted by default.</summary>
     public bool RecordsCommandAudio
@@ -58,6 +89,12 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _commandAudioStatus, value);
     }
 
+    public string CommandHistoryStatus
+    {
+        get => _commandHistoryStatus;
+        private set => SetProperty(ref _commandHistoryStatus, value);
+    }
+
     public bool IsEnabled
     {
         get => _isEnabled;
@@ -76,6 +113,12 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     {
         get => _isBusy;
         private set => SetProperty(ref _isBusy, value);
+    }
+
+    public bool IsReplaying
+    {
+        get => _isReplaying;
+        private set => SetProperty(ref _isReplaying, value);
     }
 
     public string StatusText
@@ -116,6 +159,9 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
+    /// <summary>Loads the persisted command history; called by the shell once the window exists.</summary>
+    public Task InitializeAsync() => RefreshHistoryAsync();
+
     public void Dispose()
     {
         if (_disposed)
@@ -126,6 +172,24 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         _disposed = true;
         _session.StateChanged -= OnStateChanged;
         _session.Interaction -= OnInteraction;
+        _session.Faulted -= OnFaulted;
+    }
+
+    private void LoadRetentionDays()
+    {
+        if (_retentionSettings is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _commandAudioRetentionDays = _retentionSettings.Get().CommandAudioRetentionDays;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            _commandAudioRetentionDays = RetentionSettings.Default.CommandAudioRetentionDays;
+        }
     }
 
     private async Task ToggleAsync()
@@ -182,6 +246,8 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         {
             await _session.SetCommandAudioRecordingAsync(!RecordsCommandAudio, CancellationToken.None);
             RecordsCommandAudio = _session.RecordsCommandAudio;
+            // Pick up a retention change made on the data page since this page was created.
+            LoadRetentionDays();
             CommandAudioStatus = DescribeCommandAudio(RecordsCommandAudio);
         }
         catch (InvalidOperationException)
@@ -198,34 +264,108 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         }
     }
 
-    private static string DescribeCommandAudio(bool enabled) => enabled
-        ? "命令音频已开启：唤醒后的命令音频会以 AES-GCM 加密保存，并在保留期结束后自动擦除。"
+    private string DescribeCommandAudio(bool enabled) => enabled
+        ? $"命令音频已开启：唤醒后的命令音频会以 AES-GCM 加密保存，保留 {_commandAudioRetentionDays} 天后自动擦除；可在下方记录中重听。"
         : "命令音频仅驻留内存，不落盘。";
 
-    private void OnStateChanged(object? sender, VoiceSessionState state)
+    private async Task RefreshHistoryAsync()
     {
-        if (_disposed)
+        // Interactions arrive in bursts (wake chime, transcript, feedback). Coalesce them into one
+        // in-flight query plus at most one follow-up so the newest command is never dropped.
+        if (_commandLog is null || _disposed)
         {
             return;
         }
 
-        if (Dispatcher.UIThread.CheckAccess())
+        if (_refreshingHistory)
         {
-            UpdateStatus(state);
+            _historyRefreshPending = true;
+            return;
         }
-        else
+
+        _refreshingHistory = true;
+        try
         {
-            Dispatcher.UIThread.Post(() =>
+            do
             {
-                if (!_disposed)
+                _historyRefreshPending = false;
+                var records = await _commandLog.ListRecentAsync(CommandHistoryLimit, CancellationToken.None);
+                if (_disposed)
                 {
-                    UpdateStatus(state);
+                    return;
                 }
-            });
+
+                CommandHistory.Clear();
+                foreach (var record in records)
+                {
+                    CommandHistory.Add(new VoiceCommandHistoryItem(record));
+                }
+
+                CommandHistoryStatus = records.Count == 0
+                    ? "尚无命令记录"
+                    : $"最近 {records.Count} 条（新→旧）";
+                OnPropertyChanged(nameof(HasCommandHistory));
+            }
+            while (_historyRefreshPending && !_disposed);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or AiAssistant.Core.Exceptions.AiAssistantDomainException)
+        {
+            ErrorMessage = "读取命令记录失败，请检查加密数据库状态。";
+        }
+        finally
+        {
+            _refreshingHistory = false;
         }
     }
 
-    private void OnInteraction(object? sender, VoiceInteraction interaction)
+    private async Task ReplayAsync(VoiceCommandHistoryItem? item)
+    {
+        if (item is null || IsReplaying)
+        {
+            return;
+        }
+
+        if (!item.HasAudio)
+        {
+            ErrorMessage = "该命令没有留存的音频（记录未开启或已过期）。";
+            return;
+        }
+
+        if (_commandAudioPlayer is null)
+        {
+            ErrorMessage = "当前环境不支持重听命令音频。";
+            return;
+        }
+
+        IsReplaying = true;
+        ErrorMessage = string.Empty;
+        try
+        {
+            var played = await _commandAudioPlayer.PlayAsync(item.Record.AudioContentId!, CancellationToken.None);
+            CommandHistoryStatus = played
+                ? $"已重听 {item.TimeText} 的命令音频"
+                : "音频已过期或被擦除。";
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or AiAssistant.Core.Exceptions.AiAssistantDomainException)
+        {
+            ErrorMessage = "重听失败，请检查音频设备与存储状态。";
+        }
+        finally
+        {
+            IsReplaying = false;
+        }
+    }
+
+    private void OnStateChanged(object? sender, VoiceSessionState state) =>
+        DispatchToUi(() => UpdateStatus(state));
+
+    private void OnInteraction(object? sender, VoiceInteraction interaction) =>
+        DispatchToUi(() => ApplyInteraction(interaction));
+
+    private void OnFaulted(object? sender, VoiceSessionFault fault) =>
+        DispatchToUi(() => ApplyFault(fault));
+
+    private void DispatchToUi(Action action)
     {
         if (_disposed)
         {
@@ -234,7 +374,7 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
 
         if (Dispatcher.UIThread.CheckAccess())
         {
-            ApplyInteraction(interaction);
+            action();
         }
         else
         {
@@ -242,7 +382,7 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
             {
                 if (!_disposed)
                 {
-                    ApplyInteraction(interaction);
+                    action();
                 }
             });
         }
@@ -257,6 +397,18 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
 
         LastFeedback = interaction.Feedback;
         CapabilityText = _session.Capability.Summary;
+        // A new command was persisted (or rejected); keep the review list in step with the session.
+        _ = RefreshHistoryAsync();
+    }
+
+    private void ApplyFault(VoiceSessionFault fault)
+    {
+        // The pump is gone: the switch must show "off" and tell the user what to do, instead of
+        // leaving the page claiming it is armed while the microphone is closed.
+        IsEnabled = false;
+        StatusText = "语音已停止";
+        CapabilityText = _session.Capability.Summary;
+        ErrorMessage = $"{fault.Reason}；请重新启用语音。";
     }
 
     private void UpdateStatus(VoiceSessionState state)
@@ -270,5 +422,8 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
             VoiceSessionState.Responding => "正在反馈",
             _ => "语音未知状态"
         };
+        // The capability summary now distinguishes "ready but disabled" from "armed", so it has to
+        // follow the session state instead of being captured once in the constructor.
+        CapabilityText = _session.Capability.Summary;
     }
 }

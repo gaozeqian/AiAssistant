@@ -216,7 +216,16 @@ public sealed class AppRuntime : IAsyncDisposable
         services.AddSingleton<IAudioHub>(provider => new AudioHub(
             provider.GetRequiredService<IAudioCaptureFactory>(),
             provider.GetRequiredService<ILogger<AudioHub>>()));
-        DomainRegistrations.RegisterVoice(services, dataDirectory, clock);
+        var voiceSessionOptions = DomainRegistrations.CreateVoiceSessionOptions();
+        DomainRegistrations.RegisterVoice(services, dataDirectory, clock, voiceSessionOptions);
+
+        // UI-saved retention wins; environment variables only seed the first launch. Applying here
+        // happens before capture starts, so the first write already uses the user's policy.
+        var retentionSettings = new RetentionSettingsUseCase(
+            new RetentionSettingsStore(dataDirectory),
+            new RetentionPolicyApplier(options, voiceSessionOptions));
+        retentionSettings.ApplyCurrent();
+        services.AddSingleton(retentionSettings);
 
         services.AddSingleton<ICaptureCoordinator>(provider => new BoundedCaptureCoordinator(
             provider.GetServices<ICaptureSource>(),
@@ -339,7 +348,16 @@ public sealed class AppRuntime : IAsyncDisposable
             return;
         }
 
-        await _services.GetRequiredService<IDatabaseMaintenanceService>().InitializeAsync(ct);
+        var maintenance = _services.GetRequiredService<IDatabaseMaintenanceService>();
+        // A restore staged from the UI replaces the database, key envelope and media, so it runs
+        // before anything opens the database or starts writing.
+        if (await maintenance.ApplyStagedRestoreAsync(ct))
+        {
+            _services.GetRequiredService<ILogger<AppRuntime>>().LogInformation(
+                "Staged encrypted backup restored before runtime initialization.");
+        }
+
+        await maintenance.InitializeAsync(ct);
         RecoveredJobCount = await _services.GetRequiredService<IReportJobQueue>().RecoverInterruptedJobsAsync(ct);
         await _services.GetRequiredService<IRetentionService>().StartAsync(ct);
 
@@ -394,20 +412,31 @@ public sealed class AppRuntime : IAsyncDisposable
                 _services.GetRequiredService<ILocalMcpControl>(),
                 Path.Combine(_dataDirectory, "reports"),
                 _services.GetRequiredService<IModelConfigurationAdmin>(),
-                Services.Clock),
+                Services.Clock,
+                _services.GetRequiredService<RetentionSettingsUseCase>(),
+                _services.GetRequiredService<IRetentionService>()),
             new ReportsViewModel(
                 _services.GetRequiredService<ReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports"),
                 Services.Clock,
                 _services.GetRequiredService<ReportScheduleSettingsUseCase>()),
-            new VoiceControlViewModel(_services.GetRequiredService<IVoiceSession>()),
+            new VoiceControlViewModel(
+                _services.GetRequiredService<IVoiceSession>(),
+                _services.GetRequiredService<IVoiceCommandLog>(),
+                _services.GetRequiredService<ICommandAudioPlayer>(),
+                _services.GetRequiredService<RetentionSettingsUseCase>()),
             _services.GetRequiredService<VoiceNavigationHub>(),
             new SearchViewModel(
                 _services.GetRequiredService<EvidenceSearchUseCase>(),
                 _services.GetRequiredService<RangeReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports"),
                 Services.Clock),
-            new DataManagementViewModel(_services.GetRequiredService<IDataDeletionService>(), Services.Clock));
+            new DataManagementViewModel(
+                _services.GetRequiredService<IDataDeletionService>(),
+                Services.Clock,
+                _services.GetRequiredService<IDatabaseMaintenanceService>(),
+                _services.GetRequiredService<IRetentionService>(),
+                _services.GetRequiredService<RetentionSettingsUseCase>()));
 
     public async ValueTask DisposeAsync()
     {

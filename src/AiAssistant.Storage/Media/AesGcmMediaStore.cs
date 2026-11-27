@@ -163,30 +163,7 @@ public sealed class AesGcmMediaStore : IMediaStore
 
         foreach (var item in expired)
         {
-            await using (var unlinkCmd = conn.CreateCommand())
-            {
-                unlinkCmd.Transaction = tx;
-                unlinkCmd.CommandText = "UPDATE events SET content_id = NULL WHERE content_id = $id;";
-                unlinkCmd.Parameters.AddWithValue("$id", item.ContentId);
-                await unlinkCmd.ExecuteNonQueryAsync(ct);
-            }
-
-            await using (var unlinkVoiceAudioCmd = conn.CreateCommand())
-            {
-                unlinkVoiceAudioCmd.Transaction = tx;
-                unlinkVoiceAudioCmd.CommandText =
-                    "UPDATE voice_commands SET audio_content_id = NULL WHERE audio_content_id = $id;";
-                unlinkVoiceAudioCmd.Parameters.AddWithValue("$id", item.ContentId);
-                await unlinkVoiceAudioCmd.ExecuteNonQueryAsync(ct);
-            }
-
-            await using (var delCmd = conn.CreateCommand())
-            {
-                delCmd.Transaction = tx;
-                delCmd.CommandText = "DELETE FROM content_refs WHERE content_id = $id;";
-                delCmd.Parameters.AddWithValue("$id", item.ContentId);
-                await delCmd.ExecuteNonQueryAsync(ct);
-            }
+            await UnlinkContentRefAsync(conn, tx, item.ContentId, ct);
         }
 
         await tx.CommitAsync(ct);
@@ -198,6 +175,143 @@ public sealed class AesGcmMediaStore : IMediaStore
         }
 
         return expired.Count;
+    }
+
+    /// <summary>
+    /// Size-based eviction used when the user sets a storage cap. Oldest blobs go first; the
+    /// structured event rows stay intact and simply lose their media reference.
+    /// </summary>
+    public async Task<int> PurgeOverQuotaAsync(long maxBytes, CancellationToken ct)
+    {
+        if (maxBytes <= 0)
+        {
+            return 0;
+        }
+
+        var mediaDirectory = _connectionFactory.Options.MediaDirectory;
+        if (!Directory.Exists(mediaDirectory))
+        {
+            return 0;
+        }
+
+        // Measure the whole data directory, exactly like the write gate does, otherwise a large
+        // database would keep rejecting writes even after every media blob was evicted.
+        var usedBytes = CalculateDirectorySize(_connectionFactory.Options.DataDirectory);
+        if (usedBytes <= maxBytes)
+        {
+            return 0;
+        }
+
+        var candidates = new List<(string ContentId, string RelativePath, long Bytes)>();
+        await using var conn = await _connectionFactory.OpenConnectionAsync(ct);
+        await using (var selectCmd = conn.CreateCommand())
+        {
+            selectCmd.CommandText = """
+                SELECT content_id, relative_path
+                FROM content_refs
+                WHERE ref_count > 0
+                ORDER BY created_at_utc ASC;
+                """;
+            await using var reader = await selectCmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var contentId = reader.GetString(0);
+                var relativePath = reader.GetString(1);
+                var fullPath = Path.Combine(mediaDirectory, relativePath);
+                var size = File.Exists(fullPath) ? new FileInfo(fullPath).Length : 0L;
+                candidates.Add((contentId, relativePath, size));
+            }
+        }
+
+        var victims = new List<(string ContentId, string RelativePath)>();
+        foreach (var candidate in candidates)
+        {
+            if (usedBytes <= maxBytes)
+            {
+                break;
+            }
+
+            victims.Add((candidate.ContentId, candidate.RelativePath));
+            usedBytes -= candidate.Bytes;
+        }
+
+        if (victims.Count == 0)
+        {
+            return 0;
+        }
+
+        await using var tx = (SqliteTransaction)await conn.BeginTransactionAsync(ct);
+        foreach (var victim in victims)
+        {
+            await UnlinkContentRefAsync(conn, tx, victim.ContentId, ct);
+        }
+
+        await tx.CommitAsync(ct);
+
+        foreach (var victim in victims)
+        {
+            SecureEraseAndDelete(Path.Combine(mediaDirectory, victim.RelativePath));
+        }
+
+        return victims.Count;
+    }
+
+    /// <summary>Clears every reference to a blob and removes its content_refs row inside the transaction.</summary>
+    private static async Task UnlinkContentRefAsync(
+        SqliteConnection conn,
+        SqliteTransaction tx,
+        string contentId,
+        CancellationToken ct)
+    {
+        await using (var unlinkCmd = conn.CreateCommand())
+        {
+            unlinkCmd.Transaction = tx;
+            unlinkCmd.CommandText = "UPDATE events SET content_id = NULL WHERE content_id = $id;";
+            unlinkCmd.Parameters.AddWithValue("$id", contentId);
+            await unlinkCmd.ExecuteNonQueryAsync(ct);
+        }
+
+        await using (var unlinkVoiceAudioCmd = conn.CreateCommand())
+        {
+            unlinkVoiceAudioCmd.Transaction = tx;
+            unlinkVoiceAudioCmd.CommandText =
+                "UPDATE voice_commands SET audio_content_id = NULL WHERE audio_content_id = $id;";
+            unlinkVoiceAudioCmd.Parameters.AddWithValue("$id", contentId);
+            await unlinkVoiceAudioCmd.ExecuteNonQueryAsync(ct);
+        }
+
+        await using (var delCmd = conn.CreateCommand())
+        {
+            delCmd.Transaction = tx;
+            delCmd.CommandText = "DELETE FROM content_refs WHERE content_id = $id;";
+            delCmd.Parameters.AddWithValue("$id", contentId);
+            await delCmd.ExecuteNonQueryAsync(ct);
+        }
+    }
+
+    private static long CalculateDirectorySize(string directory)
+    {
+        long total = 0;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    total += new FileInfo(file).Length;
+                }
+                catch (IOException)
+                {
+                    // A blob removed by a concurrent sweep simply stops counting.
+                }
+            }
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return 0;
+        }
+
+        return total;
     }
 
     internal async Task<StagedEncryptedBlob> StageEncryptedBlobAsync(ContentWriteRequest request, CancellationToken ct)

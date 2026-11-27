@@ -135,6 +135,69 @@ public sealed class VoiceCommandAndSessionTests
     }
 
     [Fact]
+    public async Task Session_Capability_DistinguishesDisabledFromArmed()
+    {
+        var harness = new Harness();
+
+        var disabled = harness.Session.Capability;
+        Assert.Equal(CapabilityStatus.Supported, disabled.Status);
+        Assert.Contains("未启用", disabled.Summary, StringComparison.Ordinal);
+        Assert.NotNull(disabled.RemediationHint);
+
+        await harness.Session.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => harness.Hub.SubscriberCount == 1);
+
+        var armed = harness.Session.Capability;
+        Assert.Equal(CapabilityStatus.Supported, armed.Status);
+        Assert.Contains("已启用", armed.Summary, StringComparison.Ordinal);
+        Assert.Null(armed.RemediationHint);
+
+        await harness.Session.StopAsync(CancellationToken.None);
+        Assert.Contains("未启用", harness.Session.Capability.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Session_HandlesTwoConsecutiveCommandsWithoutRestart()
+    {
+        var harness = new Harness();
+        harness.Asr.Responses.Enqueue("暂停采集");
+        harness.Asr.Responses.Enqueue("恢复采集");
+        await harness.Session.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => harness.Hub.SubscriberCount == 1);
+
+        // Round 1: wake → listen → process → respond → sleep.
+        harness.Hub.Publish(DetectionFrame(harness.Clock));
+        await WaitUntilAsync(() => harness.Session.State == VoiceSessionState.Listening);
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+        harness.Clock.Advance(TimeSpan.FromSeconds(9));
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+        await WaitUntilAsync(
+            () => harness.Log.Records.Count == 1 && harness.Session.State == VoiceSessionState.Sleeping,
+            message: () => $"first round: state={harness.Session.State}, logs={harness.Log.Records.Count}");
+        Assert.True(harness.Coordinator.IsPaused);
+
+        // Round 2: the false-wake cooldown is two seconds, so move past it before waking again.
+        harness.Clock.Advance(TimeSpan.FromSeconds(3));
+        harness.Hub.Publish(DetectionFrame(harness.Clock));
+        await WaitUntilAsync(
+            () => harness.Session.State == VoiceSessionState.Listening,
+            message: () => $"second wake: state={harness.Session.State}, active={harness.Session.IsActive}");
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+        harness.Clock.Advance(TimeSpan.FromSeconds(9));
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+
+        await WaitUntilAsync(
+            () => harness.Log.Records.Count == 2 && harness.Session.State == VoiceSessionState.Sleeping,
+            message: () => $"second round: state={harness.Session.State}, logs={harness.Log.Records.Count}, asrQueue={harness.Asr.Responses.Count}");
+
+        Assert.False(harness.Coordinator.IsPaused);
+        Assert.True(harness.Session.IsActive);
+        Assert.Equal(2, harness.Log.Records.Count);
+
+        await harness.Session.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Session_CommandAudioOptIn_PersistsEncryptedWavAndLinksLog()
     {
         var harness = new Harness(recordCommandAudio: true);
@@ -441,11 +504,16 @@ public sealed class VoiceCommandAndSessionTests
     private sealed class FakeCommandLog : IVoiceCommandLog
     {
         public List<VoiceCommandLogRecord> Records { get; } = [];
+
         public Task AppendAsync(VoiceCommandLogRecord record, CancellationToken ct)
         {
             Records.Add(record);
             return Task.CompletedTask;
         }
+
+        public Task<IReadOnlyList<VoiceCommandLogRecord>> ListRecentAsync(int limit, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<VoiceCommandLogRecord>>(
+                Records.OrderByDescending(record => record.OccurredAtUtc).Take(limit).ToArray());
     }
 
     private sealed class FakeMediaStore : IMediaStore
@@ -472,6 +540,8 @@ public sealed class VoiceCommandAndSessionTests
         public Task<int> DecrementRefAsync(string contentId, CancellationToken ct) => Task.FromResult(0);
 
         public Task<int> PurgeExpiredAsync(DateTimeOffset nowUtc, CancellationToken ct) => Task.FromResult(0);
+
+        public Task<int> PurgeOverQuotaAsync(long maxBytes, CancellationToken ct) => Task.FromResult(0);
     }
 
     private sealed class CountingNavigator : IVoiceViewNavigator

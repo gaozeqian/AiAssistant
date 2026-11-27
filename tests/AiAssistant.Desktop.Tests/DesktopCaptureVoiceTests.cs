@@ -68,6 +68,66 @@ public sealed partial class DesktopViewModelTests
     });
 
     [Fact]
+    public Task VoicePanel_SessionFaultTurnsTheSwitchOffAndExplainsWhy() => RunInHeadlessSession(async () =>
+    {
+        var session = new FakeVoiceSession();
+        using var viewModel = new VoiceControlViewModel(session);
+        await viewModel.ToggleCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsEnabled);
+
+        session.SimulateFault("音频采集已停止");
+
+        Assert.False(viewModel.IsEnabled);
+        Assert.Equal("语音已停止", viewModel.StatusText);
+        Assert.Contains("音频采集已停止", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("重新启用", viewModel.ErrorMessage, StringComparison.Ordinal);
+    });
+
+    [Fact]
+    public Task VoicePanel_ListsRecordedCommandsAndReplaysStoredAudio() => RunInHeadlessSession(async () =>
+    {
+        var log = new FakeVoiceCommandLog();
+        log.Records.Add(new VoiceCommandLogRecord(
+            "cmd_1",
+            DateTimeOffset.UtcNow.AddMinutes(-2),
+            "你好时光",
+            "暂停采集",
+            "PauseCapture",
+            "{}",
+            ModelEndpointTier.LocalOffline,
+            null,
+            "cnt_audio_1"));
+        log.Records.Add(new VoiceCommandLogRecord(
+            "cmd_2",
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            "你好时光",
+            "问一下昨天的进展",
+            "AskQuestion",
+            "{}",
+            ModelEndpointTier.LocalOffline,
+            null,
+            null));
+        var player = new FakeCommandAudioPlayer();
+        using var viewModel = new VoiceControlViewModel(new FakeVoiceSession(), log, player);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.HasCommandHistory);
+        Assert.Equal(2, viewModel.CommandHistory.Count);
+        Assert.Equal("问一下昨天的进展", viewModel.CommandHistory[0].Transcript);
+        Assert.Equal("提问", viewModel.CommandHistory[0].IntentText);
+        Assert.False(viewModel.CommandHistory[0].HasAudio);
+        Assert.True(viewModel.CommandHistory[1].HasAudio);
+
+        await viewModel.ReplayCommand.ExecuteAsync(viewModel.CommandHistory[1]);
+        Assert.Equal("cnt_audio_1", player.PlayedContentId);
+        Assert.Contains("已重听", viewModel.CommandHistoryStatus, StringComparison.Ordinal);
+
+        await viewModel.ReplayCommand.ExecuteAsync(viewModel.CommandHistory[0]);
+        Assert.Contains("没有留存", viewModel.ErrorMessage, StringComparison.Ordinal);
+    });
+
+    [Fact]
     public Task VoicePanel_CommandAudioOptIn_IsOffUntilExplicitlyEnabled() => RunInHeadlessSession(async () =>
     {
         var session = new FakeVoiceSession();
@@ -110,6 +170,42 @@ public sealed partial class DesktopViewModelTests
         window.Close();
     });
 
+
+    [Fact]
+    public Task FullWindow_VoiceCommandHistoryExposesReplayButton() => RunInHeadlessSession(async () =>
+    {
+        var log = new FakeVoiceCommandLog();
+        log.Records.Add(new VoiceCommandLogRecord(
+            "cmd_ui",
+            DateTimeOffset.UtcNow,
+            "你好时光",
+            "暂停采集",
+            "PauseCapture",
+            "{}",
+            ModelEndpointTier.LocalOffline,
+            null,
+            "cnt_audio_ui"));
+        var player = new FakeCommandAudioPlayer();
+        using var voice = new VoiceControlViewModel(new FakeVoiceSession(), log, player);
+        using var shell = CreateShellWithVoice(voice);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 3;
+
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
+            .Any(button => AutomationProperties.GetName(button) == "重听命令音频"));
+        var replay = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == "重听命令音频");
+        Assert.True(replay.IsVisible);
+        Assert.NotNull(replay.Command);
+        Assert.True(replay.Command!.CanExecute(replay.CommandParameter));
+
+        replay.Command.Execute(replay.CommandParameter);
+        await WaitUntilAsync(() => player.PlayedContentId is not null);
+        Assert.Equal("cnt_audio_ui", player.PlayedContentId);
+        window.Close();
+    });
 
     [Fact]
     public Task FullWindow_UserTogglesVoiceOnAndOff() => RunInHeadlessSession(async () =>

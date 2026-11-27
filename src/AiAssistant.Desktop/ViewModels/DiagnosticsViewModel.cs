@@ -21,10 +21,14 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private readonly IClock _clock;
     private readonly ILocalMcpControl? _mcp;
     private readonly string? _exportDirectory;
+    private readonly RetentionSettingsUseCase? _retentionSettings;
+    private readonly IRetentionService? _retention;
     private string _platformName = "正在检测平台能力…";
     private string _databaseText = "尚未检查";
     private string _pipelineText = string.Empty;
     private string _retentionText = "尚未执行清理扫描";
+    private string _retentionPolicyText = "保留策略未接入当前运行时";
+    private string _retentionStatusText = string.Empty;
     private string _modelText = "尚未探测本机模型";
     private string _modelEndpointsText = "尚未探测端点能力";
     private string _exportPreviewJson = string.Empty;
@@ -42,12 +46,16 @@ public sealed class DiagnosticsViewModel : ObservableObject
         ILocalMcpControl? mcp = null,
         string? exportDirectory = null,
         IModelConfigurationAdmin? modelConfiguration = null,
-        IClock? clock = null)
+        IClock? clock = null,
+        RetentionSettingsUseCase? retentionSettings = null,
+        IRetentionService? retention = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _clock = clock ?? new SystemClock();
         _mcp = mcp;
         _exportDirectory = exportDirectory;
+        _retentionSettings = retentionSettings;
+        _retention = retention;
         ModelConfig = new ModelConfigurationEditorViewModel(modelConfiguration);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
@@ -56,7 +64,9 @@ public sealed class DiagnosticsViewModel : ObservableObject
         RotateMcpTokenCommand = new AsyncRelayCommand(RotateMcpTokenAsync);
         ToggleMcpEnabledCommand = new AsyncRelayCommand(ToggleMcpEnabledAsync);
         ExecuteCapabilityCommand = new RelayCommand<CapabilityAction?>(ExecuteCapabilityAction);
+        RunRetentionSweepCommand = new AsyncRelayCommand(RunRetentionSweepAsync);
         _mcpEnabled = _mcp?.GetSnapshot().Enabled ?? false;
+        _retentionPolicyText = FormatRetentionPolicy();
     }
 
     public ObservableCollection<CapabilityItem> Capabilities { get; } = [];
@@ -86,6 +96,10 @@ public sealed class DiagnosticsViewModel : ObservableObject
     public IAsyncRelayCommand ToggleMcpEnabledCommand { get; }
 
     public IRelayCommand<CapabilityAction?> ExecuteCapabilityCommand { get; }
+
+    public IAsyncRelayCommand RunRetentionSweepCommand { get; }
+
+    public bool HasRetentionSweep => _retention is not null;
 
     /// <summary>Raised when a capability hint asks the user to continue on the voice page.</summary>
     public event EventHandler? VoicePageRequested;
@@ -118,6 +132,27 @@ public sealed class DiagnosticsViewModel : ObservableObject
         get => _retentionText;
         private set => SetProperty(ref _retentionText, value);
     }
+
+    /// <summary>Effective retention policy, so "过期擦除" always shows the actual window.</summary>
+    public string RetentionPolicyText
+    {
+        get => _retentionPolicyText;
+        private set => SetProperty(ref _retentionPolicyText, value);
+    }
+
+    public string RetentionStatusText
+    {
+        get => _retentionStatusText;
+        private set
+        {
+            if (SetProperty(ref _retentionStatusText, value))
+            {
+                OnPropertyChanged(nameof(HasRetentionStatus));
+            }
+        }
+    }
+
+    public bool HasRetentionStatus => !string.IsNullOrEmpty(RetentionStatusText);
 
     public string ModelText
     {
@@ -231,8 +266,9 @@ public sealed class DiagnosticsViewModel : ObservableObject
                 : "数据库健康检查未通过";
             PipelineText = $"队列 {snapshot.PipelineMetrics.QueuedDataItems} / 已保存 {snapshot.PipelineMetrics.PersistedEvents} / 控制命令 {snapshot.PipelineMetrics.ControlCommandsProcessed}";
             RetentionText = snapshot.RetentionMetrics is null
-                ? "默认保留策略已配置"
-                : $"已扫描 {snapshot.RetentionMetrics.TotalSweeps} 次 · 安全擦除过期媒体 {snapshot.RetentionMetrics.TotalPurgedBlobs} 个";
+                ? "尚未执行清理扫描"
+                : $"已扫描 {snapshot.RetentionMetrics.TotalSweeps} 次 · 安全擦除过期或超限媒体 {snapshot.RetentionMetrics.TotalPurgedBlobs} 个";
+            RetentionPolicyText = FormatRetentionPolicy();
             ModelText = snapshot.ModelCapability is null
                 ? "未配置模型网关"
                 : FormatModelSummary(snapshot.ModelCapability);
@@ -331,6 +367,53 @@ public sealed class DiagnosticsViewModel : ObservableObject
             ErrorMessage = "无法更新本地 MCP 开关，请检查权限或端口占用。";
             // Revert the optimistic toggle so the control reflects the real (unchanged) state.
             OnPropertyChanged(nameof(McpEnabled));
+        }
+    }
+
+    private string FormatRetentionPolicy()
+    {
+        if (_retentionSettings is null)
+        {
+            return "保留策略未接入当前运行时";
+        }
+
+        try
+        {
+            var settings = _retentionSettings.Get();
+            var cap = settings.MaxStorageGigabytes <= 0 ? "不限" : $"{settings.MaxStorageGigabytes} GB";
+            return $"媒体保留 {settings.MediaRetentionDays} 天 · 命令音频 {settings.CommandAudioRetentionDays} 天 · 存储上限 {cap}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return "保留策略读取失败";
+        }
+    }
+
+    private async Task RunRetentionSweepAsync()
+    {
+        if (_retention is null || IsLoading)
+        {
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = string.Empty;
+        try
+        {
+            var purged = await _retention.RunSweepNowAsync(CancellationToken.None);
+            var metrics = _retention.GetMetricsSnapshot();
+            RetentionText = $"已扫描 {metrics.TotalSweeps} 次 · 安全擦除过期或超限媒体 {metrics.TotalPurgedBlobs} 个";
+            RetentionStatusText = purged == 0
+                ? "清理完成：没有需要擦除的媒体。"
+                : $"清理完成：已擦除 {purged} 个过期或超限媒体。";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
+        {
+            ErrorMessage = "清理未完成，请检查数据库状态与磁盘权限。";
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 

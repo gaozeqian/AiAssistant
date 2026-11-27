@@ -11,6 +11,13 @@ public sealed class VoiceSessionOptions
     public TimeSpan CommandWindow { get; init; } = TimeSpan.FromSeconds(8);
     public TimeSpan FalseWakeCooldown { get; init; } = TimeSpan.FromSeconds(2);
     public TimeSpan ConfirmationWindow { get; init; } = TimeSpan.FromSeconds(8);
+
+    /// <summary>
+    /// Upper bound for one command (ASR + router + TTS). Without it a slow model call keeps the
+    /// frame loop blocked and the wake word is not heard until it returns.
+    /// </summary>
+    public TimeSpan CommandExecutionTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
     public bool EnableWakeChime { get; init; } = true;
 
     /// <summary>Explicit opt-in; command audio is discarded after processing unless enabled.</summary>
@@ -152,12 +159,28 @@ public sealed class VoiceSessionController : IVoiceSession
                     "提示音播放不可用；可在「语音」页查看状态。");
             }
 
-            return CapabilityState.Supported(CapabilityKind.WakeWord, "本机唤醒与语音命令已就绪");
+            // Models and devices can be ready while the user has never enabled the session. Reporting
+            // that as "已就绪 / 无需额外操作" hid the only step that actually turns listening on.
+            if (!IsActive)
+            {
+                return new CapabilityState(
+                    CapabilityKind.WakeWord,
+                    CapabilityStatus.Supported,
+                    "唤醒词与语音命令可用，语音未启用",
+                    "在「语音」页启用后才会监听唤醒词。");
+            }
+
+            return CapabilityState.Supported(
+                CapabilityKind.WakeWord,
+                State == VoiceSessionState.Sleeping
+                    ? "本机唤醒与语音命令已启用，等待唤醒词"
+                    : "本机唤醒与语音命令已启用，正在响应");
         }
     }
 
     public event EventHandler<VoiceSessionState>? StateChanged;
     public event EventHandler<VoiceInteraction>? Interaction;
+    public event EventHandler<VoiceSessionFault>? Faulted;
 
     public Task StartAsync(CancellationToken ct)
     {
@@ -165,9 +188,18 @@ public sealed class VoiceSessionController : IVoiceSession
         ct.ThrowIfCancellationRequested();
         lock (_sync)
         {
-            if (_runTask is not null)
+            // A previous run that already finished must not block re-arming: the loop clears its own
+            // run state, but a completed task can still be observed here between restarts.
+            if (_runTask is { IsCompleted: false })
             {
                 return Task.CompletedTask;
+            }
+
+            if (_runTask is not null)
+            {
+                _runCts?.Dispose();
+                _runCts = null;
+                _runTask = null;
             }
 
             // Missing or broken wake-word assets must keep the microphone closed; a degraded
@@ -180,8 +212,9 @@ public sealed class VoiceSessionController : IVoiceSession
                 return Task.CompletedTask;
             }
 
-            _runCts = new CancellationTokenSource();
-            _runTask = Task.Run(() => RunAsync(_runCts.Token), CancellationToken.None);
+            var runCts = new CancellationTokenSource();
+            _runCts = runCts;
+            _runTask = Task.Run(() => RunAsync(runCts), CancellationToken.None);
         }
 
         EmitInteraction(string.Empty, "语音已启用，说“你好时光”唤醒。");
@@ -236,20 +269,35 @@ public sealed class VoiceSessionController : IVoiceSession
         await StopAsync(CancellationToken.None);
     }
 
-    private async Task RunAsync(CancellationToken ct)
+    private async Task RunAsync(CancellationTokenSource runCts)
     {
+        var ct = runCts.Token;
+        var faultReason = "音频采集已停止";
         try
         {
             await foreach (var frame in _audioHub.SubscribeAsync(new AudioSubscription("voice-session"), ct))
             {
-                switch (State)
+                try
                 {
-                    case VoiceSessionState.Sleeping:
-                        HandleSleeping(frame, ct);
-                        break;
-                    case VoiceSessionState.Listening:
-                        await HandleListeningAsync(frame, ct);
-                        break;
+                    switch (State)
+                    {
+                        case VoiceSessionState.Sleeping:
+                            HandleSleeping(frame, ct);
+                            break;
+                        case VoiceSessionState.Listening:
+                            await HandleListeningAsync(frame, ct);
+                            break;
+                    }
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // One bad command (router, ASR, UI marshalling) must not take the session down.
+                    _logger.LogWarning("Voice frame handling failed with {ExceptionType}.", ex.GetType().Name);
+                    RecoverFromFrameFault();
                 }
             }
         }
@@ -261,9 +309,45 @@ public sealed class VoiceSessionController : IVoiceSession
         catch (Exception ex)
         {
             _logger.LogWarning("Voice session stopped with {ExceptionType}.", ex.GetType().Name);
-            SetState(VoiceSessionState.Sleeping);
-            EmitInteraction(string.Empty, "语音会话已停止。");
+            faultReason = "音频设备或识别引擎异常";
         }
+        finally
+        {
+            var stoppedByUser = runCts.IsCancellationRequested;
+            lock (_sync)
+            {
+                // Only clear our own run state: a restart may already have installed a new run.
+                if (ReferenceEquals(_runCts, runCts))
+                {
+                    _runCts = null;
+                    _runTask = null;
+                }
+            }
+
+            SetState(VoiceSessionState.Sleeping);
+            if (!stoppedByUser && !_disposed)
+            {
+                // The microphone is closed now; the UI must stop claiming the session is armed.
+                EmitInteraction(string.Empty, "语音已停止，请重新启用。");
+                Faulted?.Invoke(this, new VoiceSessionFault(faultReason, _clock.UtcNow));
+            }
+        }
+    }
+
+    /// <summary>Resets the state machine after a single command failed, keeping the session armed.</summary>
+    private void RecoverFromFrameFault()
+    {
+        lock (_sync)
+        {
+            _commandBuffer.Clear();
+        }
+
+        _pendingConfirmation = null;
+        _wakeWordDetector.Reset();
+        _ignoreFramesBeforeUtc = _clock.UtcNow;
+        _lastWakeAt = _clock.UtcNow;
+        SetState(VoiceSessionState.Sleeping);
+        EmitInteraction(string.Empty, "这条命令没有执行成功，请再说一次。");
     }
 
     private void HandleSleeping(AudioFrame frame, CancellationToken ct)
@@ -314,9 +398,25 @@ public sealed class VoiceSessionController : IVoiceSession
             }
         }
 
-        if (_clock.UtcNow >= _commandDeadline)
+        if (_clock.UtcNow < _commandDeadline)
         {
-            await ProcessCommandAsync(ct);
+            return;
+        }
+
+        // Bound the work so a slow ASR/model call cannot keep the frame loop blocked indefinitely;
+        // the session always returns to Sleeping and the wake word becomes audible again.
+        using var commandCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        commandCts.CancelAfter(_options.CommandExecutionTimeout);
+        try
+        {
+            await ProcessCommandAsync(commandCts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogInformation(
+                "Voice command processing exceeded {TimeoutSeconds} seconds.",
+                _options.CommandExecutionTimeout.TotalSeconds);
+            await FinishAsync("命令处理超时，请再说一次。", null, null, null, ct);
         }
     }
 

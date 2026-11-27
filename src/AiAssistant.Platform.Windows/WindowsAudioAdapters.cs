@@ -14,7 +14,9 @@ public sealed class WindowsAudioCaptureFactory(IClock clock) : IAudioCaptureFact
     public CapabilityState Capability => !OperatingSystem.IsWindows()
         ? CapabilityState.Unavailable(CapabilityKind.AudioCapture, "WASAPI 在当前主机不可用")
         : _lastErrorType is null
-            ? CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI 共享模式（AudioHub，16kHz 单声道）")
+            ? CapabilityState.Supported(
+                CapabilityKind.AudioCapture,
+                "WASAPI 共享模式已接入（麦克风待启用语音后验证）")
             : CapabilityState.Unavailable(
                 CapabilityKind.AudioCapture,
                 $"WASAPI 采集不可用（{_lastErrorType}）",
