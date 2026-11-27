@@ -6,7 +6,7 @@
 
 ## 1. 当前状态（2026-11-27）
 
-- 版本 `0.1.5`；三平台交付矩阵可构建、可打包、可签名（正式凭据由发布环境提供）。
+- 版本 `0.1.6`；三平台交付矩阵可构建、可打包、可签名（正式凭据由发布环境提供）。
 - 核心链路闭环：采集 → 加密存储 → 检索 → 日报/问答 → 导出；本地语音与只读 MCP 可用。
 - 本阶段完成的全栈标准化重构：
   - 诊断/基准/UI E2E 物理迁入 `tools/AiAssistant.Diagnostics.Host`，产品程序集不再链接或排除它们。
@@ -28,7 +28,7 @@ bash tools/audit-conventions.sh
 python3 -B build/sbom/generate-sbom.py --verify --check-manifest
 ```
 
-- 当前测试：286 例（281 通过 / 5 跳过），0 失败；受限环境用例显式 Skip（macOS 真机 Helper、真实浸泡、Linux portal）。
+- 当前测试：300 例（295 通过 / 5 跳过），0 失败；受限环境用例显式 Skip（macOS 真机 Helper、真实浸泡、Linux portal）。
 - 架构测试 13 项，审计 50+ 项；SBOM CycloneDX 1.6 校验通过。
 - macOS Swift 构建/测试/`--smoke-check` 由 macOS CI 与本地 `build/native/mac-helper.sh` 验证。
 
