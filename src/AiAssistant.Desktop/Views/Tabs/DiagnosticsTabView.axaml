@@ -35,8 +35,8 @@
         <Border Grid.Column="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="6,0,0,0">
           <StackPanel Spacing="7">
             <TextBlock Text="媒体保留清理" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding RetentionPolicyText}" TextWrapping="Wrap" FontSize="12"
-                       Foreground="{DynamicResource AccentBrush}" />
+            <TextBlock Text="按「数据与导出 → 保留与清理」中的当前设置擦除过期或超限媒体；已写入的媒体沿用写入时的保留期。"
+                       TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource AccentBrush}" />
             <TextBlock Text="{Binding RetentionText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
           </StackPanel>
         </Border>

@@ -21,12 +21,10 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private readonly IClock _clock;
     private readonly ILocalMcpControl? _mcp;
     private readonly string? _exportDirectory;
-    private readonly RetentionSettingsUseCase? _retentionSettings;
     private string _platformName = "正在检测平台能力…";
     private string _databaseText = "尚未检查";
     private string _pipelineText = string.Empty;
     private string _retentionText = "尚未执行清理扫描";
-    private string _retentionPolicyText = "保留策略未接入当前运行时";
     private string _modelText = "尚未探测本机模型";
     private string _modelEndpointsText = "尚未探测端点能力";
     private string _exportPreviewJson = string.Empty;
@@ -44,14 +42,12 @@ public sealed class DiagnosticsViewModel : ObservableObject
         ILocalMcpControl? mcp = null,
         string? exportDirectory = null,
         IModelConfigurationAdmin? modelConfiguration = null,
-        IClock? clock = null,
-        RetentionSettingsUseCase? retentionSettings = null)
+        IClock? clock = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _clock = clock ?? new SystemClock();
         _mcp = mcp;
         _exportDirectory = exportDirectory;
-        _retentionSettings = retentionSettings;
         ModelConfig = new ModelConfigurationEditorViewModel(modelConfiguration);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
@@ -61,7 +57,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
         ToggleMcpEnabledCommand = new AsyncRelayCommand(ToggleMcpEnabledAsync);
         ExecuteCapabilityCommand = new RelayCommand<CapabilityAction?>(ExecuteCapabilityAction);
         _mcpEnabled = _mcp?.GetSnapshot().Enabled ?? false;
-        _retentionPolicyText = FormatRetentionPolicy();
     }
 
     public ObservableCollection<CapabilityItem> Capabilities { get; } = [];
@@ -122,13 +117,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
     {
         get => _retentionText;
         private set => SetProperty(ref _retentionText, value);
-    }
-
-    /// <summary>Effective retention policy, so "过期擦除" always shows the actual window.</summary>
-    public string RetentionPolicyText
-    {
-        get => _retentionPolicyText;
-        private set => SetProperty(ref _retentionPolicyText, value);
     }
 
     public string ModelText
@@ -245,7 +233,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
             RetentionText = snapshot.RetentionMetrics is null
                 ? "尚未执行清理扫描"
                 : $"已扫描 {snapshot.RetentionMetrics.TotalSweeps} 次 · 安全擦除过期或超限媒体 {snapshot.RetentionMetrics.TotalPurgedBlobs} 个";
-            RetentionPolicyText = FormatRetentionPolicy();
             ModelText = snapshot.ModelCapability is null
                 ? "未配置模型网关"
                 : FormatModelSummary(snapshot.ModelCapability);
@@ -344,25 +331,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
             ErrorMessage = "无法更新本地 MCP 开关，请检查权限或端口占用。";
             // Revert the optimistic toggle so the control reflects the real (unchanged) state.
             OnPropertyChanged(nameof(McpEnabled));
-        }
-    }
-
-    private string FormatRetentionPolicy()
-    {
-        if (_retentionSettings is null)
-        {
-            return "保留策略未接入当前运行时";
-        }
-
-        try
-        {
-            var settings = _retentionSettings.Get();
-            var cap = settings.MaxStorageGigabytes <= 0 ? "不限" : $"{settings.MaxStorageGigabytes} GB";
-            return $"媒体保留 {settings.MediaRetentionDays} 天 · 命令音频 {settings.CommandAudioRetentionDays} 天 · 存储上限 {cap}";
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
-        {
-            return "保留策略读取失败";
         }
     }
 

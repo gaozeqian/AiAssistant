@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using AiAssistant.Application.Ports;
-using AiAssistant.Application.UseCases;
 using AiAssistant.Core.ValueObjects;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -16,7 +15,6 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     private readonly IVoiceSession _session;
     private readonly IVoiceCommandLog? _commandLog;
     private readonly ICommandAudioPlayer? _commandAudioPlayer;
-    private readonly RetentionSettingsUseCase? _retentionSettings;
     private bool _isEnabled;
     private bool _isBusy;
     private bool _isReplaying;
@@ -29,7 +27,6 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     private bool _recordsCommandAudio;
     private string _commandAudioStatus = "命令音频仅驻留内存，不落盘。";
     private string _commandHistoryStatus = "尚无命令记录";
-    private int _commandAudioRetentionDays = RetentionSettings.Default.CommandAudioRetentionDays;
     private bool _refreshingHistory;
     private bool _historyRefreshPending;
     private bool _disposed;
@@ -37,13 +34,11 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     public VoiceControlViewModel(
         IVoiceSession session,
         IVoiceCommandLog? commandLog = null,
-        ICommandAudioPlayer? commandAudioPlayer = null,
-        RetentionSettingsUseCase? retentionSettings = null)
+        ICommandAudioPlayer? commandAudioPlayer = null)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _commandLog = commandLog;
         _commandAudioPlayer = commandAudioPlayer;
-        _retentionSettings = retentionSettings;
         ToggleCommand = new AsyncRelayCommand(ToggleAsync);
         ToggleCommandAudioCommand = new AsyncRelayCommand(ToggleCommandAudioAsync);
         RefreshHistoryCommand = new AsyncRelayCommand(RefreshHistoryAsync);
@@ -52,7 +47,6 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         _session.Interaction += OnInteraction;
         _session.Faulted += OnFaulted;
         _isEnabled = _session.IsActive;
-        LoadRetentionDays();
         UpdateStatus(_session.State);
         RecordsCommandAudio = _session.RecordsCommandAudio;
         CommandAudioStatus = DescribeCommandAudio(RecordsCommandAudio);
@@ -175,23 +169,6 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         _session.Faulted -= OnFaulted;
     }
 
-    private void LoadRetentionDays()
-    {
-        if (_retentionSettings is null)
-        {
-            return;
-        }
-
-        try
-        {
-            _commandAudioRetentionDays = _retentionSettings.Get().CommandAudioRetentionDays;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
-        {
-            _commandAudioRetentionDays = RetentionSettings.Default.CommandAudioRetentionDays;
-        }
-    }
-
     private async Task ToggleAsync()
     {
         if (IsBusy)
@@ -246,8 +223,6 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         {
             await _session.SetCommandAudioRecordingAsync(!RecordsCommandAudio, CancellationToken.None);
             RecordsCommandAudio = _session.RecordsCommandAudio;
-            // Pick up a retention change made on the data page since this page was created.
-            LoadRetentionDays();
             CommandAudioStatus = DescribeCommandAudio(RecordsCommandAudio);
         }
         catch (InvalidOperationException)
@@ -264,8 +239,8 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         }
     }
 
-    private string DescribeCommandAudio(bool enabled) => enabled
-        ? $"命令音频已开启：唤醒后的命令音频会以 AES-GCM 加密保存，保留 {_commandAudioRetentionDays} 天后自动擦除；可在下方记录中重听。"
+    private static string DescribeCommandAudio(bool enabled) => enabled
+        ? "命令音频已开启：唤醒后的命令音频会以 AES-GCM 加密保存，按「数据与导出 → 保留与清理」中的保留期自动擦除；可在下方记录中重听。"
         : "命令音频仅驻留内存，不落盘。";
 
     private async Task RefreshHistoryAsync()

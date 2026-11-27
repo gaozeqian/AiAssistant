@@ -492,7 +492,10 @@ public sealed partial class DesktopViewModelTests
         Assert.Equal(14, store.Settings.MediaRetentionDays);
         Assert.Equal(3, store.Settings.CommandAudioRetentionDays);
         Assert.Equal(20, store.Settings.MaxStorageGigabytes);
-        Assert.Contains("14 天", viewModel.RetentionNotice, StringComparison.Ordinal);
+        // The delete card must not repeat concrete windows; only the retention card owns them.
+        Assert.Contains("保留与清理", viewModel.RetentionNotice, StringComparison.Ordinal);
+        Assert.DoesNotContain("14 天", viewModel.RetentionNotice, StringComparison.Ordinal);
+        Assert.DoesNotContain("20 GB", viewModel.RetentionNotice, StringComparison.Ordinal);
         Assert.Contains("20 GB", viewModel.RetentionPolicyText, StringComparison.Ordinal);
         // Saving a lowered cap sweeps immediately so the write gate does not start rejecting blobs.
         Assert.Equal(1, retention.SweepCount);

@@ -412,8 +412,7 @@ public sealed class AppRuntime : IAsyncDisposable
                 _services.GetRequiredService<ILocalMcpControl>(),
                 Path.Combine(_dataDirectory, "reports"),
                 _services.GetRequiredService<IModelConfigurationAdmin>(),
-                Services.Clock,
-                _services.GetRequiredService<RetentionSettingsUseCase>()),
+                Services.Clock),
             new ReportsViewModel(
                 _services.GetRequiredService<ReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports"),
@@ -422,8 +421,7 @@ public sealed class AppRuntime : IAsyncDisposable
             new VoiceControlViewModel(
                 _services.GetRequiredService<IVoiceSession>(),
                 _services.GetRequiredService<IVoiceCommandLog>(),
-                _services.GetRequiredService<ICommandAudioPlayer>(),
-                _services.GetRequiredService<RetentionSettingsUseCase>()),
+                _services.GetRequiredService<ICommandAudioPlayer>()),
             _services.GetRequiredService<VoiceNavigationHub>(),
             new SearchViewModel(
                 _services.GetRequiredService<EvidenceSearchUseCase>(),

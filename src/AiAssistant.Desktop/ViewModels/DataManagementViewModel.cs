@@ -199,18 +199,13 @@ public sealed class DataManagementViewModel : ObservableObject
         }
     }
 
-    public string RetentionNotice
-    {
-        get
-        {
-            var capText = _effectiveRetention.MaxStorageGigabytes <= 0
-                ? "当前未设置存储上限"
-                : $"占用超过 {_effectiveRetention.MaxStorageGigabytes} GB 时从最旧的媒体开始擦除";
-            return string.Create(
-                CultureInfo.InvariantCulture,
-                $"结构化事件长期保留；加密媒体按写入时的 {_effectiveRetention.MediaRetentionDays} 天保留期自动安全擦除，{capText}。删除后原始媒体无法恢复，问答与周报只会引用仍存在的结构化证据。");
-        }
-    }
+    /// <summary>
+    /// Deliberately free of concrete windows: the numbers live only in the retention card, so this
+    /// card cannot go stale after the user edits them.
+    /// </summary>
+    public string RetentionNotice { get; } =
+        "结构化事件长期保留；加密媒体按「保留与清理」中的保留期自动安全擦除，超出存储上限时从最旧的媒体开始擦除。" +
+        "删除后原始媒体无法恢复，问答与周报只会引用仍存在的结构化证据。";
 
     public string ExportNotice { get; } =
         "导出入口：日报、周报、问答与诊断均支持 Markdown / SVG / PNG / PDF / JSON；" +
@@ -237,7 +232,6 @@ public sealed class DataManagementViewModel : ObservableObject
         CommandAudioRetentionDays = _effectiveRetention.CommandAudioRetentionDays;
         MaxStorageGigabytes = _effectiveRetention.MaxStorageGigabytes;
         OnPropertyChanged(nameof(RetentionPolicyText));
-        OnPropertyChanged(nameof(RetentionNotice));
     }
 
     private async Task SaveRetentionAsync()
@@ -260,7 +254,6 @@ public sealed class DataManagementViewModel : ObservableObject
             CommandAudioRetentionDays = _effectiveRetention.CommandAudioRetentionDays;
             MaxStorageGigabytes = _effectiveRetention.MaxStorageGigabytes;
             OnPropertyChanged(nameof(RetentionPolicyText));
-            OnPropertyChanged(nameof(RetentionNotice));
 
             // A lowered cap must take effect now: the write gate rejects new blobs as soon as the
             // directory is over the limit, so waiting for the hourly sweep would break capture.
