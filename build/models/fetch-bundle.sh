@@ -116,15 +116,18 @@ fetch() {
 }
 
 verify_sha256() {
-  local file="$1" expected="$2"
-  if command -v sha256sum >/dev/null 2>&1; then
-    printf '%s  %s\n' "$expected" "$file" | sha256sum -c --status
-  elif command -v shasum >/dev/null 2>&1; then
-    [[ "$(shasum -a 256 "$file" | awk '{print $1}')" == "$expected" ]]
+  local file="$1" expected="$2" actual
+  # macOS 自带的 sha256sum 不接受 -c，统一先取摘要再比较，避免依赖 GNU 专有参数。
+  if command -v shasum >/dev/null 2>&1; then
+    actual="$(shasum -a 256 "$file" | awk '{print $1}')"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "$file" | awk '{print $1}')"
   else
     log "warning: 未找到 sha256 工具，跳过校验：$(basename "$file")"
     return 0
   fi
+
+  [[ "$actual" == "$expected" ]]
 }
 
 fetch_url() {
