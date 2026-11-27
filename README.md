@@ -72,7 +72,7 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj -- --report-ra
 
 ## 当前状态
 
-版本 `0.1.6`。三平台构建、测试、打包与文档体系已收口；当前测试 300 例（295 通过 / 5 跳过）、0 失败。剩余项（正式证书、macOS CI 真机、Intel 包等）见 [路线图](docs/release/roadmap.md)。
+版本 `0.1.7`。三平台构建、测试、打包与文档体系已收口；当前测试 312 例（307 通过 / 5 跳过）、0 失败。剩余项（正式证书、macOS CI 真机、Intel 包等）见 [路线图](docs/release/roadmap.md)。
 
 ## 隐私与许可
 
