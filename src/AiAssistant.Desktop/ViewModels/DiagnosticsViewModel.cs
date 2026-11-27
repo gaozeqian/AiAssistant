@@ -60,9 +60,13 @@ public sealed class DiagnosticsViewModel : ObservableObject, IDisposable
         ToggleMcpEnabledCommand = new AsyncRelayCommand(ToggleMcpEnabledAsync);
         ExecuteCapabilityCommand = new RelayCommand<CapabilityAction?>(ExecuteCapabilityAction);
         _mcpEnabled = _mcp?.GetSnapshot().Enabled ?? false;
+        Capabilities.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasCapabilities));
     }
 
     public ObservableCollection<CapabilityItem> Capabilities { get; } = [];
+
+    /// <summary>False before the first probe or when the probe returned nothing.</summary>
+    public bool HasCapabilities => Capabilities.Count > 0;
 
     public ObservableCollection<ReportJobItem> RecentJobs { get; } = [];
 

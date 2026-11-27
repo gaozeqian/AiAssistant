@@ -6,44 +6,48 @@
              x:DataType="vm:ShellViewModel">
   <ScrollViewer DataContext="{Binding Capture}" x:DataType="vm:CaptureControlViewModel" Margin="0,12,0,0">
     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
-      <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,12">
-        <StackPanel Spacing="14">
-          <TextBlock Text="采集状态" FontSize="18" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding CaptureStateText}" FontSize="15" Foreground="{DynamicResource AccentBrush}" />
+      <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}" Margin="0,0,8,12">
+        <StackPanel Spacing="{DynamicResource SpacingLg}">
+          <TextBlock Text="采集状态" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding CaptureStateText}" FontSize="{DynamicResource FontSizeTitle}" Foreground="{DynamicResource AccentTextBrush}" />
           <TextBlock Text="暂停会立即阻断入口并清空待处理队列。恢复后不会补写暂停期间的活动。"
                      TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
           <WrapPanel>
-            <Button Classes="primary" Content="{Binding PauseButtonText}" Command="{Binding TogglePauseCommand}" Margin="0,0,8,8" />
-            <Button Classes="secondary" Content="立即快照" Command="{Binding CaptureSnapshotCommand}" Margin="0,0,8,8" />
+            <Button Classes="primary" Content="{Binding PauseButtonText}" Command="{Binding TogglePauseCommand}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="暂停或恢复采集" />
+            <Button Classes="secondary" Content="立即快照" Command="{Binding CaptureSnapshotCommand}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="立即快照" />
           </WrapPanel>
-          <TextBlock Text="{Binding MetricsText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-          <TextBlock Text="{Binding CaptureStatusMessage}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource AccentBrush}" />
+          <TextBlock Text="{Binding MetricsText}" TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+          <TextBlock Text="{Binding CaptureStatusMessage}" TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource AccentBrush}" />
         </StackPanel>
       </Border>
 
-      <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,12">
-        <StackPanel Spacing="14">
-          <TextBlock Text="开机与隐私" FontSize="18" FontWeight="SemiBold" />
+      <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}" Margin="8,0,0,12">
+        <StackPanel Spacing="{DynamicResource SpacingLg}">
+          <TextBlock Text="开机与隐私" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
           <ToggleSwitch IsChecked="{Binding AutoStartEnabled, Mode=OneWay}"
                         Command="{Binding ToggleAutoStartCommand}"
                         OnContent="已开启" OffContent="已关闭"
                         automation:AutomationProperties.Name="开机自启" />
-          <TextBlock Text="{Binding AutoStartStatusMessage}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-          <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
+          <TextBlock Text="{Binding AutoStartStatusMessage}" TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+          <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}">
             <TextBlock Text="数据库使用 SQLite3MC 加密，媒体使用 AES-GCM 加密；密钥由系统密钥库保护。默认不监视全盘、不记录按键或剪贴板。"
                        TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
           </Border>
         </StackPanel>
       </Border>
 
-      <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24">
-        <StackPanel Spacing="12">
-          <TextBlock Text="应用与窗口黑名单" FontSize="18" FontWeight="SemiBold" />
+      <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}">
+        <StackPanel Spacing="{DynamicResource SpacingMd}">
+          <TextBlock Text="应用与窗口黑名单" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
           <TextBlock Text="每行一个关键字，匹配应用名或窗口标题，不区分大小写。密码管理器与隐私浏览的内置规则也会显示在下方。"
                      TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
-          <TextBox Text="{Binding BlacklistText}" AcceptsReturn="True" MinHeight="170" TextWrapping="NoWrap" />
-          <Button Classes="primary" Content="保存并立即生效" Command="{Binding SaveBlacklistCommand}" HorizontalAlignment="Left" />
-          <TextBlock Text="{Binding BlacklistStatusMessage}" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" />
+          <TextBox Text="{Binding BlacklistText}" AcceptsReturn="True" MinHeight="170" TextWrapping="NoWrap"
+                   automation:AutomationProperties.Name="应用与窗口黑名单关键字" />
+          <Button Classes="primary" Content="保存并立即生效" Command="{Binding SaveBlacklistCommand}" HorizontalAlignment="Left"
+                  automation:AutomationProperties.Name="保存黑名单并立即生效" />
+          <TextBlock Text="{Binding BlacklistStatusMessage}" Foreground="{DynamicResource AccentTextBrush}" TextWrapping="Wrap" />
         </StackPanel>
       </Border>
     </Grid>

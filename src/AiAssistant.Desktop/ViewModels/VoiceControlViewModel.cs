@@ -26,7 +26,7 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     private string _errorMessage = string.Empty;
     private bool _recordsCommandAudio;
     private string _commandAudioStatus = "命令音频仅驻留内存，不落盘。";
-    private string _commandHistoryStatus = "尚无命令记录";
+    private string _commandHistoryStatus = "尚无命令记录。启用语音后说「你好时光」开始。";
     private bool _refreshingHistory;
     private bool _historyRefreshPending;
     private CancellationTokenSource? _replayCts;
@@ -283,7 +283,7 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
                 }
 
                 CommandHistoryStatus = records.Count == 0
-                    ? "尚无命令记录"
+                    ? "尚无命令记录。启用语音后说「你好时光」开始。"
                     : BuildHistoryStatus();
                 OnPropertyChanged(nameof(HasCommandHistory));
             }

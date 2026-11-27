@@ -47,9 +47,13 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         RegenerateCommand = new AsyncRelayCommand(() => GenerateAsync(forceOverwrite: true));
         ExportCommand = new AsyncRelayCommand(ExportAsync);
         SaveScheduleCommand = new AsyncRelayCommand(SaveScheduleAsync);
+        Versions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasVersions));
     }
 
     public ObservableCollection<ReportVersionItem> Versions { get; } = [];
+
+    /// <summary>True when the selected date already has at least one report version.</summary>
+    public bool HasVersions => Versions.Count > 0;
 
     public IAsyncRelayCommand RefreshCommand { get; }
     public IAsyncRelayCommand GenerateCommand { get; }

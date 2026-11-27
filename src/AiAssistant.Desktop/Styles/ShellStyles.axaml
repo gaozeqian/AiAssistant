@@ -39,7 +39,7 @@
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="Template">
         <ControlTemplate>
-          <Border Name="PART_Root" Background="{TemplateBinding Background}" CornerRadius="3">
+          <Border Name="PART_Root" Background="{TemplateBinding Background}" CornerRadius="{DynamicResource RadiusXs}">
             <ContentPresenter Content="{TemplateBinding Content}"
                               HorizontalContentAlignment="Center"
                               VerticalContentAlignment="Center" />
@@ -98,6 +98,25 @@
         </ControlTemplate>
       </Setter>
     </ControlTheme>
+
+    <!-- 破坏性操作：红色描边 + 悬停红底。和主按钮一样，三态必须落在模板 ContentPresenter 上。 -->
+    <ControlTheme x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DangerForegroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DangerForegroundBrush}" />
+      <Setter Property="Padding" Value="14,8" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
+      <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource DangerBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DangerForegroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource DangerForegroundBrush}" />
+      </Style>
+      <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource DangerBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DangerForegroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource DangerForegroundBrush}" />
+      </Style>
+    </ControlTheme>
   </Styles.Resources>
 
   <Style Selector="NumericUpDown /template/ ButtonSpinner#PART_Spinner">
@@ -108,17 +127,20 @@
   </Style>
   <Style Selector="Button.secondary">
     <Setter Property="Padding" Value="14,8" />
-    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
+  </Style>
+  <Style Selector="Button.danger">
+    <Setter Property="Theme" Value="{StaticResource DangerButton}" />
   </Style>
   <!-- 顶栏胶囊按钮：状态徽标不可点，只有这两个是按钮，用同一套尺寸。 -->
   <Style Selector="Button.headerChip">
     <Setter Property="Background" Value="{DynamicResource HeaderBadgeBackgroundBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource HeaderBadgeForegroundBrush}" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusLg}" />
     <Setter Property="Padding" Value="12,6" />
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
   </Style>
-  <Style Selector="Button.headerChip.danger">
+  <Style Selector="Button.headerChip.headerDanger">
     <Setter Property="Foreground" Value="{DynamicResource DangerForegroundBrush}" />
   </Style>
   <Style Selector="Button.headerChip.armed">
@@ -127,7 +149,7 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBox, ComboBox, DatePicker">
-    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
     <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
@@ -141,6 +163,19 @@
   </Style>
   <Style Selector="ListBoxItem">
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <!-- 弱化说明文字：颜色 + 换行，不强制字号（正文/说明各自用 FontSize 令牌）。 -->
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- 能力状态：默认正文色，需要关注时用警示色；文字本身（可用/降级）始终存在，不单靠颜色。 -->
+  <Style Selector="TextBlock.status">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="TextBlock.status.attention">
+    <Setter Property="Foreground" Value="{DynamicResource WarningForegroundBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TabControl TabItem">
     <Setter Property="FontSize" Value="13" />

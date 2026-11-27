@@ -7,21 +7,23 @@
              x:DataType="vm:ShellViewModel">
   <Grid DataContext="{Binding Search}" x:DataType="vm:SearchViewModel"
         ColumnDefinitions="400,*" Margin="0,12,0,0">
-    <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,12,0">
+    <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}" Margin="0,0,12,0">
       <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*">
-        <TextBlock Text="证据检索与问答" FontSize="18" FontWeight="SemiBold" />
-        <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
+        <TextBlock Text="证据检索与问答" FontSize="{DynamicResource FontSizePage}" FontWeight="SemiBold" />
+        <StackPanel Grid.Row="1" Spacing="{DynamicResource SpacingSm}" Margin="0,14,0,0">
           <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
                    PlaceholderText="输入关键词或问题，例如：迁移进展如何"
                    automation:AutomationProperties.Name="检索关键词或问题" />
           <Grid RowDefinitions="Auto,Auto" Margin="0,4,0,0">
             <Grid Grid.Row="0" ColumnDefinitions="40,*" VerticalAlignment="Center">
               <TextBlock Text="从" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
-              <DatePicker Grid.Column="1" SelectedDate="{Binding FromDate}" Initialized="OnDatePickerInitialized" />
+              <DatePicker Grid.Column="1" SelectedDate="{Binding FromDate}" Initialized="OnDatePickerInitialized"
+                          automation:AutomationProperties.Name="检索起始日期" />
             </Grid>
             <Grid Grid.Row="1" ColumnDefinitions="40,*" VerticalAlignment="Center" Margin="0,6,0,0">
               <TextBlock Text="到" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
-              <DatePicker Grid.Column="1" SelectedDate="{Binding ToDate}" Initialized="OnDatePickerInitialized" />
+              <DatePicker Grid.Column="1" SelectedDate="{Binding ToDate}" Initialized="OnDatePickerInitialized"
+                          automation:AutomationProperties.Name="检索结束日期" />
             </Grid>
           </Grid>
         </StackPanel>
@@ -35,22 +37,22 @@
                   automation:AutomationProperties.Name="导出问答" />
         </WrapPanel>
         <ProgressBar Grid.Row="3" Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsBusy}" />
-        <StackPanel Grid.Row="4" Spacing="5" Margin="0,8,0,0">
-          <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
+        <StackPanel Grid.Row="4" Spacing="{DynamicResource SpacingXs}" Margin="0,8,0,0">
+          <TextBlock Text="{Binding StatusMessage}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding ErrorMessage}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
                      IsVisible="{Binding HasError}" />
         </StackPanel>
         <!-- 回答可能很长：必须自己滚动，否则最小窗口下会被卡片硬切。 -->
         <ScrollViewer Grid.Row="5" Margin="0,14,0,0" VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
-          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12">
-            <StackPanel Spacing="6">
+          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}">
+            <StackPanel Spacing="{DynamicResource SpacingSm}">
               <TextBlock Text="回答（仅基于证据）" FontWeight="SemiBold" />
               <TextBlock Text="{Binding Answer}" TextWrapping="Wrap" />
-              <TextBlock Text="{Binding AnswerMeta}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-              <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="6" Padding="10">
+              <TextBlock Text="{Binding AnswerMeta}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+              <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}">
                 <TextBlock Text="无证据时不会生成推测性回答；原始媒体清理后只保留结构化证据。"
-                           FontSize="12" Foreground="{DynamicResource SuccessForegroundBrush}" TextWrapping="Wrap" />
+                           FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource SuccessForegroundBrush}" TextWrapping="Wrap" />
               </Border>
             </StackPanel>
           </Border>
@@ -58,38 +60,44 @@
       </Grid>
     </Border>
 
-    <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
+    <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}">
       <Grid RowDefinitions="Auto,*,Auto">
         <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Text="证据列表" FontSize="15" FontWeight="SemiBold" />
+          <TextBlock Text="证据列表" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
           <TextBlock Grid.Column="1" Text="点击“定位”跳转到时间线对应记录"
-                     FontSize="12" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+                     FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
         </Grid>
-        <ScrollViewer Grid.Row="1" Margin="0,10,0,0">
-          <ItemsControl ItemsSource="{Binding Evidence}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:EvidenceCardItem">
-                <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" Margin="0,0,0,8">
-                  <Grid ColumnDefinitions="*,Auto">
-                    <StackPanel Spacing="4">
-                      <TextBlock Text="{Binding Header}" FontSize="12" FontWeight="SemiBold"
-                                 Foreground="{DynamicResource AccentBrush}" />
-                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                      <TextBlock Text="{Binding Excerpt}" FontSize="12" TextWrapping="Wrap" />
-                      <TextBlock Text="{Binding MatchedByText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-                      <TextBlock Text="{Binding MediaText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-                    </StackPanel>
-                    <Button Grid.Column="1" Classes="secondary" Content="定位"
-                            Command="{Binding NavigateCommand}" VerticalAlignment="Top"
-                            automation:AutomationProperties.Name="定位到时间线对应记录" />
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
-        <Border Grid.Row="2" Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="14" Margin="0,10,0,0">
-          <StackPanel Spacing="8">
+        <Grid Grid.Row="1" Margin="0,10,0,0">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Evidence}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:EvidenceCardItem">
+                  <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" Margin="0,0,0,8">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Spacing="{DynamicResource SpacingXs}">
+                        <TextBlock Text="{Binding Header}" FontSize="{DynamicResource FontSizeBody}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AccentTextBrush}" />
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Excerpt}" FontSize="{DynamicResource FontSizeBody}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding MatchedByText}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+                        <TextBlock Text="{Binding MediaText}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="secondary" Content="定位"
+                              Command="{Binding NavigateCommand}" VerticalAlignment="Top"
+                              automation:AutomationProperties.Name="定位到时间线对应记录" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <TextBlock Text="暂无证据。先输入关键词检索，或放宽日期范围。"
+                     Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
+                     IsVisible="{Binding ShowEvidenceEmpty}" />
+        </Grid>
+        <Border Grid.Row="2" Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" Margin="0,10,0,0">
+          <StackPanel Spacing="{DynamicResource SpacingSm}">
             <Grid ColumnDefinitions="*,Auto,Auto">
               <TextBlock Text="周报与统计" FontWeight="SemiBold" VerticalAlignment="Center" />
               <Button Grid.Column="1" Classes="secondary" Content="生成周报"
@@ -97,19 +105,19 @@
               <Button Grid.Column="2" Classes="secondary" Content="导出"
                       Command="{Binding ExportWeeklyCommand}" IsEnabled="{Binding HasWeeklyReport}" />
             </Grid>
-            <TextBlock Text="{Binding WeeklyStatus}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Text="{Binding WeeklyStatus}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
             <ItemsControl ItemsSource="{Binding WeeklyBars}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:DailyBarItem">
-                  <Grid ColumnDefinitions="56,*,90" Margin="0,2">
-                    <TextBlock Text="{Binding DateText}" FontSize="12" VerticalAlignment="Center" />
-                    <Border Grid.Column="1" Height="14" Background="{DynamicResource AccentBrush}"
-                            CornerRadius="3" HorizontalAlignment="Left" Width="{Binding BarWidthPixels}" />
-                    <TextBlock Grid.Column="2" Text="{Binding CountText}" FontSize="12"
-                               Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Right" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:DailyBarItem">
+                    <Grid ColumnDefinitions="56,*,90" Margin="0,2">
+                      <TextBlock Text="{Binding DateText}" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center" />
+                      <Border Grid.Column="1" Height="14" Background="{DynamicResource AccentBrush}"
+                              CornerRadius="{DynamicResource RadiusXs}" HorizontalAlignment="Left" Width="{Binding BarWidthPixels}" />
+                      <TextBlock Grid.Column="2" Text="{Binding CountText}" FontSize="{DynamicResource FontSizeBody}"
+                                 Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Right" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
             </ItemsControl>
             <md:MarkdownScrollViewer Markdown="{Binding WeeklyMarkdown}" MaxHeight="220" />
           </StackPanel>

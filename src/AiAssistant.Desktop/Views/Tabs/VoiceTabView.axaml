@@ -18,10 +18,10 @@
 
   <Grid DataContext="{Binding Voice}" x:DataType="vm:VoiceControlViewModel" Margin="0,12,0,0"
         ColumnDefinitions="*,*" RowDefinitions="Auto,*">
-    <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,12">
-      <StackPanel Spacing="14">
-        <TextBlock Text="本地语音命令" FontSize="18" FontWeight="SemiBold" />
-        <TextBlock Text="{Binding StatusText}" FontSize="15" Foreground="{DynamicResource AccentBrush}" />
+    <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}" Margin="0,0,8,12">
+      <StackPanel Spacing="{DynamicResource SpacingLg}">
+        <TextBlock Text="本地语音命令" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding StatusText}" FontSize="{DynamicResource FontSizeTitle}" Foreground="{DynamicResource AccentBrush}" />
         <TextBlock Text="唤醒词：你好时光。唤醒后 8 秒内说出固定命令，命令音频默认仅驻留内存。"
                    TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
         <ToggleSwitch IsChecked="{Binding IsEnabled, Mode=OneWay}"
@@ -32,73 +32,76 @@
                   IsChecked="{Binding RecordsCommandAudio, Mode=OneWay}"
                   Command="{Binding ToggleCommandAudioCommand}"
                   automation:AutomationProperties.Name="记录命令音频" />
-        <TextBlock Text="{Binding CommandAudioStatus}" TextWrapping="Wrap" FontSize="12"
+        <TextBlock Text="{Binding CommandAudioStatus}" TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}"
                    Foreground="{DynamicResource MutedBrush}" />
-        <TextBlock Text="{Binding CapabilityText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+        <TextBlock Text="{Binding CapabilityText}" TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
         <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Foreground="{DynamicResource DangerForegroundBrush}" IsVisible="{Binding HasError}" />
       </StackPanel>
     </Border>
-    <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,12">
-      <StackPanel Spacing="14">
-        <TextBlock Text="最近一次交互" FontSize="18" FontWeight="SemiBold" />
+    <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}" Margin="8,0,0,12">
+      <StackPanel Spacing="{DynamicResource SpacingLg}">
+        <TextBlock Text="最近一次交互" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
         <TextBlock Text="识别文本" FontWeight="SemiBold" />
         <TextBlock Text="{Binding LastTranscript}" TextWrapping="Wrap" />
         <TextBlock Text="反馈" FontWeight="SemiBold" />
         <TextBlock Text="{Binding LastFeedback}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
-        <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
+        <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}">
           <TextBlock Text="固定命令：生成日报、暂停采集、恢复采集、打开时间线、打开日报；以“问一下”开头可对近 7 天本地证据提问，回答与检索面板共用同一证据用例。退出应用需要二次确认。"
                      TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
         </Border>
       </StackPanel>
     </Border>
 
-    <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24">
+    <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}">
       <!-- 卡片自身占满剩余高度：记录再多也只滚动列表，不再把整页顶下去。 -->
       <Grid RowDefinitions="Auto,Auto,*,Auto">
         <Grid ColumnDefinitions="*,Auto">
-          <StackPanel Spacing="4">
-            <TextBlock Text="命令记录" FontSize="18" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding CommandHistoryStatus}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+          <StackPanel Spacing="{DynamicResource SpacingXs}">
+            <TextBlock Text="命令记录" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding CommandHistoryStatus}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
           </StackPanel>
           <Button Grid.Column="1" Classes="secondary" Content="刷新" Command="{Binding RefreshHistoryCommand}"
                   VerticalAlignment="Center"
                   automation:AutomationProperties.Name="刷新命令记录" />
         </Grid>
         <Grid Grid.Row="1" ColumnDefinitions="130,*,120,80,90" Margin="0,14,0,8">
-          <TextBlock Text="时间" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-          <TextBlock Grid.Column="1" Text="识别文本" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="8,0" />
-          <TextBlock Grid.Column="2" Text="意图" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-          <TextBlock Grid.Column="3" Text="音频" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-          <TextBlock Grid.Column="4" Text="操作" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="8,0,0,0" />
+          <TextBlock Text="时间" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+          <TextBlock Grid.Column="1" Text="识别文本" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" Margin="8,0" />
+          <TextBlock Grid.Column="2" Text="意图" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+          <TextBlock Grid.Column="3" Text="音频" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+          <TextBlock Grid.Column="4" Text="操作" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" Margin="8,0,0,0" />
         </Grid>
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-          <ItemsControl ItemsSource="{Binding CommandHistory}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:VoiceCommandHistoryItem">
-                <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,7">
-                  <Grid ColumnDefinitions="130,*,120,80,90">
-                    <TextBlock Text="{Binding TimeText}" FontSize="12" FontFamily="Consolas" Foreground="{DynamicResource MutedBrush}" />
-                    <TextBlock Grid.Column="1" Text="{Binding Transcript}" TextWrapping="Wrap" Margin="8,0" />
-                    <TextBlock Grid.Column="2" Text="{Binding IntentText}" FontSize="12" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="3" Text="{Binding AudioStateText}"
-                               Classes="audioState" Classes.cleared="{Binding WasAudioCleared}"
-                               ToolTip.Tip="{Binding AudioStateHint}" />
-                    <Button Grid.Column="4" Classes="secondary" Content="{Binding ReplayLabel}"
-                            Command="{Binding $parent[ItemsControl].((vm:VoiceControlViewModel)DataContext).ReplayCommand}"
-                            CommandParameter="{Binding}"
-                            IsEnabled="{Binding CanReplay}" Padding="10,4" FontSize="12"
-                            HorizontalAlignment="Left" VerticalAlignment="Center"
-                            ToolTip.Tip="{Binding AudioStateHint}"
-                            automation:AutomationProperties.Name="重听命令音频" />
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
+        <Grid Grid.Row="2">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding CommandHistory}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:VoiceCommandHistoryItem">
+                  <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,7">
+                    <Grid ColumnDefinitions="130,*,120,80,90">
+                      <TextBlock Text="{Binding TimeText}" FontSize="{DynamicResource FontSizeBody}"
+                                 FontFamily="Cascadia Mono,Consolas,monospace" Foreground="{DynamicResource MutedBrush}" />
+                      <TextBlock Grid.Column="1" Text="{Binding Transcript}" TextWrapping="Wrap" Margin="8,0" />
+                      <TextBlock Grid.Column="2" Text="{Binding IntentText}" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3" Text="{Binding AudioStateText}"
+                                 Classes="audioState" Classes.cleared="{Binding WasAudioCleared}"
+                                 ToolTip.Tip="{Binding AudioStateHint}" />
+                      <Button Grid.Column="4" Classes="secondary" Content="{Binding ReplayLabel}"
+                              Command="{Binding $parent[ItemsControl].((vm:VoiceControlViewModel)DataContext).ReplayCommand}"
+                              CommandParameter="{Binding}"
+                              IsEnabled="{Binding CanReplay}" Padding="10,4" FontSize="{DynamicResource FontSizeBody}"
+                              HorizontalAlignment="Left" VerticalAlignment="Center"
+                              ToolTip.Tip="{Binding AudioStateHint}"
+                              automation:AutomationProperties.Name="重听命令音频" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
         <TextBlock Grid.Row="3" Margin="0,10,0,0"
                    Text="命令音频默认不落盘；开启记录后按保留期加密留存。未开启记录显示“未留存”，被保留期清理的记录显示“已清理”。"
-                   FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                   FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
       </Grid>
     </Border>
   </Grid>

@@ -52,9 +52,21 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
         ExportAnswerCommand = new AsyncRelayCommand(ExportAnswerAsync);
         WeeklyReportCommand = new AsyncRelayCommand(GenerateWeeklyReportAsync);
         ExportWeeklyCommand = new AsyncRelayCommand(ExportWeeklyReportAsync);
+        // 空态跟着"有没有证据"走，而不是"有没有选中"。
+        Evidence.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasEvidence));
+            OnPropertyChanged(nameof(ShowEvidenceEmpty));
+        };
     }
 
     public ObservableCollection<EvidenceCardItem> Evidence { get; } = [];
+
+    /// <summary>True when the current query returned at least one evidence card.</summary>
+    public bool HasEvidence => Evidence.Count > 0;
+
+    /// <summary>Empty state for the evidence list: only when nothing is running, to avoid a flash.</summary>
+    public bool ShowEvidenceEmpty => !HasEvidence && !IsBusy;
 
     public ObservableCollection<DailyBarItem> WeeklyBars { get; } = [];
 
@@ -138,6 +150,7 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _isBusy, value))
             {
                 _progressPulse.SetBusy(value);
+                OnPropertyChanged(nameof(ShowEvidenceEmpty));
             }
         }
     }

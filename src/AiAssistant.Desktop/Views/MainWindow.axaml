@@ -32,27 +32,27 @@
     <Border Grid.Row="0" Background="{DynamicResource HeaderBackgroundBrush}" BorderBrush="{DynamicResource HeaderBorderBrush}"
             BorderThickness="0,0,0,1" Padding="24,14">
       <Grid ColumnDefinitions="Auto,*,Auto">
-        <Border Width="38" Height="38" CornerRadius="11" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center">
-          <TextBlock Text="时" Foreground="White" FontSize="18" FontWeight="SemiBold"
+        <Border Width="38" Height="38" CornerRadius="{DynamicResource RadiusMd}" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center">
+          <TextBlock Text="时" Foreground="White" FontSize="{DynamicResource FontSizeBrand}" FontWeight="SemiBold"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
         <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-          <TextBlock Text="时光" Foreground="{DynamicResource HeaderTextBrush}" FontSize="18" FontWeight="SemiBold" />
-          <TextBlock Text="个人活动追踪 · 默认仅在本机处理" Foreground="{DynamicResource HeaderTextSecondaryBrush}" FontSize="12" />
+          <TextBlock Text="时光" Foreground="{DynamicResource HeaderTextBrush}" FontSize="{DynamicResource FontSizeBrand}" FontWeight="SemiBold" />
+          <TextBlock Text="个人活动追踪 · 默认仅在本机处理" Foreground="{DynamicResource HeaderTextSecondaryBrush}" FontSize="{DynamicResource FontSizeBody}" />
         </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}" VerticalAlignment="Center">
           <Button Content="{Binding ThemeToggleText}" Command="{Binding ToggleThemeCommand}"
                   Classes="headerChip"
                   automation:AutomationProperties.Name="切换深色/浅色" />
-          <Border Background="{DynamicResource HeaderBadgeBackgroundBrush}" CornerRadius="14" Padding="12,6">
-            <TextBlock Text="{Binding CaptureStatus}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}" FontSize="12" />
+          <Border Background="{DynamicResource HeaderBadgeBackgroundBrush}" CornerRadius="{DynamicResource RadiusLg}" Padding="12,6">
+            <TextBlock Text="{Binding CaptureStatus}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}" FontSize="{DynamicResource FontSizeBody}" />
           </Border>
-          <Border Background="{DynamicResource HeaderBadgeBackgroundBrush}" CornerRadius="14" Padding="12,6">
-            <TextBlock Text="{Binding Voice.StatusText}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}" FontSize="12" />
+          <Border Background="{DynamicResource HeaderBadgeBackgroundBrush}" CornerRadius="{DynamicResource RadiusLg}" Padding="12,6">
+            <TextBlock Text="{Binding Voice.StatusText}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}" FontSize="{DynamicResource FontSizeBody}" />
           </Border>
           <!-- 退出是破坏性操作：第一次点击只进入待确认态，5 秒内再点一次才真正退出。 -->
           <Button Content="{Binding ExitButtonText}" Command="{Binding RequestExitCommand}"
-                  Classes="headerChip danger" Classes.armed="{Binding IsExitArmed}"
+                  Classes="headerChip headerDanger" Classes.armed="{Binding IsExitArmed}"
                   automation:AutomationProperties.Name="退出应用" />
         </StackPanel>
       </Grid>

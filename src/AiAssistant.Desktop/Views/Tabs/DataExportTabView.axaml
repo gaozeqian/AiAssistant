@@ -5,23 +5,24 @@
              x:Class="AiAssistant.Desktop.Views.Tabs.DataExportTabView"
              x:DataType="vm:ShellViewModel">
   <ScrollViewer DataContext="{Binding Data}" x:DataType="vm:DataManagementViewModel" Margin="0,12,0,0">
-    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" Margin="0,0,18,0">
-      <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="0,0,8,12">
-        <StackPanel Spacing="14">
-          <TextBlock Text="删除本地数据" FontSize="18" FontWeight="SemiBold" />
+    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" Margin="{DynamicResource ScrollGutterMargin}">
+      <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}" Margin="0,0,8,12">
+        <StackPanel Spacing="{DynamicResource SpacingLg}">
+          <TextBlock Text="删除本地数据" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
           <TextBlock Text="{Binding RetentionNotice}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
-          <DatePicker SelectedDate="{Binding SelectedDate}" Initialized="OnDatePickerInitialized" />
+          <DatePicker SelectedDate="{Binding SelectedDate}" Initialized="OnDatePickerInitialized"
+                      automation:AutomationProperties.Name="要删除的日期" />
           <WrapPanel>
-            <Button Classes="secondary" Content="{Binding DeleteDateButtonText}"
+            <Button Classes="danger" Content="{Binding DeleteDateButtonText}"
                     Command="{Binding DeleteDateCommand}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="{Binding DeleteDateButtonText}" />
-            <Button Classes="secondary" Content="{Binding DeleteAllButtonText}"
+            <Button Classes="danger" Content="{Binding DeleteAllButtonText}"
                     Command="{Binding DeleteAllCommand}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="{Binding DeleteAllButtonText}" />
             <Button Classes="secondary" Content="取消" Command="{Binding CancelPendingCommand}"
                     IsVisible="{Binding HasPendingDeletion}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8" />
           </WrapPanel>
-          <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPendingDeletion}">
+          <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" IsVisible="{Binding HasPendingDeletion}">
             <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
           </Border>
           <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsDeleting}"
@@ -32,21 +33,21 @@
         </StackPanel>
       </Border>
 
-      <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24" Margin="8,0,0,12">
-        <StackPanel Spacing="14">
-          <TextBlock Text="导出与保留" FontSize="18" FontWeight="SemiBold" />
+      <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}" Margin="8,0,0,12">
+        <StackPanel Spacing="{DynamicResource SpacingLg}">
+          <TextBlock Text="导出与保留" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
           <TextBlock Text="{Binding ExportNotice}" TextWrapping="Wrap" />
-          <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="8" Padding="14">
+          <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}">
             <TextBlock Text="所有导出均在本机生成，不经过云端。删除数据前请先导出需要保留的日报、问答或加密备份。"
                        TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
           </Border>
         </StackPanel>
       </Border>
 
-      <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10"
-              Padding="24" Margin="0,0,0,12" IsVisible="{Binding HasBackupSupport}">
-        <StackPanel Spacing="12">
-          <TextBlock Text="数据备份与恢复" FontSize="18" FontWeight="SemiBold" />
+      <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}"
+              Padding="{DynamicResource SpaceXl}" Margin="0,0,0,12" IsVisible="{Binding HasBackupSupport}">
+        <StackPanel Spacing="{DynamicResource SpacingMd}">
+          <TextBlock Text="数据备份与恢复" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
           <TextBlock Text="加密备份是可跨机器迁移的独立 ZIP（数据库 + 媒体 + 主密钥），使用导出时生成的备份密钥加密。密钥不会保存在应用内，请与备份文件分开保存；丢失密钥后备份无法恢复。恢复会先解密校验，重启后覆盖当前数据库与媒体。"
                      TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
           <WrapPanel>
@@ -65,9 +66,9 @@
                     IsVisible="{Binding RestartAvailable}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="取消暂存的恢复" />
           </WrapPanel>
-          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="14"
+          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}"
                   IsVisible="{Binding IsAwaitingBackupKey}">
-            <StackPanel Spacing="10">
+            <StackPanel Spacing="{DynamicResource SpacingMd}">
               <TextBlock Text="请保存备份密钥" FontWeight="SemiBold" />
               <TextBlock Text="这是恢复该备份的唯一密钥，不会保存在应用内。请立即保存到密码管理器或离线位置；丢失后备份无法恢复。任何同时获得密钥和备份文件的人都能读取其中的全部数据，请勿将两者放在一起。"
                          TextWrapping="Wrap" Foreground="{DynamicResource DangerForegroundBrush}" />
@@ -92,9 +93,9 @@
               </WrapPanel>
             </StackPanel>
           </Border>
-          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="14"
+          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}"
                   IsVisible="{Binding IsAwaitingRestoreKey}">
-            <StackPanel Spacing="10">
+            <StackPanel Spacing="{DynamicResource SpacingMd}">
               <TextBlock Text="输入备份密钥" FontWeight="SemiBold" />
               <TextBlock Text="输入导出时保存的备份密钥。密钥不区分大小写，可包含分隔符；解密校验通过后才会覆盖当前数据。"
                          TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
@@ -110,7 +111,7 @@
               </WrapPanel>
             </StackPanel>
           </Border>
-          <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPendingRestore}">
+          <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" IsVisible="{Binding HasPendingRestore}">
             <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
           </Border>
           <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsBackingUp}"
@@ -121,27 +122,37 @@
         </StackPanel>
       </Border>
 
-      <Border Grid.Row="2" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10"
-              Padding="24" IsVisible="{Binding HasRetentionSettings}">
-        <StackPanel Spacing="12">
-          <TextBlock Text="保留与清理" FontSize="18" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding RetentionPolicyText}" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" />
-          <Grid ColumnDefinitions="Auto,110,Auto,110,Auto,110" RowDefinitions="Auto" >
-            <TextBlock Text="媒体保留（天）" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
-            <NumericUpDown Grid.Column="1" Value="{Binding MediaRetentionDays, Mode=TwoWay}"
-                           Minimum="1" Maximum="365" Increment="1" FormatString="0"
-                           Margin="8,0,16,0" automation:AutomationProperties.Name="媒体保留天数" />
-            <TextBlock Grid.Column="2" Text="命令音频保留（天）" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
-            <NumericUpDown Grid.Column="3" Value="{Binding CommandAudioRetentionDays, Mode=TwoWay}"
-                           Minimum="1" Maximum="365" Increment="1" FormatString="0"
-                           Margin="8,0,16,0" automation:AutomationProperties.Name="命令音频保留天数" />
-            <TextBlock Grid.Column="4" Text="存储上限（GB，0=不限）" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
-            <NumericUpDown Grid.Column="5" Value="{Binding MaxStorageGigabytes, Mode=TwoWay}"
-                           Minimum="0" Maximum="1000" Increment="1" FormatString="0"
-                           Margin="8,0,0,0" automation:AutomationProperties.Name="存储上限GB" />
+      <Border Grid.Row="2" Grid.ColumnSpan="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}"
+              Padding="{DynamicResource SpaceXl}" IsVisible="{Binding HasRetentionSettings}">
+        <StackPanel Spacing="{DynamicResource SpacingMd}">
+          <TextBlock Text="保留与清理" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding RetentionPolicyText}" Foreground="{DynamicResource AccentTextBrush}" TextWrapping="Wrap" />
+          <!-- 标签在上、输入在下：三个标签宽度不同，横排时输入框起点对不齐。 -->
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="{DynamicResource SpacingLg}">
+            <StackPanel Spacing="{DynamicResource SpacingXs}">
+              <TextBlock Text="媒体保留（天）" Classes="muted" />
+              <NumericUpDown Value="{Binding MediaRetentionDays, Mode=TwoWay}"
+                             Minimum="1" Maximum="365" Increment="1" FormatString="0"
+                             Loaded="OnRetentionSpinnerLoaded"
+                             automation:AutomationProperties.Name="媒体保留天数" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="{DynamicResource SpacingXs}">
+              <TextBlock Text="命令音频保留（天）" Classes="muted" />
+              <NumericUpDown Value="{Binding CommandAudioRetentionDays, Mode=TwoWay}"
+                             Minimum="1" Maximum="365" Increment="1" FormatString="0"
+                             Loaded="OnRetentionSpinnerLoaded"
+                             automation:AutomationProperties.Name="命令音频保留天数" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="{DynamicResource SpacingXs}">
+              <TextBlock Text="存储上限（GB，0=不限）" Classes="muted" />
+              <NumericUpDown Value="{Binding MaxStorageGigabytes, Mode=TwoWay}"
+                             Minimum="0" Maximum="1000" Increment="1" FormatString="0"
+                             Loaded="OnRetentionSpinnerLoaded"
+                             automation:AutomationProperties.Name="存储上限GB" />
+            </StackPanel>
           </Grid>
           <TextBlock Text="超过存储上限时，从最旧的媒体开始擦除；结构化事件始终保留，只会失去媒体引用。"
-                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                     TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
           <WrapPanel>
             <Button Classes="primary" Content="保存保留设置" Command="{Binding SaveRetentionCommand}"
                     IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
@@ -152,8 +163,8 @@
           </WrapPanel>
           <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsRetentionBusy}"
                        automation:AutomationProperties.Name="保留清理进度" />
-          <TextBlock Text="{Binding RetentionStatusMessage}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding RetentionErrorMessage}" FontSize="12" Foreground="{DynamicResource DangerForegroundBrush}"
+          <TextBlock Text="{Binding RetentionStatusMessage}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding RetentionErrorMessage}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource DangerForegroundBrush}"
                      TextWrapping="Wrap" IsVisible="{Binding HasRetentionError}" />
         </StackPanel>
       </Border>

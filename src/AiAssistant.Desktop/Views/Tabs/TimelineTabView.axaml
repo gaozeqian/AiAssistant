@@ -6,9 +6,9 @@
              x:DataType="vm:ShellViewModel">
   <Grid DataContext="{Binding Timeline}" x:DataType="vm:TimelineViewModel"
         ColumnDefinitions="360,*" Margin="0,12,0,0">
-    <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="16" Margin="0,0,12,0">
+    <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}" Margin="0,0,12,0">
       <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
-        <TextBlock Grid.Row="0" Text="活动记录" FontSize="15" FontWeight="SemiBold" />
+        <TextBlock Grid.Row="0" Text="活动记录" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
         <ComboBox Grid.Row="1" ItemsSource="{Binding ActiveDates}" SelectedItem="{Binding SelectedDate}"
                   HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Margin="0,14,0,10">
           <ComboBox.ItemTemplate>
@@ -26,9 +26,9 @@
 
         <DockPanel Grid.Row="3" Margin="0,14,0,0" LastChildFill="True">
           <!-- 错误贴近操作区：放在卡片最底部时，实测会被状态行挤出可视区。 -->
-          <Border DockPanel.Dock="Top" Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="7"
+          <Border DockPanel.Dock="Top" Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}"
                   Padding="10,8" Margin="0,0,0,8" IsVisible="{Binding HasError}">
-            <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
+            <TextBlock Text="{Binding ErrorMessage}" FontSize="{DynamicResource FontSizeBody}"
                        Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
           </Border>
           <Button DockPanel.Dock="Bottom" Classes="secondary" Command="{Binding LoadMoreCommand}"
@@ -40,14 +40,14 @@
                      Background="Transparent" BorderThickness="0">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:TimelineEventItem">
-                  <Border Padding="10,9" CornerRadius="7" Margin="0,2">
+                  <Border Padding="10,9" CornerRadius="{DynamicResource RadiusSm}" Margin="0,2">
                     <Grid ColumnDefinitions="62,*" RowDefinitions="Auto,Auto,Auto">
-                      <TextBlock Grid.RowSpan="3" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="12"
+                      <TextBlock Grid.RowSpan="3" Text="{Binding TimeText}" FontFamily="Cascadia Mono,Consolas,monospace" FontSize="{DynamicResource FontSizeBody}"
                                  Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Top" Margin="0,2,8,0" />
                       <TextBlock Grid.Column="1" Text="{Binding AppName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Title}" TextWrapping="Wrap"
-                                 MaxHeight="40" FontSize="12" Margin="0,3,0,0" />
-                      <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding SourceText}" FontSize="12"
+                                 MaxHeight="40" FontSize="{DynamicResource FontSizeBody}" Margin="0,3,0,0" />
+                      <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding SourceText}" FontSize="{DynamicResource FontSizeBody}"
                                  Foreground="{DynamicResource MutedBrush}" Margin="0,5,0,0" />
                     </Grid>
                   </Border>
@@ -62,30 +62,30 @@
           </Grid>
         </DockPanel>
 
-        <TextBlock Grid.Row="4" Text="{Binding StatusMessage}" FontSize="12" Margin="0,12,0,0"
+        <TextBlock Grid.Row="4" Text="{Binding StatusMessage}" FontSize="{DynamicResource FontSizeBody}" Margin="0,12,0,0"
                    Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
       </Grid>
     </Border>
 
-    <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="24">
+    <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}">
       <Grid RowDefinitions="Auto,*">
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
           <StackPanel DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem" IsVisible="{Binding $parent[Grid].DataContext.HasSelectedEvent}">
-            <TextBlock Text="{Binding AppName}" FontSize="13" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,4" />
-            <TextBlock Text="{Binding CapturedTimeText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Text="{Binding DisplayText}" FontSize="12" Foreground="{DynamicResource MutedBrush}"
+            <TextBlock Text="{Binding AppName}" FontSize="{DynamicResource FontSizeLabel}" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FontSizePage}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,4" />
+            <TextBlock Text="{Binding CapturedTimeText}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Text="{Binding DisplayText}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}"
                        IsVisible="{Binding HasDisplayText}" />
           </StackPanel>
-          <Border Grid.Column="1" Background="{DynamicResource AccentSoftBackgroundBrush}" CornerRadius="6" Padding="9,5" VerticalAlignment="Top">
-            <TextBlock Text="仅本机" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+          <Border Grid.Column="1" Background="{DynamicResource AccentSoftBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="8,4" VerticalAlignment="Top">
+            <TextBlock Text="仅本机" FontSize="{DynamicResource FontSizeCaption}" FontWeight="SemiBold" Foreground="{DynamicResource BadgeForegroundBrush}" />
           </Border>
         </Grid>
 
         <ScrollViewer Grid.Row="1" Margin="0,20,0,0">
-          <StackPanel Spacing="16">
-            <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="14" IsVisible="{Binding HasSelectedEvent}">
-              <StackPanel DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem" Spacing="8">
+          <StackPanel Spacing="{DynamicResource SpacingLg}">
+            <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" IsVisible="{Binding HasSelectedEvent}">
+              <StackPanel DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem" Spacing="{DynamicResource SpacingSm}">
                 <TextBlock Text="活动内容" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding DetailText}" TextWrapping="Wrap" IsVisible="{Binding HasDetailText}" />
                 <TextBlock Text="该事件没有提取文本或摘要。" Foreground="{DynamicResource MutedBrush}"
@@ -93,25 +93,25 @@
               </StackPanel>
             </Border>
 
-            <StackPanel IsVisible="{Binding HasSelectedEvent}" Spacing="8">
+            <StackPanel IsVisible="{Binding HasSelectedEvent}" Spacing="{DynamicResource SpacingSm}">
               <TextBlock Text="媒体预览" FontWeight="SemiBold" />
               <TextBlock DataContext="{Binding SelectedEvent}" x:DataType="vm:TimelineEventItem"
-                         Text="{Binding MediaSizeText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                         Text="{Binding MediaSizeText}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
               <Border Background="{DynamicResource PlaceholderBrush}" BorderBrush="{DynamicResource DividerBrush}"
-                      BorderThickness="1" CornerRadius="8" MinHeight="180" ClipToBounds="True"
+                      BorderThickness="1" CornerRadius="{DynamicResource RadiusSm}" MinHeight="180" ClipToBounds="True"
                       IsVisible="{Binding HasPreview}">
                 <Image Source="{Binding PreviewImage}" Stretch="Uniform" MaxHeight="500"
                        RenderOptions.BitmapInterpolationMode="HighQuality" />
               </Border>
               <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsPreviewLoading}" />
-              <Border Background="{DynamicResource WarningBackgroundBrush}" CornerRadius="7" Padding="12" IsVisible="{Binding HasPreviewError}">
+              <Border Background="{DynamicResource WarningBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" IsVisible="{Binding HasPreviewError}">
                 <TextBlock Text="{Binding PreviewError}" Foreground="{DynamicResource WarningForegroundBrush}" TextWrapping="Wrap" />
               </Border>
               <TextBlock Text="此事件没有关联媒体。" Foreground="{DynamicResource MutedBrush}" IsVisible="{Binding HasNoMedia}" />
             </StackPanel>
 
-            <StackPanel IsVisible="{Binding !HasSelectedEvent}" HorizontalAlignment="Center" Margin="0,100,0,0" Spacing="8">
-              <TextBlock Text="选择左侧事件开始回看" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
+            <StackPanel IsVisible="{Binding !HasSelectedEvent}" HorizontalAlignment="Center" Margin="0,100,0,0" Spacing="{DynamicResource SpacingSm}">
+              <TextBlock Text="选择左侧事件开始回看" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" HorizontalAlignment="Center" />
               <TextBlock Text="媒体只在选中时解密，明文不会写入临时文件" Foreground="{DynamicResource MutedBrush}" />
             </StackPanel>
           </StackPanel>

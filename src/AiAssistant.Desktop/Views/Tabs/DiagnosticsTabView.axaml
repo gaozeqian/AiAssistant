@@ -5,58 +5,60 @@
              x:Class="AiAssistant.Desktop.Views.Tabs.DiagnosticsTabView"
              x:DataType="vm:ShellViewModel">
   <ScrollViewer DataContext="{Binding Diagnostics}" x:DataType="vm:DiagnosticsViewModel" Margin="0,12,0,0">
-    <StackPanel Spacing="12">
-      <!-- 右侧预留滚动条宽度（Fluent ScrollBarSize=16），避免「重新检查」按钮被覆盖层滚动条遮挡。 -->
-      <Grid ColumnDefinitions="*,Auto" Margin="0,0,18,0">
+    <StackPanel Spacing="{DynamicResource SpacingMd}">
+      <!-- 右侧给覆盖式滚动条让位：几何关系被 headless 用例锁定，宽度走 ScrollGutterMargin 令牌。 -->
+      <Grid ColumnDefinitions="*,Auto" Margin="{DynamicResource ScrollGutterMargin}">
         <StackPanel>
-          <TextBlock Text="系统健康与能力矩阵" FontSize="18" FontWeight="SemiBold" />
+          <TextBlock Text="系统健康与能力矩阵" FontSize="{DynamicResource FontSizePage}" FontWeight="SemiBold" />
           <TextBlock Text="{Binding PlatformName}" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
         </StackPanel>
         <Button Grid.Column="1" Classes="primary" Content="重新检查" Command="{Binding RefreshCommand}"
                 automation:AutomationProperties.Name="重新检查平台能力" />
       </Grid>
       <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsLoading}" />
-      <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="14" IsVisible="{Binding HasError}">
+      <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" IsVisible="{Binding HasError}">
         <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
       </Border>
       <Grid ColumnDefinitions="*,*,*">
-        <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,6,0">
-          <StackPanel Spacing="7">
+        <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}" Margin="0,0,6,0">
+          <StackPanel Spacing="{DynamicResource SpacingSm}">
             <TextBlock Text="加密数据库" FontWeight="SemiBold" />
             <TextBlock Text="{Binding DatabaseText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
           </StackPanel>
         </Border>
-        <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="6,0,6,0">
-          <StackPanel Spacing="7">
+        <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}" Margin="6,0,6,0">
+          <StackPanel Spacing="{DynamicResource SpacingSm}">
             <TextBlock Text="采集管道" FontWeight="SemiBold" />
             <TextBlock Text="{Binding PipelineText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
           </StackPanel>
         </Border>
-        <Border Grid.Column="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="6,0,0,0">
-          <StackPanel Spacing="7">
+        <Border Grid.Column="2" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}" Margin="6,0,0,0">
+          <StackPanel Spacing="{DynamicResource SpacingSm}">
             <TextBlock Text="媒体保留清理" FontWeight="SemiBold" />
             <TextBlock Text="按「数据与导出 → 保留与清理」中的当前设置擦除过期或超限媒体；已写入的媒体沿用写入时的保留期。"
-                       TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource AccentBrush}" />
+                       TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource AccentTextBrush}" />
             <TextBlock Text="{Binding RetentionText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
           </StackPanel>
         </Border>
       </Grid>
-      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
-        <StackPanel Spacing="7">
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}">
+        <StackPanel Spacing="{DynamicResource SpacingSm}">
           <TextBlock Text="本机模型网关" FontWeight="SemiBold" />
           <TextBlock Text="{Binding ModelText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
-          <TextBlock Text="{Binding ModelEndpointsText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding ModelConfig.HasModelConfiguration}">
-            <StackPanel Spacing="8">
+          <TextBlock Text="{Binding ModelEndpointsText}" TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" IsVisible="{Binding ModelConfig.HasModelConfiguration}">
+            <StackPanel Spacing="{DynamicResource SpacingSm}">
               <TextBlock Text="模型配置" FontWeight="SemiBold" />
               <TextBlock Text="对话与向量模型各自独立配置来源、地址、模型名与接口密钥，保存后重启应用生效。"
-                         FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                         FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
 
               <TextBlock Text="对话模型" FontWeight="SemiBold" />
-              <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+              <!-- 标签列固定 96：之前用 *,* 时标签与输入之间空出 400px，扫读时对不上。 -->
+              <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                    ColumnSpacing="{DynamicResource SpacingMd}" RowSpacing="{DynamicResource SpacingSm}">
                 <TextBlock Text="模型来源" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                 <ComboBox Grid.Column="1" ItemsSource="{Binding ModelConfig.TierOptions}" SelectedItem="{Binding ModelConfig.ChatTier}"
-                          HorizontalAlignment="Stretch" Margin="0,0,0,6">
+                          HorizontalAlignment="Stretch" automation:AutomationProperties.Name="对话模型来源">
                   <ComboBox.ItemTemplate>
                     <DataTemplate>
                       <TextBlock Text="{Binding Label}" />
@@ -64,16 +66,18 @@
                   </ComboBox.ItemTemplate>
                 </ComboBox>
                 <TextBlock Grid.Row="1" Text="模型名" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
-                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ModelConfig.ChatModel}" PlaceholderText="例如 gemma4:12b" Margin="0,0,0,6" />
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ModelConfig.ChatModel}" PlaceholderText="例如 gemma4:12b"
+                         automation:AutomationProperties.Name="对话模型名" />
                 <TextBlock Grid.Row="2" Text="接口地址" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
-                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ModelConfig.ChatBaseUrl}" PlaceholderText="http://127.0.0.1:11434" Margin="0,0,0,6" />
+                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ModelConfig.ChatBaseUrl}" PlaceholderText="http://127.0.0.1:11434"
+                         automation:AutomationProperties.Name="对话模型接口地址" />
                 <TextBlock Grid.Row="3" Text="允许思考" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                 <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding ModelConfig.ChatThink}" Content="启用推理（thinking）"
-                          Margin="0,0,0,6" automation:AutomationProperties.Name="允许思考" />
+                          automation:AutomationProperties.Name="允许思考" />
                 <TextBlock Grid.Row="4" Text="思考强度" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                 <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding ModelConfig.ThinkingLevelOptions}"
                           SelectedItem="{Binding ModelConfig.ChatThinkingLevel}" IsEnabled="{Binding ModelConfig.ChatThink}"
-                          HorizontalAlignment="Stretch" Margin="0,0,0,6"
+                          HorizontalAlignment="Stretch"
                           automation:AutomationProperties.Name="思考强度">
                   <ComboBox.ItemTemplate>
                     <DataTemplate>
@@ -83,10 +87,10 @@
                 </ComboBox>
                 <TextBlock Grid.Row="5" Text="接口密钥" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                 <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding ModelConfig.ChatApiKey}" PasswordChar="●"
-                         PlaceholderText="留空表示不修改" Margin="0,0,0,6"
+                         PlaceholderText="留空表示不修改"
                          automation:AutomationProperties.Name="对话模型接口密钥" />
-                <StackPanel Grid.Row="6" Grid.Column="1" Spacing="2" Margin="0,0,0,6">
-                  <TextBlock Text="{Binding ModelConfig.ChatApiKeyHint}" FontSize="11"
+                <StackPanel Grid.Row="6" Grid.Column="1" Spacing="2">
+                  <TextBlock Text="{Binding ModelConfig.ChatApiKeyHint}" FontSize="{DynamicResource FontSizeCaption}"
                              Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
                   <CheckBox Content="清除已保存密钥" IsChecked="{Binding ModelConfig.ClearChatApiKey}"
                             automation:AutomationProperties.Name="清除对话模型密钥" />
@@ -94,10 +98,11 @@
               </Grid>
 
               <TextBlock Text="向量模型（Embedding）" FontWeight="SemiBold" />
-              <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+              <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                    ColumnSpacing="{DynamicResource SpacingMd}" RowSpacing="{DynamicResource SpacingSm}">
                 <TextBlock Text="模型来源" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                 <ComboBox Grid.Column="1" ItemsSource="{Binding ModelConfig.TierOptions}" SelectedItem="{Binding ModelConfig.EmbeddingTier}"
-                          HorizontalAlignment="Stretch" Margin="0,0,0,6">
+                          HorizontalAlignment="Stretch" automation:AutomationProperties.Name="向量模型来源">
                   <ComboBox.ItemTemplate>
                     <DataTemplate>
                       <TextBlock Text="{Binding Label}" />
@@ -105,15 +110,17 @@
                   </ComboBox.ItemTemplate>
                 </ComboBox>
                 <TextBlock Grid.Row="1" Text="模型名" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
-                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ModelConfig.EmbeddingModel}" PlaceholderText="例如 embeddinggemma-2:740m" Margin="0,0,0,6" />
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ModelConfig.EmbeddingModel}" PlaceholderText="例如 embeddinggemma-2:740m"
+                         automation:AutomationProperties.Name="向量模型名" />
                 <TextBlock Grid.Row="2" Text="接口地址" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
-                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ModelConfig.EmbeddingBaseUrl}" PlaceholderText="http://127.0.0.1:11434" Margin="0,0,0,6" />
+                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ModelConfig.EmbeddingBaseUrl}" PlaceholderText="http://127.0.0.1:11434"
+                         automation:AutomationProperties.Name="向量模型接口地址" />
                 <TextBlock Grid.Row="3" Text="接口密钥" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
                 <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding ModelConfig.EmbeddingApiKey}" PasswordChar="●"
-                         PlaceholderText="留空表示不修改" Margin="0,0,0,6"
+                         PlaceholderText="留空表示不修改"
                          automation:AutomationProperties.Name="向量模型接口密钥" />
-                <StackPanel Grid.Row="4" Grid.Column="1" Spacing="2" Margin="0,0,0,6">
-                  <TextBlock Text="{Binding ModelConfig.EmbeddingApiKeyHint}" FontSize="11"
+                <StackPanel Grid.Row="4" Grid.Column="1" Spacing="2">
+                  <TextBlock Text="{Binding ModelConfig.EmbeddingApiKeyHint}" FontSize="{DynamicResource FontSizeCaption}"
                              Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
                   <CheckBox Content="清除已保存密钥" IsChecked="{Binding ModelConfig.ClearEmbeddingApiKey}"
                             automation:AutomationProperties.Name="清除向量模型密钥" />
@@ -121,15 +128,16 @@
               </Grid>
 
               <WrapPanel>
-                <Button Classes="primary" Content="保存并重启" Command="{Binding ModelConfig.SaveModelConfigurationCommand}" />
+                <Button Classes="primary" Content="保存并重启" Command="{Binding ModelConfig.SaveModelConfigurationCommand}"
+                        automation:AutomationProperties.Name="保存模型配置并重启" />
               </WrapPanel>
-              <TextBlock Text="{Binding ModelConfig.ModelConfigStatus}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding ModelConfig.ModelConfigStatus}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
         </StackPanel>
       </Border>
-      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" IsVisible="{Binding HasMcpControl}">
-        <StackPanel Spacing="8">
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}" IsVisible="{Binding HasMcpControl}">
+        <StackPanel Spacing="{DynamicResource SpacingSm}">
           <TextBlock Text="只读本地 MCP" FontWeight="SemiBold" />
           <ToggleSwitch IsChecked="{Binding McpEnabled, Mode=OneWay}"
                         Command="{Binding ToggleMcpEnabledCommand}"
@@ -137,23 +145,27 @@
                         automation:AutomationProperties.Name="启用本地 MCP" />
           <TextBlock Text="{Binding McpStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
           <TextBlock Text="仅暴露 search_events、activity_stats、list_reports、get_report 四个只读工具；无写工具，强制 loopback 与本地令牌。"
-                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-          <TextBox Text="{Binding McpTokenText}" IsReadOnly="True" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+                     TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+          <TextBox Text="{Binding McpTokenText}" IsReadOnly="True" FontFamily="Cascadia Mono,Consolas,monospace"
+                   FontSize="{DynamicResource FontSizeBody}" TextWrapping="Wrap"
+                   automation:AutomationProperties.Name="本地 MCP 访问令牌" />
           <WrapPanel>
-            <Button Classes="secondary" Content="显示令牌" Command="{Binding RevealMcpTokenCommand}" Margin="0,0,8,8" />
-            <Button Classes="secondary" Content="轮换令牌" Command="{Binding RotateMcpTokenCommand}" Margin="0,0,8,8" />
+            <Button Classes="secondary" Content="显示令牌" Command="{Binding RevealMcpTokenCommand}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="显示 MCP 令牌" />
+            <Button Classes="secondary" Content="轮换令牌" Command="{Binding RotateMcpTokenCommand}" Margin="0,0,8,8"
+                    automation:AutomationProperties.Name="轮换 MCP 令牌" />
           </WrapPanel>
         </StackPanel>
       </Border>
-      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
-        <StackPanel Spacing="10">
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}">
+        <StackPanel Spacing="{DynamicResource SpacingMd}">
           <TextBlock Text="平台能力" FontWeight="SemiBold" />
           <Grid ColumnDefinitions="130,85,*,260,120">
-            <TextBlock Text="能力" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Grid.Column="1" Text="状态" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Grid.Column="2" Text="说明" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="8,0" />
-            <TextBlock Grid.Column="3" Text="处理建议" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Grid.Column="4" Text="操作" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="8,0,0,0" />
+            <TextBlock Text="能力" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="1" Text="状态" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="2" Text="说明" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" Margin="8,0" />
+            <TextBlock Grid.Column="3" Text="处理建议" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="4" Text="操作" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" Margin="8,0,0,0" />
           </Grid>
           <ItemsControl ItemsSource="{Binding Capabilities}">
             <ItemsControl.ItemTemplate>
@@ -161,29 +173,32 @@
                 <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,9">
                   <Grid ColumnDefinitions="130,85,*,260,120">
                     <TextBlock Text="{Binding KindText}" FontWeight="SemiBold" />
-                    <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{DynamicResource AccentBrush}" />
+                    <TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="status"
+                               Classes.attention="{Binding NeedsAttention}" />
                     <TextBlock Grid.Column="2" Text="{Binding Summary}" TextWrapping="Wrap" Margin="8,0" />
-                    <TextBlock Grid.Column="3" Text="{Binding RemediationHint}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                    <TextBlock Grid.Column="3" Text="{Binding RemediationHint}" TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
                     <Button Grid.Column="4" Classes="secondary" Content="{Binding ActionLabel}"
                             Command="{Binding ActionCommand}" CommandParameter="{Binding Action}"
-                            IsVisible="{Binding NeedsAction}" Padding="10,6" FontSize="12"
+                            IsVisible="{Binding NeedsAction}" Padding="10,6" FontSize="{DynamicResource FontSizeBody}"
                             Margin="2,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" />
                   </Grid>
                 </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+          <TextBlock Text="尚未读取到平台能力。点击右上角「重新检查」。"
+                     Classes="muted" Margin="0,4,0,0" IsVisible="{Binding !HasCapabilities}" />
         </StackPanel>
       </Border>
-      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
-        <StackPanel Spacing="10">
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}">
+        <StackPanel Spacing="{DynamicResource SpacingMd}">
           <TextBlock Text="最近后台任务" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding RecentJobsSummary}" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+          <TextBlock Text="{Binding RecentJobsSummary}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
           <Grid ColumnDefinitions="120,120,100,*">
-            <TextBlock Text="报告日期" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Grid.Column="1" Text="状态" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Grid.Column="2" Text="尝试" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Grid.Column="3" Text="创建时间" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Text="报告日期" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="1" Text="状态" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="2" Text="尝试" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="3" Text="创建时间" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
           </Grid>
           <ItemsControl ItemsSource="{Binding RecentJobs}">
             <ItemsControl.ItemTemplate>
@@ -199,34 +214,34 @@
           </ItemsControl>
         </StackPanel>
       </Border>
-      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
-        <StackPanel Spacing="10">
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}">
+        <StackPanel Spacing="{DynamicResource SpacingMd}">
           <TextBlock Text="最近脱敏结构化日志" FontWeight="SemiBold" />
           <Grid ColumnDefinitions="120,90,150,*">
-            <TextBlock Text="时间" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Grid.Column="1" Text="级别" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Grid.Column="2" Text="类别" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Grid.Column="3" Text="消息" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Text="时间" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="1" Text="级别" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="2" Text="类别" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+            <TextBlock Grid.Column="3" Text="消息" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
           </Grid>
           <ItemsControl ItemsSource="{Binding RecentLogs}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:DiagnosticLogItem">
                 <Grid ColumnDefinitions="120,90,150,*" Margin="0,4">
-                  <TextBlock Text="{Binding TimeText}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
-                  <TextBlock Grid.Column="1" Text="{Binding LevelText}" FontSize="12" FontWeight="SemiBold" />
-                  <TextBlock Grid.Column="2" Text="{Binding CategoryText}" FontSize="12" Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Grid.Column="3" Text="{Binding MessageText}" FontSize="12" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding TimeText}" FontFamily="Cascadia Mono,Consolas,monospace" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
+                  <TextBlock Grid.Column="1" Text="{Binding LevelText}" FontSize="{DynamicResource FontSizeBody}" FontWeight="SemiBold" />
+                  <TextBlock Grid.Column="2" Text="{Binding CategoryText}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="3" Text="{Binding MessageText}" FontSize="{DynamicResource FontSizeBody}" TextWrapping="Wrap" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </StackPanel>
       </Border>
-      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18">
-        <StackPanel Spacing="8">
+      <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}">
+        <StackPanel Spacing="{DynamicResource SpacingSm}">
           <TextBlock Text="诊断导出（脱敏）" FontWeight="SemiBold" />
           <TextBlock Text="先生成预览，确认后再保存为 Markdown / SVG / PNG / PDF / JSON。导出内容只有平台、数据库健康、采集管道、能力状态、最近任务与脱敏日志等元数据，不含活动正文、密钥或完整文件路径。"
-                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
+                     TextWrapping="Wrap" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
           <WrapPanel>
             <Button Classes="secondary" Content="生成预览" Command="{Binding GeneratePreviewCommand}" Margin="0,0,8,0"
                     automation:AutomationProperties.Name="生成脱敏导出预览" />
@@ -235,12 +250,12 @@
                     automation:AutomationProperties.Name="确认导出脱敏预览" />
           </WrapPanel>
           <TextBox Text="{Binding ExportPreviewJson}" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180"
-                   FontFamily="Consolas" FontSize="12" IsVisible="{Binding HasExportPreview}" />
-          <TextBlock Text="{Binding ExportStatusText}" FontSize="12" Foreground="{DynamicResource MutedBrush}"
+                   FontFamily="Cascadia Mono,Consolas,monospace" FontSize="{DynamicResource FontSizeBody}" IsVisible="{Binding HasExportPreview}" />
+          <TextBlock Text="{Binding ExportStatusText}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}"
                      TextWrapping="Wrap" IsVisible="{Binding HasExportStatus}" />
         </StackPanel>
       </Border>
-      <TextBlock Text="{Binding LastRefreshText}" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,12" />
+      <TextBlock Text="{Binding LastRefreshText}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,12" />
     </StackPanel>
   </ScrollViewer>
 </UserControl>

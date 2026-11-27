@@ -7,38 +7,43 @@
              x:DataType="vm:ShellViewModel">
   <Grid DataContext="{Binding Reports}" x:DataType="vm:ReportsViewModel"
         ColumnDefinitions="360,*" Margin="0,12,0,0">
-    <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,12,0">
+    <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}" Margin="0,0,12,0">
       <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
-        <TextBlock Text="日报与站会" FontSize="18" FontWeight="SemiBold" />
-        <DatePicker Grid.Row="1" SelectedDate="{Binding SelectedDate}" Margin="0,14,0,10" Initialized="OnDatePickerInitialized" />
+        <TextBlock Text="日报与站会" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
+        <DatePicker Grid.Row="1" SelectedDate="{Binding SelectedDate}" Margin="0,14,0,10" Initialized="OnDatePickerInitialized"
+                    automation:AutomationProperties.Name="日报日期" />
         <WrapPanel Grid.Row="2" Margin="0,0,0,12">
-          <Button Classes="primary" Content="生成日报" Command="{Binding GenerateCommand}" Margin="0,0,8,8" />
-          <Button Classes="secondary" Content="强制重生成" Command="{Binding RegenerateCommand}" Margin="0,0,8,8" />
-          <Button Classes="secondary" Content="刷新" Command="{Binding RefreshCommand}" Margin="0,0,8,8" />
+          <Button Classes="primary" Content="生成日报" Command="{Binding GenerateCommand}" Margin="0,0,8,8"
+                  automation:AutomationProperties.Name="生成日报" />
+          <Button Classes="secondary" Content="强制重生成" Command="{Binding RegenerateCommand}" Margin="0,0,8,8"
+                  automation:AutomationProperties.Name="强制重新生成日报" />
+          <Button Classes="secondary" Content="刷新" Command="{Binding RefreshCommand}" Margin="0,0,8,8"
+                  automation:AutomationProperties.Name="刷新日报版本" />
         </WrapPanel>
-        <Border Grid.Row="3" Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12"
+        <Border Grid.Row="3" Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}"
                 Margin="0,0,0,12" IsVisible="{Binding HasScheduleSettings}">
-          <StackPanel Spacing="8">
+          <StackPanel Spacing="{DynamicResource SpacingSm}">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Spacing="2">
                 <TextBlock Text="自动日报" FontWeight="SemiBold" />
-                <TextBlock Text="检查前一天，有活动才生成" FontSize="11"
+                <TextBlock Text="检查前一天，有活动才生成" FontSize="{DynamicResource FontSizeCaption}"
                            Foreground="{DynamicResource MutedBrush}" />
               </StackPanel>
               <ToggleSwitch Grid.Column="1" IsChecked="{Binding ScheduleEnabled, Mode=TwoWay}"
                             OnContent="开" OffContent="关" VerticalAlignment="Center"
                             automation:AutomationProperties.Name="启用自动日报" />
             </Grid>
-            <Grid ColumnDefinitions="Auto,*">
-              <TextBlock Text="每天" VerticalAlignment="Center" Margin="0,0,8,0" />
-              <TimePicker Grid.Column="1" SelectedTime="{Binding ScheduleTime, Mode=TwoWay}"
+            <!-- 标签在上：360px 卡片里横排会把 TimePicker 挤成「0 : 30」。 -->
+            <StackPanel Spacing="{DynamicResource SpacingXs}">
+              <TextBlock Text="每天" Classes="muted" />
+              <TimePicker SelectedTime="{Binding ScheduleTime, Mode=TwoWay}"
                           ClockIdentifier="24HourClock" MinuteIncrement="1" HorizontalAlignment="Stretch"
                           automation:AutomationProperties.Name="自动日报检查时间" />
-            </Grid>
+            </StackPanel>
             <TextBlock Text="启动时也会检查前一天。无日报且有活动记录时生成；已有日报但之后有新活动时自动追加新版本。"
-                       FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                       FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
             <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Text="{Binding ScheduleStatusMessage}" FontSize="11"
+              <TextBlock Text="{Binding ScheduleStatusMessage}" FontSize="{DynamicResource FontSizeCaption}"
                          Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
                          VerticalAlignment="Center" Margin="0,0,8,0" />
               <Button Grid.Column="1" Classes="secondary" Content="保存"
@@ -57,34 +62,44 @@
             </ListBox.ItemTemplate>
           </ListBox>
           <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" VerticalAlignment="Top" IsVisible="{Binding IsBusy}" />
+          <TextBlock Text="这一天还没有日报。点击「生成日报」创建第一版。"
+                     Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16"
+                     IsVisible="{Binding !HasVersions}" />
         </Grid>
-        <StackPanel Grid.Row="5" Spacing="5" Margin="0,12,0,0">
+        <StackPanel Grid.Row="5" Spacing="{DynamicResource SpacingXs}" Margin="0,12,0,0">
           <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
         </StackPanel>
       </Grid>
     </Border>
 
-    <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="22">
+    <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}">
       <Grid RowDefinitions="Auto,Auto,*">
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel>
-            <TextBlock Text="日报正文" FontSize="20" FontWeight="SemiBold" />
+            <TextBlock Text="日报正文" FontSize="{DynamicResource FontSizePage}" FontWeight="SemiBold" />
             <TextBlock Text="{Binding VersionText}" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
           </StackPanel>
           <Button Grid.Column="1" Classes="secondary" Content="导出…"
                   Command="{Binding ExportCommand}" IsEnabled="{Binding HasReport}"
                   automation:AutomationProperties.Name="导出日报" />
         </Grid>
-        <Border Grid.Row="1" Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="14" Margin="0,14,0,12">
-          <StackPanel Spacing="6">
+        <Border Grid.Row="1" Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" Margin="0,14,0,12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}">
             <TextBlock Text="站会视图" FontWeight="SemiBold" />
             <TextBlock Text="{Binding StandupText}" TextWrapping="Wrap" />
           </StackPanel>
         </Border>
-        <ScrollViewer Grid.Row="2">
-          <md:MarkdownScrollViewer Markdown="{Binding Markdown}" />
-        </ScrollViewer>
+        <Grid Grid.Row="2">
+          <ScrollViewer>
+            <md:MarkdownScrollViewer Markdown="{Binding Markdown}" />
+          </ScrollViewer>
+          <TextBlock Text="还没有可显示的日报正文。先在左侧选择日期并生成。"
+                     Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
+                     IsVisible="{Binding !HasReport}" />
+        </Grid>
       </Grid>
     </Border>
   </Grid>

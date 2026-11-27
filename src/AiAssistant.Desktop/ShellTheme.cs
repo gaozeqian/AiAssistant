@@ -20,6 +20,8 @@ public static class ShellTheme
         application.Styles.Add(new FluentTheme());
         application.Resources.ThemeDictionaries[ThemeVariant.Light] = BuildThemeDictionary(isDark: false);
         application.Resources.ThemeDictionaries[ThemeVariant.Dark] = BuildThemeDictionary(isDark: true);
+        // 令牌与主题无关，放在应用级资源里，XAML 通过 {DynamicResource FontSizeBody} 等引用。
+        DesignTokens.AddTo(application.Resources);
     }
 
     /// <summary>
@@ -44,6 +46,8 @@ public static class ShellTheme
             Add("HeaderBadgeBackgroundBrush", "#E5E5E5");
             Add("HeaderBadgeForegroundBrush", "#242424");
             Add("AccentBrush", "#0078D4");
+            Add("AccentTextBrush", "#005A9E");
+            Add("BadgeForegroundBrush", "#005A9E");
             Add("AccentSoftBackgroundBrush", "#D6EBFF");
             Add("ListSelectionBackgroundBrush", "#CCE4FF");
             Add("TextPrimaryBrush", "#1F1F1F");
@@ -86,6 +90,8 @@ public static class ShellTheme
             Add("HeaderBadgeBackgroundBrush", "#2D2D2D");
             Add("HeaderBadgeForegroundBrush", "#E0E0E0");
             Add("AccentBrush", "#0078D4");
+            Add("AccentTextBrush", "#4CA6E8");
+            Add("BadgeForegroundBrush", "#7CC4F5");
             Add("AccentSoftBackgroundBrush", "#123B63");
             Add("ListSelectionBackgroundBrush", "#04395E");
             Add("TextPrimaryBrush", "#D4D4D4");

@@ -9,6 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Headless;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 
@@ -154,6 +155,132 @@ public sealed partial class DesktopViewModelTests
         }
 
         Assert.True(value >= 94.9, $"progress never approached the ceiling: {value}");
+    }
+
+
+    [Fact]
+    public Task DesignTokens_AreRegisteredForBothThemes() => RunInHeadlessSession(() =>
+    {
+        Assert.Equal(12d, Avalonia.Application.Current!.Resources["FontSizeBody"]);
+        Assert.Equal(11d, Avalonia.Application.Current.Resources["FontSizeCaption"]);
+        Assert.Equal(15d, Avalonia.Application.Current.Resources["FontSizeTitle"]);
+        Assert.Equal(20d, Avalonia.Application.Current.Resources["FontSizePage"]);
+        Assert.Equal(new Thickness(24), Avalonia.Application.Current.Resources["SpaceXl"]);
+        Assert.Equal(new CornerRadius(10), Avalonia.Application.Current.Resources["RadiusMd"]);
+        Assert.IsType<TimeSpan>(Avalonia.Application.Current.Resources["DurationBase"]);
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public Task AccentTextBrush_MeetsAaOnCardBackground() => RunInHeadlessSession(() =>
+    {
+        foreach (var variant in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+        {
+            var foreground = Resolve<ISolidColorBrush>("AccentTextBrush", variant);
+            var background = Resolve<ISolidColorBrush>("CardBackgroundBrush", variant);
+            var ratio = Contrast(foreground.Color, background.Color);
+            Assert.True(ratio >= 4.5, $"{variant}: accent text contrast {ratio:0.00} < 4.5");
+        }
+
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public Task DangerButton_PointerOverUsesDangerBackground() => RunInHeadlessSession(async () =>
+    {
+        using var shell = CreateShell();
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 4;
+        await WaitUntilAsync(() => DangerButton(window) is not null);
+
+        var button = DangerButton(window);
+        Assert.NotNull(button);
+        var presenter = button!.GetVisualDescendants().OfType<ContentPresenter>().First();
+        ((IPseudoClasses)button.Classes).Set(":pointerover", true);
+        Dispatcher.UIThread.RunJobs();
+
+        var expected = Resolve<ISolidColorBrush>("DangerBackgroundBrush", ThemeVariant.Light).Color;
+        Assert.Equal(expected, SolidColor(presenter.Background));
+        ((IPseudoClasses)button.Classes).Set(":pointerover", false);
+        Dispatcher.UIThread.RunJobs();
+        window.Close();
+    });
+
+    [Fact]
+    public Task EvidenceList_ShowsEmptyStateUntilResultsArrive() => RunInHeadlessSession(async () =>
+    {
+        var clock = new SystemClock();
+        var timeline = new TimelineViewModel(
+            new TimelineUseCase(new InMemoryEventRepository(), new FakeMediaStore(), clock));
+        var timestamp = ((IClock)clock).Now();
+        var evidence = new EvidenceReference(
+            "E1", "cited", timestamp.LocalDate, timestamp.OccurredAtUtc,
+            "TestApp", "Synthetic test event", "结构化证据摘录", false, "keyword+vector", 0.5);
+        var search = new SearchViewModel(
+            new EvidenceSearchUseCase(new FakeEvidenceSearch(evidence), new FakeAnswerer(), clock),
+            new RangeReportUseCase(new FakeRangeReportService(), clock),
+            TempArtifactDirectory.CreatePath("search-empty"));
+        using var shell = new ShellViewModel(
+            timeline,
+            new CaptureControlViewModel(new CaptureControlUseCase(new FakeCaptureCoordinator(), new FakeAutoStartService())),
+            new DiagnosticsViewModel(new DiagnosticsUseCase(
+                new FakeCapabilityProvider(), new FakeMaintenanceService(),
+                new FakeCaptureCoordinator(), new FakeReportJobQueue())),
+            new ReportsViewModel(
+                new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
+                TempArtifactDirectory.CreatePath("reports-empty")),
+            voice: null, voiceNavigation: null, search: search);
+
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 1;
+        await WaitUntilAsync(() => EmptyEvidenceHint(window) is not null);
+
+        var hint = EmptyEvidenceHint(window);
+        Assert.NotNull(hint);
+        Assert.True(hint!.IsVisible);
+
+        search.Query = "迁移";
+        await search.SearchCommand.ExecuteAsync(null);
+        await WaitUntilAsync(() => !hint.IsVisible);
+        Assert.False(hint.IsVisible);
+        window.Close();
+    });
+
+    private static Button? DangerButton(Window window) =>
+        window.GetVisualDescendants().OfType<Button>()
+            .FirstOrDefault(button => button.Classes.Contains("danger") && button.IsEffectivelyVisible);
+
+    private static TextBlock? EmptyEvidenceHint(Window window) =>
+        window.GetVisualDescendants().OfType<TextBlock>()
+            .FirstOrDefault(block => block.Text?.StartsWith("暂无证据", StringComparison.Ordinal) == true);
+
+    private static T Resolve<T>(string key, ThemeVariant variant) where T : class
+    {
+        Assert.True(Avalonia.Application.Current!.TryFindResource(key, variant, out var value), $"missing resource {key}");
+        return Assert.IsAssignableFrom<T>(value);
+    }
+
+    private static double Contrast(Color first, Color second)
+    {
+        var a = Luminance(first);
+        var b = Luminance(second);
+        var (high, low) = a >= b ? (a, b) : (b, a);
+        return (high + 0.05) / (low + 0.05);
+    }
+
+    private static double Luminance(Color color)
+    {
+        static double Channel(byte value)
+        {
+            var c = value / 255d;
+            return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+        }
+
+        return (0.2126 * Channel(color.R)) + (0.7152 * Channel(color.G)) + (0.0722 * Channel(color.B));
     }
 
     private static Button? PrimaryButton(Window window) =>
