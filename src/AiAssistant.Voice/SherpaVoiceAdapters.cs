@@ -38,6 +38,13 @@ public sealed class SherpaVoiceOptions
     public int Threads { get; init; } = 1;
 
     /// <summary>
+    /// Upper bound for one synthesis call. MeloTTS inference is synchronous native code that a
+    /// cancellation token cannot interrupt, so a caller-side bound is the only way to keep the
+    /// voice session responsive when the model or CPU stalls.
+    /// </summary>
+    public TimeSpan SynthesisTimeout { get; init; } = TimeSpan.FromSeconds(15);
+
+    /// <summary>
     /// Boosts keyword paths during decoding. Tuned on the 13-positive / 2.12 h golden set:
     /// 1.0 gave 84.6% recall, 3.0 gave 92.3% with zero false alarms, 5.0 regressed to 84.6%.
     /// </summary>
@@ -246,11 +253,14 @@ public sealed class SherpaOnnxTtsService : ITtsService
             return new SpeechSynthesisResult(ReadOnlyMemory<float>.Empty, 0, "unavailable");
         }
 
-        await _gate.WaitAsync(ct);
-        try
+        var text = request.Text.Length <= 200 ? request.Text : request.Text[..200];
+
+        // The semaphore is released by the worker, not by the caller: a timed-out caller must not
+        // hand the gate to the next synthesis while native inference is still touching the model.
+        var work = Task.Run(async () =>
         {
-            var text = request.Text.Length <= 200 ? request.Text : request.Text[..200];
-            var result = await Task.Run(() =>
+            await _gate.WaitAsync(ct).ConfigureAwait(false);
+            try
             {
                 var tts = GetTts();
                 var config = new OfflineTtsGenerationConfig
@@ -260,20 +270,31 @@ public sealed class SherpaOnnxTtsService : ITtsService
                     SilenceScale = 0.2f
                 };
                 var audio = tts.GenerateWithConfig(text, config, null);
+                _errorType = null;
                 return new SpeechSynthesisResult(audio.Samples, audio.SampleRate, "sherpa-onnx-vits");
-            }, ct);
-            _errorType = null;
-            return result;
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }, ct);
+
+        try
+        {
+            return await work.WaitAsync(_options.SynthesisTimeout, ct);
+        }
+        catch (TimeoutException)
+        {
+            _logger.LogWarning(
+                "TTS synthesis exceeded {TimeoutSeconds} seconds; returning silence.",
+                _options.SynthesisTimeout.TotalSeconds);
+            return new SpeechSynthesisResult(ReadOnlyMemory<float>.Empty, 0, "timeout");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _errorType = ex.GetType().Name;
             _logger.LogWarning("TTS synthesis degraded with {ExceptionType}.", ex.GetType().Name);
             return new SpeechSynthesisResult(ReadOnlyMemory<float>.Empty, 0, "unavailable");
-        }
-        finally
-        {
-            _gate.Release();
         }
     }
 

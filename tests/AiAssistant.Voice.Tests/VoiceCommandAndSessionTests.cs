@@ -276,6 +276,129 @@ public sealed class VoiceCommandAndSessionTests
         Assert.Empty(detector.Accept(new AudioFrame(DateTimeOffset.UtcNow, 16_000, 1, new float[512])));
     }
 
+    [Fact]
+    public async Task Router_QuestionTimeout_FallsBackToEvidenceDigest()
+    {
+        var evidence = new EvidenceReference(
+            "E1",
+            "e1",
+            new DateOnly(2026, 11, 20),
+            new DateTimeOffset(2026, 11, 20, 1, 0, 0, TimeSpan.Zero),
+            "Rider",
+            "迁移方案",
+            "结构化证据摘录",
+            false,
+            "keyword",
+            0.4);
+        var router = new VoiceCommandRouter(
+            new ReportUseCase(new FakeReportQueue(), new FakeReportRepository(), new FakeClock()),
+            new CaptureControlUseCase(new FakeCoordinator(), new FakeAutoStart()),
+            new VoiceNavigationHub(),
+            new FakeClock(),
+            new EvidenceSearchUseCase(
+                new FakeEvidenceSearch(evidence),
+                new FakeAnswerer(new EvidenceQaAnswer(
+                    "迁移进展",
+                    "不应返回的模型答案 [E1]",
+                    [evidence],
+                    ["E1"],
+                    "fake-chat",
+                    ModelEndpointTier.LocalOffline,
+                    false,
+                    null))
+                {
+                    HangForever = true
+                },
+                new FakeClock()))
+        {
+            QuestionTimeout = TimeSpan.FromMilliseconds(100)
+        };
+
+        var outcome = await router.ExecuteAsync(
+            VoiceCommandParser.Parse("问一下迁移进展"),
+            CancellationToken.None);
+
+        Assert.True(outcome.Handled);
+        Assert.Contains("模型响应超时", outcome.Feedback, StringComparison.Ordinal);
+        Assert.Contains("迁移方案", outcome.Feedback, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Session_WedgedFeedbackPlayback_StillReturnsToSleepingAndHearsNextWake()
+    {
+        var harness = new Harness();
+        harness.Asr.Responses.Enqueue("暂停采集");
+        harness.Asr.Responses.Enqueue("恢复采集");
+        await harness.Session.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => harness.Hub.SubscriberCount == 1);
+
+        harness.Playback.HangForever = true;
+        harness.Hub.Publish(DetectionFrame(harness.Clock));
+        await WaitUntilAsync(() => harness.Session.State == VoiceSessionState.Listening);
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+        harness.Clock.Advance(TimeSpan.FromSeconds(9));
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+
+        // The command itself succeeded; only the spoken feedback is wedged. The state machine must
+        // still converge to Sleeping instead of stranding the session in Responding forever.
+        await WaitUntilAsync(
+            () => harness.Session.State == VoiceSessionState.Sleeping,
+            timeoutMs: 5000,
+            message: () => $"state={harness.Session.State}, logs={harness.Log.Records.Count}");
+
+        // Once back in Sleeping, the next wake word must be heard again.
+        harness.Playback.HangForever = false;
+        harness.Clock.Advance(TimeSpan.FromSeconds(3));
+        harness.Hub.Publish(DetectionFrame(harness.Clock));
+        await WaitUntilAsync(
+            () => harness.Session.State == VoiceSessionState.Listening,
+            timeoutMs: 3000,
+            message: () => $"second wake: state={harness.Session.State}, active={harness.Session.IsActive}");
+
+        await harness.Session.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Session_FeedbackPlaybackHonoursCancellation()
+    {
+        var harness = new Harness();
+        harness.Asr.Responses.Enqueue("暂停采集");
+        await harness.Session.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => harness.Hub.SubscriberCount == 1);
+
+        harness.Hub.Publish(DetectionFrame(harness.Clock));
+        await WaitUntilAsync(() => harness.Session.State == VoiceSessionState.Listening);
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+        harness.Clock.Advance(TimeSpan.FromSeconds(9));
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+        await WaitUntilAsync(() => harness.Session.State == VoiceSessionState.Sleeping);
+
+        var stop = harness.Session.StopAsync(CancellationToken.None);
+        await stop.WaitAsync(TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public async Task Session_StopAbandonsHandlerStuckInNativeInference()
+    {
+        var harness = new Harness();
+        harness.Asr.Responses.Enqueue("暂停采集");
+        await harness.Session.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => harness.Hub.SubscriberCount == 1);
+
+        harness.Asr.HangForever = true;
+        harness.Hub.Publish(DetectionFrame(harness.Clock));
+        await WaitUntilAsync(() => harness.Session.State == VoiceSessionState.Listening);
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+        harness.Clock.Advance(TimeSpan.FromSeconds(9));
+        harness.Hub.Publish(CommandFrame(harness.Clock));
+        await WaitUntilAsync(() => harness.Session.State == VoiceSessionState.Processing);
+
+        // ASR ignores cancellation; StopAsync must still give the UI back instead of hanging.
+        await harness.Session.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(harness.Session.IsActive);
+        Assert.Equal(VoiceSessionState.Sleeping, harness.Session.State);
+    }
+
     private static AudioFrame DetectionFrame(FakeClock clock) =>
         new(clock.UtcNow, 16_000, 1, new[] { 1f, 0f, 0f, 0f });
 
@@ -314,6 +437,8 @@ public sealed class VoiceCommandAndSessionTests
             Options = new VoiceSessionOptions
             {
                 CommandWindow = TimeSpan.FromSeconds(8),
+                FeedbackTimeout = TimeSpan.FromSeconds(1),
+                StopTimeout = TimeSpan.FromSeconds(1),
                 RecordCommandAudio = recordCommandAudio
             };
             var router = new VoiceCommandRouter(
@@ -349,12 +474,22 @@ public sealed class VoiceCommandAndSessionTests
 
     private sealed class FakeAnswerer(EvidenceQaAnswer answer) : IEvidenceQuestionAnswerer
     {
-        public Task<EvidenceQaAnswer> AnswerAsync(
+        /// <summary>Simulates a large local model that outlives the voice Q&amp;A budget.</summary>
+        public bool HangForever { get; init; }
+
+        public async Task<EvidenceQaAnswer> AnswerAsync(
             string question,
             DateOnly fromDate,
             DateOnly toDate,
-            CancellationToken ct) =>
-            Task.FromResult(answer);
+            CancellationToken ct)
+        {
+            if (HangForever)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            }
+
+            return answer;
+        }
     }
 
     private sealed class FakeClock : IClock
@@ -413,12 +548,18 @@ public sealed class VoiceCommandAndSessionTests
     private sealed class FakeAsr : IAsrEngine
     {
         public Queue<string> Responses { get; } = new();
+
+        /// <summary>Simulates native inference that never observes the cancellation token.</summary>
+        public bool HangForever { get; set; }
+
         public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.AudioCapture, "fake ASR");
         public Task<AudioTranscriptionResult> TranscribeAsync(AudioTranscriptionRequest request, CancellationToken ct) =>
-            Task.FromResult(new AudioTranscriptionResult(
-                Responses.Count > 0 ? Responses.Dequeue() : string.Empty,
-                0.95,
-                "fake-asr"));
+            HangForever
+                ? new TaskCompletionSource<AudioTranscriptionResult>().Task
+                : Task.FromResult(new AudioTranscriptionResult(
+                    Responses.Count > 0 ? Responses.Dequeue() : string.Empty,
+                    0.95,
+                    "fake-asr"));
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
@@ -433,11 +574,17 @@ public sealed class VoiceCommandAndSessionTests
     private sealed class FakePlayback : IAudioPlayback
     {
         public int PlayCount { get; private set; }
+
+        /// <summary>Simulates a wedged output device: the task never completes and ignores cancellation.</summary>
+        public bool HangForever { get; set; }
+
         public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.WakeWord, "fake playback");
         public Task PlayAsync(ReadOnlyMemory<float> samples, int sampleRateHz, CancellationToken ct)
         {
             PlayCount++;
-            return Task.CompletedTask;
+            return HangForever
+                ? new TaskCompletionSource().Task
+                : Task.CompletedTask;
         }
     }
 

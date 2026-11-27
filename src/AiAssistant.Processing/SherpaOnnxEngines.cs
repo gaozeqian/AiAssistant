@@ -19,6 +19,13 @@ public sealed class SherpaOnnxOptions
     public string AsrModelVersion { get; init; } = "sherpa-onnx-paraformer-zh";
     public int Threads { get; init; } = Math.Max(1, Math.Min(4, Environment.ProcessorCount / 2));
 
+    /// <summary>
+    /// Upper bound for one decode. Paraformer runs synchronously in native code and ignores the
+    /// cancellation token, so a stalled decode must be abandoned by the caller instead of holding
+    /// the voice state machine in Processing forever.
+    /// </summary>
+    public TimeSpan TranscriptionTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
     public string AsrModelPath => Resolve(AsrModelFileName);
     public string TokensPath => Resolve(TokensFileName);
     public string VadModelPath => Resolve(VadModelFileName);
@@ -64,28 +71,46 @@ public sealed class SherpaOnnxAsrEngine : IAsrEngine
             return AudioTranscriptionResult.Empty;
         }
 
-        await _gate.WaitAsync(ct);
+        var samples = request.Samples.ToArray();
+
+        // The gate is released by the worker: a caller that gives up waiting must not let the next
+        // decode enter the recognizer while native inference is still using it.
+        var work = Task.Run(async () =>
+        {
+            await _gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var recognizer = GetRecognizer();
+                using var stream = recognizer.CreateStream();
+                stream.AcceptWaveform(16_000, samples);
+                recognizer.Decode(stream);
+                var text = stream.Result.Text?.Trim() ?? string.Empty;
+                return new AudioTranscriptionResult(
+                    text,
+                    string.IsNullOrEmpty(text) ? 0 : 0.90,
+                    _options.AsrModelVersion);
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }, ct);
+
         try
         {
-            ct.ThrowIfCancellationRequested();
-            var recognizer = GetRecognizer();
-            using var stream = recognizer.CreateStream();
-            stream.AcceptWaveform(16_000, request.Samples.ToArray());
-            recognizer.Decode(stream);
-            var text = stream.Result.Text?.Trim() ?? string.Empty;
-            return new AudioTranscriptionResult(
-                text,
-                string.IsNullOrEmpty(text) ? 0 : 0.90,
-                _options.AsrModelVersion);
+            return await work.WaitAsync(_options.TranscriptionTimeout, ct);
+        }
+        catch (TimeoutException)
+        {
+            _logger.LogWarning(
+                "sherpa-onnx ASR exceeded {TimeoutSeconds} seconds; abandoning the decode.",
+                _options.TranscriptionTimeout.TotalSeconds);
+            return AudioTranscriptionResult.Empty;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning("sherpa-onnx ASR degraded with {ExceptionType}.", ex.GetType().Name);
             return AudioTranscriptionResult.Empty;
-        }
-        finally
-        {
-            _gate.Release();
         }
     }
 

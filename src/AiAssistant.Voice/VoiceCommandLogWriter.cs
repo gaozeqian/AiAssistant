@@ -15,7 +15,8 @@ internal sealed class VoiceCommandLogWriter(
         string wakeKeyword,
         string transcript,
         ParsedVoiceCommand? command,
-        string? audioContentId)
+        string? audioContentId,
+        CancellationToken ct = default)
     {
         try
         {
@@ -30,7 +31,12 @@ internal sealed class VoiceCommandLogWriter(
                     ModelEndpointTier.LocalOffline,
                     ResponseRef: null,
                     AudioContentId: audioContentId),
-                CancellationToken.None);
+                ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // The session stopped while the record was being written; the command log is
+            // best-effort and must not hold the response path open.
         }
         catch (Exception ex)
         {

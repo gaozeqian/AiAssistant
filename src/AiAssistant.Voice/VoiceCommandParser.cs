@@ -146,6 +146,13 @@ public sealed class VoiceCommandRouter(
     IClock clock,
     EvidenceSearchUseCase? evidence = null)
 {
+    /// <summary>
+    /// Local models can need far longer than the voice command window. Bounding the Q&amp;A call
+    /// below that window guarantees a spoken answer instead of the generic "command timed out"
+    /// path, which used to leave the session silent and stranded.
+    /// </summary>
+    public TimeSpan QuestionTimeout { get; init; } = TimeSpan.FromSeconds(20);
+
     public async Task<VoiceCommandOutcome> ExecuteAsync(ParsedVoiceCommand command, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -193,14 +200,60 @@ public sealed class VoiceCommandRouter(
             return new VoiceCommandOutcome(false, "没有听清问题，请再说一次。");
         }
 
-        var answer = await evidence.AskRecentAsync(question, days: 7, ct);
+        using var questionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        questionCts.CancelAfter(QuestionTimeout);
+        EvidenceQaAnswer answer;
+        try
+        {
+            answer = await evidence.AskRecentAsync(question, days: 7, questionCts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // The local model spent the whole voice budget. The retrieved evidence is still
+            // verifiable, so speak the matching records instead of "timed out, say it again".
+            return await AnswerFromEvidenceAsync(question, ct);
+        }
+
         if (!answer.HasEvidence)
         {
             return new VoiceCommandOutcome(true, "没有找到可验证的本地证据，暂不回答。");
         }
 
         var text = answer.Answer.Replace('\r', ' ').Replace('\n', ' ').Trim();
-        var feedback = text.Length <= 140 ? text : text[..140] + "…";
+        // Spoken answers stay short on purpose: every character costs synthesis plus playback time
+        // inside the command window, and the full answer is still visible in the search panel.
+        var feedback = text.Length <= 50 ? text : text[..50] + "…";
         return new VoiceCommandOutcome(true, feedback);
+    }
+
+    /// <summary>
+    /// Model-free fallback for the voice budget. Reading back the top matches keeps the command
+    /// useful when a large local model is still thinking after the Q&amp;A window closes.
+    /// </summary>
+    private async Task<VoiceCommandOutcome> AnswerFromEvidenceAsync(string question, CancellationToken ct)
+    {
+        if (evidence is null)
+        {
+            return new VoiceCommandOutcome(false, "本地模型响应超时，请稍后再问。");
+        }
+
+        try
+        {
+            var (from, to) = evidence.DefaultRange(7);
+            var result = await evidence.SearchAsync(question, from, to, ct);
+            if (result.Evidence.Count == 0)
+            {
+                return new VoiceCommandOutcome(true, "本地模型响应超时，也没有找到可验证的本地记录。");
+            }
+
+            var top = result.Evidence
+                .Take(2)
+                .Select(item => $"{item.AppName}：{item.Title}");
+            return new VoiceCommandOutcome(true, $"模型响应超时。相关记录：{string.Join("；", top)}");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new VoiceCommandOutcome(true, "本地模型响应超时，请稍后再问，或打开检索面板查看证据。");
+        }
     }
 }

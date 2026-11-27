@@ -16,7 +16,21 @@ public sealed class VoiceSessionOptions
     /// Upper bound for one command (ASR + router + TTS). Without it a slow model call keeps the
     /// frame loop blocked and the wake word is not heard until it returns.
     /// </summary>
-    public TimeSpan CommandExecutionTimeout { get; init; } = TimeSpan.FromSeconds(30);
+    public TimeSpan CommandExecutionTimeout { get; init; } = TimeSpan.FromSeconds(50);
+
+    /// <summary>
+    /// Upper bound for spoken feedback. The TTS engine runs native inference that cannot be
+    /// interrupted by a token, so the state machine waits at most this long and then returns to
+    /// sleep; otherwise a wedged synthesis or output device strands the session in Responding and
+    /// the wake word is never heard again.
+    /// </summary>
+    public TimeSpan FeedbackTimeout { get; init; } = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// Upper bound for stopping the pump. A frame handler stuck in native inference must not keep
+    /// the UI toggle disabled forever.
+    /// </summary>
+    public TimeSpan StopTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     public bool EnableWakeChime { get; init; } = true;
 
@@ -52,6 +66,7 @@ public sealed class VoiceSessionController : IVoiceSession
     private readonly List<float> _commandBuffer = [];
     private CancellationTokenSource? _runCts;
     private Task? _runTask;
+    private long _runGeneration;
     private int _state = (int)VoiceSessionState.Sleeping;
     private DateTimeOffset _commandDeadline;
     private DateTimeOffset _lastWakeAt = DateTimeOffset.MinValue;
@@ -213,8 +228,9 @@ public sealed class VoiceSessionController : IVoiceSession
             }
 
             var runCts = new CancellationTokenSource();
+            var generation = Interlocked.Increment(ref _runGeneration);
             _runCts = runCts;
-            _runTask = Task.Run(() => RunAsync(runCts), CancellationToken.None);
+            _runTask = Task.Run(() => RunAsync(runCts, generation), CancellationToken.None);
         }
 
         EmitInteraction(string.Empty, "语音已启用，说“你好时光”唤醒。");
@@ -242,12 +258,23 @@ public sealed class VoiceSessionController : IVoiceSession
         await cts.CancelAsync();
         try
         {
-            await task.WaitAsync(ct);
+            // A handler stuck in native inference (ASR/TTS) never observes the token. Waiting
+            // forever would keep the UI toggle disabled and leave the user unable to re-arm voice.
+            await task.WaitAsync(_options.StopTimeout, ct);
         }
         catch (OperationCanceledException ex)
         {
             // Expected when the session is stopped
             AiAssistant.Application.Diagnostics.SuppressedExceptionLog.Trace("Voice.VoiceSessionController.StopAsync", ex);
+        }
+        catch (TimeoutException)
+        {
+            _logger.LogWarning(
+                "Voice session did not stop within {TimeoutSeconds} seconds; abandoning the previous loop.",
+                _options.StopTimeout.TotalSeconds);
+            // Retire the old loop so a restart can install a new one even if the old handler is
+            // still blocked inside a native call.
+            Interlocked.Increment(ref _runGeneration);
         }
         finally
         {
@@ -269,7 +296,7 @@ public sealed class VoiceSessionController : IVoiceSession
         await StopAsync(CancellationToken.None);
     }
 
-    private async Task RunAsync(CancellationTokenSource runCts)
+    private async Task RunAsync(CancellationTokenSource runCts, long generation)
     {
         var ct = runCts.Token;
         var faultReason = "音频采集已停止";
@@ -277,6 +304,13 @@ public sealed class VoiceSessionController : IVoiceSession
         {
             await foreach (var frame in _audioHub.SubscribeAsync(new AudioSubscription("voice-session"), ct))
             {
+                // A loop that was abandoned by a stop timeout must never touch the state of the
+                // replacement loop, even if its blocked handler eventually returns.
+                if (Volatile.Read(ref _runGeneration) != generation)
+                {
+                    break;
+                }
+
                 try
                 {
                     switch (State)
@@ -314,6 +348,7 @@ public sealed class VoiceSessionController : IVoiceSession
         finally
         {
             var stoppedByUser = runCts.IsCancellationRequested;
+            var superseded = Volatile.Read(ref _runGeneration) != generation;
             lock (_sync)
             {
                 // Only clear our own run state: a restart may already have installed a new run.
@@ -324,12 +359,15 @@ public sealed class VoiceSessionController : IVoiceSession
                 }
             }
 
-            SetState(VoiceSessionState.Sleeping);
-            if (!stoppedByUser && !_disposed)
+            if (!superseded)
             {
-                // The microphone is closed now; the UI must stop claiming the session is armed.
-                EmitInteraction(string.Empty, "语音已停止，请重新启用。");
-                Faulted?.Invoke(this, new VoiceSessionFault(faultReason, _clock.UtcNow));
+                SetState(VoiceSessionState.Sleeping);
+                if (!stoppedByUser && !_disposed)
+                {
+                    // The microphone is closed now; the UI must stop claiming the session is armed.
+                    EmitInteraction(string.Empty, "语音已停止，请重新启用。");
+                    Faulted?.Invoke(this, new VoiceSessionFault(faultReason, _clock.UtcNow));
+                }
             }
         }
     }
@@ -480,10 +518,10 @@ public sealed class VoiceSessionController : IVoiceSession
         if (parsed.RequiresConfirmation)
         {
             _pendingConfirmation = parsed;
-            await _commandLogWriter.WriteAsync(_wakeKeyword, transcript, parsed, audioContentId);
+            await _commandLogWriter.WriteAsync(_wakeKeyword, transcript, parsed, audioContentId, ct);
             SetState(VoiceSessionState.Responding);
             EmitInteraction(transcript, parsed.Feedback);
-            await _feedback.PlayAsync(parsed.Feedback, ct);
+            await PlayFeedbackBoundedAsync(parsed.Feedback, ct);
             BeginListening(_options.ConfirmationWindow);
             return;
         }
@@ -509,18 +547,62 @@ public sealed class VoiceSessionController : IVoiceSession
         CancellationToken ct)
     {
         SetState(VoiceSessionState.Responding);
-        if (!string.IsNullOrWhiteSpace(transcript))
+        try
         {
-            await _commandLogWriter.WriteAsync(_wakeKeyword, transcript, command, audioContentId);
-        }
+            if (!string.IsNullOrWhiteSpace(transcript))
+            {
+                await _commandLogWriter.WriteAsync(_wakeKeyword, transcript, command, audioContentId, ct);
+            }
 
-        EmitInteraction(transcript ?? string.Empty, feedback);
-        await _feedback.PlayAsync(feedback, ct);
-        _pendingConfirmation = null;
-        _wakeWordDetector.Reset();
-        _ignoreFramesBeforeUtc = _clock.UtcNow;
-        SetState(VoiceSessionState.Sleeping);
-        _lastWakeAt = _clock.UtcNow;
+            // Publish the text first: even when the spoken feedback is abandoned, the page still
+            // shows what the command did and why it ended.
+            EmitInteraction(transcript ?? string.Empty, feedback);
+            await PlayFeedbackBoundedAsync(feedback, ct);
+        }
+        finally
+        {
+            // The state machine must converge no matter how the feedback path ends. Leaving it in
+            // Responding silently discards every following audio frame, so the wake word would
+            // never be heard again.
+            _pendingConfirmation = null;
+            _wakeWordDetector.Reset();
+            _ignoreFramesBeforeUtc = _clock.UtcNow;
+            SetState(VoiceSessionState.Sleeping);
+            _lastWakeAt = _clock.UtcNow;
+        }
+    }
+
+    /// <summary>
+    /// Speaks one feedback line with a hard bound. Native synthesis and the output device can both
+    /// stall without observing cancellation, so the command loop must not await them forever.
+    /// </summary>
+    private async Task PlayFeedbackBoundedAsync(string text, CancellationToken ct)
+    {
+        using var feedbackCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var playback = _feedback.PlayAsync(text, feedbackCts.Token);
+        try
+        {
+            await playback.WaitAsync(_options.FeedbackTimeout, ct);
+        }
+        catch (TimeoutException)
+        {
+            _logger.LogWarning(
+                "Voice feedback exceeded {TimeoutSeconds} seconds and was abandoned.",
+                _options.FeedbackTimeout.TotalSeconds);
+        }
+        finally
+        {
+            if (!playback.IsCompleted)
+            {
+                // Stop the abandoned clip so it cannot talk over the next command.
+                await feedbackCts.CancelAsync();
+                _ = playback.ContinueWith(
+                    static task => _ = task.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+            }
+        }
     }
 
     private void BeginListening(TimeSpan window)
