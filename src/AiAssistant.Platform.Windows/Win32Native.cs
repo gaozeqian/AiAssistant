@@ -7,6 +7,12 @@ internal static partial class Win32Native
     public const int SmCxScreen = 0;
     public const int SmCyScreen = 1;
     public const int Srccopy = 0x00CC0020;
+
+    /// <summary>COLORONCOLOR: drops pixels when shrinking. Fast, but destroys small text.</summary>
+    public const int ColorOnColor = 3;
+
+    /// <summary>HALFTONE: averages source pixels. Slower, but keeps downscaled text readable.</summary>
+    public const int Halftone = 4;
     public const uint MonitorInfoPrimary = 1;
     public const uint MonitorDefaultToPrimary = 1;
     public const uint MonitorDefaultToNearest = 2;
@@ -154,6 +160,11 @@ internal static partial class Win32Native
 
     [DllImport("gdi32.dll")]
     public static extern int SetStretchBltMode(nint hdc, int mode);
+
+    /// <summary>Required after <see cref="SetStretchBltMode"/> selects HALFTONE, otherwise GDI offsets the halftone pattern.</summary>
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetBrushOrgEx(nint hdc, int x, int y, nint lppt);
 
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
     public static extern int RegOpenKeyExW(nuint hKey, string lpSubKey, uint ulOptions, int samDesired, out nuint phkResult);

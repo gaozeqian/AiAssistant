@@ -19,14 +19,14 @@ public sealed class ScreenCapture(IMacHelperSupervisor supervisor, IClock clock)
         supervisor,
         CapabilityKind.ScreenCapture,
         supervisor.Permissions.ScreenRecording,
-        "ScreenCaptureKit（Swift Helper，逐显示器 ≤1280px PNG + 感知哈希）",
+        "ScreenCaptureKit（Swift Helper，逐显示器 ≤1920px PNG + 感知哈希）",
         "请在「系统设置 > 隐私与安全性 > 屏幕与系统音频录制」中启用 AiAssistant。");
 
     public async Task<IReadOnlyList<ScreenCaptureFrame>> CaptureDisplaysAsync(ScreenCaptureTarget target, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var response = await supervisor.InvokeAsync(
-            new MacIpcRequest(string.Empty, MacHelperProtocol.Methods.ScreenCapture, MaxWidth: 1280),
+            new MacIpcRequest(string.Empty, MacHelperProtocol.Methods.ScreenCapture, MaxWidth: ScreenCaptureLimits.MaxFrameWidth),
             ct);
 
         if (!response.Ok)

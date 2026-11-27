@@ -6,10 +6,10 @@ using AiAssistant.Core.ValueObjects;
 namespace AiAssistant.Platform.Windows;
 
 /// <summary>
-/// Captures every connected display via Win32 GDI StretchBlt (downscaled to &lt;= 1280px width for
-/// &lt;1% CPU overhead per screen), computes a 64-bit perceptual hash per display, and encodes PNG in
-/// memory. The display hosting the foreground window is flagged so the window activity record keeps
-/// its context while the remaining monitors still get their own record.
+/// Captures every connected display via Win32 GDI StretchBlt (downscaled to &lt;= <see cref="ScreenCaptureLimits.MaxFrameWidth"/>px
+/// width with HALFTONE averaging so downscaled text stays legible), computes a 64-bit perceptual hash per
+/// display, and encodes PNG in memory. The display hosting the foreground window is flagged so the window
+/// activity record keeps its context while the remaining monitors still get their own record.
 /// </summary>
 public sealed class WindowsScreenCapture(IClock clock) : IScreenCapture
 {
@@ -122,7 +122,7 @@ public sealed class WindowsScreenCapture(IClock clock) : IScreenCapture
             return null;
         }
 
-        var targetWidth = Math.Min(srcWidth, 1280);
+        var targetWidth = Math.Min(srcWidth, ScreenCaptureLimits.MaxFrameWidth);
         var targetHeight = Math.Max(1, (int)Math.Round((double)srcHeight * targetWidth / srcWidth));
 
         var screenDc = Win32Native.GetDC(0);
@@ -157,7 +157,19 @@ public sealed class WindowsScreenCapture(IClock clock) : IScreenCapture
             }
 
             oldObj = Win32Native.SelectObject(memDc, dib);
-            _ = Win32Native.SetStretchBltMode(memDc, 3); // COLORONCOLOR fast downscale
+            // HALFTONE averages source pixels instead of dropping them (COLORONCOLOR), which is the
+            // difference between unreadable and readable text once a 2560px display is shrunk. GDI
+            // requires the brush origin to be re-aligned after selecting HALFTONE; without it the
+            // halftone pattern is offset per blit and the frame picks up a colored cast.
+            if (Win32Native.SetStretchBltMode(memDc, Win32Native.Halftone) == 0)
+            {
+                // Driver refused HALFTONE (rare for memory DCs); COLORONCOLOR still produces a frame.
+                _ = Win32Native.SetStretchBltMode(memDc, Win32Native.ColorOnColor);
+            }
+            else
+            {
+                _ = Win32Native.SetBrushOrgEx(memDc, 0, 0, 0);
+            }
             // The desktop DC spans the virtual screen, so a monitor left/above the primary has
             // negative source coordinates; StretchBlt accepts them relative to the primary origin.
             var ok = Win32Native.StretchBlt(

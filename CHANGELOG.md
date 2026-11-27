@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- 三平台截图：存储宽度上限统一从 1280px 提到 1920px（`ScreenCaptureLimits.MaxFrameWidth`）。Windows 由 COLORONCOLOR 点采样改为 HALFTONE 平均采样，Linux X11 由点采样改为按区域取平均，macOS 沿用 ScreenCaptureKit 的硬件缩放、只放宽上限（Swift Helper 的默认值同步）。回看时正文文字可辨认；Windows 同一帧实测 1280×720 214 KB / 50 ms → 1920×1080 625 KB / 87 ms（每 10 秒一次），mac/Linux 的体积与耗时同比上升。
+
 ### Fixed
 
 - 数据与导出：删除本地数据不再让窗口无响应——删除与保留清理的同步核心（SQLite 删除、WAL checkpoint、媒体擦除）改到线程池执行。

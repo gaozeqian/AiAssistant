@@ -68,7 +68,7 @@ public sealed class MacPlatformIpcAndAdapterContractTests : IDisposable
 
         var screens = await screenCapture.CaptureDisplaysAsync(new ScreenCaptureTarget(), CancellationToken.None);
         var screen = Assert.Single(screens);
-        Assert.Equal(1280, screen.Width);
+        Assert.Equal(ScreenCaptureLimits.MaxFrameWidth, screen.Width);
         Assert.Equal([0x89, 0x50, 0x4E, 0x47], screen.EncodedPngBytes);
         Assert.True(screen.IsForegroundDisplay);
 
@@ -593,8 +593,10 @@ public sealed class MacPlatformIpcAndAdapterContractTests : IDisposable
                 new(request.RequestId, true, Window: new MacForegroundWindowDto($"Xcode{(behavior.Generation > 1 ? $"-Restart{behavior.Generation}" : string.Empty)}", "AiAssistant", "com.apple.dt.Xcode", 42)),
             MacHelperProtocol.Methods.ScreenCapture when behavior.ScreenRecording != MacPermissionGrant.Granted =>
                 new(request.RequestId, false, ErrorCode: MacHelperProtocol.ErrorCodes.PermissionDenied, Permissions: behavior.Permissions()),
+            // Echo the requested cap so the assertion below covers the adapter's frame budget, not a
+            // hard-coded number that would stay green if the request regressed to a smaller width.
             MacHelperProtocol.Methods.ScreenCapture =>
-                new(request.RequestId, true, ScreenFrame: new MacScreenFrameDto(1280, 720, 123, Convert.ToBase64String([0x89, 0x50, 0x4E, 0x47]))),
+                new(request.RequestId, true, ScreenFrame: new MacScreenFrameDto(request.MaxWidth ?? 1280, 720, 123, Convert.ToBase64String([0x89, 0x50, 0x4E, 0x47]))),
             MacHelperProtocol.Methods.ExtractText =>
                 BuildExtractTextResponse(request, behavior),
             MacHelperProtocol.Methods.PollFileEvents =>

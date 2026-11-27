@@ -3,6 +3,16 @@ using AiAssistant.Core.ValueObjects;
 
 namespace AiAssistant.Application.Ports;
 
+/// <summary>
+/// Frame-size policy shared by every platform adapter so Windows, macOS and Linux downsample to the
+/// same budget. 1280 (the original cap) discarded half of a 2560px display before the timeline ever
+/// saw it, which is what made media previews unreadable; 1920 keeps 12px UI text recognizable.
+/// </summary>
+public static class ScreenCaptureLimits
+{
+    public const int MaxFrameWidth = 1920;
+}
+
 /// <summary>Identity and virtual-screen bounds of one display.</summary>
 public sealed record DisplayInfo(
     string Id,

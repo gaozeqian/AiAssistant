@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using AiAssistant.Application.Imaging;
@@ -89,6 +90,10 @@ internal static partial class X11Native
 /// <summary>Pure XImage pixel conversion, independently testable without an X server.</summary>
 public static class X11PixelConverter
 {
+    /// <summary>
+    /// Converts an XImage buffer to BGRA32, averaging (not sampling) the source pixels behind each
+    /// destination pixel so downscaled text stays legible.
+    /// </summary>
     public static byte[] DownsampleToBgra32(
         ReadOnlySpan<byte> source,
         int sourceWidth,
@@ -110,40 +115,44 @@ public static class X11PixelConverter
         }
 
         var bytesPerPixel = bitsPerPixel / 8;
+        var blue = new ChannelMask(blueMask);
+        var green = new ChannelMask(greenMask);
+        var red = new ChannelMask(redMask);
         var output = new byte[checked(targetWidth * targetHeight * 4)];
+
+        // Box filter: every destination pixel averages the full source rectangle it covers. Point
+        // sampling (the previous implementation) discarded source pixels instead of averaging them,
+        // which is what made 2560px displays unreadable once downscaled to the stored frame width.
         for (var y = 0; y < targetHeight; y++)
         {
-            var sourceY = Math.Min(sourceHeight - 1, y * sourceHeight / targetHeight);
+            var sourceY0 = Math.Min(sourceHeight - 1, y * sourceHeight / targetHeight);
+            var sourceY1 = Math.Clamp((y + 1) * sourceHeight / targetHeight, sourceY0 + 1, sourceHeight);
             for (var x = 0; x < targetWidth; x++)
             {
-                var sourceX = Math.Min(sourceWidth - 1, x * sourceWidth / targetWidth);
-                var index = sourceY * stride + sourceX * bytesPerPixel;
-                uint pixel;
-                if (byteOrder == 0)
+                var sourceX0 = Math.Min(sourceWidth - 1, x * sourceWidth / targetWidth);
+                var sourceX1 = Math.Clamp((x + 1) * sourceWidth / targetWidth, sourceX0 + 1, sourceWidth);
+
+                // ulong accumulators: a 1px target from a 16384px source would overflow uint.
+                ulong sumBlue = 0;
+                ulong sumGreen = 0;
+                ulong sumRed = 0;
+                for (var sy = sourceY0; sy < sourceY1; sy++)
                 {
-                    pixel = source[index];
-                    pixel |= (uint)source[index + 1] << 8;
-                    pixel |= (uint)source[index + 2] << 16;
-                    if (bytesPerPixel == 4)
+                    var rowStart = sy * stride;
+                    for (var sx = sourceX0; sx < sourceX1; sx++)
                     {
-                        pixel |= (uint)source[index + 3] << 24;
-                    }
-                }
-                else
-                {
-                    pixel = source[index + bytesPerPixel - 1];
-                    pixel |= (uint)source[index + bytesPerPixel - 2] << 8;
-                    pixel |= (uint)source[index + bytesPerPixel - 3] << 16;
-                    if (bytesPerPixel == 4)
-                    {
-                        pixel |= (uint)source[index] << 24;
+                        var pixel = ReadPixel(source, rowStart + sx * bytesPerPixel, bytesPerPixel, byteOrder);
+                        sumBlue += blue.Extract(pixel);
+                        sumGreen += green.Extract(pixel);
+                        sumRed += red.Extract(pixel);
                     }
                 }
 
+                var sampleCount = (ulong)((sourceY1 - sourceY0) * (sourceX1 - sourceX0));
                 var target = (y * targetWidth + x) * 4;
-                output[target] = ScaleMask(pixel, blueMask);
-                output[target + 1] = ScaleMask(pixel, greenMask);
-                output[target + 2] = ScaleMask(pixel, redMask);
+                output[target] = (byte)(sumBlue / sampleCount);
+                output[target + 1] = (byte)(sumGreen / sampleCount);
+                output[target + 2] = (byte)(sumRed / sampleCount);
                 output[target + 3] = 255;
             }
         }
@@ -151,17 +160,54 @@ public static class X11PixelConverter
         return output;
     }
 
-    private static byte ScaleMask(uint pixel, ulong mask)
+    /// <summary>Reads one packed XImage pixel honouring the buffer byte order and pixel width.</summary>
+    private static uint ReadPixel(ReadOnlySpan<byte> source, int index, int bytesPerPixel, int byteOrder)
     {
-        if (mask == 0)
+        uint pixel;
+        if (byteOrder == 0)
         {
-            return 0;
+            pixel = source[index];
+            pixel |= (uint)source[index + 1] << 8;
+            pixel |= (uint)source[index + 2] << 16;
+            if (bytesPerPixel == 4)
+            {
+                pixel |= (uint)source[index + 3] << 24;
+            }
+        }
+        else
+        {
+            pixel = source[index + bytesPerPixel - 1];
+            pixel |= (uint)source[index + bytesPerPixel - 2] << 8;
+            pixel |= (uint)source[index + bytesPerPixel - 3] << 16;
+            if (bytesPerPixel == 4)
+            {
+                pixel |= (uint)source[index] << 24;
+            }
         }
 
-        var shift = System.Numerics.BitOperations.TrailingZeroCount(mask);
-        var max = mask >> shift;
-        var value = (pixel & mask) >> shift;
-        return (byte)Math.Min(255UL, value * 255UL / max);
+        return pixel;
+    }
+
+    /// <summary>
+    /// Extracts one 8-bit channel from a packed pixel. Mask geometry is resolved once per frame instead
+    /// of once per pixel, and the common 8-bit case skips the rescale division entirely.
+    /// </summary>
+    private readonly struct ChannelMask(ulong mask)
+    {
+        private readonly ulong _mask = mask;
+        private readonly int _shift = mask == 0 ? 0 : BitOperations.TrailingZeroCount(mask);
+        private readonly ulong _max = mask == 0 ? 0 : mask >> BitOperations.TrailingZeroCount(mask);
+
+        public byte Extract(uint pixel)
+        {
+            if (_max == 0)
+            {
+                return 0;
+            }
+
+            var value = (pixel & _mask) >> _shift;
+            return _max == 255 ? (byte)value : (byte)Math.Min(255UL, value * 255UL / _max);
+        }
     }
 }
 
@@ -217,7 +263,7 @@ public sealed class X11ScreenCapture(IClock clock) : IScreenCapture
 
             var raw = new byte[byteCount];
             Marshal.Copy(layout.Data, raw, 0, byteCount);
-            var targetWidth = Math.Min(width, 1280);
+            var targetWidth = Math.Min(width, ScreenCaptureLimits.MaxFrameWidth);
             var targetHeight = Math.Max(1, (int)Math.Round((double)height * targetWidth / width));
             var bgra = X11PixelConverter.DownsampleToBgra32(
                 raw,

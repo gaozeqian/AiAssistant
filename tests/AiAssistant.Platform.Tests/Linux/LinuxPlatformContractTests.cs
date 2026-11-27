@@ -197,6 +197,42 @@ public sealed class LinuxPlatformContractTests : IDisposable
     }
 
     [Fact]
+    public void X11PixelConverter_AveragesSourcePixelsInsteadOfDroppingThem()
+    {
+        // 4x4 checkerboard of black and white downscaled to 1x1: averaging must land on mid grey.
+        // The previous point-sampling implementation returned one of the two extremes (0 or 255),
+        // which is exactly what shredded thin text strokes on a downscaled desktop capture.
+        var source = new byte[4 * 4 * 4];
+        for (var y = 0; y < 4; y++)
+        {
+            for (var x = 0; x < 4; x++)
+            {
+                var value = (byte)((x + y) % 2 == 0 ? 0 : 255);
+                var index = ((y * 4) + x) * 4;
+                source[index] = value;     // B
+                source[index + 1] = value; // G
+                source[index + 2] = value; // R
+                source[index + 3] = 255;
+            }
+        }
+
+        var bgra = X11PixelConverter.DownsampleToBgra32(
+            source,
+            4,
+            4,
+            stride: 16,
+            bitsPerPixel: 32,
+            byteOrder: 0,
+            redMask: 0x00FF0000,
+            greenMask: 0x0000FF00,
+            blueMask: 0x000000FF,
+            targetWidth: 1,
+            targetHeight: 1);
+
+        Assert.Equal([127, 127, 127, 255], bgra);
+    }
+
+    [Fact]
     public async Task XdgAutoStart_WritesQuotedExecAtomically_AndCanDisable()
     {
         var directory = Path.Combine(_tempRoot, "autostart");

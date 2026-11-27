@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
@@ -93,8 +94,14 @@ public sealed class WindowsPlatformAdapterTests : IDisposable
             foreach (var frame in frames)
             {
                 Assert.True(frame.Width > 0 && frame.Height > 0);
+                // The stored frame must stay inside the documented cap: the timeline preview decodes at
+                // the stored width, so a regression here is a user-visible blur regression.
+                Assert.InRange(frame.Width, 1, ScreenCaptureLimits.MaxFrameWidth);
                 Assert.Equal([0x89, 0x50, 0x4E, 0x47], frame.EncodedPngBytes[..4]);
                 Assert.NotNull(frame.Display);
+                // IHDR carries the encoded size; a mismatch means the DIB and the PNG disagree.
+                Assert.Equal((uint)frame.Width, BinaryPrimitives.ReadUInt32BigEndian(frame.EncodedPngBytes.AsSpan(16, 4)));
+                Assert.Equal((uint)frame.Height, BinaryPrimitives.ReadUInt32BigEndian(frame.EncodedPngBytes.AsSpan(20, 4)));
             }
 
             // Exactly one display is flagged as hosting the foreground window.

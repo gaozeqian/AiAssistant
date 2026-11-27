@@ -190,7 +190,9 @@ enum MacHelperServer {
             )
 
         case "screen.capture":
-            let result = MacNativeCapabilities.captureScreens(maxWidth: req.maxWidth ?? 1280)
+            // Keep the default in step with ScreenCaptureLimits.MaxFrameWidth on the host side: the host
+            // always sends maxWidth, but a request that omits it must not fall back to the old 1280 cap.
+            let result = MacNativeCapabilities.captureScreens(maxWidth: req.maxWidth ?? 1920)
             switch result {
             case .success(let frames):
                 return MacIpcResponse(
