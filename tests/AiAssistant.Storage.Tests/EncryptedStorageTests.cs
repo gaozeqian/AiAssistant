@@ -5,6 +5,7 @@ using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.Exceptions;
 using AiAssistant.Core.ValueObjects;
+using AiAssistant.Storage.Backup;
 using AiAssistant.Storage.KeyStores;
 using AiAssistant.Storage.Media;
 using AiAssistant.Storage.Sqlite;
@@ -212,19 +213,23 @@ public sealed class EncryptedStorageTests : IDisposable
             new ActivityEvent(evId, ts, SourceKind.WindowActivity, "Terminal", "git status")
         ], CancellationToken.None);
 
+        var backupKey = maintenance.CreateBackupKey();
         var backupPath = Path.Combine(_tempRoot, "backups", "daily.backup.enc.db");
-        await maintenance.BackupEncryptedAsync(backupPath, CancellationToken.None);
+        await maintenance.BackupEncryptedAsync(backupPath, backupKey, CancellationToken.None);
 
-        // Backup must also be encrypted (wrong key fails)
-        var wrongKeyFactory = new EncryptedSqliteConnectionFactory(options, new StaticKeyStore(RandomNumberGenerator.GetBytes(32)));
+        // The archive is encrypted under the user key: another key must fail before touching live data.
         await Assert.ThrowsAsync<StorageAuthenticationException>(
-            () => wrongKeyFactory.OpenConnectionForPathAsync(backupPath, CancellationToken.None));
+            () => maintenance.RestoreEncryptedAsync(
+                backupPath,
+                maintenance.CreateBackupKey(),
+                CancellationToken.None));
+        Assert.NotNull(await repo.GetByIdAsync(evId, CancellationToken.None));
 
-        // Purge live DB, then restore from encrypted backup
+        // Purge live DB, then restore from the portable backup
         await repo.PurgeDateAsync(ts.LocalDate, CancellationToken.None);
         Assert.Null(await repo.GetByIdAsync(evId, CancellationToken.None));
 
-        await maintenance.RestoreEncryptedAsync(backupPath, CancellationToken.None);
+        await maintenance.RestoreEncryptedAsync(backupPath, backupKey, CancellationToken.None);
         var restored = await repo.GetByIdAsync(evId, CancellationToken.None);
         Assert.NotNull(restored);
         Assert.Equal("git status", restored!.WindowTitle);
@@ -261,32 +266,63 @@ public sealed class EncryptedStorageTests : IDisposable
             new ContentWriteRequest("content-1", ContentKind.ScreenshotPng, new byte[] { 0x89, 0x50, 0x4E, 0x47 }.AsMemory(), DateTimeOffset.UtcNow),
             CancellationToken.None);
 
-        var backupPath = Path.Combine(_tempRoot, "full.aia-backup.zip");
-        await maintA.BackupEncryptedAsync(backupPath, CancellationToken.None);
+        // Larger than the 1 MiB chunk size, so the portable container exercises multi-chunk encryption.
+        var largeMedia = RandomNumberGenerator.GetBytes(2_500_000);
+        await mediaA.PutAsync(
+            new ContentWriteRequest("content-large", ContentKind.ScreenshotPng, largeMedia.AsMemory(), DateTimeOffset.UtcNow),
+            CancellationToken.None);
 
-        // The archive must be self-contained: database + encrypted media. The keystore envelope only
-        // exists for OS-backed key stores (StaticKeyStore keeps the key in memory, so no files to carry).
+        var backupKey = maintA.CreateBackupKey();
+        var backupPath = Path.Combine(_tempRoot, "full.aia-backup.zip");
+        await maintA.BackupEncryptedAsync(backupPath, backupKey, CancellationToken.None);
+
+        // The outer ZIP exposes only a manifest and the encrypted payload; database, media and the
+        // master key stay inside the payload and cannot be read without the backup key.
         using (var zip = ZipFile.OpenRead(backupPath))
         {
             var names = zip.Entries.Select(e => e.FullName).ToArray();
-            Assert.Contains("database/aiassistant.enc.db", names);
-            Assert.Contains(names, n => n.StartsWith("media/", StringComparison.Ordinal));
+            Assert.Contains("manifest.json", names);
+            Assert.Contains("payload.enc", names);
+            Assert.DoesNotContain("database/aiassistant.enc.db", names);
+            Assert.DoesNotContain(names, n => n.StartsWith("media/", StringComparison.Ordinal));
         }
 
-        // Restore into a cold directory with a fresh key store instance (same OS user).
+        // Restore into a cold directory with a fresh, unrelated key store: the portable archive must
+        // re-bind the source master key to the target machine.
         var dirB = Path.Combine(_tempRoot, "full-dst");
-        var factoryB = new EncryptedSqliteConnectionFactory(new StorageOptions { DataDirectory = dirB }, new StaticKeyStore(key));
-        var mediaB = new AesGcmMediaStore(factoryB, new StaticKeyStore(key));
+        var keyStoreB = new StaticKeyStore(RandomNumberGenerator.GetBytes(32));
+        var factoryB = new EncryptedSqliteConnectionFactory(new StorageOptions { DataDirectory = dirB }, keyStoreB);
+        var mediaB = new AesGcmMediaStore(factoryB, keyStoreB);
         var repoB = new SqliteEventRepository(factoryB, mediaB);
         var maintB = new SqliteDatabaseMaintenanceService(factoryB);
-        await maintB.RestoreEncryptedAsync(backupPath, CancellationToken.None);
+        await maintB.RestoreEncryptedAsync(backupPath, backupKey, CancellationToken.None);
 
         var restored = await repoB.GetByIdAsync(evId, CancellationToken.None);
         Assert.NotNull(restored);
         Assert.Equal("cross-dir backup", restored!.WindowTitle);
 
+        var restoredLargeMedia = await mediaB.ReadDecryptedAsync("content-large", CancellationToken.None);
+        Assert.NotNull(restoredLargeMedia);
+        Assert.Equal(largeMedia, restoredLargeMedia);
+
         var health = await maintB.CheckHealthAsync(CancellationToken.None);
-        Assert.Equal(1, health.EncryptedBlobCount);
+        Assert.Equal(2, health.EncryptedBlobCount);
+    }
+
+    [Fact]
+    public void BackupKeyCodec_RoundTripsAndAcceptsRelaxedInput()
+    {
+        var key = BackupKeyCodec.CreateKey();
+        Assert.Equal(64, key.Length);
+
+        var parsed = BackupKeyCodec.Parse(key);
+        Assert.Equal(32, parsed.Length);
+        Assert.Equal(key, BackupKeyCodec.Format(parsed));
+
+        var relaxed = key.Replace("-", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+        Assert.Equal(parsed, BackupKeyCodec.Parse(relaxed));
+
+        Assert.Throws<ArgumentException>(() => BackupKeyCodec.Parse("not-a-backup-key"));
     }
 
     [Fact]

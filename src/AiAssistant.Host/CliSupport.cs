@@ -57,8 +57,10 @@ internal static class CliSupport
                                              Evidence-grounded Q&A over recent local events
 
         Maintenance:
-          --backup <path>                    Write an encrypted backup
-          --restore <path> --confirm-restore Restore an encrypted backup
+          --backup <path> [--backup-key <key>]
+                                             Write a portable encrypted backup; prints a new key when omitted
+          --restore <path> --backup-key <key> --confirm-restore
+                                             Restore a portable encrypted backup
           --purge-data --confirm-purge       Delete all captured local data
           --rebuild-vectors                  Rebuild the embedding index
 

@@ -28,12 +28,14 @@
 
 | 参数 | 说明 |
 |---|---|
-| `--backup <路径>` | 写加密备份 |
-| `--restore <路径> --confirm-restore` | 恢复加密备份 |
+| `--backup <路径> [--backup-key <密钥>]` | 写可移植加密备份；省略 `--backup-key` 时生成并打印新密钥 |
+| `--restore <路径> --backup-key <密钥> --confirm-restore` | 用备份密钥恢复可移植加密备份 |
 | `--purge-data --confirm-purge` | 删除全部本地数据 |
 | `--rebuild-vectors` | 重建 embedding 索引 |
 
 维护命令会先初始化加密 Schema，再执行。
+
+> 备份密钥只在导出时打印一次，请与备份文件分开保存；恢复时也可用 `AIASSISTANT_BACKUP_KEY` 传入，避免密钥出现在命令历史中。备份可跨机器、跨系统用户恢复，恢复后主密钥会重新绑定目标机器的系统密钥库。
 
 ## 4. 模型
 

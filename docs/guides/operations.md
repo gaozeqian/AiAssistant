@@ -28,9 +28,9 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
 ## 3. 维护命令
 
 ```bash
-# 加密备份 / 恢复（恢复需显式确认）
+# 可移植加密备份 / 恢复（导出会打印一次性备份密钥；恢复需密钥 + 显式确认）
 AiAssistant --backup /safe/aiassistant-backup.zip
-AiAssistant --restore /safe/aiassistant-backup.zip --confirm-restore
+AiAssistant --restore /safe/aiassistant-backup.zip --backup-key <密钥> --confirm-restore
 
 # 删除全部本地数据（两步确认）
 AiAssistant --purge-data --confirm-purge
@@ -43,10 +43,11 @@ AiAssistant --report-range --from 2026-11-16 --to 2026-11-22
 AiAssistant --ask "本周数据库迁移进展如何" --days 7
 ```
 
-- 桌面端「数据与导出」页同样可以导出加密备份（ZIP）并发起恢复：恢复会先校验备份，重启应用后才覆盖当前数据。
+- 桌面端「数据与导出」页同样可以导出可移植加密备份（ZIP）并发起恢复：导出时自动生成备份密钥并要求确认已保存；恢复需输入该密钥，解密校验通过并再次确认后才在重启时覆盖当前数据。
 - 无证据时问答明确降级并以退出码 1 结束。
 - 报告默认写入 `artifacts/test-results/reports/`；可用 `--output` 覆盖。
-- 备份包含 SQLite3MC 加密库与媒体密钥引用；恢复会替换现有数据，务必先备份。
+- 备份包含数据库、媒体与主密钥，整体由每个备份独立生成的 256 位密钥加密；密钥只在导出时显示、不写入应用，丢失后无法恢复，请与备份文件分开保存。
+- 备份可跨机器、跨系统用户恢复；恢复时主密钥会重新绑定目标机器的系统密钥库（DPAPI / Keychain / libsecret），无需目标机器原有密钥。恢复会替换现有数据，务必先备份。
 
 ## 4. 模型密钥
 

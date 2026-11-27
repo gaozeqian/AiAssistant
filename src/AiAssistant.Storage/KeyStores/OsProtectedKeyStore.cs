@@ -84,6 +84,39 @@ public sealed class OsProtectedKeyStore : IKeyStore, IDisposable
         }
     }
 
+    public async Task ImportMasterKeyAsync(string keyId, ReadOnlyMemory<byte> masterKey, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
+        if (masterKey.Length != 32)
+        {
+            throw new ArgumentException("A master key must be 32 bytes.", nameof(masterKey));
+        }
+
+        await _gate.WaitAsync(ct);
+        try
+        {
+            Directory.CreateDirectory(_keyDirectory);
+            var generation = $"gen-{Guid.NewGuid():N}";
+            var dek = masterKey.ToArray();
+            byte[] wrapped;
+            try
+            {
+                wrapped = WrapDek(keyId, generation, dek);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(dek);
+            }
+
+            await WriteFileAtomicAsync(GetGenerationPath(keyId), Encoding.UTF8.GetBytes(generation), ct);
+            await WriteFileAtomicAsync(GetDekEnvelopePath(keyId), wrapped, ct);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task RotateWrapperKeyAsync(string keyId, CancellationToken ct)
     {
         var dek = await GetOrCreateMasterKeyAsync(keyId, ct);
@@ -395,6 +428,17 @@ public sealed class StaticKeyStore(byte[] masterKey) : IKeyStore
 
     public Task RotateWrapperKeyAsync(string keyId, CancellationToken ct) =>
         Task.CompletedTask;
+
+    public Task ImportMasterKeyAsync(string keyId, ReadOnlyMemory<byte> masterKey, CancellationToken ct)
+    {
+        if (masterKey.Length != 32)
+        {
+            throw new ArgumentException("A master key must be 32 bytes.", nameof(masterKey));
+        }
+
+        _key = masterKey.ToArray();
+        return Task.CompletedTask;
+    }
 
     public IKeyStore CreateForDirectory(string dataDirectory) => this;
 

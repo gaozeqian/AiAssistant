@@ -1,18 +1,27 @@
 using System.Globalization;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.Exceptions;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Storage;
+using AiAssistant.Storage.Backup;
+using AiAssistant.Storage.KeyStores;
 using Microsoft.Data.Sqlite;
 
 namespace AiAssistant.Storage.Sqlite;
 
 /// <summary>
-/// Manages database bootstrap migrations, integrity checks, encrypted online backups, and safe restores.
+/// Manages database bootstrap migrations, integrity checks, portable encrypted backups and safe restores.
 /// </summary>
 public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFactory connectionFactory) : IDatabaseMaintenanceService
 {
+    private const string StagingFolderName = "restore-pending";
+    private const string ReadyMarkerName = "READY";
+    private const string KeystoreReadyMarkerName = "keystore.ready";
+    private const string LegacyStagedRestoreFileName = "restore-pending.zip";
+    private const string PayloadDatabaseEntry = "database/aiassistant.enc.db";
+
     public async Task InitializeAsync(CancellationToken ct)
     {
         await using var conn = await connectionFactory.OpenConnectionAsync(ct);
@@ -60,9 +69,20 @@ public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFa
             IntegrityMessage: integrity);
     }
 
-    public async Task BackupEncryptedAsync(string destinationPath, CancellationToken ct)
+    public string CreateBackupKey() => BackupKeyCodec.CreateKey();
+
+    /// <summary>
+    /// The online backup and ZIP compression are synchronous and can take seconds on a large data
+    /// directory; running them on the caller's thread would freeze the desktop UI. The whole core is
+    /// therefore dispatched to the thread pool.
+    /// </summary>
+    public Task BackupEncryptedAsync(string destinationPath, string backupKey, CancellationToken ct) =>
+        Task.Run(() => BackupEncryptedCoreAsync(destinationPath, backupKey, ct), ct);
+
+    private async Task BackupEncryptedCoreAsync(string destinationPath, string backupKey, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(backupKey);
         var parent = Path.GetDirectoryName(destinationPath);
         if (!string.IsNullOrEmpty(parent))
         {
@@ -74,13 +94,10 @@ public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFa
             File.Delete(destinationPath);
         }
 
-        // Backups are self-contained: encrypted DB + the wrapped master-key envelope + encrypted media,
-        // so a restore into another data directory on the same machine can decrypt everything.
-        var tempDir = Path.Combine(Path.GetTempPath(), $"aiassistant-backup-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
+        var tempDir = CreateTempDirectory("aiassistant-backup");
         try
         {
-            var tempDb = Path.Combine(tempDir, connectionFactory.Options.DatabaseFileName);
+            var tempDb = Path.Combine(tempDir, "aiassistant.enc.db");
             await using (var sourceConn = await connectionFactory.OpenConnectionAsync(ct))
             await using (var destConn = await connectionFactory.OpenConnectionForPathAsync(tempDb, ct))
             {
@@ -88,48 +105,42 @@ public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFa
                 await destConn.CloseAsync();
             }
 
-            using var zip = ZipFile.Open(destinationPath, ZipArchiveMode.Create);
-            zip.CreateEntryFromFile(tempDb, "database/aiassistant.enc.db", CompressionLevel.Optimal);
-            AddDirectoryToZip(zip, connectionFactory.Options.KeyStoreDirectory, "keystore");
-            AddDirectoryToZip(zip, connectionFactory.Options.MediaDirectory, "media");
-        }
-        finally
-        {
-            if (Directory.Exists(tempDir))
+            RestrictToCurrentUser(tempDb, isDirectory: false);
+            var masterKey = await connectionFactory.KeyStore.GetOrCreateMasterKeyAsync(
+                connectionFactory.Options.MasterKeyId,
+                ct);
+            try
             {
-                Directory.Delete(tempDir, recursive: true);
+                var payloadZip = Path.Combine(tempDir, "payload.zip");
+                await using (var payloadStream = new FileStream(
+                                 payloadZip,
+                                 FileMode.Create,
+                                 FileAccess.Write,
+                                 FileShare.None))
+                using (var zip = new ZipArchive(payloadStream, ZipArchiveMode.Create, leaveOpen: false))
+                {
+                    zip.CreateEntryFromFile(tempDb, PayloadDatabaseEntry, CompressionLevel.Optimal);
+                    AddDirectoryToZip(zip, connectionFactory.Options.MediaDirectory, "media");
+                    var keyEntry = zip.CreateEntry("master.key", CompressionLevel.NoCompression);
+                    await using var keyStream = keyEntry.Open();
+                    await keyStream.WriteAsync(masterKey, ct);
+                }
+
+                RestrictToCurrentUser(payloadZip, isDirectory: false);
+                try
+                {
+                    await PortableBackupArchive.WriteAsync(destinationPath, backupKey, payloadZip, ct);
+                }
+                catch
+                {
+                    TryDeleteFile(destinationPath);
+                    throw;
+                }
             }
-        }
-    }
-
-    public async Task RestoreEncryptedAsync(string backupSourcePath, CancellationToken ct)
-    {
-        if (!File.Exists(backupSourcePath))
-        {
-            throw new FileNotFoundException("Encrypted backup file does not exist.", backupSourcePath);
-        }
-
-        if (!IsZipArchive(backupSourcePath))
-        {
-            await RestoreLegacyDatabaseFileAsync(backupSourcePath, ct);
-            return;
-        }
-
-        var tempDir = CreateRestoreTempDirectory();
-        try
-        {
-            var extractedDb = await ExtractAndVerifyArchiveAsync(backupSourcePath, tempDir, ct);
-
-            var dbPath = connectionFactory.Options.DatabasePath;
-            Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
-            DeleteDatabaseSidecars(dbPath);
-            File.Copy(extractedDb, dbPath, overwrite: true);
-
-            ReplaceDirectoryContents(Path.Combine(tempDir, "keystore"), connectionFactory.Options.KeyStoreDirectory);
-            ReplaceDirectoryContents(Path.Combine(tempDir, "media"), connectionFactory.Options.MediaDirectory);
-
-            // Apply forward migrations if the backup was from an older schema version.
-            await InitializeAsync(ct);
+            finally
+            {
+                CryptographicOperations.ZeroMemory(masterKey);
+            }
         }
         finally
         {
@@ -137,106 +148,191 @@ public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFa
         }
     }
 
+    /// <summary>Immediate restore used by the CLI; the desktop uses stage/commit/apply instead.</summary>
+    public Task RestoreEncryptedAsync(string backupSourcePath, string backupKey, CancellationToken ct) =>
+        Task.Run(
+            async () =>
+            {
+                await StageRestoreCoreAsync(backupSourcePath, backupKey, ct);
+                if (!CommitStagedRestoreCore())
+                {
+                    throw new StorageIntegrityException("Failed to commit the staged restore.");
+                }
+
+                if (!ApplyStagedRestoreCore(ct))
+                {
+                    throw new StorageIntegrityException("Failed to apply the staged restore.");
+                }
+            },
+            ct);
+
     /// <summary>
-    /// Validates the archive without touching live data, then leaves it next to the database so the
-    /// next start can replace everything while no worker holds the database open.
+    /// Validates the archive and prepares the staged database, media and a keystore re-wrapped for
+    /// this machine. Nothing is applied until the caller commits the staging.
     /// </summary>
-    public async Task StageRestoreAsync(string backupSourcePath, CancellationToken ct)
+    public Task StageRestoreAsync(string backupSourcePath, string backupKey, CancellationToken ct) =>
+        Task.Run(() => StageRestoreCoreAsync(backupSourcePath, backupKey, ct), ct);
+
+    private async Task StageRestoreCoreAsync(string backupSourcePath, string backupKey, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(backupSourcePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(backupKey);
         var fullPath = Path.GetFullPath(backupSourcePath);
         if (!File.Exists(fullPath))
         {
             throw new FileNotFoundException("Encrypted backup file does not exist.", fullPath);
         }
 
-        if (IsZipArchive(fullPath))
+        var tempDir = CreateTempDirectory("aiassistant-restore");
+        try
         {
-            var tempDir = CreateRestoreTempDirectory();
+            var masterKey = await PortableBackupArchive.ExtractAsync(fullPath, backupKey, tempDir, ct);
             try
             {
-                _ = await ExtractAndVerifyArchiveAsync(fullPath, tempDir, ct);
+                var extractedDb = Path.Combine(tempDir, PayloadDatabaseEntry);
+                if (!File.Exists(extractedDb))
+                {
+                    throw new StorageIntegrityException("Backup payload does not contain the database.");
+                }
+
+                var tempFactory = new EncryptedSqliteConnectionFactory(
+                    new StorageOptions { DataDirectory = tempDir },
+                    new StaticKeyStore(masterKey));
+                await VerifyRestorableAsync(tempFactory, extractedDb, ct);
+
+                var stagingDir = StagingDirectory;
+                if (Directory.Exists(stagingDir))
+                {
+                    Directory.Delete(stagingDir, recursive: true);
+                }
+
+                Directory.CreateDirectory(stagingDir);
+                var stagedDb = Path.Combine(stagingDir, PayloadDatabaseEntry);
+                Directory.CreateDirectory(Path.GetDirectoryName(stagedDb)!);
+                File.Copy(extractedDb, stagedDb, overwrite: true);
+                ReplaceDirectoryContents(Path.Combine(tempDir, "media"), Path.Combine(stagingDir, "media"));
+
+                // Bind the backup's master key to this machine's OS keystore. The staged keystore is
+                // swapped in together with the database, so the next start needs no backup key.
+                var stagingKeyStore = connectionFactory.KeyStore.CreateForDirectory(stagingDir);
+                await stagingKeyStore.ImportMasterKeyAsync(
+                    connectionFactory.Options.MasterKeyId,
+                    masterKey,
+                    ct);
+
+                // A key store may not use a directory at all (the in-memory test store does not), so
+                // record that the key was re-wrapped instead of inferring it from the directory.
+                File.WriteAllText(Path.Combine(stagingDir, KeystoreReadyMarkerName), "1");
             }
             finally
             {
-                TryDeleteDirectory(tempDir);
+                CryptographicOperations.ZeroMemory(masterKey);
             }
         }
-        else
+        finally
         {
-            // A legacy raw database is only readable with the live key envelope.
-            await VerifyRestorableAsync(connectionFactory, fullPath, ct);
-        }
-
-        var stagedPath = StagedRestorePath;
-        Directory.CreateDirectory(connectionFactory.Options.DataDirectory);
-        if (!string.Equals(fullPath, stagedPath, StringComparison.OrdinalIgnoreCase))
-        {
-            File.Copy(fullPath, stagedPath, overwrite: true);
+            TryDeleteDirectory(tempDir);
         }
     }
 
-    public async Task<bool> ApplyStagedRestoreAsync(CancellationToken ct)
+    public Task<bool> CommitStagedRestoreAsync(CancellationToken ct)
     {
-        var stagedPath = StagedRestorePath;
-        if (!File.Exists(stagedPath))
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(CommitStagedRestoreCore());
+    }
+
+    private bool CommitStagedRestoreCore()
+    {
+        var stagingDir = StagingDirectory;
+        if (!File.Exists(Path.Combine(stagingDir, PayloadDatabaseEntry)) ||
+            !File.Exists(Path.Combine(stagingDir, KeystoreReadyMarkerName)))
         {
             return false;
         }
 
-        try
+        File.WriteAllText(Path.Combine(stagingDir, ReadyMarkerName), "ready");
+        return true;
+    }
+
+    public Task<bool> ApplyStagedRestoreAsync(CancellationToken ct) =>
+        Task.Run(() => ApplyStagedRestoreCore(ct), ct);
+
+    private bool ApplyStagedRestoreCore(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        // Same-machine archives from 0.1.6 and earlier are no longer supported; drop a stale marker
+        // so it cannot be mistaken for a portable restore.
+        TryDeleteFile(LegacyStagedRestorePath);
+
+        var stagingDir = StagingDirectory;
+        if (!File.Exists(Path.Combine(stagingDir, ReadyMarkerName)))
         {
-            await RestoreEncryptedAsync(stagedPath, ct);
-            return true;
+            TryDeleteDirectory(stagingDir);
+            return false;
         }
-        finally
+
+        var stagedDb = Path.Combine(stagingDir, PayloadDatabaseEntry);
+        var dbPath = connectionFactory.Options.DatabasePath;
+        Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+        DeleteDatabaseSidecars(dbPath);
+        File.Copy(stagedDb, dbPath, overwrite: true);
+        ReplaceDirectoryContents(Path.Combine(stagingDir, "media"), connectionFactory.Options.MediaDirectory);
+        var stagedKeystore = Path.Combine(stagingDir, "keystore");
+        if (Directory.Exists(stagedKeystore))
         {
-            // Always drop the marker: a failing archive must not block every future start.
-            TryDeleteFile(stagedPath);
+            ReplaceDirectoryContents(stagedKeystore, connectionFactory.Options.KeyStoreDirectory);
         }
+
+        TryDeleteDirectory(stagingDir);
+        return true;
     }
 
     public Task<bool> DiscardStagedRestoreAsync(CancellationToken ct)
     {
-        var stagedPath = StagedRestorePath;
-        if (!File.Exists(stagedPath))
-        {
-            return Task.FromResult(false);
-        }
-
-        TryDeleteFile(stagedPath);
-        return Task.FromResult(!File.Exists(stagedPath));
+        ct.ThrowIfCancellationRequested();
+        var existed = Directory.Exists(StagingDirectory) || File.Exists(LegacyStagedRestorePath);
+        TryDeleteDirectory(StagingDirectory);
+        TryDeleteFile(LegacyStagedRestorePath);
+        return Task.FromResult(existed);
     }
 
-    private string StagedRestorePath =>
-        Path.Combine(connectionFactory.Options.DataDirectory, "restore-pending.zip");
+    private string StagingDirectory =>
+        Path.Combine(connectionFactory.Options.DataDirectory, StagingFolderName);
 
-    private static string CreateRestoreTempDirectory()
+    private string LegacyStagedRestorePath =>
+        Path.Combine(connectionFactory.Options.DataDirectory, LegacyStagedRestoreFileName);
+
+    private static string CreateTempDirectory(string prefix)
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"aiassistant-restore-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
-        return tempDir;
+        var path = Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(path);
+        RestrictToCurrentUser(path, isDirectory: true);
+        return path;
     }
 
-    private async Task<string> ExtractAndVerifyArchiveAsync(
-        string backupPath,
-        string tempDir,
-        CancellationToken ct)
+    private static void RestrictToCurrentUser(string path, bool isDirectory)
     {
-        ZipFile.ExtractToDirectory(backupPath, tempDir);
-        var extractedDb = Path.Combine(tempDir, "database", "aiassistant.enc.db");
-        if (!File.Exists(extractedDb))
+        if (OperatingSystem.IsWindows())
         {
-            throw new StorageIntegrityException("Backup archive does not contain database/aiassistant.enc.db.");
+            return;
         }
 
-        // Verify with the backup's own keystore BEFORE touching the live data directory. On this machine
-        // the OS KEK still unwraps the envelope; a backup from another machine fails here cleanly.
-        var tempFactory = new EncryptedSqliteConnectionFactory(
-            new StorageOptions { DataDirectory = tempDir },
-            connectionFactory.KeyStore.CreateForDirectory(tempDir));
-        await VerifyRestorableAsync(tempFactory, extractedDb, ct);
-        return extractedDb;
+        try
+        {
+            File.SetUnixFileMode(
+                path,
+                isDirectory
+                    ? UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                    : UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch (IOException)
+        {
+            // Best effort: the temporary directory is deleted as soon as the operation finishes.
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private static void TryDeleteDirectory(string path)
@@ -285,18 +381,6 @@ public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFa
         }
     }
 
-    /// <summary>Legacy path: a raw SQLite3MC database file, restorable only with the live key envelope.</summary>
-    private async Task RestoreLegacyDatabaseFileAsync(string backupSourcePath, CancellationToken ct)
-    {
-        await VerifyRestorableAsync(connectionFactory, backupSourcePath, ct);
-
-        var dbPath = connectionFactory.Options.DatabasePath;
-        Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
-        DeleteDatabaseSidecars(dbPath);
-        File.Copy(backupSourcePath, dbPath, overwrite: true);
-        await InitializeAsync(ct);
-    }
-
     private static async Task VerifyRestorableAsync(
         EncryptedSqliteConnectionFactory factory,
         string databasePath,
@@ -318,25 +402,6 @@ public sealed class SqliteDatabaseMaintenanceService(EncryptedSqliteConnectionFa
         {
             throw new SchemaMigrationException(
                 $"Backup schema version ({backupVersion.Number}) is newer than current application ({SchemaVersion.Current.Number}).");
-        }
-    }
-
-    private static bool IsZipArchive(string path)
-    {
-        try
-        {
-            using var file = File.OpenRead(path);
-            Span<byte> magic = stackalloc byte[4];
-            if (file.Read(magic) < 4)
-            {
-                return false;
-            }
-
-            return magic[0] == 0x50 && magic[1] == 0x4B && (magic[2] == 0x03 || magic[2] == 0x05 || magic[2] == 0x07);
-        }
-        catch (IOException)
-        {
-            return false;
         }
     }
 

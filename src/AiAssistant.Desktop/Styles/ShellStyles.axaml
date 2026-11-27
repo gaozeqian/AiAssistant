@@ -1,5 +1,84 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <StreamGeometry x:Key="CompactSpinnerIncreaseIcon">M0,9 L10,0 20,9 19,10 10,2 1,10 z</StreamGeometry>
+    <StreamGeometry x:Key="CompactSpinnerDecreaseIcon">M0,1 L10,10 20,1 19,0 10,8 1,0 z</StreamGeometry>
+
+    <!-- Fluent 默认把两个 34×32 的箭头左右并排，占掉一半输入框；这里改为 18×14 上下排列。 -->
+    <ControlTheme x:Key="CompactSpinnerButton" TargetType="RepeatButton">
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="14" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="PART_Root" Background="{TemplateBinding Background}" CornerRadius="3">
+            <ContentPresenter Content="{TemplateBinding Content}"
+                              HorizontalContentAlignment="Center"
+                              VerticalContentAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover /template/ Border#PART_Root">
+        <Setter Property="Background" Value="{DynamicResource RepeatButtonBackgroundPointerOver}" />
+      </Style>
+      <Style Selector="^:pressed /template/ Border#PART_Root">
+        <Setter Property="Background" Value="{DynamicResource RepeatButtonBackgroundPressed}" />
+      </Style>
+      <Style Selector="^:disabled">
+        <Setter Property="Opacity" Value="0.4" />
+      </Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="CompactNumericSpinner" TargetType="ButtonSpinner">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <DataValidationErrors>
+            <Border Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    MinHeight="{TemplateBinding MinHeight}">
+              <DockPanel>
+                <StackPanel Name="PART_SpinnerPanel"
+                            DockPanel.Dock="Right"
+                            Orientation="Vertical"
+                            VerticalAlignment="Center"
+                            Margin="0,0,2,0"
+                            IsVisible="{TemplateBinding ShowButtonSpinner}">
+                  <RepeatButton Name="PART_IncreaseButton"
+                                Theme="{StaticResource CompactSpinnerButton}"
+                                IsTabStop="{TemplateBinding IsTabStop}"
+                                Foreground="{TemplateBinding Foreground}">
+                    <PathIcon Width="8" Height="4" Data="{StaticResource CompactSpinnerIncreaseIcon}" />
+                  </RepeatButton>
+                  <RepeatButton Name="PART_DecreaseButton"
+                                Theme="{StaticResource CompactSpinnerButton}"
+                                IsTabStop="{TemplateBinding IsTabStop}"
+                                Foreground="{TemplateBinding Foreground}">
+                    <PathIcon Width="8" Height="4" Data="{StaticResource CompactSpinnerDecreaseIcon}" />
+                  </RepeatButton>
+                </StackPanel>
+                <ContentPresenter Name="PART_ContentPresenter"
+                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                  Content="{TemplateBinding Content}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                  Padding="{TemplateBinding Padding}" />
+              </DockPanel>
+            </Border>
+          </DataValidationErrors>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+  </Styles.Resources>
+
+  <Style Selector="NumericUpDown /template/ ButtonSpinner#PART_Spinner">
+    <Setter Property="Theme" Value="{StaticResource CompactNumericSpinner}" />
+  </Style>
   <Style Selector="Button.primary">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
     <Setter Property="Foreground" Value="White" />

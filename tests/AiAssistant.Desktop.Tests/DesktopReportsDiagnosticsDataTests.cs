@@ -3,6 +3,7 @@ using AiAssistant.Application.Policies;
 using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
 using AiAssistant.Core.Domain;
+using AiAssistant.Core.Exceptions;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Desktop.Views;
@@ -425,6 +426,169 @@ public sealed partial class DesktopViewModelTests
     });
 
     [Fact]
+    public Task FullWindow_RetentionSpinnersUseCompactVerticalArrows() => RunInHeadlessSession(async () =>
+    {
+        var data = new DataManagementViewModel(
+            new FakeDataDeletionService(),
+            retention: new RecordingRetentionService(),
+            retentionSettings: new RetentionSettingsUseCase(
+                new RecordingRetentionSettingsStore(RetentionSettings.Default)));
+        using var voice = new VoiceControlViewModel(new FakeVoiceSession());
+        using var shell = CreateShellWithVoice(voice, data: data);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 4;
+
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<NumericUpDown>().Count() == 3);
+        foreach (var number in window.GetVisualDescendants().OfType<NumericUpDown>())
+        {
+            var spinner = number.GetVisualDescendants().OfType<ButtonSpinner>().Single();
+            var panel = spinner.GetVisualDescendants().OfType<StackPanel>()
+                .Single(item => item.Name == "PART_SpinnerPanel");
+            Assert.Equal(Orientation.Vertical, panel.Orientation);
+
+            var buttons = panel.GetVisualDescendants().OfType<RepeatButton>().ToArray();
+            Assert.Equal(2, buttons.Length);
+            Assert.All(buttons, button =>
+            {
+                Assert.Equal(18, button.Width);
+                Assert.Equal(14, button.Height);
+            });
+        }
+
+        window.Close();
+    });
+
+    [Fact]
+    public Task FullWindow_DataProgressStaysInsideItsOwnCard() => RunInHeadlessSession(async () =>
+    {
+        var maintenance = new RecordingMaintenanceService();
+        var gate = new TaskCompletionSource<bool>();
+        maintenance.BackupGate = gate;
+        var backupPath = Path.Combine(
+            TempArtifactDirectory.CreatePath("backup-progress"),
+            "aiassistant-backup-progress.zip");
+        var data = new DataManagementViewModel(
+            new FakeDataDeletionService(),
+            maintenance: maintenance,
+            retention: new RecordingRetentionService(),
+            retentionSettings: new RetentionSettingsUseCase(
+                new RecordingRetentionSettingsStore(RetentionSettings.Default)))
+        {
+            SaveFilePicker = new FakeSaveFilePicker(backupPath)
+        };
+        using var voice = new VoiceControlViewModel(new FakeVoiceSession());
+        using var shell = CreateShellWithVoice(voice, data: data);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 4;
+
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
+            .Any(button => AutomationProperties.GetName(button) == "导出加密备份"));
+        await data.BackupCommand.ExecuteAsync(null);
+        await WaitUntilAsync(() => data.IsAwaitingBackupKey);
+        data.BackupKeyConfirmed = true;
+        var backup = data.ConfirmBackupCommand.ExecuteAsync(null);
+        await WaitUntilAsync(() => data.IsBackingUp);
+
+        // The delete card used to host the only progress bar, so backup work showed up there.
+        var bars = window.GetVisualDescendants().OfType<ProgressBar>().ToArray();
+        var backupBar = bars.Single(bar => AutomationProperties.GetName(bar) == "备份恢复进度");
+        var deleteBar = bars.Single(bar => AutomationProperties.GetName(bar) == "删除进度");
+        var retentionBar = bars.Single(bar => AutomationProperties.GetName(bar) == "保留清理进度");
+        Assert.True(backupBar.IsVisible);
+        Assert.False(deleteBar.IsVisible);
+        Assert.False(retentionBar.IsVisible);
+        Assert.Equal("数据备份与恢复", OwningCardTitle(backupBar));
+        Assert.Equal("删除本地数据", OwningCardTitle(deleteBar));
+        Assert.Equal("保留与清理", OwningCardTitle(retentionBar));
+
+        gate.SetResult(true);
+        await backup;
+
+        Assert.Contains("已导出加密备份", data.BackupStatusMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("已导出加密备份", data.DeleteStatusMessage, StringComparison.Ordinal);
+        window.Close();
+    });
+
+    [Fact]
+    public Task FullWindow_BackupKeyPanelRequiresSavedKeyConfirmation() => RunInHeadlessSession(async () =>
+    {
+        var data = new DataManagementViewModel(
+            new FakeDataDeletionService(),
+            maintenance: new RecordingMaintenanceService())
+        {
+            SaveFilePicker = new FakeSaveFilePicker(Path.Combine(
+                TempArtifactDirectory.CreatePath("backup-key-panel"),
+                "aiassistant-backup.zip"))
+        };
+        using var voice = new VoiceControlViewModel(new FakeVoiceSession());
+        using var shell = CreateShellWithVoice(voice, data: data);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 4;
+
+        await WaitUntilAsync(() => HasButton(window, "导出加密备份…"));
+        Click(window, "导出加密备份…");
+        await WaitUntilAsync(() => data.IsAwaitingBackupKey);
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
+            .Any(button => string.Equals(button.Content?.ToString(), "开始导出", StringComparison.Ordinal)));
+
+        var start = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => string.Equals(button.Content?.ToString(), "开始导出", StringComparison.Ordinal));
+        var keyBox = window.GetVisualDescendants().OfType<TextBox>()
+            .Single(box => AutomationProperties.GetName(box) == "备份密钥");
+        Assert.Equal(data.PendingBackupKey, keyBox.Text);
+        Assert.False(start.IsEnabled);
+
+        var confirm = window.GetVisualDescendants().OfType<CheckBox>()
+            .Single(box => AutomationProperties.GetName(box) == "确认已保存备份密钥");
+        confirm.IsChecked = true;
+        await WaitUntilAsync(() => data.BackupKeyConfirmed);
+        Assert.True(start.IsEnabled);
+        window.Close();
+    });
+
+    [Fact]
+    public Task FullWindow_RestoreKeyPanelEnablesValidationAfterInput() => RunInHeadlessSession(async () =>
+    {
+        var data = new DataManagementViewModel(
+            new FakeDataDeletionService(),
+            maintenance: new RecordingMaintenanceService())
+        {
+            OpenFilePicker = new FakeOpenFilePicker(Path.Combine(
+                TempArtifactDirectory.CreatePath("restore-key-panel"),
+                "aiassistant-backup.zip"))
+        };
+        using var voice = new VoiceControlViewModel(new FakeVoiceSession());
+        using var shell = CreateShellWithVoice(voice, data: data);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 4;
+
+        await WaitUntilAsync(() => HasButton(window, "从备份恢复…"));
+        Click(window, "从备份恢复…");
+        await WaitUntilAsync(() => data.IsAwaitingRestoreKey);
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
+            .Any(button => AutomationProperties.GetName(button) == "解密并校验备份"));
+
+        var validate = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == "解密并校验备份");
+        Assert.False(validate.IsEnabled);
+
+        var input = window.GetVisualDescendants().OfType<TextBox>()
+            .Single(box => AutomationProperties.GetName(box) == "备份密钥输入");
+        input.Text = TestBackupKey;
+        await WaitUntilAsync(() => data.RestoreKeyInput == TestBackupKey);
+        Assert.True(validate.IsEnabled);
+        window.Close();
+    });
+
+    [Fact]
     public async Task DataManagement_ExportsBackupAndStagesRestoreBehindConfirmation()
     {
         var maintenance = new RecordingMaintenanceService();
@@ -442,21 +606,43 @@ public sealed partial class DesktopViewModelTests
             OpenFilePicker = new FakeOpenFilePicker(restorePath)
         };
 
+        // Export first generates a key and waits for the user to save it; nothing is written yet.
         await viewModel.BackupCommand.ExecuteAsync(null);
-        Assert.Equal(backupPath, maintenance.BackupPath);
-        Assert.Contains("已导出加密备份", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.True(viewModel.IsAwaitingBackupKey);
+        Assert.Null(maintenance.BackupPath);
+        Assert.False(string.IsNullOrWhiteSpace(viewModel.PendingBackupKey));
 
-        // First click picks the archive and asks for confirmation; nothing is staged yet.
+        viewModel.BackupKeyConfirmed = true;
+        await viewModel.ConfirmBackupCommand.ExecuteAsync(null);
+        Assert.Equal(backupPath, maintenance.BackupPath);
+        Assert.Equal(TestBackupKey, maintenance.BackupKey);
+        Assert.True(viewModel.BackupExportCompleted);
+        Assert.Contains("已导出加密备份", viewModel.BackupStatusMessage, StringComparison.Ordinal);
+
+        // The same command then closes the key panel.
+        await viewModel.ConfirmBackupCommand.ExecuteAsync(null);
+        Assert.False(viewModel.IsAwaitingBackupKey);
+
+        // First click picks the archive and asks for its key; nothing is staged yet.
         await viewModel.RestoreCommand.ExecuteAsync(null);
-        Assert.True(viewModel.HasPendingRestore);
+        Assert.True(viewModel.IsAwaitingRestoreKey);
+        Assert.False(viewModel.HasPendingRestore);
         Assert.Null(maintenance.StagedPath);
+
+        viewModel.RestoreKeyInput = TestBackupKey;
+        await viewModel.ValidateRestoreKeyCommand.ExecuteAsync(null);
+        Assert.Equal(restorePath, maintenance.StagedPath);
+        Assert.Equal(TestBackupKey, maintenance.StagedKey);
+        Assert.True(viewModel.HasPendingRestore);
+        Assert.False(viewModel.RestartAvailable);
         Assert.Contains("aiassistant-restore-test.zip", viewModel.PendingText, StringComparison.Ordinal);
 
+        // The danger confirmation commits the already validated staging.
         await viewModel.RestoreCommand.ExecuteAsync(null);
-        Assert.Equal(restorePath, maintenance.StagedPath);
+        Assert.True(maintenance.Committed);
         Assert.False(viewModel.HasPending);
         Assert.True(viewModel.RestartAvailable);
-        Assert.Contains("重启后", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Contains("重启后", viewModel.BackupStatusMessage, StringComparison.Ordinal);
 
         var restarted = false;
         viewModel.RestartRequested += (_, _) => restarted = true;
@@ -467,7 +653,31 @@ public sealed partial class DesktopViewModelTests
         await viewModel.CancelStagedRestoreCommand.ExecuteAsync(null);
         Assert.True(maintenance.Discarded);
         Assert.False(viewModel.RestartAvailable);
-        Assert.Contains("已取消", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Contains("已取消", viewModel.BackupStatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DataManagement_WrongBackupKeyExplainsFailure()
+    {
+        var maintenance = new RecordingMaintenanceService
+        {
+            StageRestoreFailure = new StorageAuthenticationException("Backup key is incorrect.")
+        };
+        var viewModel = new DataManagementViewModel(new FakeDataDeletionService(), maintenance: maintenance)
+        {
+            OpenFilePicker = new FakeOpenFilePicker(Path.Combine(
+                TempArtifactDirectory.CreatePath("wrong-backup-key"),
+                "aiassistant-backup.zip"))
+        };
+
+        await viewModel.RestoreCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsAwaitingRestoreKey);
+
+        viewModel.RestoreKeyInput = "WRONG-KEY";
+        await viewModel.ValidateRestoreKeyCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsAwaitingRestoreKey);
+        Assert.False(viewModel.HasPendingRestore);
+        Assert.Contains("密钥不正确", viewModel.BackupErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -521,7 +731,7 @@ public sealed partial class DesktopViewModelTests
         await viewModel.DeleteDateCommand.ExecuteAsync(null);
         Assert.False(viewModel.HasPending);
         Assert.Equal(1, deletion.Calls);
-        Assert.Contains("已删除", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Contains("已删除", viewModel.DeleteStatusMessage, StringComparison.Ordinal);
     });
 
     [Fact]
@@ -540,9 +750,18 @@ public sealed partial class DesktopViewModelTests
 
         Click(window, "确认删除");
         await WaitUntilAsync(() => !data.HasPending);
-        Assert.Contains("已删除", data.StatusMessage, StringComparison.Ordinal);
+        Assert.Contains("已删除", data.DeleteStatusMessage, StringComparison.Ordinal);
         window.Close();
     });
+
+    /// <summary>Heading of the nearest card that contains the control.</summary>
+    private static string OwningCardTitle(Control control) =>
+        control.GetVisualAncestors()
+            .OfType<Border>()
+            .Select(border => border.GetVisualDescendants().OfType<TextBlock>()
+                .Select(text => text.Text)
+                .FirstOrDefault(text => text is "删除本地数据" or "数据备份与恢复" or "保留与清理"))
+            .FirstOrDefault(title => title is not null) ?? string.Empty;
 
     private static bool HasButton(Window window, string text) =>
         window.GetVisualDescendants().OfType<Button>()

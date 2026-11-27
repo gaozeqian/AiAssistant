@@ -172,6 +172,9 @@ public sealed partial class DesktopViewModelTests
             [CapabilityState.Supported(CapabilityKind.SystemTray, "Headless tray test")];
     }
 
+    private const string TestBackupKey =
+        "AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA";
+
     private sealed class FakeMaintenanceService : IDatabaseMaintenanceService
     {
         public Task InitializeAsync(CancellationToken ct) => Task.CompletedTask;
@@ -179,11 +182,15 @@ public sealed partial class DesktopViewModelTests
         public Task<DatabaseHealthReport> CheckHealthAsync(CancellationToken ct) =>
             Task.FromResult(new DatabaseHealthReport(true, SchemaVersion.Current, "test-cipher", "test-vector", 0, 0, "ok"));
 
-        public Task BackupEncryptedAsync(string destinationPath, CancellationToken ct) => Task.CompletedTask;
+        public string CreateBackupKey() => TestBackupKey;
 
-        public Task RestoreEncryptedAsync(string backupSourcePath, CancellationToken ct) => Task.CompletedTask;
+        public Task BackupEncryptedAsync(string destinationPath, string backupKey, CancellationToken ct) => Task.CompletedTask;
 
-        public Task StageRestoreAsync(string backupSourcePath, CancellationToken ct) => Task.CompletedTask;
+        public Task RestoreEncryptedAsync(string backupSourcePath, string backupKey, CancellationToken ct) => Task.CompletedTask;
+
+        public Task StageRestoreAsync(string backupSourcePath, string backupKey, CancellationToken ct) => Task.CompletedTask;
+
+        public Task<bool> CommitStagedRestoreAsync(CancellationToken ct) => Task.FromResult(true);
 
         public Task<bool> ApplyStagedRestoreAsync(CancellationToken ct) => Task.FromResult(false);
 
@@ -193,26 +200,54 @@ public sealed partial class DesktopViewModelTests
     private sealed class RecordingMaintenanceService : IDatabaseMaintenanceService
     {
         public string? BackupPath { get; private set; }
+        public string? BackupKey { get; private set; }
         public string? StagedPath { get; private set; }
+        public string? StagedKey { get; private set; }
+        public bool Committed { get; private set; }
         public bool Discarded { get; private set; }
+
+        /// <summary>Holds the backup open so a test can observe the in-progress UI.</summary>
+        public TaskCompletionSource<bool>? BackupGate { get; set; }
+
+        /// <summary>Simulates a backup that cannot be decrypted (wrong key or damaged archive).</summary>
+        public Exception? StageRestoreFailure { get; set; }
 
         public Task InitializeAsync(CancellationToken ct) => Task.CompletedTask;
 
         public Task<DatabaseHealthReport> CheckHealthAsync(CancellationToken ct) =>
             Task.FromResult(new DatabaseHealthReport(true, SchemaVersion.Current, "test-cipher", "test-vector", 0, 0, "ok"));
 
-        public Task BackupEncryptedAsync(string destinationPath, CancellationToken ct)
+        public string CreateBackupKey() => TestBackupKey;
+
+        public async Task BackupEncryptedAsync(string destinationPath, string backupKey, CancellationToken ct)
         {
             BackupPath = destinationPath;
+            BackupKey = backupKey;
+            if (BackupGate is not null)
+            {
+                await BackupGate.Task;
+            }
+        }
+
+        public Task RestoreEncryptedAsync(string backupSourcePath, string backupKey, CancellationToken ct) =>
+            Task.CompletedTask;
+
+        public Task StageRestoreAsync(string backupSourcePath, string backupKey, CancellationToken ct)
+        {
+            if (StageRestoreFailure is not null)
+            {
+                throw StageRestoreFailure;
+            }
+
+            StagedPath = backupSourcePath;
+            StagedKey = backupKey;
             return Task.CompletedTask;
         }
 
-        public Task RestoreEncryptedAsync(string backupSourcePath, CancellationToken ct) => Task.CompletedTask;
-
-        public Task StageRestoreAsync(string backupSourcePath, CancellationToken ct)
+        public Task<bool> CommitStagedRestoreAsync(CancellationToken ct)
         {
-            StagedPath = backupSourcePath;
-            return Task.CompletedTask;
+            Committed = StagedPath is not null;
+            return Task.FromResult(Committed);
         }
 
         public Task<bool> ApplyStagedRestoreAsync(CancellationToken ct) => Task.FromResult(false);
@@ -221,6 +256,7 @@ public sealed partial class DesktopViewModelTests
         {
             Discarded = StagedPath is not null;
             StagedPath = null;
+            StagedKey = null;
             return Task.FromResult(Discarded);
         }
     }

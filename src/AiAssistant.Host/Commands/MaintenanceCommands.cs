@@ -1,3 +1,5 @@
+using AiAssistant.Core.Configuration;
+
 namespace AiAssistant.Host.Commands;
 
 internal sealed class RebuildVectorsCommand : ICliCommand
@@ -25,8 +27,20 @@ internal sealed class BackupCommand : ICliCommand
     {
         CliSupport.TryGetOption(context.Args, "--backup", out var backupPath);
         var fullPath = Path.GetFullPath(backupPath);
-        await context.Services.DatabaseMaintenance.BackupEncryptedAsync(fullPath, ct);
-        Console.WriteLine($"AiAssistant encrypted backup written to {fullPath}");
+        var generatedKey = !CliSupport.TryGetOption(context.Args, "--backup-key", out var backupKey);
+        if (generatedKey)
+        {
+            backupKey = context.Services.DatabaseMaintenance.CreateBackupKey();
+        }
+
+        await context.Services.DatabaseMaintenance.BackupEncryptedAsync(fullPath, backupKey, ct);
+        Console.WriteLine($"AiAssistant portable encrypted backup written to {fullPath}");
+        if (generatedKey)
+        {
+            Console.WriteLine("Backup key (store it separately from the archive; it cannot be recovered):");
+            Console.WriteLine(backupKey);
+        }
+
         return CliResult.Done();
     }
 }
@@ -46,9 +60,21 @@ internal sealed class RestoreCommand : ICliCommand
             return CliResult.Done(3);
         }
 
+        if (!CliSupport.TryGetOption(context.Args, "--backup-key", out var backupKey))
+        {
+            backupKey = Environment.GetEnvironmentVariable(EnvironmentNames.BackupKey) ?? string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(backupKey))
+        {
+            Console.Error.WriteLine(
+                "Refusing to restore without --backup-key or AIASSISTANT_BACKUP_KEY; the portable backup cannot be decrypted.");
+            return CliResult.Done(3);
+        }
+
         var fullPath = Path.GetFullPath(restorePath);
-        await context.Services.DatabaseMaintenance.RestoreEncryptedAsync(fullPath, ct);
-        Console.WriteLine($"AiAssistant encrypted backup restored from {fullPath}");
+        await context.Services.DatabaseMaintenance.RestoreEncryptedAsync(fullPath, backupKey, ct);
+        Console.WriteLine($"AiAssistant portable encrypted backup restored from {fullPath}");
         return CliResult.Done();
     }
 }

@@ -19,6 +19,14 @@
 | `AIASSISTANT_PDF_FONT_PATH` | PDF 中文字体 | 内置回退 |
 | `AIASSISTANT_IPC_TOKEN` | Helper IPC 一次性令牌 | 运行时随机 |
 
+## 备份
+
+| 变量 | 作用 | 默认 |
+|---|---|---|
+| `AIASSISTANT_BACKUP_KEY` | CLI 恢复时替代 `--backup-key` 传入备份密钥，避免密钥出现在进程列表或命令历史 | 空 |
+
+> 备份密钥是高熵随机值，只在导出时显示一次；不要写入脚本、提交到仓库或与备份文件放在一起。
+
 ## 模型网关
 
 | 变量 | 作用 | 默认 |

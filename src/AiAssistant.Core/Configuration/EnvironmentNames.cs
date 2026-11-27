@@ -19,6 +19,9 @@ public static class EnvironmentNames
     public const string PdfFontPath = "AIASSISTANT_PDF_FONT_PATH";
     public const string IpcToken = "AIASSISTANT_IPC_TOKEN";
 
+    // 备份
+    public const string BackupKey = "AIASSISTANT_BACKUP_KEY";
+
     // 模型网关
     public const string ModelBaseUrl = "AIASSISTANT_MODEL_BASE_URL";
     public const string ChatModel = "AIASSISTANT_CHAT_MODEL";

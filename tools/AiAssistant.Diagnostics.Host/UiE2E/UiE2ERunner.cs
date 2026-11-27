@@ -327,7 +327,7 @@ public static class UiE2ERunner
                 throw new InvalidOperationException("二次确认未完成");
             }
 
-            return $"status={shell.Data.StatusMessage}";
+            return $"status={shell.Data.DeleteStatusMessage}";
         });
 
         await StepAsync("关闭仅隐藏、退出按钮可退出", () =>

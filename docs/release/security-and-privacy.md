@@ -20,7 +20,7 @@
 - **数据库**：SQLite3MC 加密；master key 由 DPAPI（Windows）、Keychain（macOS）或 libsecret（Linux）保护。
 - **媒体**：AES-GCM；密钥只在选中预览、导出或语音反馈时解密；明文不写临时文件，使用后清零。
 - **模型密钥**：AES-GCM 加密库；`models.json` 只保存 `apiKeySecret` 名称；密钥值只写不读。
-- **备份**：与数据库同级的加密备份；恢复需 `--confirm-restore`。
+- **备份**：可移植加密备份（数据库 + 媒体 + 主密钥），整体由每个备份独立生成的 256 位密钥经 AES-256-GCM 分块加密；密钥只在导出时显示、不写入应用，丢失后无法恢复。恢复需 `--backup-key` 与 `--confirm-restore`；主密钥会重新绑定目标机器的系统密钥库，因此可跨机器、跨系统用户恢复。
 
 Schema 迁移与密钥库设计见 [ADR-0003](../adr/0003-sqlite3mc-keystore-and-aesgcm-media.md)。
 

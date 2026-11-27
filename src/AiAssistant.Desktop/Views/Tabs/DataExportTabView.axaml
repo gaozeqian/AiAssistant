@@ -19,15 +19,16 @@
                     Command="{Binding DeleteAllCommand}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="{Binding DeleteAllButtonText}" />
             <Button Classes="secondary" Content="取消" Command="{Binding CancelPendingCommand}"
-                    IsVisible="{Binding HasPendingDeletion}" Margin="0,0,8,8" />
+                    IsVisible="{Binding HasPendingDeletion}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8" />
           </WrapPanel>
           <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPendingDeletion}">
             <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
           </Border>
-          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
-          <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
-                     IsVisible="{Binding HasError}" />
+          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsDeleting}"
+                       automation:AutomationProperties.Name="删除进度" />
+          <TextBlock Text="{Binding DeleteStatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding DeleteErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
+                     IsVisible="{Binding HasDeleteError}" />
         </StackPanel>
       </Border>
 
@@ -39,8 +40,6 @@
             <TextBlock Text="所有导出均在本机生成，不经过云端。删除数据前请先导出需要保留的日报、问答或加密备份。"
                        TextWrapping="Wrap" Foreground="{DynamicResource SuccessForegroundBrush}" />
           </Border>
-          <TextBlock Text="键盘快捷键：Ctrl+1…Ctrl+7 切换页面，Ctrl+F 打开检索，F5 刷新当前页。"
-                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" />
         </StackPanel>
       </Border>
 
@@ -48,17 +47,17 @@
               Padding="24" Margin="0,0,0,12" IsVisible="{Binding HasBackupSupport}">
         <StackPanel Spacing="12">
           <TextBlock Text="数据备份与恢复" FontSize="18" FontWeight="SemiBold" />
-          <TextBlock Text="加密备份是独立 ZIP（数据库 + 密钥封装 + 加密媒体），可在同一台机器上恢复。恢复会先校验备份，重启后覆盖当前数据库、密钥与媒体。"
+          <TextBlock Text="加密备份是可跨机器迁移的独立 ZIP（数据库 + 媒体 + 主密钥），使用导出时生成的备份密钥加密。密钥不会保存在应用内，请与备份文件分开保存；丢失密钥后备份无法恢复。恢复会先解密校验，重启后覆盖当前数据库与媒体。"
                      TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
           <WrapPanel>
             <Button Classes="secondary" Content="导出加密备份…" Command="{Binding BackupCommand}"
-                    IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+                    IsEnabled="{Binding CanStartBackup}" IsVisible="{Binding !IsAwaitingBackupKey}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="导出加密备份" />
             <Button Classes="secondary" Content="{Binding RestoreButtonText}" Command="{Binding RestoreCommand}"
-                    IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+                    IsEnabled="{Binding CanStartRestore}" IsVisible="{Binding !IsAwaitingRestoreKey}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="从备份恢复" />
             <Button Classes="secondary" Content="取消" Command="{Binding CancelPendingCommand}"
-                    IsVisible="{Binding HasPendingRestore}" Margin="0,0,8,8" />
+                    IsVisible="{Binding HasPendingRestore}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8" />
             <Button Classes="primary" Content="立即重启" Command="{Binding RestartCommand}"
                     IsVisible="{Binding RestartAvailable}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="重启应用完成恢复" />
@@ -66,9 +65,59 @@
                     IsVisible="{Binding RestartAvailable}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="取消暂存的恢复" />
           </WrapPanel>
+          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="14"
+                  IsVisible="{Binding IsAwaitingBackupKey}">
+            <StackPanel Spacing="10">
+              <TextBlock Text="请保存备份密钥" FontWeight="SemiBold" />
+              <TextBlock Text="这是恢复该备份的唯一密钥，不会保存在应用内。请立即保存到密码管理器或离线位置；丢失后备份无法恢复。任何同时获得密钥和备份文件的人都能读取其中的全部数据，请勿将两者放在一起。"
+                         TextWrapping="Wrap" Foreground="{DynamicResource DangerForegroundBrush}" />
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox x:Name="BackupKeyBox" Text="{Binding PendingBackupKey, Mode=OneWay}" IsReadOnly="True"
+                         FontFamily="Cascadia Mono,Consolas,monospace" TextWrapping="Wrap"
+                         automation:AutomationProperties.Name="备份密钥" />
+                <Button Grid.Column="1" Classes="secondary" Content="复制密钥" Click="OnCopyBackupKeyClick"
+                        Margin="8,0,0,0" automation:AutomationProperties.Name="复制备份密钥" />
+              </Grid>
+              <CheckBox IsChecked="{Binding BackupKeyConfirmed, Mode=TwoWay}"
+                        IsVisible="{Binding !BackupExportCompleted}" IsEnabled="{Binding !IsBusy}"
+                        automation:AutomationProperties.Name="确认已保存备份密钥">
+                <TextBlock Text="我已安全保存密钥，并了解丢失后无法恢复" TextWrapping="Wrap" />
+              </CheckBox>
+              <WrapPanel>
+                <Button Classes="primary" Content="{Binding BackupKeyActionText}" Command="{Binding ConfirmBackupCommand}"
+                        IsEnabled="{Binding CanConfirmBackup}" Margin="0,0,8,8"
+                        automation:AutomationProperties.Name="{Binding BackupKeyActionText}" />
+                <Button Classes="secondary" Content="取消" Command="{Binding CancelBackupKeyCommand}"
+                        IsVisible="{Binding !BackupExportCompleted}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8" />
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="14"
+                  IsVisible="{Binding IsAwaitingRestoreKey}">
+            <StackPanel Spacing="10">
+              <TextBlock Text="输入备份密钥" FontWeight="SemiBold" />
+              <TextBlock Text="输入导出时保存的备份密钥。密钥不区分大小写，可包含分隔符；解密校验通过后才会覆盖当前数据。"
+                         TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+              <TextBox Text="{Binding RestoreKeyInput, Mode=TwoWay}" PlaceholderText="XXXX-XXXX-XXXX-…"
+                       FontFamily="Cascadia Mono,Consolas,monospace"
+                       automation:AutomationProperties.Name="备份密钥输入" />
+              <WrapPanel>
+                <Button Classes="primary" Content="解密并校验" Command="{Binding ValidateRestoreKeyCommand}"
+                        IsEnabled="{Binding CanValidateRestoreKey}" Margin="0,0,8,8"
+                        automation:AutomationProperties.Name="解密并校验备份" />
+                <Button Classes="secondary" Content="取消" Command="{Binding CancelRestoreKeyCommand}"
+                        IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8" />
+              </WrapPanel>
+            </StackPanel>
+          </Border>
           <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPendingRestore}">
             <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
           </Border>
+          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBackingUp}"
+                       automation:AutomationProperties.Name="备份恢复进度" />
+          <TextBlock Text="{Binding BackupStatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding BackupErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
+                     IsVisible="{Binding HasBackupError}" />
         </StackPanel>
       </Border>
 
@@ -101,7 +150,11 @@
                     IsEnabled="{Binding !IsBusy}" IsVisible="{Binding HasRetentionSweep}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="立即清理媒体" />
           </WrapPanel>
+          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsRetentionBusy}"
+                       automation:AutomationProperties.Name="保留清理进度" />
           <TextBlock Text="{Binding RetentionStatusMessage}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding RetentionErrorMessage}" FontSize="12" Foreground="{DynamicResource DangerForegroundBrush}"
+                     TextWrapping="Wrap" IsVisible="{Binding HasRetentionError}" />
         </StackPanel>
       </Border>
     </Grid>

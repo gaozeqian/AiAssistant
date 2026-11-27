@@ -10,6 +10,12 @@ public interface IKeyStore
     Task RotateWrapperKeyAsync(string keyId, CancellationToken ct);
 
     /// <summary>
+    /// Wraps an existing master key with this machine's OS keystore. Portable backup restore uses it
+    /// to bind the source machine's data key to the target machine before the staged data is applied.
+    /// </summary>
+    Task ImportMasterKeyAsync(string keyId, ReadOnlyMemory<byte> masterKey, CancellationToken ct);
+
+    /// <summary>
     /// Returns a key store bound to a different data directory. Used by backup restore to verify the
     /// bundled key envelope against the backup's own keystore before touching the live data directory.
     /// </summary>
