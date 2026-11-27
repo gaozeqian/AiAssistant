@@ -4,6 +4,30 @@
     <StreamGeometry x:Key="CompactSpinnerIncreaseIcon">M0,9 L10,0 20,9 19,10 10,2 1,10 z</StreamGeometry>
     <StreamGeometry x:Key="CompactSpinnerDecreaseIcon">M0,1 L10,10 20,1 19,0 10,8 1,0 z</StreamGeometry>
 
+    <!--
+      主按钮必须显式接管三态：Fluent 的 Button 模板在 :pointerover / :pressed 时改的是
+      模板内 ContentPresenter.Background，而不是 Button.Background。只在样式里设 Background
+      会让按钮在悬停时变成 10% 黑白叠加、按下时变成纯白/纯黑，白色文字随之不可读。
+    -->
+    <ControlTheme x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+      <Setter Property="Padding" Value="16,9" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+      </Style>
+      <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentPressedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+      </Style>
+      <Style Selector="^:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentDisabledBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccentDisabledBrush}" />
+      </Style>
+    </ControlTheme>
+
     <!-- Fluent 默认把两个 34×32 的箭头左右并排，占掉一半输入框；这里改为 18×14 上下排列。 -->
     <ControlTheme x:Key="CompactSpinnerButton" TargetType="RepeatButton">
       <Setter Property="Width" Value="18" />
@@ -80,14 +104,27 @@
     <Setter Property="Theme" Value="{StaticResource CompactNumericSpinner}" />
   </Style>
   <Style Selector="Button.primary">
-    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="Foreground" Value="White" />
-    <Setter Property="Padding" Value="16,9" />
-    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Theme" Value="{StaticResource PrimaryButton}" />
   </Style>
   <Style Selector="Button.secondary">
     <Setter Property="Padding" Value="14,8" />
     <Setter Property="CornerRadius" Value="7" />
+  </Style>
+  <!-- 顶栏胶囊按钮：状态徽标不可点，只有这两个是按钮，用同一套尺寸。 -->
+  <Style Selector="Button.headerChip">
+    <Setter Property="Background" Value="{DynamicResource HeaderBadgeBackgroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource HeaderBadgeForegroundBrush}" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="Button.headerChip.danger">
+    <Setter Property="Foreground" Value="{DynamicResource DangerForegroundBrush}" />
+  </Style>
+  <Style Selector="Button.headerChip.armed">
+    <Setter Property="Background" Value="{DynamicResource DangerBackgroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerForegroundBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBox, ComboBox, DatePicker">
     <Setter Property="CornerRadius" Value="6" />

@@ -12,6 +12,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     private int _selectedSectionIndex;
     private string _captureStatus = "本机加密存储";
     private readonly VoiceNavigationHub? _voiceNavigation;
+    private bool _exitArmed;
+    private CancellationTokenSource? _exitArmCts;
 
     public ShellViewModel(
         TimelineViewModel timeline,
@@ -125,11 +127,66 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     public bool IsExitRequested { get; set; }
 
-    /// <summary>Explicit exit affordance; closing the window only hides it.</summary>
+    /// <summary>True while the exit button waits for the second, confirming click.</summary>
+    public bool IsExitArmed => _exitArmed;
+
+    /// <summary>Header button label; changes to 「确认退出」 while armed.</summary>
+    public string ExitButtonText => _exitArmed ? "确认退出" : "退出";
+
+    /// <summary>
+    /// Explicit exit affordance; closing the window only hides it. Exiting stops capture, so the
+    /// first click only arms the button — a second click within five seconds confirms. The control's
+    /// AutomationProperties.Name stays 「退出应用」 so headless assertions and screen readers keep working.
+    /// </summary>
     public void RequestExit()
     {
+        if (!_exitArmed)
+        {
+            _exitArmed = true;
+            OnPropertyChanged(nameof(IsExitArmed));
+            OnPropertyChanged(nameof(ExitButtonText));
+            _exitArmCts?.Cancel();
+            _exitArmCts?.Dispose();
+            _exitArmCts = new CancellationTokenSource();
+            _ = ResetExitArmAsync(_exitArmCts.Token);
+            return;
+        }
+
+        CancelExitArm();
         IsExitRequested = true;
         ExitRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async Task ResetExitArmAsync(CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (!ct.IsCancellationRequested)
+        {
+            Dispatcher.UIThread.Post(CancelExitArm);
+        }
+    }
+
+    private void CancelExitArm()
+    {
+        _exitArmCts?.Cancel();
+        _exitArmCts?.Dispose();
+        _exitArmCts = null;
+        if (!_exitArmed)
+        {
+            return;
+        }
+
+        _exitArmed = false;
+        OnPropertyChanged(nameof(IsExitArmed));
+        OnPropertyChanged(nameof(ExitButtonText));
     }
 
     public async Task InitializeAsync()
@@ -197,6 +254,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         Capture.StateChanged -= OnCaptureStateChanged;
+        _exitArmCts?.Cancel();
+        _exitArmCts?.Dispose();
+        _exitArmCts = null;
         if (_voiceNavigation is not null)
         {
             _voiceNavigation.TimelineRequested -= OnTimelineRequested;

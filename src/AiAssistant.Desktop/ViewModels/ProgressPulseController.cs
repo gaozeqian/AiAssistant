@@ -11,7 +11,7 @@ internal sealed class ProgressPulseController : IDisposable
 {
     private readonly DispatcherTimer _timer;
     private readonly Action<double> _setPulse;
-    private int _value;
+    private double _value;
     private bool _disposed;
 
     public ProgressPulseController(Action<double> setPulse)
@@ -20,9 +20,17 @@ internal sealed class ProgressPulseController : IDisposable
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(50), DispatcherPriority.Normal, OnTick);
     }
 
+    /// <summary>
+    /// Next determinate value: asymptotic approach to 95%. The previous <c>(value + 2) % 101</c>
+    /// wrapped from 100 back to 0 every 2.5 s, which users read as "the task restarted". The bar is
+    /// hidden on completion, so 95% is the ceiling and the last 5% is never faked.
+    /// </summary>
+    internal static double NextValue(double current) =>
+        current >= 95 ? 95 : Math.Min(95, current + Math.Max(1, (95 - current) * 0.06));
+
     private void OnTick(object? sender, EventArgs e)
     {
-        _value = (_value + 2) % 101;
+        _value = NextValue(_value);
         _setPulse(_value);
     }
 

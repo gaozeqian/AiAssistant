@@ -8,7 +8,7 @@
   <Grid DataContext="{Binding Search}" x:DataType="vm:SearchViewModel"
         ColumnDefinitions="400,*" Margin="0,12,0,0">
     <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10" Padding="18" Margin="0,0,12,0">
-      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*">
         <TextBlock Text="证据检索与问答" FontSize="18" FontWeight="SemiBold" />
         <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
           <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
@@ -40,17 +40,21 @@
           <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
                      IsVisible="{Binding HasError}" />
         </StackPanel>
-        <Border Grid.Row="5" Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12" Margin="0,14,0,0">
-          <StackPanel Spacing="6">
-            <TextBlock Text="回答（仅基于证据）" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding Answer}" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding AnswerMeta}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-            <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="6" Padding="10">
-              <TextBlock Text="无证据时不会生成推测性回答；原始媒体清理后只保留结构化证据。"
-                         FontSize="12" Foreground="{DynamicResource SuccessForegroundBrush}" TextWrapping="Wrap" />
-            </Border>
-          </StackPanel>
-        </Border>
+        <!-- 回答可能很长：必须自己滚动，否则最小窗口下会被卡片硬切。 -->
+        <ScrollViewer Grid.Row="5" Margin="0,14,0,0" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="12">
+            <StackPanel Spacing="6">
+              <TextBlock Text="回答（仅基于证据）" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Answer}" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding AnswerMeta}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+              <Border Background="{DynamicResource SuccessBackgroundBrush}" CornerRadius="6" Padding="10">
+                <TextBlock Text="无证据时不会生成推测性回答；原始媒体清理后只保留结构化证据。"
+                           FontSize="12" Foreground="{DynamicResource SuccessForegroundBrush}" TextWrapping="Wrap" />
+              </Border>
+            </StackPanel>
+          </Border>
+        </ScrollViewer>
       </Grid>
     </Border>
 

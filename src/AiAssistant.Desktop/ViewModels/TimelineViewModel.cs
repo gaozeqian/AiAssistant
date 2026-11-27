@@ -41,6 +41,9 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
         _progressPulse = new ProgressPulseController(value => ProgressPulse = value);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         LoadMoreCommand = new AsyncRelayCommand(LoadEarlierAsync);
+        // 空态只跟"有没有数据"走：没有这条通知，界面会在有 120 条记录、只是没选中时
+        // 依然显示「暂无可显示的活动」并压在列表上。
+        Events.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasEvents));
     }
 
     public ObservableCollection<TimelineDateItem> ActiveDates { get; } = [];
@@ -184,6 +187,9 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
     private void SyncProgressPulse() => _progressPulse.SetBusy(IsLoading || IsLoadingMore || IsPreviewLoading);
 
     public bool HasSelectedEvent => SelectedEvent is not null;
+
+    /// <summary>True when the current date actually has rows; drives the list's empty state.</summary>
+    public bool HasEvents => Events.Count > 0;
 
     public bool HasNoMedia => SelectedEvent is { HasMedia: false };
 

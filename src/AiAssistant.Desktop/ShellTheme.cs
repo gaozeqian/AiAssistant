@@ -49,6 +49,18 @@ public static class ShellTheme
             Add("TextPrimaryBrush", "#1F1F1F");
             Add("InputBackgroundBrush", "#FFFFFF");
             Add("InputBorderBrush", "#D4D4D4");
+            // 主按钮三态：Fluent 模板在 hover/pressed 时改的是模板内 ContentPresenter，
+            // 只设 Button.Background 会被覆盖成 10% 黑/纯黑，白字直接看不见。
+            Add("OnAccentBrush", "#FFFFFF");
+            Add("AccentHoverBrush", "#0A6CBF");
+            Add("AccentPressedBrush", "#095A9E");
+            Add("AccentDisabledBrush", "#C7E0F4");
+            Add("OnAccentDisabledBrush", "#6E6E6E");
+            // 输入框聚焦/悬停默认吃 Fluent 的 #000000（暗色）与纯白（亮色），与卡片底色不一致。
+            Add("TextControlBackgroundFocused", "#FFFFFF");
+            Add("TextControlBackgroundPointerOver", "#FFFFFF");
+            Add("ComboBoxBackgroundFocused", "#FFFFFF");
+            Add("ComboBoxBackgroundPointerOver", "#FFFFFF");
             Add("DatePickerFlyoutPresenterBackground", "#FFFFFF");
             Add("DatePickerFlyoutPresenterBorderBrush", "#C8C8C8");
             Add("MutedBrush", "#616161");
@@ -79,6 +91,15 @@ public static class ShellTheme
             Add("TextPrimaryBrush", "#D4D4D4");
             Add("InputBackgroundBrush", "#252526");
             Add("InputBorderBrush", "#3C3C3C");
+            Add("OnAccentBrush", "#FFFFFF");
+            Add("AccentHoverBrush", "#0A6CBF");
+            Add("AccentPressedBrush", "#095A9E");
+            Add("AccentDisabledBrush", "#1E3A54");
+            Add("OnAccentDisabledBrush", "#8C8C8C");
+            Add("TextControlBackgroundFocused", "#252526");
+            Add("TextControlBackgroundPointerOver", "#252526");
+            Add("ComboBoxBackgroundFocused", "#252526");
+            Add("ComboBoxBackgroundPointerOver", "#252526");
             Add("DatePickerFlyoutPresenterBackground", "#252526");
             Add("DatePickerFlyoutPresenterBorderBrush", "#3F3F3F");
             Add("MutedBrush", "#A8A8A8");

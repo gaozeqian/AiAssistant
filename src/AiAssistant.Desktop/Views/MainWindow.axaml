@@ -42,8 +42,7 @@
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <Button Content="{Binding ThemeToggleText}" Command="{Binding ToggleThemeCommand}"
-                  Background="{DynamicResource HeaderBadgeBackgroundBrush}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}"
-                  CornerRadius="14" Padding="12,6" FontSize="12"
+                  Classes="headerChip"
                   automation:AutomationProperties.Name="切换深色/浅色" />
           <Border Background="{DynamicResource HeaderBadgeBackgroundBrush}" CornerRadius="14" Padding="12,6">
             <TextBlock Text="{Binding CaptureStatus}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}" FontSize="12" />
@@ -51,9 +50,9 @@
           <Border Background="{DynamicResource HeaderBadgeBackgroundBrush}" CornerRadius="14" Padding="12,6">
             <TextBlock Text="{Binding Voice.StatusText}" Foreground="{DynamicResource HeaderBadgeForegroundBrush}" FontSize="12" />
           </Border>
-          <Button Content="退出" Command="{Binding RequestExitCommand}"
-                  Background="{DynamicResource HeaderBadgeBackgroundBrush}" Foreground="{DynamicResource DangerForegroundBrush}"
-                  CornerRadius="14" Padding="12,6" FontSize="12"
+          <!-- 退出是破坏性操作：第一次点击只进入待确认态，5 秒内再点一次才真正退出。 -->
+          <Button Content="{Binding ExitButtonText}" Command="{Binding RequestExitCommand}"
+                  Classes="headerChip danger" Classes.armed="{Binding IsExitArmed}"
                   automation:AutomationProperties.Name="退出应用" />
         </StackPanel>
       </Grid>

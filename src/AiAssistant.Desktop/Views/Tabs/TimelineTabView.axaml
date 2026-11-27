@@ -25,6 +25,12 @@
         </Grid>
 
         <DockPanel Grid.Row="3" Margin="0,14,0,0" LastChildFill="True">
+          <!-- 错误贴近操作区：放在卡片最底部时，实测会被状态行挤出可视区。 -->
+          <Border DockPanel.Dock="Top" Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="7"
+                  Padding="10,8" Margin="0,0,0,8" IsVisible="{Binding HasError}">
+            <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
+                       Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
+          </Border>
           <Button DockPanel.Dock="Bottom" Classes="secondary" Command="{Binding LoadMoreCommand}"
                   Content="加载更早的记录" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                   Margin="0,8,0,0" IsVisible="{Binding HasMore}" IsEnabled="{Binding !IsLoadingMore}"
@@ -50,17 +56,14 @@
             </ListBox>
             <TextBlock Text="暂无可显示的活动" Foreground="{DynamicResource MutedBrush}"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                       IsVisible="{Binding !HasSelectedEvent}" />
+                       IsVisible="{Binding !HasEvents}" />
             <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" VerticalAlignment="Top" IsVisible="{Binding IsLoading}" />
             <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" VerticalAlignment="Bottom" IsVisible="{Binding IsLoadingMore}" />
           </Grid>
         </DockPanel>
 
-        <StackPanel Grid.Row="4" Margin="0,12,0,0" Spacing="5">
-          <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
-                     IsVisible="{Binding HasError}" />
-        </StackPanel>
+        <TextBlock Grid.Row="4" Text="{Binding StatusMessage}" FontSize="12" Margin="0,12,0,0"
+                   Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
       </Grid>
     </Border>
 
