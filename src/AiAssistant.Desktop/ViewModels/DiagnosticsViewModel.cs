@@ -22,13 +22,11 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private readonly ILocalMcpControl? _mcp;
     private readonly string? _exportDirectory;
     private readonly RetentionSettingsUseCase? _retentionSettings;
-    private readonly IRetentionService? _retention;
     private string _platformName = "正在检测平台能力…";
     private string _databaseText = "尚未检查";
     private string _pipelineText = string.Empty;
     private string _retentionText = "尚未执行清理扫描";
     private string _retentionPolicyText = "保留策略未接入当前运行时";
-    private string _retentionStatusText = string.Empty;
     private string _modelText = "尚未探测本机模型";
     private string _modelEndpointsText = "尚未探测端点能力";
     private string _exportPreviewJson = string.Empty;
@@ -47,15 +45,13 @@ public sealed class DiagnosticsViewModel : ObservableObject
         string? exportDirectory = null,
         IModelConfigurationAdmin? modelConfiguration = null,
         IClock? clock = null,
-        RetentionSettingsUseCase? retentionSettings = null,
-        IRetentionService? retention = null)
+        RetentionSettingsUseCase? retentionSettings = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _clock = clock ?? new SystemClock();
         _mcp = mcp;
         _exportDirectory = exportDirectory;
         _retentionSettings = retentionSettings;
-        _retention = retention;
         ModelConfig = new ModelConfigurationEditorViewModel(modelConfiguration);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
@@ -64,7 +60,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
         RotateMcpTokenCommand = new AsyncRelayCommand(RotateMcpTokenAsync);
         ToggleMcpEnabledCommand = new AsyncRelayCommand(ToggleMcpEnabledAsync);
         ExecuteCapabilityCommand = new RelayCommand<CapabilityAction?>(ExecuteCapabilityAction);
-        RunRetentionSweepCommand = new AsyncRelayCommand(RunRetentionSweepAsync);
         _mcpEnabled = _mcp?.GetSnapshot().Enabled ?? false;
         _retentionPolicyText = FormatRetentionPolicy();
     }
@@ -96,10 +91,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
     public IAsyncRelayCommand ToggleMcpEnabledCommand { get; }
 
     public IRelayCommand<CapabilityAction?> ExecuteCapabilityCommand { get; }
-
-    public IAsyncRelayCommand RunRetentionSweepCommand { get; }
-
-    public bool HasRetentionSweep => _retention is not null;
 
     /// <summary>Raised when a capability hint asks the user to continue on the voice page.</summary>
     public event EventHandler? VoicePageRequested;
@@ -139,20 +130,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
         get => _retentionPolicyText;
         private set => SetProperty(ref _retentionPolicyText, value);
     }
-
-    public string RetentionStatusText
-    {
-        get => _retentionStatusText;
-        private set
-        {
-            if (SetProperty(ref _retentionStatusText, value))
-            {
-                OnPropertyChanged(nameof(HasRetentionStatus));
-            }
-        }
-    }
-
-    public bool HasRetentionStatus => !string.IsNullOrEmpty(RetentionStatusText);
 
     public string ModelText
     {
@@ -386,34 +363,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             return "保留策略读取失败";
-        }
-    }
-
-    private async Task RunRetentionSweepAsync()
-    {
-        if (_retention is null || IsLoading)
-        {
-            return;
-        }
-
-        IsLoading = true;
-        ErrorMessage = string.Empty;
-        try
-        {
-            var purged = await _retention.RunSweepNowAsync(CancellationToken.None);
-            var metrics = _retention.GetMetricsSnapshot();
-            RetentionText = $"已扫描 {metrics.TotalSweeps} 次 · 安全擦除过期或超限媒体 {metrics.TotalPurgedBlobs} 个";
-            RetentionStatusText = purged == 0
-                ? "清理完成：没有需要擦除的媒体。"
-                : $"清理完成：已擦除 {purged} 个过期或超限媒体。";
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
-        {
-            ErrorMessage = "清理未完成，请检查数据库状态与磁盘权限。";
-        }
-        finally
-        {
-            IsLoading = false;
         }
     }
 

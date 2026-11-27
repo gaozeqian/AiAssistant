@@ -413,8 +413,7 @@ public sealed class AppRuntime : IAsyncDisposable
                 Path.Combine(_dataDirectory, "reports"),
                 _services.GetRequiredService<IModelConfigurationAdmin>(),
                 Services.Clock,
-                _services.GetRequiredService<RetentionSettingsUseCase>(),
-                _services.GetRequiredService<IRetentionService>()),
+                _services.GetRequiredService<RetentionSettingsUseCase>()),
             new ReportsViewModel(
                 _services.GetRequiredService<ReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports"),
