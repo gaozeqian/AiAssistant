@@ -3,13 +3,20 @@ using AiAssistant.Core.ValueObjects;
 
 namespace AiAssistant.Platform.Windows;
 
+/// <summary>
+/// Windows capability matrix. The wake-word row is supplied by the composition root because voice
+/// readiness lives in the voice stack (models, ASR, TTS, playback), not in a platform adapter;
+/// a hard-coded row would drift from what the voice page actually reports.
+/// </summary>
 public sealed class WindowsCapabilityProvider(
     IScreenCapture screenCapture,
     IWindowActivitySource windowActivitySource,
     IFileActivitySource fileActivitySource,
     ITextExtractor textExtractor,
     IKeyStore keyStore,
-    IAutoStartService autoStartService) : ICapabilityProvider
+    IAutoStartService autoStartService,
+    IAudioCaptureFactory? audioCaptureFactory = null,
+    Func<CapabilityState?>? wakeWordCapability = null) : ICapabilityProvider
 {
     public string PlatformName => "Windows";
 
@@ -23,10 +30,13 @@ public sealed class WindowsCapabilityProvider(
         keyStore.Capability,
         autoStartService.Capability,
         CapabilityState.Supported(CapabilityKind.SystemTray, "Avalonia 托盘已启用"),
-        CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI 共享模式采集（AudioHub）"),
-        CapabilityState.Degraded(
+        audioCaptureFactory?.Capability ?? CapabilityState.Unavailable(
+            CapabilityKind.AudioCapture,
+            "音频采集未接入当前运行时",
+            "请重新启动应用；若问题持续，请导出诊断。"),
+        wakeWordCapability?.Invoke() ?? CapabilityState.Degraded(
             CapabilityKind.WakeWord,
-            "语音为可选功能，请在「语音」页开启",
-            "需要安装语音唤醒与合成模型后才能启用；可在「语音」页查看状态。")
+            "语音能力未接入当前运行时",
+            "请重新启动应用；若问题持续，请导出诊断。")
     ];
 }

@@ -3,8 +3,8 @@
 本产品（AiAssistant）为专有软件，其自身代码与资源的许可条款见产品 `LICENSE` 与最终用户许可协议（EULA）。本文件仅列出随安装包分发的第三方模型、语音引擎及其许可证，不改变产品本身的专有许可。
 
 - 适用版本：0.1.0
-- 生成日期：2026-11-23
-- 覆盖范围：随包语音模型与语音引擎（`models/sherpa/**`、sherpa-onnx 原生库、ONNX Runtime）。其余 .NET / NuGet 依赖的许可清单见 `docs/release/compliance.md`。
+- 生成日期：2026-11-27
+- 覆盖范围：随包语音与 OCR 模型、语音引擎（`models/sherpa/**`、`models/rapidocr/**`、sherpa-onnx 原生库、ONNX Runtime）。其余 .NET / NuGet 依赖的许可清单见 `docs/release/compliance.md`。
 
 ## 1. 组件清单与归属
 
@@ -14,6 +14,7 @@
 | KWS 唤醒词 | `sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01`；`models/sherpa/kws/{encoder,decoder,joiner}.onnx`、`tokens.txt`、`keywords.txt` | k2-fsa / sherpa-onnx 模型发布（作者 pkufool），使用 icefall 在 WenetSpeech 上训练 | Apache-2.0 | 本产品生成 `keywords.txt`（自定义唤醒词「你好时光」）；未修改权重 |
 | MeloTTS 语音合成 | `vits-melo-tts-zh_en`；`models/sherpa/tts/**`（含 `dict/` 与 4 个 `*.fst`） | © 2024 MyShell.ai：MeloTTS；由 sherpa-onnx 转换为 VITS ONNX | MIT | 未修改权重；随包附带分词词典与文本正则化 FST |
 | Silero VAD | `silero_vad_v5.onnx`；`models/sherpa/silero_vad.onnx` | © 2020-present Silero Team | MIT | 未修改 |
+| RapidOCR PP-OCRv4 | `RapidAI/RapidOCR` v3.10.0；`models/rapidocr/{ch_PP-OCRv4_det_infer,ch_PP-OCRv4_rec_infer}.onnx`、`ppocr_keys_v1.txt` | © PaddlePaddle Authors（PaddleOCR PP-OCRv4）；由 RapidAI 转换为 ONNX 并提供下载 | Apache-2.0 | 本产品仅重命名文件与随包复制，未修改权重或字典 |
 | sherpa-onnx | NuGet `org.k2fsa.sherpa.onnx` 2.0.3；原生库随发布产物分发 | © k2-fsa / sherpa-onnx contributors | Apache-2.0 | 未修改 |
 | ONNX Runtime | 1.28.2；由 sherpa-onnx 原生库携带 | © Microsoft Corporation | MIT | 未修改 |
 
@@ -27,11 +28,17 @@
 
 依 Apache-2.0 第 4 条，再分发时须：(a) 向接收者提供许可证副本；(b) 保留版权、归属与免责声明；(c) 对修改过的文件作显著说明；(d) 若上游提供 NOTICE 文件则一并保留。本文件与第 2 节的许可证全文用于履行 (a)(b)(d)，第 1 节的「修改说明」列用于履行 (c)。
 
+### RapidOCR 归属链说明
+
+1. **原始模型**：PaddlePaddle PaddleOCR 的 PP-OCRv4 中文检测/识别模型，Apache-2.0。
+2. **ONNX 转换**：`RapidAI/RapidOCR` v3.10.0 将 Paddle 权重转换为 ONNX（mobile 版），通过 ModelScope 分发。
+3. **随包打包**：本产品下载后重命名为 `ch_PP-OCRv4_det_infer.onnx` / `ch_PP-OCRv4_rec_infer.onnx` 并随包分发；未修改权重或字典。
+
 ## 2. 许可证全文
 
 ### 2.1 Apache License 2.0
 
-适用于：Paraformer ASR、KWS 唤醒词、sherpa-onnx。
+适用于：Paraformer ASR、KWS 唤醒词、RapidOCR PP-OCRv4、sherpa-onnx。
 
 ```text
                                  Apache License

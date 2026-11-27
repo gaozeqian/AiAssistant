@@ -1,5 +1,4 @@
 using AiAssistant.Application.Ports;
-using AiAssistant.Core.Configuration;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Processing.Ocr;
 using AiAssistant.Testing.Common;
@@ -11,7 +10,7 @@ namespace AiAssistant.Processing.Tests;
 public sealed class RapidOcrTests
 {
     [Fact]
-    public async Task MissingModels_ReportPermissionRequired_AndReturnNull()
+    public async Task MissingModels_ReportDegraded_AndReturnNull()
     {
         var options = new RapidOcrOptions
         {
@@ -21,14 +20,14 @@ public sealed class RapidOcrTests
             options,
             NullLogger<RapidOcrTextRecognizer>.Instance);
 
-        Assert.Equal(CapabilityStatus.PermissionRequired, recognizer.Capability.Status);
+        Assert.Equal(CapabilityStatus.Degraded, recognizer.Capability.Status);
         Assert.NotNull(recognizer.Capability.RemediationHint);
-        Assert.Contains(EnvironmentNames.RapidOcrModelDir, recognizer.Capability.RemediationHint, StringComparison.Ordinal);
+        Assert.Contains("OCR 模型资产", recognizer.Capability.RemediationHint, StringComparison.Ordinal);
 
         var text = await recognizer.RecognizeAsync(WhiteFrame(32, 32), CancellationToken.None);
 
         Assert.Null(text);
-        Assert.Equal(CapabilityStatus.PermissionRequired, recognizer.Capability.Status);
+        Assert.Equal(CapabilityStatus.Degraded, recognizer.Capability.Status);
     }
 
     [Fact]

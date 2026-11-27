@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 把仓库内已下载的 sherpa-onnx 语音模型安装到应用数据目录，
-# 使 GUI 的语音唤醒/命令识别就绪，无需设置 AIASSISTANT_SHERPA_MODEL_DIR。
+# 把仓库内已下载的 sherpa-onnx 语音模型与 RapidOCR 资产安装到应用数据目录，
+# 使 GUI 的语音唤醒/命令识别与图像 OCR 就绪，无需设置 AIASSISTANT_SHERPA_MODEL_DIR。
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,7 +15,7 @@ usage() {
 用法: bash tools/install-voice-models.sh [目标数据目录] [选项]
 
 把 artifacts/cache/models 下已下载的 KWS / Paraformer / MeloTTS 资产复制到
-<目标数据目录>/models/sherpa，供本机 GUI 直接使用。
+<目标数据目录>/models/sherpa，并把 RapidOCR 资产复制到 <目标数据目录>/models/rapidocr。
 
   [目标数据目录]   默认 ${AIASSISTANT_DATA_DIRECTORY}；否则按 OS 解析：
                    macOS  ~/Library/Application Support/AiAssistant
@@ -48,6 +48,7 @@ MODELS="$ARTIFACTS_ROOT/cache/models"
 KWS_SRC="$MODELS/sherpa-kws/kws"
 ASR_SRC="$MODELS/sherpa-onnx-paraformer-zh-small-2024-03-09"
 TTS_SRC="$MODELS/sherpa-tts"
+OCR_SRC="$MODELS/rapidocr"
 
 for path in "$KWS_SRC" "$ASR_SRC"; do
   [[ -d "$path" ]] || { echo "缺少模型资产目录：${path}（请先下载 sherpa-onnx KWS / Paraformer 模型）" >&2; exit 1; }
@@ -65,6 +66,7 @@ default_data_root() {
 }
 
 DEST="${DEST_ROOT:-${AIASSISTANT_DATA_DIRECTORY:-$(default_data_root)}}/models/sherpa"
+OCR_DEST="${DEST%/sherpa}/rapidocr"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "dry-run：将安装到 $DEST"
@@ -72,6 +74,9 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "  - 命令 ASR（Paraformer zh）：$ASR_SRC/model.int8.onnx -> $DEST/"
   if [[ -f "$TTS_SRC/model.onnx" ]]; then
     echo "  - TTS（MeloTTS zh_en）：$TTS_SRC -> $DEST/tts/"
+  fi
+  if [[ -f "$OCR_SRC/ch_PP-OCRv4_det_infer.onnx" ]]; then
+    echo "  - OCR（RapidOCR PP-OCRv4）：$OCR_SRC -> $OCR_DEST/"
   fi
   echo "dry-run 结束，未写入任何文件。"
   exit 0
@@ -94,10 +99,20 @@ if [[ -f "$TTS_SRC/model.onnx" ]]; then
   fi
 fi
 
+if [[ -f "$OCR_SRC/ch_PP-OCRv4_det_infer.onnx" && -f "$OCR_SRC/ch_PP-OCRv4_rec_infer.onnx" && -f "$OCR_SRC/ppocr_keys_v1.txt" ]]; then
+  mkdir -p "$OCR_DEST"
+  cp "$OCR_SRC/ch_PP-OCRv4_det_infer.onnx" "$OCR_SRC/ch_PP-OCRv4_rec_infer.onnx" "$OCR_SRC/ppocr_keys_v1.txt" "$OCR_DEST/"
+else
+  echo "warning: 缺少 RapidOCR 资产（$OCR_SRC），跳过 OCR 安装" >&2
+fi
+
 echo "语音模型已安装到：$DEST"
 echo "  - KWS（你好时光）：$DEST/kws/"
 echo "  - 命令 ASR（Paraformer zh）：$DEST/model.int8.onnx"
 if [[ -f "$DEST/tts/model.onnx" ]]; then
   echo "  - TTS（MeloTTS zh_en）：$DEST/tts/"
+fi
+if [[ -f "$OCR_DEST/ch_PP-OCRv4_det_infer.onnx" ]]; then
+  echo "  - OCR（RapidOCR PP-OCRv4）：$OCR_DEST/"
 fi
 echo "下一步：在语音页点「启用语音」，状态应变为「正在聆听」。"

@@ -294,8 +294,8 @@ public sealed class LinuxTextExtractor(
         ? ocr.Capability
         : CapabilityState.Degraded(
             CapabilityKind.Ocr,
-            "RapidOCR models are not configured; AT-SPI accessibility remains available",
-            "请设置 AIASSISTANT_RAPIDOCR_MODEL_DIR 以启用 ONNX 图像 OCR 兜底。");
+            "未配置图像 OCR 兜底（无障碍文本可用）",
+            "请安装 OCR 模型资产后点击「重新检查」。");
 
     public async Task<ExtractedTextResult> ExtractAsync(TextExtractionRequest request, CancellationToken ct)
     {

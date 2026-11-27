@@ -43,7 +43,9 @@ public sealed class CapabilityItem(
 
     public string Summary => capability.Summary;
 
-    public string RemediationHint => capability.RemediationHint ?? "无需额外操作";
+    /// <summary>Only a supported capability may claim that nothing needs doing.</summary>
+    public string RemediationHint => capability.RemediationHint
+        ?? (capability.Status == CapabilityStatus.Supported ? "无需额外操作" : "暂无可执行操作");
 
     public bool NeedsAttention => capability.Status is not CapabilityStatus.Supported;
 

@@ -124,7 +124,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $modelBundleSource = Join-Path $artifactsRoot "cache\models\bundle"
 if ($SkipModelBundle) {
-    Write-Warning "Model bundle skipped; the portable package will not include wake-word/ASR/TTS assets."
+    Write-Warning "Model bundle skipped; the portable package will not include wake-word/ASR/TTS/OCR assets."
 }
 else {
     if (-not (Test-Path -Path $modelBundleSource)) {
@@ -136,7 +136,10 @@ else {
         (Join-Path $publishDir "models\sherpa\kws\encoder.onnx"),
         (Join-Path $publishDir "models\sherpa\model.int8.onnx"),
         (Join-Path $publishDir "models\sherpa\silero_vad.onnx"),
-        (Join-Path $publishDir "models\sherpa\tts\model.onnx"))) {
+        (Join-Path $publishDir "models\sherpa\tts\model.onnx"),
+        (Join-Path $publishDir "models\rapidocr\ch_PP-OCRv4_det_infer.onnx"),
+        (Join-Path $publishDir "models\rapidocr\ch_PP-OCRv4_rec_infer.onnx"),
+        (Join-Path $publishDir "models\rapidocr\ppocr_keys_v1.txt"))) {
         if (-not (Test-Path -Path $required)) {
             throw "Bundled model missing: $required"
         }

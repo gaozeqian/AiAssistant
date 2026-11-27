@@ -207,7 +207,9 @@ public sealed class VoiceCommandAndSessionTests
     {
         var options = new SherpaVoiceOptions { ModelDirectory = TempArtifactDirectory.CreatePath("voice") };
         using var detector = new SherpaOnnxWakeWordDetector(options, NullLogger<SherpaOnnxWakeWordDetector>.Instance);
-        Assert.Equal(CapabilityStatus.PermissionRequired, detector.Capability.Status);
+        // Missing assets are a degraded capability, not a permission the user can grant in the OS.
+        Assert.Equal(CapabilityStatus.Degraded, detector.Capability.Status);
+        Assert.NotNull(detector.Capability.RemediationHint);
         Assert.Empty(detector.Accept(new AudioFrame(DateTimeOffset.UtcNow, 16_000, 1, new float[512])));
     }
 

@@ -51,7 +51,7 @@ python3 -B build/sbom/generate-sbom.py --verify --check-manifest
 
 ### P2（能力扩展）
 
-- [ ] 可选 Whisper/RapidOCR/说话人分离资产的按需打包矩阵。
+- [ ] 可选 Whisper/说话人分离资产的按需打包矩阵。
 - [ ] MCP 工具级审计与更细粒度限流（保持只读与默认关闭）。
 - [ ] 跨设备加密备份/迁移的威胁模型与密钥轮换方案。
 

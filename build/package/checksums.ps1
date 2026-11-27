@@ -14,7 +14,7 @@ function Write-DistChecksums {
         throw "Distribution directory does not exist: $Directory"
     }
 
-    # 校验清单固定 LF，保证 Linux/macOS 的 sha256sum/shasum 可直接校验 Windows 产出的文件。
+    # Keep the manifest LF-only so sha256sum/shasum on Linux and macOS can verify Windows artifacts.
     function Write-AsciiLf {
         param([string]$Path, [string[]]$Lines)
         [System.IO.File]::WriteAllText($Path, (($Lines -join "`n") + "`n"), [System.Text.Encoding]::ASCII)

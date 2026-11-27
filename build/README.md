@@ -6,7 +6,7 @@
 
 | 路径 | 职责 |
 |---|---|
-| `models/fetch-bundle.sh` | 下载并展开 sherpa-onnx 模型资产 |
+| `models/fetch-bundle.sh` | 下载并展开 sherpa-onnx 与 RapidOCR 模型资产（含 SHA-256 校验） |
 | `models/stage-bundle.sh` | 汇总随包模型载荷到 `artifacts/cache/models/bundle` |
 | `package/package-windows.ps1` | Windows 便携 zip；发布一次共享载荷（可选签名） |
 | `package/package-windows-msi.ps1` | Windows MSI（复用 publish 载荷，可选签名） |

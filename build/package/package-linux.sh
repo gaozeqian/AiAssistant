@@ -95,7 +95,7 @@ dotnet publish "$REPO_ROOT/src/AiAssistant.Host/AiAssistant.Host.csproj" \
 
 # Local model assets ship beside the executable (/usr/lib/aiassistant/models).
 if [[ "$SKIP_MODELS" -eq 1 ]]; then
-  echo "warning: --skip-models set; the package will not include voice model assets" >&2
+  echo "warning: --skip-models set; the package will not include voice/OCR model assets" >&2
 else
   MODEL_BUNDLE="$ARTIFACTS_ROOT/cache/models/bundle"
   if [[ ! -d "$MODEL_BUNDLE" ]]; then
@@ -104,7 +104,8 @@ else
   fi
 
   cp -R "$MODEL_BUNDLE" "$PUBLISH_DIR/models"
-  for required in "sherpa/kws/encoder.onnx" "sherpa/model.int8.onnx" "sherpa/silero_vad.onnx" "sherpa/tts/model.onnx"; do
+  for required in "sherpa/kws/encoder.onnx" "sherpa/model.int8.onnx" "sherpa/silero_vad.onnx" "sherpa/tts/model.onnx" \
+    "rapidocr/ch_PP-OCRv4_det_infer.onnx" "rapidocr/ch_PP-OCRv4_rec_infer.onnx" "rapidocr/ppocr_keys_v1.txt"; do
     if [[ ! -f "$PUBLISH_DIR/models/$required" ]]; then
       echo "bundled model missing: $required" >&2
       exit 1

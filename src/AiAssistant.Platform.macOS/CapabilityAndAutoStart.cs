@@ -62,6 +62,7 @@ public sealed class CapabilityProvider : ICapabilityProvider
     private readonly IKeyStore _keyStore;
     private readonly IAutoStartService? _autoStartService;
     private readonly IMacHelperSupervisor? _supervisor;
+    private readonly Func<CapabilityState?>? _wakeWordCapability;
 
     public CapabilityProvider(IKeyStore keyStore)
     {
@@ -77,7 +78,8 @@ public sealed class CapabilityProvider : ICapabilityProvider
         IAudioCapture audioCapture,
         IKeyStore keyStore,
         IAutoStartService autoStartService,
-        IMacHelperSupervisor supervisor)
+        IMacHelperSupervisor supervisor,
+        Func<CapabilityState?>? wakeWordCapability = null)
     {
         ArgumentNullException.ThrowIfNull(screenCapture);
         ArgumentNullException.ThrowIfNull(windowActivitySource);
@@ -96,6 +98,7 @@ public sealed class CapabilityProvider : ICapabilityProvider
         _keyStore = keyStore;
         _autoStartService = autoStartService;
         _supervisor = supervisor;
+        _wakeWordCapability = wakeWordCapability;
     }
 
     public string PlatformName => "macOS";
@@ -131,10 +134,10 @@ public sealed class CapabilityProvider : ICapabilityProvider
             _keyStore.Capability,
             _autoStartService.Capability,
             CapabilityState.Supported(CapabilityKind.SystemTray, "Avalonia NSStatusItem 托盘已启用"),
-            CapabilityState.Degraded(
+            _wakeWordCapability?.Invoke() ?? CapabilityState.Degraded(
                 CapabilityKind.WakeWord,
-                "语音为可选功能，请在「语音」页开启",
-                "需要安装语音唤醒与合成模型后才能启用；可在「语音」页查看状态。")
+                "语音能力未接入当前运行时",
+                "请重新启动应用；若问题持续，请导出诊断。")
         ];
     }
 }

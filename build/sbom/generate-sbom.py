@@ -46,11 +46,14 @@ LICENSE_OVERRIDES: dict[str, tuple[str, str]] = {
 }
 
 # Bundled models are declared in docs/release/compliance.md (single source of truth).
-MODEL_ASSETS: tuple[tuple[str, str, str, str], ...] = (
-    ("sherpa-kws-wenetspeech-3.3M", "2024-01-01", "Apache-2.0", "Sherpa ONNX KWS wake-word model"),
-    ("sherpa-paraformer-zh-small-int8", "2024-03-09", "Apache-2.0", "Sherpa ONNX Paraformer ASR model"),
-    ("sherpa-melo-tts-zh-en", "2024", "MIT", "MeloTTS Chinese/English VITS model"),
-    ("silero-vad-v5", "5", "MIT", "Silero voice activity detection model"),
+# The last field is the path inside artifacts/cache/models/bundle used for hashing.
+MODEL_ASSETS: tuple[tuple[str, str, str, str, str], ...] = (
+    ("sherpa-kws-wenetspeech-3.3M", "2024-01-01", "Apache-2.0", "Sherpa ONNX KWS wake-word model", "sherpa/kws/encoder.onnx"),
+    ("sherpa-paraformer-zh-small-int8", "2024-03-09", "Apache-2.0", "Sherpa ONNX Paraformer ASR model", "sherpa/model.int8.onnx"),
+    ("sherpa-melo-tts-zh-en", "2024", "MIT", "MeloTTS Chinese/English VITS model", "sherpa/tts/model.onnx"),
+    ("silero-vad-v5", "5", "MIT", "Silero voice activity detection model", "sherpa/silero_vad.onnx"),
+    ("rapidocr-pp-ocrv4-det", "3.10.0", "Apache-2.0", "PP-OCRv4 text detection model (ONNX conversion by RapidAI)", "rapidocr/ch_PP-OCRv4_det_infer.onnx"),
+    ("rapidocr-pp-ocrv4-rec", "3.10.0", "Apache-2.0", "PP-OCRv4 Chinese recognition model and ppocr_keys_v1.txt dictionary (ONNX conversion by RapidAI)", "rapidocr/ch_PP-OCRv4_rec_infer.onnx"),
 )
 
 
@@ -214,8 +217,8 @@ def build_bom(repo: Path, art_root: Path, version: str):
     component_entries.append(helper_entry)
 
     # ML-BOM: bundled local models. Hashes are filled in when the staged bundle exists.
-    bundle_root = art_root / "models" / "bundle" / "sherpa"
-    for model_name, model_version, license_id, description in MODEL_ASSETS:
+    bundle_root = art_root / "cache" / "models" / "bundle"
+    for model_name, model_version, license_id, description, relative_path in MODEL_ASSETS:
         model_ref = f"pkg:generic/aiassistant/{model_name}@{model_version}"
         entry = {
             "type": "machine-learning-model",
@@ -228,7 +231,7 @@ def build_bom(repo: Path, art_root: Path, version: str):
             "licenses": [{"expression": license_id}],
             "properties": [{"name": "aiassistant:distribution", "value": "bundled"}],
         }
-        staged = file_digest(bundle_root / f"{model_name}.onnx")
+        staged = file_digest(bundle_root / relative_path)
         if staged:
             entry["hashes"] = [{"alg": "SHA-256", "content": staged}]
         component_entries.append(entry)

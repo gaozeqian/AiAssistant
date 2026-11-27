@@ -177,7 +177,7 @@ public sealed class AppRuntime : IAsyncDisposable
 
         if (OperatingSystem.IsWindows())
         {
-            PlatformRegistrations.RegisterWindows(services, clock, keyStore);
+            PlatformRegistrations.RegisterWindows(services, clock, keyStore, dataDirectory);
         }
         else if (OperatingSystem.IsMacOS())
         {

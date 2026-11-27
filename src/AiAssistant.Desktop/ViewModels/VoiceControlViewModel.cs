@@ -28,6 +28,7 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         ToggleCommandAudioCommand = new AsyncRelayCommand(ToggleCommandAudioAsync);
         _session.StateChanged += OnStateChanged;
         _session.Interaction += OnInteraction;
+        _isEnabled = _session.IsActive;
         UpdateStatus(_session.State);
         CapabilityText = _session.Capability.Summary;
         RecordsCommandAudio = _session.RecordsCommandAudio;
@@ -146,7 +147,9 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
             else
             {
                 await _session.StartAsync(CancellationToken.None);
-                IsEnabled = _session.Capability.IsOperational;
+                // The session can refuse to arm (for example missing wake-word assets); the switch
+                // must follow what actually happened, not the capability alone.
+                IsEnabled = _session.IsActive;
                 CapabilityText = _session.Capability.Summary;
                 if (!IsEnabled)
                 {

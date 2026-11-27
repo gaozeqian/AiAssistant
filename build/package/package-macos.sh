@@ -153,7 +153,8 @@ else
   fi
 
   cp -R "$MODEL_BUNDLE" "$CONTENTS/MacOS/models"
-  for required in "sherpa/kws/encoder.onnx" "sherpa/model.int8.onnx" "sherpa/silero_vad.onnx" "sherpa/tts/model.onnx"; do
+  for required in "sherpa/kws/encoder.onnx" "sherpa/model.int8.onnx" "sherpa/silero_vad.onnx" "sherpa/tts/model.onnx" \
+    "rapidocr/ch_PP-OCRv4_det_infer.onnx" "rapidocr/ch_PP-OCRv4_rec_infer.onnx" "rapidocr/ppocr_keys_v1.txt"; do
     if [[ ! -f "$CONTENTS/MacOS/models/$required" ]]; then
       echo "bundled model missing: $required" >&2
       exit 1

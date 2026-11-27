@@ -23,7 +23,7 @@ internal static class CapabilityActionResolver
 {
     public static CapabilityAction? Resolve(CapabilityState capability) => capability.Status switch
     {
-        CapabilityStatus.PermissionRequired => Permission(capability.Kind),
+        CapabilityStatus.PermissionRequired => Permission(capability.Kind) ?? Guidance(capability),
         CapabilityStatus.Degraded or CapabilityStatus.Unavailable => Guidance(capability),
         _ => null
     };
@@ -77,9 +77,18 @@ internal static class CapabilityActionResolver
         _ => null
     };
 
+    /// <summary>
+    /// Maps the guidance promised by a hint to the follow-up that can actually carry it out.
+    /// OCR assets are resolved outside the app, so the only useful step is a fresh probe.
+    /// </summary>
     private static CapabilityAction? Guidance(CapabilityState capability) =>
-        capability.Kind == CapabilityKind.WakeWord &&
-        !string.IsNullOrWhiteSpace(capability.RemediationHint)
-            ? new("前往语音", CapabilityActionKind.OpenVoicePage)
-            : null;
+        string.IsNullOrWhiteSpace(capability.RemediationHint)
+            ? null
+            : capability.Kind switch
+            {
+                CapabilityKind.WakeWord => new("前往语音", CapabilityActionKind.OpenVoicePage),
+                CapabilityKind.AudioCapture => new("前往语音", CapabilityActionKind.OpenVoicePage),
+                CapabilityKind.Ocr => new("重新检查", CapabilityActionKind.RetryDiagnostics),
+                _ => null
+            };
 }

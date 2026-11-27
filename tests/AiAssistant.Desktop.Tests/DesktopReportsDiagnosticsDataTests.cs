@@ -78,9 +78,36 @@ public sealed partial class DesktopViewModelTests
         Assert.Null(CapabilityActionResolver.Resolve(
             CapabilityState.Degraded(CapabilityKind.Ocr, "按需兜底")));
 
+        // OCR assets are installed outside the app, so the only useful follow-up is a fresh probe.
+        var ocr = CapabilityActionResolver.Resolve(
+            CapabilityState.Degraded(CapabilityKind.Ocr, "OCR 模型资产未安装", "安装后点击「重新检查」。"));
+        Assert.Equal(CapabilityActionKind.RetryDiagnostics, ocr!.Kind);
+        Assert.Equal("重新检查", ocr.Label);
+        Assert.Equal(
+            CapabilityActionKind.RetryDiagnostics,
+            CapabilityActionResolver.Resolve(
+                CapabilityState.PermissionRequired(CapabilityKind.Ocr, "OCR 模型资产未安装", "安装后点击「重新检查」。"))!.Kind);
+
+        // A failed microphone is retried by re-arming voice, not by probing the same broken device.
+        var audio = CapabilityActionResolver.Resolve(
+            CapabilityState.Unavailable(CapabilityKind.AudioCapture, "采集不可用", "请在「语音」页重新启用。"));
+        Assert.Equal(CapabilityActionKind.OpenVoicePage, audio!.Kind);
+
         var keyStore = CapabilityActionResolver.Resolve(
             CapabilityState.PermissionRequired(CapabilityKind.KeyStore, "已锁定", "解锁后重试。"));
         Assert.Equal(CapabilityActionKind.RetryDiagnostics, keyStore!.Kind);
+    }
+
+    [Fact]
+    public void CapabilityItems_NeverClaimNothingToDoWhileAttentionIsNeeded()
+    {
+        var supported = new CapabilityItem(CapabilityState.Supported(CapabilityKind.SystemTray, "已启用"));
+        Assert.Equal("无需额外操作", supported.RemediationHint);
+        Assert.False(supported.NeedsAttention);
+
+        var degraded = new CapabilityItem(CapabilityState.Degraded(CapabilityKind.Ocr, "模型缺失"));
+        Assert.Equal("暂无可执行操作", degraded.RemediationHint);
+        Assert.True(degraded.NeedsAttention);
     }
 
     [Fact]

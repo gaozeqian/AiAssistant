@@ -9,22 +9,40 @@ namespace AiAssistant.Platform.Windows;
 /// <summary>Creates a WASAPI shared-mode capture only while AudioHub has active subscribers.</summary>
 public sealed class WindowsAudioCaptureFactory(IClock clock) : IAudioCaptureFactory
 {
-    public CapabilityState Capability => OperatingSystem.IsWindows()
-        ? CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI 共享模式（AudioHub，16kHz 单声道）")
-        : CapabilityState.Unavailable(CapabilityKind.AudioCapture, "WASAPI 在当前主机不可用");
+    private volatile string? _lastErrorType;
 
-    public IAudioCapture Create() => new WindowsWasapiAudioCapture(clock);
+    public CapabilityState Capability => !OperatingSystem.IsWindows()
+        ? CapabilityState.Unavailable(CapabilityKind.AudioCapture, "WASAPI 在当前主机不可用")
+        : _lastErrorType is null
+            ? CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI 共享模式（AudioHub，16kHz 单声道）")
+            : CapabilityState.Unavailable(
+                CapabilityKind.AudioCapture,
+                $"WASAPI 采集不可用（{_lastErrorType}）",
+                "请检查麦克风设备与系统隐私设置，然后在「语音」页重新启用。");
+
+    public IAudioCapture Create() => new WindowsWasapiAudioCapture(
+        clock,
+        errorType => _lastErrorType = errorType);
 }
 
 /// <summary>
 /// WASAPI microphone capture normalized to 16 kHz mono float32 for the shared AudioHub.
 /// Device buffers are copied before leaving the callback so subscribers never observe reused memory.
 /// </summary>
-public sealed class WindowsWasapiAudioCapture(IClock clock) : IAudioCapture
+public sealed class WindowsWasapiAudioCapture(
+    IClock clock,
+    Action<string?>? reportError = null) : IAudioCapture
 {
-    public CapabilityState Capability => OperatingSystem.IsWindows()
-        ? CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI 麦克风采集")
-        : CapabilityState.Unavailable(CapabilityKind.AudioCapture, "WASAPI 在当前主机不可用");
+    private volatile string? _lastErrorType;
+
+    public CapabilityState Capability => !OperatingSystem.IsWindows()
+        ? CapabilityState.Unavailable(CapabilityKind.AudioCapture, "WASAPI 在当前主机不可用")
+        : _lastErrorType is null
+            ? CapabilityState.Supported(CapabilityKind.AudioCapture, "WASAPI 麦克风采集")
+            : CapabilityState.Unavailable(
+                CapabilityKind.AudioCapture,
+                $"WASAPI 麦克风采集异常（{_lastErrorType}）",
+                "请检查麦克风设备与系统隐私设置，然后在「语音」页重新启用。");
 
     public async IAsyncEnumerable<AudioFrame> ReadFramesAsync([EnumeratorCancellation] CancellationToken ct)
     {
@@ -42,27 +60,72 @@ public sealed class WindowsWasapiAudioCapture(IClock clock) : IAudioCapture
                 .WithBufferLength(100)
                 .Build();
         }
-        catch
+        catch (Exception ex)
         {
+            ReportError(ex.GetType().Name);
             yield break;
         }
 
+        // A try block containing yield return cannot also catch, so the enumerator is driven
+        // explicitly: failures are recorded for the capability row and then surface to AudioHub.
+        var enumerator = recorder.CaptureAsync(ct).GetAsyncEnumerator(ct);
         try
         {
-            await foreach (var buffer in recorder.CaptureAsync(ct))
+            while (true)
             {
-                var data = buffer.Data.ToArray();
-                var samples = NormalizeTo16KhzMono(data, data.Length, recorder.WaveFormat);
-                if (samples.Length > 0)
+                bool hasFrame;
+                try
                 {
-                    yield return new AudioFrame(clock.UtcNow, 16_000, 1, samples);
+                    hasFrame = await enumerator.MoveNextAsync();
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    ReportError(ex.GetType().Name);
+                    throw;
+                }
+
+                if (!hasFrame)
+                {
+                    break;
+                }
+
+                var data = enumerator.Current.Data.ToArray();
+                var samples = NormalizeTo16KhzMono(data, data.Length, recorder.WaveFormat);
+                if (samples.Length == 0)
+                {
+                    continue;
+                }
+
+                ReportSuccess();
+                yield return new AudioFrame(clock.UtcNow, 16_000, 1, samples);
             }
         }
         finally
         {
+            await enumerator.DisposeAsync();
             await recorder.DisposeAsync();
         }
+    }
+
+    private void ReportError(string errorType)
+    {
+        _lastErrorType = errorType;
+        reportError?.Invoke(errorType);
+    }
+
+    private void ReportSuccess()
+    {
+        if (_lastErrorType is null)
+        {
+            return;
+        }
+
+        _lastErrorType = null;
+        reportError?.Invoke(null);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

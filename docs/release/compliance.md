@@ -1,6 +1,6 @@
 # 合规、依赖与 SBOM
 
-> **状态**：living ｜ **最后更新**：2026-11-23 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：依赖、许可证、模型资产或 SBOM 流程变化时
+> **状态**：living ｜ **最后更新**：2026-11-27 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：依赖、许可证、模型资产或 SBOM 流程变化时
 
 本文件合并原 `compliance/dependency-manifest.md`、`compliance/model-assets.md` 与发布合规说明。
 
@@ -66,6 +66,7 @@ Swift Helper 仅使用 Apple 系统框架（AppKit、AVFoundation、ScreenCaptur
 | sherpa-onnx Paraformer zh small int8 | Apache-2.0 | 中文命令 ASR |
 | MeloTTS zh_en | MIT | 语音反馈；含 jieba 词典与 FST |
 | Silero VAD v5 | MIT | 语音活动检测 |
+| RapidOCR PP-OCRv4 det/rec + 字典 | Apache-2.0 | 无障碍文本为空时的图像 OCR 兜底；PaddleOCR 权重经 RapidAI 转换为 ONNX |
 
 模型权重不入库；`build/models/fetch-bundle.sh` 下载到 `artifacts/cache/models/`，`stage-bundle.sh` 汇总为 `bundle/`。已移除许可不明的 AISHELL-3 VITS；退役资产保留在 `artifacts/test-results/retired-models/`，不参与打包。
 

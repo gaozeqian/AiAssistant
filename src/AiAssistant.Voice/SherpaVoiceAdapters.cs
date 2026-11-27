@@ -98,13 +98,16 @@ public sealed class SherpaOnnxWakeWordDetector : IWakeWordDetector
     }
 
     public CapabilityState Capability => _errorType is not null
-        ? CapabilityState.Degraded(CapabilityKind.WakeWord, $"KWS degraded ({_errorType})")
+        ? CapabilityState.Degraded(
+            CapabilityKind.WakeWord,
+            $"KWS degraded ({_errorType})",
+            "唤醒词检测出现异常；请在「语音」页关闭后重新启用。")
         : _options.HasKwsAssets
             ? CapabilityState.Supported(CapabilityKind.WakeWord, "sherpa-onnx 唤醒词「你好时光」")
-            : CapabilityState.PermissionRequired(
+            : CapabilityState.Degraded(
                 CapabilityKind.WakeWord,
                 "唤醒词模型资产未安装",
-                "请安装唤醒词模型（含 encoder、decoder、joiner、tokens 与关键词表）后重试。");
+                "请安装唤醒词模型（含 encoder、decoder、joiner、tokens 与关键词表）；可在「语音」页查看状态。");
 
     public IReadOnlyList<WakeWordDetection> Accept(AudioFrame frame)
     {

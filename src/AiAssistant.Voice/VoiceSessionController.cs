@@ -82,6 +82,17 @@ public sealed class VoiceSessionController : IVoiceSession
 
     public VoiceSessionState State => (VoiceSessionState)Volatile.Read(ref _state);
 
+    public bool IsActive
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _runTask is not null;
+            }
+        }
+    }
+
     public bool RecordsCommandAudio => _commandAudio.RecordsCommandAudio;
 
     public Task SetCommandAudioRecordingAsync(bool enabled, CancellationToken ct)
@@ -96,24 +107,49 @@ public sealed class VoiceSessionController : IVoiceSession
     {
         get
         {
-            if (!_wakeWordDetector.Capability.IsOperational)
+            if (!_audioHub.Capability.IsOperational)
             {
-                return _wakeWordDetector.Capability;
+                var audio = _audioHub.Capability;
+                // Preserve a real permission problem so the diagnostics row can offer the OS grant
+                // instead of degrading into an informational hint.
+                return audio.Status == CapabilityStatus.PermissionRequired
+                    ? CapabilityState.PermissionRequired(CapabilityKind.WakeWord, audio.Summary, audio.RemediationHint)
+                    : CapabilityState.Degraded(
+                        CapabilityKind.WakeWord,
+                        $"语音输入不可用：{audio.Summary}",
+                        audio.RemediationHint ?? "请检查麦克风与系统隐私设置；可在「语音」页查看状态。");
+            }
+
+            // A degraded detector means the wake word itself is not usable (for example missing
+            // KWS assets), so report it directly instead of claiming it is ready.
+            var wakeWord = _wakeWordDetector.Capability;
+            if (wakeWord.Status != CapabilityStatus.Supported)
+            {
+                return wakeWord;
             }
 
             if (!_asr.Capability.IsOperational)
             {
-                return CapabilityState.Degraded(CapabilityKind.WakeWord, "唤醒词已就绪；命令识别模型缺失");
+                return CapabilityState.Degraded(
+                    CapabilityKind.WakeWord,
+                    "唤醒词已就绪；命令识别模型缺失",
+                    "命令识别模型资产未安装；可在「语音」页查看状态。");
             }
 
             if (!_tts.Capability.IsOperational)
             {
-                return CapabilityState.Degraded(CapabilityKind.WakeWord, "唤醒词已就绪；语音反馈不可用");
+                return CapabilityState.Degraded(
+                    CapabilityKind.WakeWord,
+                    "唤醒词已就绪；语音反馈不可用",
+                    "语音合成模型资产未安装；可在「语音」页查看状态。");
             }
 
             if (!_playback.Capability.IsOperational)
             {
-                return CapabilityState.Degraded(CapabilityKind.WakeWord, "唤醒词已就绪；提示音播放不可用");
+                return CapabilityState.Degraded(
+                    CapabilityKind.WakeWord,
+                    "唤醒词已就绪；提示音播放不可用",
+                    "提示音播放不可用；可在「语音」页查看状态。");
             }
 
             return CapabilityState.Supported(CapabilityKind.WakeWord, "本机唤醒与语音命令已就绪");
@@ -134,10 +170,13 @@ public sealed class VoiceSessionController : IVoiceSession
                 return Task.CompletedTask;
             }
 
-            if (!_wakeWordDetector.Capability.IsOperational)
+            // Missing or broken wake-word assets must keep the microphone closed; a degraded
+            // capability is not enough to arm the session.
+            var wakeWord = _wakeWordDetector.Capability;
+            if (wakeWord.Status != CapabilityStatus.Supported)
             {
                 SetState(VoiceSessionState.Sleeping);
-                EmitInteraction(string.Empty, "唤醒词模型未安装，语音保持关闭。");
+                EmitInteraction(string.Empty, $"{wakeWord.Summary}，语音保持关闭。");
                 return Task.CompletedTask;
             }
 

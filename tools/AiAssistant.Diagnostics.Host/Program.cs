@@ -96,7 +96,7 @@ internal static class Program
             Environment.SetEnvironmentVariable(
                 EnvironmentNames.UiE2EOutput,
                 Environment.GetEnvironmentVariable(EnvironmentNames.UiE2EOutput)
-                ?? ArtifactPaths.Resolve("test-results", "e2e"));
+                ?? ArtifactPaths.Resolve(["test-results", "e2e"]));
 
             // The diagnostics host injects the self-driving runner; the shipped Desktop assembly
             // only knows the delegate type and the immutable launch context.
@@ -117,11 +117,13 @@ internal static class Program
 
     private static string OutputPath(string kind)
     {
-        var path = ArtifactPaths.Resolve("test-results", "benchmarks", $"{kind}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.md");
+        // The params overload is the one that appends to the artifacts root; a leading string
+        // argument would bind to the base-directory overload instead.
+        var path = ArtifactPaths.Resolve(["test-results", "benchmarks", $"{kind}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.md"]);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         return path;
     }
 
     private static string SamplesPath(string kind) =>
-        ArtifactPaths.Resolve("cache", "models", "golden-sets", kind);
+        ArtifactPaths.Resolve(["cache", "models", "golden-sets", kind]);
 }

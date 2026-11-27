@@ -1,3 +1,4 @@
+using AiAssistant.Application.Imaging;
 using AiAssistant.Application.Ports;
 using AiAssistant.Core.ValueObjects;
 
@@ -5,19 +6,24 @@ namespace AiAssistant.Platform.Windows;
 
 /// <summary>
 /// Accessibility-first text extractor: inspects Win32 accessible child controls (strictly skipping ES_PASSWORD controls)
-/// and falls back to pluggable OCR delegate when accessibility yields no text (implementation.md S2.3).
+/// and falls back to the local OCR recognizer when accessibility yields no text (implementation.md S2.3).
 /// </summary>
-public sealed class WindowsTextExtractor(Func<byte[], CancellationToken, Task<string?>>? ocrFallback = null) : ITextExtractor
+public sealed class WindowsTextExtractor(IImageOcrRecognizer? ocr = null) : ITextExtractor
 {
     public CapabilityState AccessibilityCapability => OperatingSystem.IsWindows()
         ? CapabilityState.Supported(CapabilityKind.AccessibilityText, "Win32 UI 控件树（排除密码框）")
         : CapabilityState.Unavailable(CapabilityKind.AccessibilityText, "Windows 无障碍仅在 Windows 主机可用");
 
-    public CapabilityState OcrCapability => ocrFallback is not null
-        ? CapabilityState.Supported(CapabilityKind.Ocr, "已配置 OCR 兜底")
-        : OperatingSystem.IsWindows()
-            ? CapabilityState.Degraded(CapabilityKind.Ocr, "Windows.Media.Ocr 按需兜底（无障碍树优先）")
-            : CapabilityState.Unavailable(CapabilityKind.Ocr, "Windows OCR 仅在 Windows 主机可用");
+    /// <summary>
+    /// Reports the recognizer's own state: assets present means OCR really works, missing assets
+    /// means the row must ask for them instead of claiming a fallback that was never wired.
+    /// </summary>
+    public CapabilityState OcrCapability => ocr is not null
+        ? ocr.Capability
+        : CapabilityState.Unavailable(
+            CapabilityKind.Ocr,
+            "未接入图像 OCR 兜底（无障碍文本优先可用）",
+            "请重新启动应用后点击「重新检查」。");
 
     public async Task<ExtractedTextResult> ExtractAsync(TextExtractionRequest request, CancellationToken ct)
     {
@@ -32,9 +38,12 @@ public sealed class WindowsTextExtractor(Func<byte[], CancellationToken, Task<st
             }
         }
 
-        if (ocrFallback is not null && request.ScreenshotPngBytes is { Length: > 0 } png)
+        if (ocr is not null &&
+            request.ScreenshotPngBytes is { Length: > 0 } png &&
+            PngCodec.TryDecodeToBgra32(png, out var bgra, out var width, out var height, out _) &&
+            bgra is not null)
         {
-            var ocrText = await ocrFallback(png, ct);
+            var ocrText = await ocr.RecognizeAsync(new ImageFrameBuffer(bgra, width, height), ct);
             if (!string.IsNullOrWhiteSpace(ocrText))
             {
                 return new ExtractedTextResult(ocrText.Trim(), TextExtractionMethod.SystemOcr, 0.80);

@@ -87,9 +87,18 @@ public sealed class LinuxCapabilityProvider : ICapabilityProvider
             _keyStore.Capability,
             _autoStart.Capability,
             _backend.Decision.Backend == LinuxDisplayBackendKind.Wayland
-                ? CapabilityState.Degraded(CapabilityKind.GlobalHotkey, "Wayland 限制全局热键；请使用托盘或语音命令")
-                : CapabilityState.Degraded(CapabilityKind.GlobalHotkey, "当前精简外壳未注册 X11 全局热键"),
-            CapabilityState.Degraded(CapabilityKind.SystemTray, "需要桌面支持 StatusNotifierItem/AppIndicator")
+                ? CapabilityState.Degraded(
+                    CapabilityKind.GlobalHotkey,
+                    "Wayland 限制全局热键；请使用托盘或语音命令",
+                    "Wayland 不允许应用注册全局热键；请改用托盘菜单或语音命令。")
+                : CapabilityState.Degraded(
+                    CapabilityKind.GlobalHotkey,
+                    "当前精简外壳未注册 X11 全局热键",
+                    "当前版本未注册全局热键；请改用托盘菜单或语音命令。"),
+            CapabilityState.Degraded(
+                CapabilityKind.SystemTray,
+                "需要桌面支持 StatusNotifierItem/AppIndicator",
+                "请确认桌面已启用 StatusNotifierItem/AppIndicator 支持。")
         ];
     }
 }

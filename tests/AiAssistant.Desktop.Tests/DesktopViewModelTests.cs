@@ -303,6 +303,7 @@ public sealed partial class DesktopViewModelTests
     {
         public VoiceSessionState State { get; private set; } = VoiceSessionState.Sleeping;
         public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.WakeWord, "fake KWS");
+        public bool IsActive { get; private set; }
         public bool RecordsCommandAudio { get; private set; }
         public event EventHandler<VoiceSessionState>? StateChanged;
         public event EventHandler<VoiceInteraction>? Interaction;
@@ -317,6 +318,7 @@ public sealed partial class DesktopViewModelTests
         {
             // Mirrors the real controller: enabling only arms wake-word detection and the session
             // stays Sleeping (no StateChanged) until the wake word is detected.
+            IsActive = true;
             Interaction?.Invoke(this, new VoiceInteraction(State, "你好时光", string.Empty, "语音已启用，说“你好时光”唤醒。", DateTimeOffset.UtcNow));
             return Task.CompletedTask;
         }
@@ -329,6 +331,7 @@ public sealed partial class DesktopViewModelTests
 
         public Task StopAsync(CancellationToken ct)
         {
+            IsActive = false;
             if (State != VoiceSessionState.Sleeping)
             {
                 State = VoiceSessionState.Sleeping;

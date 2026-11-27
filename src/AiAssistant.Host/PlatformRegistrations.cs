@@ -29,32 +29,57 @@ namespace AiAssistant.Host;
 /// </summary>
 internal static class PlatformRegistrations
 {
-    internal static void RegisterWindows(IServiceCollection services, IClock clock, IKeyStore keyStore)
+    internal static void RegisterWindows(IServiceCollection services, IClock clock, IKeyStore keyStore, string dataDirectory)
     {
         var screenCapture = new WindowsScreenCapture(clock);
         var windowSource = new WindowsWindowActivitySource(clock, screenCapture);
         var fileSource = new WhitelistedFileActivitySource(clock);
-        var textExtractor = new WindowsTextExtractor();
         var processPath = Environment.ProcessPath;
         var executableCommand = string.IsNullOrWhiteSpace(processPath) ? "AiAssistant.Host" : $"\"{processPath}\"";
         var autoStart = new WindowsAutoStartService(executableCommand);
+        var audioCaptureFactory = new WindowsAudioCaptureFactory(clock);
 
         services.AddSingleton<IScreenCapture>(screenCapture);
         services.AddSingleton<IWindowActivitySource>(windowSource);
         services.AddSingleton<IFileActivitySource>(fileSource);
         services.AddSingleton<ICaptureSource>(windowSource);
         services.AddSingleton<ICaptureSource>(fileSource);
-        services.AddSingleton<ITextExtractor>(textExtractor);
         services.AddSingleton<IAutoStartService>(autoStart);
-        services.AddSingleton<IAudioCaptureFactory>(new WindowsAudioCaptureFactory(clock));
+        services.AddSingleton<IAudioCaptureFactory>(audioCaptureFactory);
         services.AddSingleton<IAudioPlayback>(new WindowsAudioPlayback());
-        services.AddSingleton<ICapabilityProvider>(new WindowsCapabilityProvider(
-            screenCapture,
-            windowSource,
-            fileSource,
-            textExtractor,
-            keyStore,
-            autoStart));
+
+        // OCR fallback is optional: RapidOCR assets may be bundled, dropped into the data directory
+        // or pointed at explicitly. The capability row reports whichever of those is actually present.
+        var rapidOcrDirectory = Environment.GetEnvironmentVariable(EnvironmentNames.RapidOcrModelDir);
+        if (string.IsNullOrWhiteSpace(rapidOcrDirectory))
+        {
+            rapidOcrDirectory = DomainRegistrations.ResolveModelDirectory(
+                dataDirectory,
+                "rapidocr",
+                "ch_PP-OCRv4_det_infer.onnx",
+                "ch_PP-OCRv4_rec_infer.onnx");
+        }
+
+        services.AddSingleton(new RapidOcrOptions { ModelDirectory = Path.GetFullPath(rapidOcrDirectory) });
+        services.AddSingleton<RapidOcrTextRecognizer>();
+        services.AddSingleton<IImageOcrRecognizer>(provider => provider.GetRequiredService<RapidOcrTextRecognizer>());
+        services.AddSingleton<ITextExtractor>(provider => new WindowsTextExtractor(
+            provider.GetRequiredService<IImageOcrRecognizer>()));
+
+        services.AddSingleton<ICapabilityProvider>(provider =>
+        {
+            // Voice readiness is owned by the voice stack; read it lazily so every refresh is live.
+            var voice = provider.GetService<IVoiceSession>();
+            return new WindowsCapabilityProvider(
+                screenCapture,
+                windowSource,
+                fileSource,
+                provider.GetRequiredService<ITextExtractor>(),
+                keyStore,
+                autoStart,
+                audioCaptureFactory,
+                () => voice?.Capability);
+        });
     }
 
     internal static void RegisterMacPlatform(IServiceCollection services, IClock clock, IKeyStore keyStore)
@@ -93,15 +118,21 @@ internal static class PlatformRegistrations
         services.AddSingleton<IAudioPlayback>(provider =>
             new AudioPlayback(provider.GetRequiredService<IMacHelperSupervisor>()));
         services.AddSingleton<IAutoStartService>(autoStart);
-        services.AddSingleton<ICapabilityProvider>(provider => new CapabilityProvider(
-            provider.GetRequiredService<IScreenCapture>(),
-            provider.GetRequiredService<IWindowActivitySource>(),
-            provider.GetRequiredService<IFileActivitySource>(),
-            provider.GetRequiredService<ITextExtractor>(),
-            provider.GetRequiredService<IAudioCapture>(),
-            keyStore,
-            autoStart,
-            provider.GetRequiredService<IMacHelperSupervisor>()));
+        services.AddSingleton<ICapabilityProvider>(provider =>
+        {
+            // Voice readiness is owned by the voice stack; read it lazily so every refresh is live.
+            var voice = provider.GetService<IVoiceSession>();
+            return new CapabilityProvider(
+                provider.GetRequiredService<IScreenCapture>(),
+                provider.GetRequiredService<IWindowActivitySource>(),
+                provider.GetRequiredService<IFileActivitySource>(),
+                provider.GetRequiredService<ITextExtractor>(),
+                provider.GetRequiredService<IAudioCapture>(),
+                keyStore,
+                autoStart,
+                provider.GetRequiredService<IMacHelperSupervisor>(),
+                () => voice?.Capability);
+        });
     }
 
     internal static void RegisterLinux(

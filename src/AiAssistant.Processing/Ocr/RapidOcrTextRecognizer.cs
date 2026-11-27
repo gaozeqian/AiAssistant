@@ -7,7 +7,7 @@ using Microsoft.ML.OnnxRuntime.Tensors;
 namespace AiAssistant.Processing.Ocr;
 
 /// <summary>
-/// On-demand Linux image OCR fallback for windows whose AT-SPI tree exposes no text.
+/// On-demand image OCR fallback for windows whose accessibility tree exposes no text.
 /// Only used when the PP-OCRv4 det/rec models and key dictionary are installed locally.
 /// </summary>
 public sealed class RapidOcrTextRecognizer : IImageOcrRecognizer, IDisposable
@@ -32,13 +32,16 @@ public sealed class RapidOcrTextRecognizer : IImageOcrRecognizer, IDisposable
     }
 
     public CapabilityState Capability => _errorType is not null
-        ? CapabilityState.Degraded(CapabilityKind.Ocr, $"RapidOCR degraded ({_errorType})")
+        ? CapabilityState.Degraded(
+            CapabilityKind.Ocr,
+            $"RapidOCR degraded ({_errorType})",
+            "OCR 识别异常；请确认模型资产完整后点击「重新检查」。")
         : _options.HasAssets
             ? CapabilityState.Supported(CapabilityKind.Ocr, $"RapidOCR PP-OCRv4 ({_options.ModelVersion})")
-            : CapabilityState.PermissionRequired(
+            : CapabilityState.Degraded(
                 CapabilityKind.Ocr,
-                "RapidOCR ONNX models are not installed",
-                "Set AIASSISTANT_RAPIDOCR_MODEL_DIR to a directory containing det/rec ONNX models and ppocr_keys_v1.txt.");
+                "OCR 模型资产未安装",
+                "请安装 OCR 模型资产（检测/识别 ONNX 与字典文件）后点击「重新检查」。");
 
     /// <summary>Returns recognized text or null when OCR is unavailable or finds nothing.</summary>
     public async Task<string?> RecognizeAsync(ImageFrameBuffer frame, CancellationToken ct)

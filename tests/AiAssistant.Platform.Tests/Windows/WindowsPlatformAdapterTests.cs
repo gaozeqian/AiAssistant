@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using AiAssistant.Application.Ports;
+using AiAssistant.Core.ValueObjects;
 using AiAssistant.Platform.Linux;
 using AiAssistant.Platform.macOS;
 using AiAssistant.Platform.Windows;
@@ -78,7 +79,8 @@ public sealed class WindowsPlatformAdapterTests : IDisposable
         var clock = new SystemClock();
         await using var screenCapture = new WindowsScreenCapture(clock);
         await using var windowSource = new WindowsWindowActivitySource(clock, screenCapture);
-        var extractor = new WindowsTextExtractor((bytes, _) => Task.FromResult<string?>($"OCR-Fallback-Len:{bytes.Length}"));
+        var ocr = new FakeOcrRecognizer();
+        var extractor = new WindowsTextExtractor(ocr);
 
         if (OperatingSystem.IsWindows())
         {
@@ -104,12 +106,27 @@ public sealed class WindowsPlatformAdapterTests : IDisposable
             Assert.False(windowSource.Capability.IsOperational);
         }
 
-        // Verify OCR fallback triggers when WindowHandle == 0
+        // Verify OCR fallback triggers when WindowHandle == 0 and the screenshot is a decodable PNG.
+        var screenshot = PngEncoder.EncodeBgra32(new byte[16 * 16 * 4], 16, 16, 16 * 4);
         var extracted = await extractor.ExtractAsync(
-            new TextExtractionRequest(0, "Reader", "Spec.pdf", [1, 2, 3, 4]),
+            new TextExtractionRequest(0, "Reader", "Spec.pdf", screenshot),
             CancellationToken.None);
         Assert.Equal(TextExtractionMethod.SystemOcr, extracted.Method);
-        Assert.Equal("OCR-Fallback-Len:4", extracted.Text);
+        Assert.Equal("OCR-Fallback-Len:1024", extracted.Text);
+        Assert.Equal(16, ocr.LastWidth);
+    }
+
+    private sealed class FakeOcrRecognizer : IImageOcrRecognizer
+    {
+        public int LastWidth { get; private set; }
+
+        public CapabilityState Capability => CapabilityState.Supported(CapabilityKind.Ocr, "FakeOCR");
+
+        public Task<string?> RecognizeAsync(ImageFrameBuffer frame, CancellationToken ct)
+        {
+            LastWidth = frame.Width;
+            return Task.FromResult<string?>($"OCR-Fallback-Len:{frame.Bgra32Pixels.Length}");
+        }
     }
 
     [Fact]
@@ -131,6 +148,49 @@ public sealed class WindowsPlatformAdapterTests : IDisposable
 
         Assert.Equal(160, normalized.Length);
         Assert.All(normalized, sample => Assert.InRange(sample, 0.49f, 0.51f));
+    }
+
+    [Fact]
+    public void WindowsCapabilityProvider_ReportsLiveVoiceAndOcrState()
+    {
+        var keyStore = new StaticKeyStore(RandomNumberGenerator.GetBytes(32));
+        var clock = new SystemClock();
+        var liveWakeWord = CapabilityState.Degraded(
+            CapabilityKind.WakeWord,
+            "唤醒词已就绪；命令识别模型缺失",
+            "命令识别模型资产未安装；可在「语音」页查看状态。");
+
+        var capabilities = new WindowsCapabilityProvider(
+            new WindowsScreenCapture(clock),
+            new WindowsWindowActivitySource(clock),
+            new WhitelistedFileActivitySource(clock),
+            new WindowsTextExtractor(new FakeOcrRecognizer()),
+            keyStore,
+            new WindowsAutoStartService("app.exe"),
+            new WindowsAudioCaptureFactory(clock),
+            () => liveWakeWord).GetCapabilities();
+
+        // The row must mirror the voice stack, not a hard-coded "optional feature" placeholder.
+        Assert.Equal(liveWakeWord, capabilities.Single(c => c.Kind == CapabilityKind.WakeWord));
+        Assert.Equal(CapabilityStatus.Supported, capabilities.Single(c => c.Kind == CapabilityKind.Ocr).Status);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal(CapabilityStatus.Supported, capabilities.Single(c => c.Kind == CapabilityKind.AudioCapture).Status);
+        }
+
+        var withoutVoice = new WindowsCapabilityProvider(
+            new WindowsScreenCapture(clock),
+            new WindowsWindowActivitySource(clock),
+            new WhitelistedFileActivitySource(clock),
+            new WindowsTextExtractor(),
+            keyStore,
+            new WindowsAutoStartService("app.exe")).GetCapabilities();
+
+        var fallback = withoutVoice.Single(c => c.Kind == CapabilityKind.WakeWord);
+        Assert.Equal(CapabilityStatus.Degraded, fallback.Status);
+        Assert.False(string.IsNullOrWhiteSpace(fallback.RemediationHint));
+        Assert.Equal(CapabilityStatus.Unavailable, withoutVoice.Single(c => c.Kind == CapabilityKind.Ocr).Status);
     }
 
     [Fact]

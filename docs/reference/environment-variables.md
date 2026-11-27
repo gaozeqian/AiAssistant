@@ -1,6 +1,6 @@
 # 环境变量
 
-> **状态**：living ｜ **最后更新**：2026-11-26 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：新增/删除环境变量或改默认值时
+> **状态**：living ｜ **最后更新**：2026-11-27 ｜ **适用版本**：0.1.x ｜ **维护触发条件**：新增/删除环境变量或改默认值时
 
 本文件是全部环境变量的唯一权威。代码只能通过 `AiAssistant.Core.Configuration.EnvironmentNames` 常量引用，禁止字面量散落（审计 R9）。
 
@@ -14,7 +14,7 @@
 | `AIASSISTANT_MODELS_CONFIG` | `models.json` 路径 | `<数据目录>/models.json` |
 | `AIASSISTANT_SHERPA_MODEL_DIR` | sherpa 模型根目录 | 数据目录 → 应用目录 `models/sherpa` |
 | `AIASSISTANT_WHISPER_MODEL_PATH` | Whisper ggml 模型 | 按模型解析顺序 |
-| `AIASSISTANT_RAPIDOCR_MODEL_DIR` | RapidOCR 模型目录 | 应用目录 `models` |
+| `AIASSISTANT_RAPIDOCR_MODEL_DIR` | RapidOCR 模型目录（Windows/Linux OCR 兜底） | 随包 → 数据目录 → 应用目录 `models/rapidocr` |
 | `AIASSISTANT_MAC_HELPER_PATH` | Swift Helper 可执行文件 | `.app/Contents/MacOS/aiassistant-mac-helper` |
 | `AIASSISTANT_PDF_FONT_PATH` | PDF 中文字体 | 内置回退 |
 | `AIASSISTANT_IPC_TOKEN` | Helper IPC 一次性令牌 | 运行时随机 |
