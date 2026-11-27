@@ -29,7 +29,10 @@ internal sealed class TimelinePreviewLoader(TimelineUseCase timeline)
             }
 
             using var stream = new MemoryStream(plaintext, writable: false);
-            return new TimelinePreviewResult(Bitmap.DecodeToWidth(stream, 960), string.Empty);
+            // Decode at the stored width. The previous 960px clamp threw away a quarter of a 1280px
+            // frame before the panel ever rendered it; the panel is ~890 DIP wide (over 1100 physical
+            // pixels at 125%+ scaling), so it was upscaling an already-downscaled bitmap.
+            return new TimelinePreviewResult(new Bitmap(stream), string.Empty);
         }
         catch (OperationCanceledException)
         {
