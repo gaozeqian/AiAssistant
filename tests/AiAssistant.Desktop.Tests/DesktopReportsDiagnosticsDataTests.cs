@@ -514,6 +514,103 @@ public sealed partial class DesktopViewModelTests
     });
 
     [Fact]
+    public Task FullWindow_BusySectionDisablesEveryCardThatStartsWork() => RunInHeadlessSession(async () =>
+    {
+        var maintenance = new RecordingMaintenanceService { BackupGate = new TaskCompletionSource<bool>() };
+        var data = new DataManagementViewModel(
+            new FakeDataDeletionService(),
+            maintenance: maintenance,
+            retention: new RecordingRetentionService(),
+            retentionSettings: new RetentionSettingsUseCase(
+                new RecordingRetentionSettingsStore(RetentionSettings.Default)))
+        {
+            SaveFilePicker = new FakeSaveFilePicker(Path.Combine(
+                TempArtifactDirectory.CreatePath("busy-buttons"),
+                "aiassistant-busy.zip"))
+        };
+        using var voice = new VoiceControlViewModel(new FakeVoiceSession());
+        using var shell = CreateShellWithVoice(voice, data: data);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 4;
+
+        await WaitUntilAsync(() => HasButton(window, "导出加密备份…"));
+        await data.BackupCommand.ExecuteAsync(null);
+        await WaitUntilAsync(() => data.IsAwaitingBackupKey);
+        data.BackupKeyConfirmed = true;
+        var backup = data.ConfirmBackupCommand.ExecuteAsync(null);
+        await WaitUntilAsync(() => data.IsBackingUp);
+
+        // Only one section may run at a time. The delete card used to stay clickable during a
+        // backup and could start a purge next to it; every work-starting button must be disabled.
+        Assert.False(ButtonByText(window, "删除该日数据").IsEnabled);
+        Assert.False(ButtonByText(window, "清空全部本地数据").IsEnabled);
+        Assert.False(ButtonByText(window, "保存保留设置").IsEnabled);
+        Assert.False(ButtonByText(window, "立即清理").IsEnabled);
+
+        // The command refuses as well, so automation cannot bypass the disabled buttons.
+        await data.DeleteDateCommand.ExecuteAsync(null);
+        Assert.False(data.HasPending);
+
+        maintenance.BackupGate!.SetResult(true);
+        await backup;
+        await WaitUntilAsync(() => !data.IsBusy);
+        Assert.True(ButtonByText(window, "删除该日数据").IsEnabled);
+        window.Close();
+    });
+
+    [Fact]
+    public Task FullWindow_EveryProgressBarUsesTheSameDeterminatePulse() => RunInHeadlessSession(async () =>
+    {
+        var data = new DataManagementViewModel(
+            new FakeDataDeletionService(),
+            maintenance: new RecordingMaintenanceService(),
+            retention: new RecordingRetentionService(),
+            retentionSettings: new RetentionSettingsUseCase(
+                new RecordingRetentionSettingsStore(RetentionSettings.Default)));
+        using var voice = new VoiceControlViewModel(new FakeVoiceSession());
+        using var shell = CreateShellWithVoice(voice, data: data);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+
+        // Indeterminate bars freeze once their tab content is detached and re-attached, and they
+        // look different from the determinate pulse used by 日报/检索; every panel must match.
+        Type[] tabViews =
+        [
+            typeof(Views.Tabs.TimelineTabView),
+            typeof(Views.Tabs.SearchTabView),
+            typeof(Views.Tabs.PrivacyCaptureTabView),
+            typeof(Views.Tabs.VoiceTabView),
+            typeof(Views.Tabs.DataExportTabView),
+            typeof(Views.Tabs.DiagnosticsTabView),
+            typeof(Views.Tabs.ReportsTabView)
+        ];
+
+        var names = new List<string>();
+        for (var index = 0; index < tabViews.Length; index++)
+        {
+            shell.SelectedSectionIndex = index;
+            var expected = tabViews[index];
+            await WaitUntilAsync(() => window.GetVisualDescendants().Any(visual => visual.GetType() == expected));
+            foreach (var bar in window.GetVisualDescendants().OfType<ProgressBar>())
+            {
+                Assert.False(bar.IsIndeterminate);
+                Assert.Equal(0, bar.Minimum);
+                Assert.Equal(100, bar.Maximum);
+                names.Add(AutomationProperties.GetName(bar) ?? string.Empty);
+            }
+        }
+
+        // The data page keeps one bar per card; all three are on the shared pulse now.
+        Assert.Contains("删除进度", names);
+        Assert.Contains("备份恢复进度", names);
+        Assert.Contains("保留清理进度", names);
+        window.Close();
+    });
+
+    [Fact]
     public Task FullWindow_BackupKeyPanelRequiresSavedKeyConfirmation() => RunInHeadlessSession(async () =>
     {
         var data = new DataManagementViewModel(

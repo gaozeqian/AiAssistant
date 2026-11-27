@@ -218,7 +218,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
         Timeline.Dispose();
         Capture.Dispose();
+        Diagnostics.Dispose();
         Reports.Dispose();
+        Data?.Dispose();
         Voice?.Dispose();
     }
 

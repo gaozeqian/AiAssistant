@@ -12,7 +12,7 @@ namespace AiAssistant.Desktop.ViewModels;
 /// Local diagnostics surface. Model configuration and secret administration live in their own
 /// view models; this type owns snapshot formatting, MCP status and sanitized export.
 /// </summary>
-public sealed class DiagnosticsViewModel : ObservableObject
+public sealed class DiagnosticsViewModel : ObservableObject, IDisposable
 {
     /// <summary>Diagnostics is an overview, not a job history browser; keep the list scannable.</summary>
     public const int RecentJobDisplayLimit = 5;
@@ -21,6 +21,8 @@ public sealed class DiagnosticsViewModel : ObservableObject
     private readonly IClock _clock;
     private readonly ILocalMcpControl? _mcp;
     private readonly string? _exportDirectory;
+    private readonly ProgressPulseController _progressPulse;
+    private double _progressPulseValue;
     private string _platformName = "正在检测平台能力…";
     private string _databaseText = "尚未检查";
     private string _pipelineText = string.Empty;
@@ -48,6 +50,7 @@ public sealed class DiagnosticsViewModel : ObservableObject
         _clock = clock ?? new SystemClock();
         _mcp = mcp;
         _exportDirectory = exportDirectory;
+        _progressPulse = new ProgressPulseController(value => ProgressPulse = value);
         ModelConfig = new ModelConfigurationEditorViewModel(modelConfiguration);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         GeneratePreviewCommand = new AsyncRelayCommand(GenerateExportPreviewAsync);
@@ -209,8 +212,16 @@ public sealed class DiagnosticsViewModel : ObservableObject
             if (SetProperty(ref _isLoading, value))
             {
                 OnPropertyChanged(nameof(CanExportPreview));
+                _progressPulse.SetBusy(value);
             }
         }
+    }
+
+    /// <summary>Determinate 0..100 progress driven while busy, matching the other panels.</summary>
+    public double ProgressPulse
+    {
+        get => _progressPulseValue;
+        private set => SetProperty(ref _progressPulseValue, value);
     }
 
     public async Task RefreshAsync()
@@ -478,4 +489,6 @@ public sealed class DiagnosticsViewModel : ObservableObject
             IsLoading = false;
         }
     }
+
+    public void Dispose() => _progressPulse.Dispose();
 }

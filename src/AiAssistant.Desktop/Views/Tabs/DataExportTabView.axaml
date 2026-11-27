@@ -13,10 +13,10 @@
           <DatePicker SelectedDate="{Binding SelectedDate}" Initialized="OnDatePickerInitialized" />
           <WrapPanel>
             <Button Classes="secondary" Content="{Binding DeleteDateButtonText}"
-                    Command="{Binding DeleteDateCommand}" Margin="0,0,8,8"
+                    Command="{Binding DeleteDateCommand}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="{Binding DeleteDateButtonText}" />
             <Button Classes="secondary" Content="{Binding DeleteAllButtonText}"
-                    Command="{Binding DeleteAllCommand}" Margin="0,0,8,8"
+                    Command="{Binding DeleteAllCommand}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="{Binding DeleteAllButtonText}" />
             <Button Classes="secondary" Content="取消" Command="{Binding CancelPendingCommand}"
                     IsVisible="{Binding HasPendingDeletion}" IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8" />
@@ -24,7 +24,7 @@
           <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPendingDeletion}">
             <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
           </Border>
-          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsDeleting}"
+          <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsDeleting}"
                        automation:AutomationProperties.Name="删除进度" />
           <TextBlock Text="{Binding DeleteStatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding DeleteErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
@@ -113,7 +113,7 @@
           <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasPendingRestore}">
             <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
           </Border>
-          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBackingUp}"
+          <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsBackingUp}"
                        automation:AutomationProperties.Name="备份恢复进度" />
           <TextBlock Text="{Binding BackupStatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding BackupErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
@@ -150,7 +150,7 @@
                     IsEnabled="{Binding !IsBusy}" IsVisible="{Binding HasRetentionSweep}" Margin="0,0,8,8"
                     automation:AutomationProperties.Name="立即清理媒体" />
           </WrapPanel>
-          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsRetentionBusy}"
+          <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsRetentionBusy}"
                        automation:AutomationProperties.Name="保留清理进度" />
           <TextBlock Text="{Binding RetentionStatusMessage}" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding RetentionErrorMessage}" FontSize="12" Foreground="{DynamicResource DangerForegroundBrush}"

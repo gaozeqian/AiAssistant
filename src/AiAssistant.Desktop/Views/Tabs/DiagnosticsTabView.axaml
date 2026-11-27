@@ -15,7 +15,7 @@
         <Button Grid.Column="1" Classes="primary" Content="重新检查" Command="{Binding RefreshCommand}"
                 automation:AutomationProperties.Name="重新检查平台能力" />
       </Grid>
-      <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" />
+      <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsLoading}" />
       <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="8" Padding="14" IsVisible="{Binding HasError}">
         <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
       </Border>

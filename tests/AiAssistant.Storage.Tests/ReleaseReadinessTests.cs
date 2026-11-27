@@ -127,6 +127,26 @@ public sealed class ReleaseReadinessTests : IDisposable
     }
 
     [Fact]
+    public async Task PurgeDate_RunsOffTheCallingThread_SoTheDesktopUiStaysResponsive()
+    {
+        var storage = await CreateStorageAsync("purge-offload");
+        var recording = new ThreadRecordingEventRepository(storage.Repository);
+        var deletion = new DataDeletionService(storage.Factory, recording);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await AppendWithMediaAsync(storage.Repository, today, "offload-media");
+
+        var callerThread = Environment.CurrentManagedThreadId;
+        var result = await deletion.PurgeDateAsync(today, CancellationToken.None);
+
+        // Microsoft.Data.Sqlite's async APIs are synchronous; running the purge inline on the
+        // caller (the Avalonia UI thread) froze the window, so the core must be dispatched.
+        Assert.True(result.EventsDeleted >= 1);
+        Assert.NotEqual(0, recording.PurgeThreadId);
+        Assert.NotEqual(callerThread, recording.PurgeThreadId);
+    }
+
+    [Fact]
     public async Task PurgeAll_RemovesEveryTableAndBlob_AndDatabaseStaysUsable()
     {
         var storage = await CreateStorageAsync("purge-all");
@@ -250,4 +270,34 @@ public sealed class ReleaseReadinessTests : IDisposable
         EncryptedSqliteConnectionFactory Factory,
         SqliteEventRepository Repository,
         byte[] Key);
+
+    /// <summary>Records which thread the purge actually ran on, so an inline purge is detectable.</summary>
+    private sealed class ThreadRecordingEventRepository(IEventRepository inner) : IEventRepository
+    {
+        public int PurgeThreadId { get; private set; }
+
+        public Task AppendBatchAsync(IReadOnlyList<ActivityEvent> events, CancellationToken ct) =>
+            inner.AppendBatchAsync(events, ct);
+
+        public Task AppendWithMediaBatchAsync(IReadOnlyList<EventWithMediaWrite> items, CancellationToken ct) =>
+            inner.AppendWithMediaBatchAsync(items, ct);
+
+        public IAsyncEnumerable<ActivityEvent> QueryAsync(EventQuery query, CancellationToken ct) =>
+            inner.QueryAsync(query, ct);
+
+        public Task<ActivityEvent?> GetByIdAsync(string eventId, CancellationToken ct) =>
+            inner.GetByIdAsync(eventId, ct);
+
+        public Task<IReadOnlyList<DateOnly>> ListActiveDatesAsync(CancellationToken ct) =>
+            inner.ListActiveDatesAsync(ct);
+
+        public Task<bool> DeleteEventAsync(string eventId, CancellationToken ct) =>
+            inner.DeleteEventAsync(eventId, ct);
+
+        public Task<int> PurgeDateAsync(DateOnly localDate, CancellationToken ct)
+        {
+            PurgeThreadId = Environment.CurrentManagedThreadId;
+            return inner.PurgeDateAsync(localDate, ct);
+        }
+    }
 }

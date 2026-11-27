@@ -35,9 +35,11 @@ internal sealed class ProgressPulseController : IDisposable
 
         if (busy)
         {
-            _value = 0;
+            // Several busy sources can report in sequence for one logical operation; restarting the
+            // cycle each time would snap the bar back to 0 while it is already advancing.
             if (!_timer.IsEnabled)
             {
+                _value = 0;
                 _timer.Start();
             }
         }

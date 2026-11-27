@@ -21,7 +21,15 @@ public sealed class DataDeletionService : IDataDeletionService
         _events = events;
     }
 
-    public async Task<DataDeletionResult> PurgeDateAsync(DateOnly localDate, CancellationToken ct)
+    /// <summary>
+    /// Microsoft.Data.Sqlite's async APIs run synchronously and the media sweep is plain file IO, so
+    /// the whole purge would otherwise execute on the caller's thread and freeze the desktop UI.
+    /// The core is dispatched to the thread pool, exactly like the backup/restore paths.
+    /// </summary>
+    public Task<DataDeletionResult> PurgeDateAsync(DateOnly localDate, CancellationToken ct) =>
+        Task.Run(() => PurgeDateCoreAsync(localDate, ct), ct);
+
+    private async Task<DataDeletionResult> PurgeDateCoreAsync(DateOnly localDate, CancellationToken ct)
     {
         var date = localDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var eventsDeleted = await _events.PurgeDateAsync(localDate, ct);
@@ -36,7 +44,10 @@ public sealed class DataDeletionService : IDataDeletionService
         return new DataDeletionResult(eventsDeleted, reports, jobs, 0, 0);
     }
 
-    public async Task<DataDeletionResult> PurgeAllAsync(CancellationToken ct)
+    public Task<DataDeletionResult> PurgeAllAsync(CancellationToken ct) =>
+        Task.Run(() => PurgeAllCoreAsync(ct), ct);
+
+    private async Task<DataDeletionResult> PurgeAllCoreAsync(CancellationToken ct)
     {
         int events;
         int reports;

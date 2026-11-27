@@ -67,7 +67,15 @@ public sealed class MediaRetentionService : IRetentionService
         }
     }
 
-    public async Task<int> RunSweepNowAsync(CancellationToken ct)
+    /// <summary>
+    /// The sweep is synchronous underneath (SQLite async APIs plus zero-filling each blob with an
+    /// fsync), so a UI-triggered sweep would block the dispatcher for seconds. Dispatch it to the
+    /// thread pool like the backup/restore paths do.
+    /// </summary>
+    public Task<int> RunSweepNowAsync(CancellationToken ct) =>
+        Task.Run(() => RunSweepCoreAsync(ct), ct);
+
+    private async Task<int> RunSweepCoreAsync(CancellationToken ct)
     {
         await _sweepGate.WaitAsync(ct);
         try

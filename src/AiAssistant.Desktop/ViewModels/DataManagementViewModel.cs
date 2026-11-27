@@ -19,13 +19,14 @@ internal enum PendingAction
 /// and the retention policy that decides when media is erased. Export entry points for reports,
 /// search and diagnostics live in their own panels.
 /// </summary>
-public sealed class DataManagementViewModel : ObservableObject
+public sealed class DataManagementViewModel : ObservableObject, IDisposable
 {
     private readonly IDataDeletionService _deletion;
     private readonly IClock _clock;
     private readonly IDatabaseMaintenanceService? _maintenance;
     private readonly IRetentionService? _retention;
     private readonly RetentionSettingsUseCase? _retentionSettings;
+    private readonly ProgressPulseController _progressPulse;
     private DateTimeOffset? _selectedDate;
     private PendingAction _pending;
     private string _deleteStatusMessage = "删除不可撤销；加密媒体与结构化事件会同时移除。";
@@ -51,6 +52,7 @@ public sealed class DataManagementViewModel : ObservableObject
     private string _retentionStatusMessage = string.Empty;
     private string _retentionErrorMessage = string.Empty;
     private bool _isRetentionBusy;
+    private double _progressPulseValue;
 
     public DataManagementViewModel(
         IDataDeletionService deletion,
@@ -64,6 +66,7 @@ public sealed class DataManagementViewModel : ObservableObject
         _maintenance = maintenance;
         _retention = retention;
         _retentionSettings = retentionSettings;
+        _progressPulse = new ProgressPulseController(value => ProgressPulse = value);
         _selectedDate = _clock.LocalNow.Date;
         DeleteDateCommand = new AsyncRelayCommand(DeleteDateAsync);
         DeleteAllCommand = new AsyncRelayCommand(DeleteAllAsync);
@@ -256,6 +259,16 @@ public sealed class DataManagementViewModel : ObservableObject
     /// <summary>Only one section may run at a time; each section still owns its own progress bar.</summary>
     public bool IsBusy => IsDeleting || IsBackingUp || IsRetentionBusy;
 
+    /// <summary>
+    /// Determinate 0..100 progress driven while busy, so every bar keeps advancing across tab
+    /// switches. All three cards share it because only one section can run at a time.
+    /// </summary>
+    public double ProgressPulse
+    {
+        get => _progressPulseValue;
+        private set => SetProperty(ref _progressPulseValue, value);
+    }
+
     public bool IsDeleting
     {
         get => _isDeleting;
@@ -299,6 +312,7 @@ public sealed class DataManagementViewModel : ObservableObject
         OnPropertyChanged(nameof(CanValidateRestoreKey));
         OnPropertyChanged(nameof(CanStartBackup));
         OnPropertyChanged(nameof(CanStartRestore));
+        _progressPulse.SetBusy(IsBusy);
     }
 
     public bool HasPending => _pending != PendingAction.None;
@@ -742,6 +756,13 @@ public sealed class DataManagementViewModel : ObservableObject
 
     private async Task DeleteDateAsync()
     {
+        // The UI disables both delete buttons while another section runs; the guard keeps
+        // automation and direct command calls from starting a purge next to a backup/restore.
+        if (IsBusy)
+        {
+            return;
+        }
+
         if (_pending != PendingAction.DeleteDate)
         {
             SetPending(PendingAction.DeleteDate);
@@ -759,6 +780,11 @@ public sealed class DataManagementViewModel : ObservableObject
 
     private async Task DeleteAllAsync()
     {
+        if (IsBusy)
+        {
+            return;
+        }
+
         if (_pending != PendingAction.DeleteAll)
         {
             SetPending(PendingAction.DeleteAll);
@@ -844,4 +870,6 @@ public sealed class DataManagementViewModel : ObservableObject
             IsDeleting = false;
         }
     }
+
+    public void Dispose() => _progressPulse.Dispose();
 }

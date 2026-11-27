@@ -15,6 +15,7 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
     private readonly TimelineUseCase _timeline;
     private readonly TimelinePreviewLoader _previewLoader;
     private readonly CancellationTokenSource _disposeCts = new();
+    private readonly ProgressPulseController _progressPulse;
     private CancellationTokenSource? _queryCts;
     private CancellationTokenSource? _loadMoreCts;
     private CancellationTokenSource? _mediaCts;
@@ -31,11 +32,13 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
     private bool _hasMore;
     private bool _suppressDateSelection;
     private bool _disposed;
+    private double _progressPulseValue;
 
     public TimelineViewModel(TimelineUseCase timeline)
     {
         _timeline = timeline ?? throw new ArgumentNullException(nameof(timeline));
         _previewLoader = new TimelinePreviewLoader(_timeline);
+        _progressPulse = new ProgressPulseController(value => ProgressPulse = value);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         LoadMoreCommand = new AsyncRelayCommand(LoadEarlierAsync);
     }
@@ -58,7 +61,13 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
     public bool IsLoadingMore
     {
         get => _isLoadingMore;
-        private set => SetProperty(ref _isLoadingMore, value);
+        private set
+        {
+            if (SetProperty(ref _isLoadingMore, value))
+            {
+                SyncProgressPulse();
+            }
+        }
     }
 
     public TimelineDateItem? SelectedDate
@@ -143,14 +152,36 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
     public bool IsLoading
     {
         get => _isLoading;
-        private set => SetProperty(ref _isLoading, value);
+        private set
+        {
+            if (SetProperty(ref _isLoading, value))
+            {
+                SyncProgressPulse();
+            }
+        }
     }
 
     public bool IsPreviewLoading
     {
         get => _isPreviewLoading;
-        private set => SetProperty(ref _isPreviewLoading, value);
+        private set
+        {
+            if (SetProperty(ref _isPreviewLoading, value))
+            {
+                SyncProgressPulse();
+            }
+        }
     }
+
+    /// <summary>Determinate 0..100 progress driven while any of the list/preview loads run.</summary>
+    public double ProgressPulse
+    {
+        get => _progressPulseValue;
+        private set => SetProperty(ref _progressPulseValue, value);
+    }
+
+    /// <summary>Three independent bars share one pulse, so it stops only when every load is done.</summary>
+    private void SyncProgressPulse() => _progressPulse.SetBusy(IsLoading || IsLoadingMore || IsPreviewLoading);
 
     public bool HasSelectedEvent => SelectedEvent is not null;
 
@@ -233,6 +264,7 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
         ResetCancellation(ref _queryCts);
         ResetCancellation(ref _loadMoreCts);
         ResetCancellation(ref _mediaCts);
+        _progressPulse.Dispose();
         PreviewImage = null;
         _disposeCts.Cancel();
         _disposeCts.Dispose();
