@@ -160,10 +160,17 @@ public sealed class VoiceCommandLogTests : IDisposable
 
         await using var conn = await factory.OpenConnectionAsync(CancellationToken.None);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT transcript, audio_content_id FROM voice_commands WHERE id = 'cmd_audio';";
+        cmd.CommandText = "SELECT transcript, audio_content_id, audio_cleared_at_utc FROM voice_commands WHERE id = 'cmd_audio';";
         await using var reader = await cmd.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.Equal("暂停采集", reader.GetString(0));
         Assert.True(reader.IsDBNull(1));
+        // The row keeps a timestamp so the voice page can show “已清理” instead of “未留存”.
+        Assert.False(reader.IsDBNull(2));
+
+        var listed = await log.ListRecentAsync(5, CancellationToken.None);
+        var record = Assert.Single(listed);
+        Assert.Null(record.AudioContentId);
+        Assert.NotNull(record.AudioClearedAtUtc);
     }
 }

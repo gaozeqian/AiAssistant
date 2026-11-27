@@ -274,8 +274,14 @@ public sealed class AesGcmMediaStore : IMediaStore
         await using (var unlinkVoiceAudioCmd = conn.CreateCommand())
         {
             unlinkVoiceAudioCmd.Transaction = tx;
-            unlinkVoiceAudioCmd.CommandText =
-                "UPDATE voice_commands SET audio_content_id = NULL WHERE audio_content_id = $id;";
+            // Keep a timestamp so the voice page can tell "never recorded" apart from "recorded,
+            // then erased by retention" after the reference itself is gone.
+            unlinkVoiceAudioCmd.CommandText = """
+                UPDATE voice_commands
+                SET audio_content_id = NULL,
+                    audio_cleared_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+                WHERE audio_content_id = $id;
+                """;
             unlinkVoiceAudioCmd.Parameters.AddWithValue("$id", contentId);
             await unlinkVoiceAudioCmd.ExecuteNonQueryAsync(ct);
         }

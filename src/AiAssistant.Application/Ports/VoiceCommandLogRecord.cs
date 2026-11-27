@@ -12,4 +12,5 @@ public sealed record VoiceCommandLogRecord(
     string ParamsJson,
     ModelEndpointTier EndpointTier,
     string? ResponseRef,
-    string? AudioContentId);
+    string? AudioContentId,
+    DateTimeOffset? AudioClearedAtUtc = null);

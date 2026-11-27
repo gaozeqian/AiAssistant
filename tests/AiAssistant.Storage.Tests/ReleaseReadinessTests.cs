@@ -40,7 +40,7 @@ public sealed class ReleaseReadinessTests : IDisposable
     }
 
     [Fact]
-    public async Task SchemaUpgrade_FromV1ToV2_PreservesEventsAndVoiceCommands()
+    public async Task SchemaUpgrade_FromV1ToCurrent_PreservesEventsAndVoiceCommands()
     {
         var storage = await CreateStorageAsync("upgrade");
         var timestamp = OccurredTimestamp.FromInstant(new DateTimeOffset(2026, 11, 20, 1, 0, 0, TimeSpan.Zero), TimeZoneInfo.Utc);
@@ -55,10 +55,11 @@ public sealed class ReleaseReadinessTests : IDisposable
         {
             command.CommandText = """
                 INSERT INTO voice_commands (
-                    id, occurred_at_utc, wake_word, transcript, intent, params_json, endpoint_tier, response_ref, audio_content_id
-                ) VALUES ('v1-row', '2026-11-20T01:00:00.0000000+00:00', '你好时光', '暂停采集', 'PauseCapture', '{}', 0, NULL, NULL);
+                    id, occurred_at_utc, wake_word, transcript, intent, params_json, endpoint_tier, response_ref, audio_content_id, audio_cleared_at_utc
+                ) VALUES ('v1-row', '2026-11-20T01:00:00.0000000+00:00', '你好时光', '暂停采集', 'PauseCapture', '{}', 0, NULL, NULL, NULL);
                 ALTER TABLE voice_commands DROP COLUMN audio_content_id;
-                DELETE FROM schema_migrations WHERE version = 2;
+                ALTER TABLE voice_commands DROP COLUMN audio_cleared_at_utc;
+                DELETE FROM schema_migrations WHERE version >= 2;
                 """;
             await command.ExecuteNonQueryAsync(CancellationToken.None);
         }
@@ -71,9 +72,11 @@ public sealed class ReleaseReadinessTests : IDisposable
 
         await using (var check = upgraded.CreateCommand())
         {
-            check.CommandText = "SELECT audio_content_id FROM voice_commands WHERE id = 'v1-row';";
-            var value = await check.ExecuteScalarAsync(CancellationToken.None);
-            Assert.True(value is null or DBNull);
+            check.CommandText = "SELECT audio_content_id, audio_cleared_at_utc FROM voice_commands WHERE id = 'v1-row';";
+            await using var reader = await check.ExecuteReaderAsync(CancellationToken.None);
+            Assert.True(await reader.ReadAsync(CancellationToken.None));
+            Assert.True(reader.IsDBNull(0));
+            Assert.True(reader.IsDBNull(1));
         }
 
         var restored = await storage.Repository.GetByIdAsync("e-upgrade", CancellationToken.None);

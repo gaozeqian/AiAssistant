@@ -302,6 +302,26 @@ public sealed partial class DesktopViewModelTests
         }
     }
 
+    /// <summary>Keeps each playback pending until the test completes it, mimicking a slow device.</summary>
+    private sealed class ControllableCommandAudioPlayer : ICommandAudioPlayer
+    {
+        private readonly Dictionary<string, TaskCompletionSource<bool>> _pending = new(StringComparer.Ordinal);
+
+        public Task<bool> PlayAsync(string contentId, CancellationToken ct)
+        {
+            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _pending[contentId] = completion;
+            ct.Register(() => completion.TrySetCanceled(ct));
+            return completion.Task;
+        }
+
+        public void Complete(string contentId, bool played = true)
+        {
+            Assert.True(_pending.TryGetValue(contentId, out var completion), $"No pending playback for {contentId}.");
+            completion!.TrySetResult(played);
+        }
+    }
+
     private sealed class FakeReportJobQueue : IReportJobQueue
     {
         public Task<EnqueueResult> EnqueueAsync(ReportJobRequest request, CancellationToken ct) => throw new NotSupportedException();

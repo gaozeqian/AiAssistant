@@ -46,7 +46,7 @@ public sealed class SqliteVoiceCommandLog(EncryptedSqliteConnectionFactory conne
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT id, occurred_at_utc, wake_word, transcript, intent, params_json,
-                   endpoint_tier, response_ref, audio_content_id
+                   endpoint_tier, response_ref, audio_content_id, audio_cleared_at_utc
             FROM voice_commands
             ORDER BY occurred_at_utc DESC
             LIMIT $limit;
@@ -64,7 +64,10 @@ public sealed class SqliteVoiceCommandLog(EncryptedSqliteConnectionFactory conne
                 reader.GetString(5),
                 (ModelEndpointTier)reader.GetInt32(6),
                 reader.IsDBNull(7) ? null : reader.GetString(7),
-                reader.IsDBNull(8) ? null : reader.GetString(8)));
+                reader.IsDBNull(8) ? null : reader.GetString(8),
+                reader.IsDBNull(9)
+                    ? null
+                    : DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)));
         }
 
         return records;

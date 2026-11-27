@@ -6,9 +6,11 @@ using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Desktop.Views;
+using AiAssistant.Desktop.Views.Tabs;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -107,24 +109,100 @@ public sealed partial class DesktopViewModelTests
             ModelEndpointTier.LocalOffline,
             null,
             null));
+        // Retention already erased this clip; the row must say “已清理”, not “未留存”.
+        log.Records.Add(new VoiceCommandLogRecord(
+            "cmd_3",
+            DateTimeOffset.UtcNow.AddSeconds(-30),
+            "你好时光",
+            "恢复采集",
+            "ResumeCapture",
+            "{}",
+            ModelEndpointTier.LocalOffline,
+            null,
+            null,
+            DateTimeOffset.UtcNow.AddMinutes(-5)));
         var player = new FakeCommandAudioPlayer();
         using var viewModel = new VoiceControlViewModel(new FakeVoiceSession(), log, player);
 
         await viewModel.InitializeAsync();
 
         Assert.True(viewModel.HasCommandHistory);
-        Assert.Equal(2, viewModel.CommandHistory.Count);
-        Assert.Equal("问一下昨天的进展", viewModel.CommandHistory[0].Transcript);
-        Assert.Equal("提问", viewModel.CommandHistory[0].IntentText);
-        Assert.False(viewModel.CommandHistory[0].HasAudio);
-        Assert.True(viewModel.CommandHistory[1].HasAudio);
+        Assert.Equal(3, viewModel.CommandHistory.Count);
+        Assert.Equal("恢复采集", viewModel.CommandHistory[0].Transcript);
+        Assert.Equal("已清理", viewModel.CommandHistory[0].AudioStateText);
+        Assert.True(viewModel.CommandHistory[0].WasAudioCleared);
+        Assert.Equal("问一下昨天的进展", viewModel.CommandHistory[1].Transcript);
+        Assert.Equal("提问", viewModel.CommandHistory[1].IntentText);
+        Assert.False(viewModel.CommandHistory[1].HasAudio);
+        Assert.Equal("未留存", viewModel.CommandHistory[1].AudioStateText);
+        Assert.False(viewModel.CommandHistory[1].WasAudioCleared);
+        Assert.True(viewModel.CommandHistory[2].HasAudio);
+        Assert.Equal("已留存", viewModel.CommandHistory[2].AudioStateText);
 
-        await viewModel.ReplayCommand.ExecuteAsync(viewModel.CommandHistory[1]);
+        await viewModel.ReplayCommand.ExecuteAsync(viewModel.CommandHistory[2]);
         Assert.Equal("cnt_audio_1", player.PlayedContentId);
         Assert.Contains("已重听", viewModel.CommandHistoryStatus, StringComparison.Ordinal);
 
-        await viewModel.ReplayCommand.ExecuteAsync(viewModel.CommandHistory[0]);
+        await viewModel.ReplayCommand.ExecuteAsync(viewModel.CommandHistory[1]);
         Assert.Contains("没有留存", viewModel.ErrorMessage, StringComparison.Ordinal);
+
+        await viewModel.ReplayCommand.ExecuteAsync(viewModel.CommandHistory[0]);
+        Assert.Contains("已按保留期清理", viewModel.ErrorMessage, StringComparison.Ordinal);
+    });
+
+    [Fact]
+    public Task VoicePanel_ReplayStateIsPerRow_SoOneSlowClipDoesNotDisableEveryButton() => RunInHeadlessSession(async () =>
+    {
+        var log = new FakeVoiceCommandLog();
+        log.Records.Add(new VoiceCommandLogRecord(
+            "cmd_a",
+            DateTimeOffset.UtcNow.AddMinutes(-2),
+            "你好时光",
+            "暂停采集",
+            "PauseCapture",
+            "{}",
+            ModelEndpointTier.LocalOffline,
+            null,
+            "cnt_a"));
+        log.Records.Add(new VoiceCommandLogRecord(
+            "cmd_b",
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            "你好时光",
+            "恢复采集",
+            "ResumeCapture",
+            "{}",
+            ModelEndpointTier.LocalOffline,
+            null,
+            "cnt_b"));
+        var player = new ControllableCommandAudioPlayer();
+        using var viewModel = new VoiceControlViewModel(new FakeVoiceSession(), log, player);
+        await viewModel.InitializeAsync();
+
+        var first = viewModel.CommandHistory.Single(item => item.Record.Id == "cmd_a");
+        var second = viewModel.CommandHistory.Single(item => item.Record.Id == "cmd_b");
+
+        // A clip that never finishes must only mark its own row as playing.
+        var firstRun = viewModel.ReplayCommand.ExecuteAsync(first);
+        Assert.True(first.IsPlaying);
+        Assert.False(first.CanReplay);
+        Assert.Equal("播放中", first.ReplayLabel);
+        Assert.True(viewModel.ReplayCommand.CanExecute(second));
+        Assert.True(second.CanReplay);
+
+        var secondRun = viewModel.ReplayCommand.ExecuteAsync(second);
+        await firstRun;
+        Assert.False(first.IsPlaying);
+        Assert.True(second.IsPlaying);
+
+        player.Complete("cnt_b");
+        await secondRun;
+        Assert.False(second.IsPlaying);
+        Assert.Contains("已重听", viewModel.CommandHistoryStatus, StringComparison.Ordinal);
+
+        // Both rows are usable again once playback returns.
+        Assert.True(first.CanReplay);
+        Assert.True(second.CanReplay);
+        Assert.True(viewModel.ReplayCommand.CanExecute(first));
     });
 
     [Fact]
@@ -204,6 +282,55 @@ public sealed partial class DesktopViewModelTests
         replay.Command.Execute(replay.CommandParameter);
         await WaitUntilAsync(() => player.PlayedContentId is not null);
         Assert.Equal("cnt_audio_ui", player.PlayedContentId);
+        window.Close();
+    });
+
+    [Fact]
+    public Task FullWindow_VoiceCommandHistoryScrollsInsideItsCard() => RunInHeadlessSession(async () =>
+    {
+        var log = new FakeVoiceCommandLog();
+        for (var i = 0; i < 30; i++)
+        {
+            log.Records.Add(new VoiceCommandLogRecord(
+                $"cmd_scroll_{i}",
+                DateTimeOffset.UtcNow.AddMinutes(-i),
+                "你好时光",
+                $"命令 {i}",
+                "PauseCapture",
+                "{}",
+                ModelEndpointTier.LocalOffline,
+                null,
+                null,
+                // The newest row was already swept by retention and must be toned as “已清理”.
+                i == 0 ? DateTimeOffset.UtcNow.AddMinutes(-5) : null));
+        }
+
+        using var voice = new VoiceControlViewModel(new FakeVoiceSession(), log);
+        using var shell = CreateShellWithVoice(voice);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = 3;
+
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<VoiceTabView>().Any());
+        var tab = window.GetVisualDescendants().OfType<VoiceTabView>().Single();
+        // The page itself must not scroll any more; only the history card does.
+        Assert.IsType<Grid>(tab.Content);
+
+        var list = window.GetVisualDescendants().OfType<ItemsControl>()
+            .Single(control => ReferenceEquals(control.ItemsSource, voice.CommandHistory));
+        var scroller = list.GetVisualAncestors().OfType<ScrollViewer>().FirstOrDefault();
+        Assert.NotNull(scroller);
+        Assert.Equal(ScrollBarVisibility.Auto, scroller!.VerticalScrollBarVisibility);
+
+        tab.UpdateLayout();
+        Assert.True(
+            scroller.Extent.Height > scroller.Viewport.Height,
+            $"expected the card to scroll, extent={scroller.Extent.Height} viewport={scroller.Viewport.Height}");
+
+        var clearedState = window.GetVisualDescendants().OfType<TextBlock>()
+            .First(block => block.Text == "已清理");
+        Assert.Contains("cleared", clearedState.Classes);
         window.Close();
     });
 

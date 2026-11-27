@@ -29,6 +29,7 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
     private string _commandHistoryStatus = "尚无命令记录";
     private bool _refreshingHistory;
     private bool _historyRefreshPending;
+    private CancellationTokenSource? _replayCts;
     private bool _disposed;
 
     public VoiceControlViewModel(
@@ -42,7 +43,11 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         ToggleCommand = new AsyncRelayCommand(ToggleAsync);
         ToggleCommandAudioCommand = new AsyncRelayCommand(ToggleCommandAudioAsync);
         RefreshHistoryCommand = new AsyncRelayCommand(RefreshHistoryAsync);
-        ReplayCommand = new AsyncRelayCommand<VoiceCommandHistoryItem?>(ReplayAsync);
+        // Replay must not serialize the whole list behind one command: a slow clip would grey out
+        // every row. Each row carries its own "playing" state and a new click supersedes the old clip.
+        ReplayCommand = new AsyncRelayCommand<VoiceCommandHistoryItem?>(
+            ReplayAsync,
+            AsyncRelayCommandOptions.AllowConcurrentExecutions);
         _session.StateChanged += OnStateChanged;
         _session.Interaction += OnInteraction;
         _session.Faulted += OnFaulted;
@@ -164,6 +169,7 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        _replayCts?.Cancel();
         _session.StateChanged -= OnStateChanged;
         _session.Interaction -= OnInteraction;
         _session.Faulted -= OnFaulted;
@@ -278,7 +284,7 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
 
                 CommandHistoryStatus = records.Count == 0
                     ? "尚无命令记录"
-                    : $"最近 {records.Count} 条（新→旧）";
+                    : BuildHistoryStatus();
                 OnPropertyChanged(nameof(HasCommandHistory));
             }
             while (_historyRefreshPending && !_disposed);
@@ -295,14 +301,16 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
 
     private async Task ReplayAsync(VoiceCommandHistoryItem? item)
     {
-        if (item is null || IsReplaying)
+        if (item is null || _disposed)
         {
             return;
         }
 
         if (!item.HasAudio)
         {
-            ErrorMessage = "该命令没有留存的音频（记录未开启或已过期）。";
+            ErrorMessage = item.WasAudioCleared
+                ? "该命令的音频已按保留期清理，无法重听。"
+                : "该命令没有留存的音频（记录未开启或已过期）。";
             return;
         }
 
@@ -312,23 +320,68 @@ public sealed class VoiceControlViewModel : ObservableObject, IDisposable
             return;
         }
 
+        // A new click supersedes the clip in flight. Combined with per-row state this guarantees a
+        // slow or wedged device can never leave every replay button disabled.
+        var cts = new CancellationTokenSource();
+        _replayCts?.Cancel();
+        _replayCts = cts;
+        foreach (var entry in CommandHistory)
+        {
+            entry.IsPlaying = false;
+        }
+
+        item.IsPlaying = true;
         IsReplaying = true;
         ErrorMessage = string.Empty;
         try
         {
-            var played = await _commandAudioPlayer.PlayAsync(item.Record.AudioContentId!, CancellationToken.None);
-            CommandHistoryStatus = played
-                ? $"已重听 {item.TimeText} 的命令音频"
-                : "音频已过期或被擦除。";
+            var played = await _commandAudioPlayer.PlayAsync(item.Record.AudioContentId!, cts.Token);
+            if (!ReferenceEquals(_replayCts, cts))
+            {
+                // A newer replay took over and owns the status line.
+                return;
+            }
+
+            if (played)
+            {
+                CommandHistoryStatus = $"已重听 {item.TimeText} 的命令音频";
+            }
+            else
+            {
+                item.MarkAudioCleared();
+                CommandHistoryStatus = "音频已过期或被擦除。";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer replay, or the page was closed while the clip was playing.
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or AiAssistant.Core.Exceptions.AiAssistantDomainException)
         {
-            ErrorMessage = "重听失败，请检查音频设备与存储状态。";
+            if (ReferenceEquals(_replayCts, cts))
+            {
+                ErrorMessage = "重听失败，请检查音频设备与存储状态。";
+            }
         }
         finally
         {
-            IsReplaying = false;
+            item.IsPlaying = false;
+            if (ReferenceEquals(_replayCts, cts))
+            {
+                _replayCts = null;
+                IsReplaying = false;
+            }
+
+            cts.Dispose();
         }
+    }
+
+    private string BuildHistoryStatus()
+    {
+        var cleared = CommandHistory.Count(entry => entry.WasAudioCleared);
+        return cleared == 0
+            ? $"最近 {CommandHistory.Count} 条（新→旧）"
+            : $"最近 {CommandHistory.Count} 条（新→旧）· {cleared} 条音频已清理";
     }
 
     private void OnStateChanged(object? sender, VoiceSessionState state) =>

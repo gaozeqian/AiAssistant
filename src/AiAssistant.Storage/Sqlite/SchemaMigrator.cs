@@ -111,6 +111,12 @@ internal static class SchemaMigrator
             ALTER TABLE voice_commands ADD COLUMN audio_content_id TEXT NULL;
             CREATE INDEX IF NOT EXISTS ix_voice_commands_occurred ON voice_commands(occurred_at_utc);
             """)
+        ,
+        new(
+            new SchemaVersion(3, "S8_VoiceCommandAudioClearedMarker"),
+            """
+            ALTER TABLE voice_commands ADD COLUMN audio_cleared_at_utc TEXT NULL;
+            """)
     ];
 
     public static async Task<SchemaVersion> MigrateAsync(SqliteConnection connection, CancellationToken ct = default)

@@ -1,11 +1,15 @@
 using System.Globalization;
 using AiAssistant.Application.Ports;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AiAssistant.Desktop.ViewModels;
 
 /// <summary>One persisted voice command shown on the voice page, with its replay affordance.</summary>
-public sealed class VoiceCommandHistoryItem(VoiceCommandLogRecord record)
+public sealed class VoiceCommandHistoryItem(VoiceCommandLogRecord record) : ObservableObject
 {
+    private bool _isPlaying;
+    private bool _audioCleared;
+
     public VoiceCommandLogRecord Record { get; } = record;
 
     public string TimeText => Record.OccurredAtUtc.ToLocalTime()
@@ -30,7 +34,54 @@ public sealed class VoiceCommandHistoryItem(VoiceCommandLogRecord record)
         _ => Record.Intent
     };
 
-    public bool HasAudio => !string.IsNullOrWhiteSpace(Record.AudioContentId);
+    /// <summary>Only the row that is actually playing is disabled; the rest stay replayable.</summary>
+    public bool IsPlaying
+    {
+        get => _isPlaying;
+        internal set
+        {
+            if (SetProperty(ref _isPlaying, value))
+            {
+                OnPropertyChanged(nameof(ReplayLabel));
+                OnPropertyChanged(nameof(CanReplay));
+            }
+        }
+    }
 
-    public string AudioStateText => HasAudio ? "已留存" : "未留存";
+    public bool HasAudio => !_audioCleared && !string.IsNullOrWhiteSpace(Record.AudioContentId);
+
+    public bool CanReplay => HasAudio && !IsPlaying;
+
+    public string ReplayLabel => IsPlaying ? "播放中" : "重听";
+
+    /// <summary>Distinguishes "never recorded" from "recorded, then erased by the retention sweep".</summary>
+    public string AudioStateText => HasAudio ? "已留存" : WasAudioCleared ? "已清理" : "未留存";
+
+    /// <summary>Drives the warning tone of <see cref="AudioStateText"/> in the list.</summary>
+    public bool WasAudioCleared => _audioCleared || Record.AudioClearedAtUtc is not null;
+
+    public string AudioStateHint => HasAudio
+        ? "音频已加密留存，可重听"
+        : Record.AudioClearedAtUtc is { } clearedAt
+            ? $"音频已于 {clearedAt.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.CurrentCulture)} 按保留期清理"
+            : _audioCleared
+                ? "音频已被保留期清理"
+                : "该命令未记录音频";
+
+    /// <summary>The blob disappeared after the list was loaded; keep the row honest instead of
+    /// offering a replay that can only fail.</summary>
+    internal void MarkAudioCleared()
+    {
+        if (!HasAudio)
+        {
+            return;
+        }
+
+        _audioCleared = true;
+        OnPropertyChanged(nameof(HasAudio));
+        OnPropertyChanged(nameof(CanReplay));
+        OnPropertyChanged(nameof(AudioStateText));
+        OnPropertyChanged(nameof(AudioStateHint));
+        OnPropertyChanged(nameof(WasAudioCleared));
+    }
 }
