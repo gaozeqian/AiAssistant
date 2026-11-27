@@ -1,5 +1,6 @@
 using AiAssistant.Application.Ports;
 using AiAssistant.Scheduler;
+using AiAssistant.Testing.Common;
 
 namespace AiAssistant.Report.Tests;
 
@@ -9,9 +10,7 @@ public sealed class ReportScheduleSettingsStoreTests
     [Fact]
     public async Task Store_RoundTripsSettingsAcrossInstances()
     {
-        var directory = Path.Combine(
-            Path.GetTempPath(),
-            "aiassistant-schedule-" + Guid.NewGuid().ToString("N"));
+        var directory = TempArtifactDirectory.CreatePath("report-schedule");
         try
         {
             var store = new ReportScheduleSettingsStore(directory);
