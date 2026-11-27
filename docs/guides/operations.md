@@ -29,8 +29,8 @@ dotnet run --project src/AiAssistant.Host/AiAssistant.Host.csproj
 
 ```bash
 # 加密备份 / 恢复（恢复需显式确认）
-AiAssistant --backup /safe/aiassistant-backup.db
-AiAssistant --restore /safe/aiassistant-backup.db --confirm-restore
+AiAssistant --backup /safe/aiassistant-backup.zip
+AiAssistant --restore /safe/aiassistant-backup.zip --confirm-restore
 
 # 删除全部本地数据（两步确认）
 AiAssistant --purge-data --confirm-purge
@@ -43,6 +43,7 @@ AiAssistant --report-range --from 2026-11-16 --to 2026-11-22
 AiAssistant --ask "本周数据库迁移进展如何" --days 7
 ```
 
+- 桌面端「数据与导出」页同样可以导出加密备份（ZIP）并发起恢复：恢复会先校验备份，重启应用后才覆盖当前数据。
 - 无证据时问答明确降级并以退出码 1 结束。
 - 报告默认写入 `artifacts/test-results/reports/`；可用 `--output` 覆盖。
 - 备份包含 SQLite3MC 加密库与媒体密钥引用；恢复会替换现有数据，务必先备份。

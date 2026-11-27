@@ -12,16 +12,18 @@
 | macOS | `~/Library/Application Support/AiAssistant` |
 | Linux | `~/.local/share/AiAssistant` |
 
-覆盖：`AIASSISTANT_DATA_DIRECTORY`。目录内存放加密数据库、系统密钥库引用、媒体库、向量索引、语音日志、`models.json` 与 `report-schedule.json`（日报定时设置）。
+覆盖：`AIASSISTANT_DATA_DIRECTORY`。目录内存放加密数据库、系统密钥库引用、媒体库、向量索引、语音日志、`models.json`、`report-schedule.json`（日报定时设置）与 `retention.json`（保留与容量策略）。
 
 ## 2. 加密与保留
 
 | 项 | 默认 |
 |---|---|
 | 数据库 | SQLite3MC 加密；master key 由系统密钥库保护 |
-| 媒体 | AES-GCM；默认保留 30 天，每小时扫描一次过期媒体 |
+| 媒体 | AES-GCM；默认保留 30 天，每小时扫描一次过期媒体；可设置存储上限，超限时从最旧媒体开始擦除 |
 | 命令音频 | 默认不落盘；开启后默认保留 7 天（1–365） |
 | 日报 | 每日 00:30（可在「日报与站会」页修改）或应用启动时检查前一天：无日报且有活动记录时生成；已有日报但生成后又有活动记录时自动追加新版本 |
+
+保留天数与存储上限在「数据与导出」页的「保留与清理」卡片中设置，保存到 `<数据目录>/retention.json` 并立即生效；诊断页「媒体保留清理」显示当前生效策略。
 
 数据删除、备份与恢复见 [运维指南](../guides/operations.md)。
 

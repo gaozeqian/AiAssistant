@@ -42,7 +42,16 @@
 | `AIASSISTANT_KWS_THRESHOLD` | 唤醒判定阈值（0.01–0.99） | `0.25` |
 | `AIASSISTANT_VOICE_DISABLE_CHIME` | `true` 关闭提示音 | 有提示音 |
 | `AIASSISTANT_VOICE_RECORD_COMMAND_AUDIO` | `true` 记录命令音频 | 关 |
-| `AIASSISTANT_VOICE_AUDIO_RETENTION_DAYS` | 命令音频保留天数 | `7` |
+| `AIASSISTANT_VOICE_AUDIO_RETENTION_DAYS` | 命令音频保留天数（仅在没有 UI 保存的 `retention.json` 时作为初始值） | `7` |
+
+## 保留与容量
+
+| 变量 | 作用 | 默认 |
+|---|---|---|
+| `AIASSISTANT_MEDIA_RETENTION_DAYS` | 加密媒体保留天数（同上，仅作初始值） | `30` |
+| `AIASSISTANT_MAX_STORAGE_GB` | 数据目录容量上限（GB，`0` 表示不限；超限时从最旧媒体开始擦除） | `0` |
+
+> 推荐在桌面端「数据与导出」页的「保留与清理」卡片中设置；保存后会写入 `<数据目录>/retention.json`，并优先于上述环境变量。
 
 ## 报告
 
