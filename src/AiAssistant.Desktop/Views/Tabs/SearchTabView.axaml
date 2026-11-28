@@ -14,28 +14,33 @@
           <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
                    PlaceholderText="输入关键词或问题，例如：迁移进展如何"
                    automation:AutomationProperties.Name="检索关键词或问题" />
-          <Grid RowDefinitions="Auto,Auto" Margin="0,4,0,0">
-            <Grid Grid.Row="0" ColumnDefinitions="40,*" VerticalAlignment="Center">
-              <TextBlock Text="从" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
-              <DatePicker Grid.Column="1" SelectedDate="{Binding FromDate}" Initialized="OnDatePickerInitialized"
-                          automation:AutomationProperties.Name="检索起始日期" />
-            </Grid>
-            <Grid Grid.Row="1" ColumnDefinitions="40,*" VerticalAlignment="Center" Margin="0,6,0,0">
-              <TextBlock Text="到" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
-              <DatePicker Grid.Column="1" SelectedDate="{Binding ToDate}" Initialized="OnDatePickerInitialized"
-                          automation:AutomationProperties.Name="检索结束日期" />
-            </Grid>
-          </Grid>
+          <!-- 标签在上：40px 行内标签会让 DatePicker 的最小宽度撑出卡片 20px。 -->
+          <StackPanel Spacing="{DynamicResource SpacingXs}" Margin="0,4,0,0">
+            <TextBlock Text="从" Classes="muted" />
+            <DatePicker SelectedDate="{Binding FromDate}" Initialized="OnDatePickerInitialized"
+                        HorizontalAlignment="Stretch"
+                        automation:AutomationProperties.Name="检索起始日期" />
+          </StackPanel>
+          <StackPanel Spacing="{DynamicResource SpacingXs}" Margin="0,6,0,0">
+            <TextBlock Text="到" Classes="muted" />
+            <DatePicker SelectedDate="{Binding ToDate}" Initialized="OnDatePickerInitialized"
+                        HorizontalAlignment="Stretch"
+                        automation:AutomationProperties.Name="检索结束日期" />
+          </StackPanel>
         </StackPanel>
-        <WrapPanel Grid.Row="2" Margin="0,12,0,0">
-          <Button Classes="primary" Content="检索证据" Command="{Binding SearchCommand}" Margin="0,0,8,8"
+        <!-- 与 日报/周报 一致：三按钮等宽排布，宽度与上方输入框对齐。 -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,*,*" ColumnSpacing="6" Margin="0,12,0,0">
+          <Button Classes="primary reportAction" Content="检索证据" Command="{Binding SearchCommand}"
+                  IsEnabled="{Binding !IsBusy}" HorizontalAlignment="Stretch"
                   automation:AutomationProperties.Name="检索证据" />
-          <Button Classes="secondary" Content="提问" Command="{Binding AskCommand}" Margin="0,0,8,8"
+          <Button Grid.Column="1" Classes="secondary reportAction" Content="提问" Command="{Binding AskCommand}"
+                  IsEnabled="{Binding !IsBusy}" HorizontalAlignment="Stretch"
                   automation:AutomationProperties.Name="基于证据提问" />
-          <Button Classes="secondary" Content="导出问答…" Command="{Binding ExportAnswerCommand}"
-                  IsEnabled="{Binding HasAnswer}" Margin="0,0,8,8"
+          <Button Grid.Column="2" Classes="secondary reportAction" Content="导出问答"
+                  Command="{Binding ExportAnswerCommand}" IsEnabled="{Binding HasAnswer}"
+                  HorizontalAlignment="Stretch"
                   automation:AutomationProperties.Name="导出问答" />
-        </WrapPanel>
+        </Grid>
         <ProgressBar Grid.Row="3" Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsBusy}" />
         <StackPanel Grid.Row="4" Spacing="{DynamicResource SpacingXs}" Margin="0,8,0,0">
           <TextBlock Text="{Binding StatusMessage}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
