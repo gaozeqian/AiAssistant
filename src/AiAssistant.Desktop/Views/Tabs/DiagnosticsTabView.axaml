@@ -195,7 +195,7 @@
         <StackPanel Spacing="{DynamicResource SpacingMd}">
           <TextBlock Text="最近后台任务" FontWeight="SemiBold" />
           <TextBlock Text="{Binding RecentJobsSummary}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
-          <Grid ColumnDefinitions="120,120,100,*">
+          <Grid ColumnDefinitions="168,120,100,*">
             <TextBlock Text="报告日期" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
             <TextBlock Grid.Column="1" Text="状态" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
             <TextBlock Grid.Column="2" Text="尝试" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" />
@@ -204,7 +204,7 @@
           <ItemsControl ItemsSource="{Binding RecentJobs}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ReportJobItem">
-                <Grid ColumnDefinitions="120,120,100,*" Margin="0,5">
+                <Grid ColumnDefinitions="168,120,100,*" Margin="0,5">
                   <TextBlock Text="{Binding DateText}" />
                   <TextBlock Grid.Column="1" Text="{Binding StatusText}" />
                   <TextBlock Grid.Column="2" Text="{Binding AttemptText}" />

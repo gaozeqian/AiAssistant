@@ -42,6 +42,7 @@
                   IsEnabled="{Binding !IsBusy}" Margin="0,0,8,0"
                   automation:AutomationProperties.Name="刷新报告版本" />
           <Button Classes="secondary" Content="导出" Command="{Binding ActiveExportCommand}"
+                  IsEnabled="{Binding CanExport}"
                   automation:AutomationProperties.Name="导出报告" />
         </WrapPanel>
 
@@ -164,10 +165,11 @@
 
         <!-- 5. 状态 -->
         <StackPanel Grid.Row="5" Spacing="{DynamicResource SpacingXs}" Margin="0,12,0,0">
+          <!-- 空列表时不再重复"还没有日报/周报"：列表空态已经说过一次。 -->
           <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
-                     IsVisible="{Binding ShowDailyView}" />
+                     IsVisible="{Binding HasVersions}" />
           <TextBlock Text="{Binding WeeklyStatus}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
-                     IsVisible="{Binding IsWeeklyView}" />
+                     IsVisible="{Binding HasWeeklyVersions}" />
           <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
                      IsVisible="{Binding HasError}" />
         </StackPanel>

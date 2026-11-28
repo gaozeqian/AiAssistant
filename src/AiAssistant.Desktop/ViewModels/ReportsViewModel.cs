@@ -148,6 +148,7 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
 
                 OnPropertyChanged(nameof(HasWeeklyReport));
                 OnPropertyChanged(nameof(WeeklyVersionText));
+                OnPropertyChanged(nameof(CanExport));
                 ExportWeeklyCommand.NotifyCanExecuteChanged();
             }
         }
@@ -163,6 +164,7 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
             {
                 OnPropertyChanged(nameof(ShowDailyView));
                 OnPropertyChanged(nameof(ContentTitle));
+                OnPropertyChanged(nameof(CanExport));
             }
         }
     }
@@ -326,6 +328,7 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
                 StandupText = value is null ? "尚无站会数据" : FormatStandup(value.Report.StatsJson);
                 OnPropertyChanged(nameof(HasReport));
                 OnPropertyChanged(nameof(VersionText));
+                OnPropertyChanged(nameof(CanExport));
             }
         }
     }
@@ -391,6 +394,9 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
     public bool HasReport => SelectedVersion is not null;
+
+    /// <summary>当前视图是否有可导出的版本；没有时「导出」应禁用而不是静默无响应。</summary>
+    public bool CanExport => IsWeeklyView ? _selectedWeekly is not null : SelectedVersion is not null;
 
     /// <summary>Save-file dialog, wired by the shell after the window exists; null falls back to the export directory.</summary>
     public ISaveFilePicker? SaveFilePicker { get; set; }
