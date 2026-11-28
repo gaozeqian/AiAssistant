@@ -138,7 +138,8 @@
         <Grid Grid.Row="4">
           <Grid IsVisible="{Binding ShowDailyView}">
             <ListBox ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}"
-                     Background="Transparent" BorderThickness="0">
+                     Background="Transparent" BorderThickness="0"
+                     automation:AutomationProperties.Name="日报版本列表">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:ReportVersionItem">
                   <TextBlock Text="{Binding DisplayText}" Padding="6,8" />
@@ -152,7 +153,8 @@
           </Grid>
           <Grid IsVisible="{Binding IsWeeklyView}">
             <ListBox ItemsSource="{Binding WeeklyVersions}" SelectedItem="{Binding SelectedWeeklyVersion}"
-                     Background="Transparent" BorderThickness="0">
+                     Background="Transparent" BorderThickness="0"
+                     automation:AutomationProperties.Name="周报版本列表">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:WeeklyVersionItem">
                   <TextBlock Text="{Binding DisplayText}" Padding="6,8" />
@@ -214,7 +216,8 @@
 
         <!-- 周报正文：柱状统计 + 区间报告 -->
         <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="0,12,0,0" IsVisible="{Binding IsWeeklyView}">
-          <ItemsControl ItemsSource="{Binding WeeklyBars}">
+          <ItemsControl ItemsSource="{Binding WeeklyBars}"
+                        automation:AutomationProperties.Name="本周每日分布">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:DailyBarItem">
                 <Grid ColumnDefinitions="56,*,90" Margin="0,2">
