@@ -92,6 +92,17 @@ public sealed class ReportJobWorker : IAsyncDisposable
                     "Startup daily-report check failed with {ExceptionType}; the scheduled check will retry.",
                     ex.GetType().Name);
             }
+
+            try
+            {
+                await EvaluateWeeklyCatchUpAsync(ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    "Startup weekly-report check failed with {ExceptionType}; the scheduled check will retry.",
+                    ex.GetType().Name);
+            }
         }
 
         _workerTask = Task.Run(() => RunAsync(_shutdown.Token), CancellationToken.None);
@@ -253,6 +264,66 @@ public sealed class ReportJobWorker : IAsyncDisposable
     /// The trigger targets the previous completed week (anchor = yesterday) so a Sunday-evening run
     /// summarises the week that just ended.
     /// </summary>
+    /// <summary>
+    /// Startup compensation for weekly reports: finds the most recent scheduled occurrence and, if the
+    /// week it targets has no report yet, enqueues one. This covers "app was closed at the scheduled
+    /// time" — the daily path has the same guarantee through <see cref="EvaluatePreviousDayAsync"/>.
+    /// </summary>
+    private async Task EvaluateWeeklyCatchUpAsync(CancellationToken ct)
+    {
+        if (_weeklyReports is null)
+        {
+            return;
+        }
+
+        var settings = _scheduleSettings.Load();
+        if (!settings.WeeklyEnabled)
+        {
+            return;
+        }
+
+        var now = _clock.Now();
+        var localTime = TimeOnly.FromDateTime(now.ToCapturedLocalTime().DateTime);
+        var daysSince = ((int)now.LocalDate.DayOfWeek - (int)settings.WeeklyDay + 7) % 7;
+        var lastDueDate = now.LocalDate.AddDays(-daysSince);
+        if (daysSince == 0 && localTime < settings.WeeklyLocalTime)
+        {
+            // 今天就是触发日但还没到点：最近一次是上周。
+            lastDueDate = lastDueDate.AddDays(-7);
+        }
+
+        // 触发日当天生成的是"前一天所在的那一周"。
+        var weekStart = RangeReportUseCase.WeekContaining(lastDueDate.AddDays(-1)).From;
+        if (await _weeklyReports.ListVersionsAsync(weekStart, ct) is { Count: > 0 })
+        {
+            return;
+        }
+
+        var weekEnd = weekStart.AddDays(6);
+        if (!await HasRangeActivityAsync(weekStart, weekEnd, ct))
+        {
+            _logger.LogInformation(
+                "Skipping weekly catch-up for {From}..{To}: no activity records.",
+                weekStart,
+                weekEnd);
+            return;
+        }
+
+        if (await HasActiveJobAsync(weekStart, forceOverwrite: false, ReportJobKind.Weekly, ct))
+        {
+            return;
+        }
+
+        var enqueued = await _queue.EnqueueAsync(
+            new ReportJobRequest(weekStart, ReportTriggerSource.StartupCatchUp, ForceOverwrite: false, ReportJobKind.Weekly),
+            ct);
+        _logger.LogInformation(
+            "Queued weekly catch-up for week {WeekStart} (job={JobId}, deduplicated={Deduplicated}).",
+            weekStart,
+            enqueued.JobId,
+            enqueued.DeduplicatedExistingPendingJob);
+    }
+
     private async Task EvaluateWeeklyIfDueAsync(CancellationToken ct)
     {
         if (_weeklyReports is null)
@@ -364,6 +435,18 @@ public sealed class ReportJobWorker : IAsyncDisposable
     {
         await foreach (var _ in _events.QueryAsync(
                            new EventQuery(LocalDate: targetDate, FromUtc: fromUtc, Limit: 1),
+                           ct))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private async Task<bool> HasRangeActivityAsync(DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        await foreach (var _ in _events.QueryAsync(
+                           new EventQuery(FromLocalDate: from, ToLocalDate: to, Limit: 1),
                            ct))
         {
             return true;

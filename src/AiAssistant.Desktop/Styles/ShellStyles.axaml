@@ -129,13 +129,6 @@
     <Setter Property="Padding" Value="14,8" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
   </Style>
-  <!-- 报告操作行：四个按钮要在一排放下，统一 12px 与小内距。 -->
-  <Style Selector="Button.reportAction">
-    <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
-    <Setter Property="Padding" Value="8,6" />
-    <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
-    <Setter Property="HorizontalContentAlignment" Value="Center" />
-  </Style>
   <!-- 分段开关（日报/周报）：未选中弱化，选中用列表选中底色。 -->
   <Style Selector="Button.segment">
     <Setter Property="Padding" Value="10,4" />

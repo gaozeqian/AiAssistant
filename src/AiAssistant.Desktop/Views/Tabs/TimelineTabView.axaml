@@ -43,9 +43,9 @@
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:TimelineEventItem">
                   <Border Padding="10,8" CornerRadius="{DynamicResource RadiusSm}" Margin="0,2">
-                    <Grid ColumnDefinitions="62,*" RowDefinitions="Auto,Auto,Auto">
+                    <Grid ColumnDefinitions="76,*" RowDefinitions="Auto,Auto,Auto">
                       <TextBlock Grid.RowSpan="3" Text="{Binding TimeText}" FontFamily="Cascadia Mono,Consolas,monospace" FontSize="{DynamicResource FontSizeBody}"
-                                 Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Top" Margin="0,2,8,0" />
+                                 Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Top" Margin="0,2,10,0" />
                       <TextBlock Grid.Column="1" Text="{Binding AppName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Title}" TextWrapping="Wrap"
                                  MaxHeight="40" FontSize="{DynamicResource FontSizeBody}" Margin="0,3,0,0" />

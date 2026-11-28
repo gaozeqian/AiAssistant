@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using AiAssistant.Application.Ports;
+using AiAssistant.Application.UseCases;
 using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Models;
@@ -402,6 +403,119 @@ public sealed class ReportWorkerTests
         Assert.Equal(0, runner.Calls);
     }
 
+    [Fact]
+    public async Task Worker_StartupCatchUp_QueuesMissedWeeklyReport()
+    {
+        var queue = new FakeReportQueue();
+        var runner = new FakeRunner();
+        var clock = new FixedClock(new DateTimeOffset(2026, 11, 30, 9, 0, 0, TimeSpan.Zero));
+        var weeklyRepository = new InMemoryWeeklyRepository();
+        var weekly = new WeeklyReportUseCase(
+            new RangeReportUseCase(new FakeRangeReportService(), clock),
+            weeklyRepository,
+            clock);
+        var events = new FakeEventRepository(
+            [Event("e1", new DateTimeOffset(2026, 11, 26, 10, 0, 0, TimeSpan.Zero))]);
+        var worker = CreateWorker(
+            queue,
+            runner,
+            new InMemoryReportRepository(),
+            events,
+            clock,
+            settings: new ReportScheduleSettings(
+                new TimeOnly(0, 30),
+                Enabled: true,
+                WeeklyEnabled: true,
+                DayOfWeek.Sunday,
+                new TimeOnly(18, 0)),
+            weekly: weekly);
+
+        await worker.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => weeklyRepository.Reports.Count > 0);
+        await worker.DisposeAsync();
+
+        var job = Assert.Single(queue.Jobs);
+        Assert.Equal(ReportJobKind.Weekly, job.Kind);
+        Assert.Equal(new DateOnly(2026, 11, 23), job.TargetDate);
+        Assert.Equal(ReportTriggerSource.StartupCatchUp, job.TriggerSource);
+        Assert.Equal(ReportJobStatus.Completed, job.Status);
+    }
+
+    [Fact]
+    public async Task Worker_StartupCatchUp_SkipsWeekThatAlreadyHasReport()
+    {
+        var queue = new FakeReportQueue();
+        var runner = new FakeRunner();
+        var clock = new FixedClock(new DateTimeOffset(2026, 11, 30, 9, 0, 0, TimeSpan.Zero));
+        var weekStart = new DateOnly(2026, 11, 23);
+        var weeklyRepository = new InMemoryWeeklyRepository();
+        weeklyRepository.Seed(weekStart);
+        var weekly = new WeeklyReportUseCase(
+            new RangeReportUseCase(new FakeRangeReportService(), clock),
+            weeklyRepository,
+            clock);
+        var events = new FakeEventRepository(
+            [Event("e1", new DateTimeOffset(2026, 11, 26, 10, 0, 0, TimeSpan.Zero))]);
+        var worker = CreateWorker(
+            queue,
+            runner,
+            new InMemoryReportRepository(),
+            events,
+            clock,
+            settings: new ReportScheduleSettings(
+                new TimeOnly(0, 30),
+                Enabled: true,
+                WeeklyEnabled: true,
+                DayOfWeek.Sunday,
+                new TimeOnly(18, 0)),
+            weekly: weekly);
+
+        await worker.StartAsync(CancellationToken.None);
+        await Task.Delay(150);
+        await worker.DisposeAsync();
+
+        Assert.Empty(queue.Jobs);
+    }
+
+    private sealed class InMemoryWeeklyRepository : IWeeklyReportRepository
+    {
+        public List<WeeklyReport> Reports { get; } = [];
+
+        public void Seed(DateOnly weekStart) =>
+            Reports.Add(new WeeklyReport(
+                $"seed-{weekStart:yyyyMMdd}", weekStart, weekStart.AddDays(6), 1, "# 周报", "{}", "test",
+                ReportTriggerSource.ScheduledWeekly, DateTimeOffset.UtcNow));
+
+        public Task<WeeklyReport?> GetLatestAsync(DateOnly weekStart, CancellationToken ct) =>
+            Task.FromResult(Reports
+                .Where(report => report.WeekStart == weekStart)
+                .OrderByDescending(report => report.Version)
+                .FirstOrDefault());
+
+        public Task<IReadOnlyList<WeeklyReport>> ListVersionsAsync(DateOnly weekStart, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<WeeklyReport>>(Reports
+                .Where(report => report.WeekStart == weekStart)
+                .OrderByDescending(report => report.Version)
+                .ToList());
+
+        public Task<WeeklyReport> AppendAsync(
+            DateOnly weekStart,
+            DateOnly weekEnd,
+            string markdown,
+            string payloadJson,
+            string modelId,
+            ReportTriggerSource triggerSource,
+            DateTimeOffset generatedAtUtc,
+            CancellationToken ct)
+        {
+            var version = Reports.Count(report => report.WeekStart == weekStart) + 1;
+            var report = new WeeklyReport(
+                $"weekly-{version}", weekStart, weekEnd, version, markdown, payloadJson, modelId, triggerSource, generatedAtUtc);
+            Reports.Add(report);
+            return Task.FromResult(report);
+        }
+    }
+
     private static ReportJobWorker CreateWorker(
         FakeReportQueue queue,
         FakeRunner runner,
@@ -409,7 +523,8 @@ public sealed class ReportWorkerTests
         FakeEventRepository events,
         FixedClock clock,
         ReportScheduleOptions? options = null,
-        ReportScheduleSettings? settings = null) =>
+        ReportScheduleSettings? settings = null,
+        WeeklyReportUseCase? weekly = null) =>
         new(
             queue,
             runner,
@@ -418,7 +533,8 @@ public sealed class ReportWorkerTests
             clock,
             new FakeScheduleSettings(settings ?? ReportScheduleSettings.Default),
             options ?? new ReportScheduleOptions { PollInterval = TimeSpan.FromMilliseconds(10) },
-            NullLogger<ReportJobWorker>.Instance);
+            NullLogger<ReportJobWorker>.Instance,
+            weekly);
 
     private static ActivityEvent Event(string id, DateTimeOffset occurredAtUtc) =>
         new(
@@ -470,6 +586,7 @@ public sealed class ReportWorkerTests
             {
                 var existing = !request.ForceOverwrite
                     ? Jobs.FirstOrDefault(job => job.TargetDate == request.TargetDate &&
+                                                 job.Kind == request.Kind &&
                                                  job.Status is ReportJobStatus.Pending or ReportJobStatus.Running)
                     : null;
                 if (existing is not null)
@@ -482,7 +599,8 @@ public sealed class ReportWorkerTests
                     request.TargetDate,
                     request.TriggerSource,
                     request.ForceOverwrite,
-                    DateTimeOffset.UtcNow);
+                    DateTimeOffset.UtcNow,
+                    kind: request.Kind);
                 Jobs.Add(job);
                 return Task.FromResult(new EnqueueResult(job.Id, false));
             }
@@ -531,6 +649,16 @@ public sealed class ReportWorkerTests
         {
             await Task.Yield();
             var matches = events.Where(item => query.LocalDate is null || item.Timestamp.LocalDate == query.LocalDate);
+            if (query.FromLocalDate is { } fromLocalDate)
+            {
+                matches = matches.Where(item => item.Timestamp.LocalDate >= fromLocalDate);
+            }
+
+            if (query.ToLocalDate is { } toLocalDate)
+            {
+                matches = matches.Where(item => item.Timestamp.LocalDate <= toLocalDate);
+            }
+
             if (query.FromUtc is { } fromUtc)
             {
                 matches = matches.Where(item => item.Timestamp.OccurredAtUtc >= fromUtc);
