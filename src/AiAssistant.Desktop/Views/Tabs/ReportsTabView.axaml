@@ -31,20 +31,20 @@
         </StackPanel>
 
         <!-- 2. 四种操作两边完全一致。 -->
-        <WrapPanel Grid.Row="2" Margin="0,12,0,0">
-          <Button Classes="primary" Content="生成" Command="{Binding ActiveGenerateCommand}"
-                  IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="6" Margin="0,12,0,0">
+          <Button Classes="primary reportAction" Content="生成" Command="{Binding ActiveGenerateCommand}"
+                  IsEnabled="{Binding !IsBusy}"
                   automation:AutomationProperties.Name="生成报告" />
-          <Button Classes="secondary" Content="强制重生成" Command="{Binding ActiveRegenerateCommand}"
-                  IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+          <Button Grid.Column="1" Classes="secondary reportAction" Content="强制重生成"
+                  Command="{Binding ActiveRegenerateCommand}" IsEnabled="{Binding !IsBusy}"
                   automation:AutomationProperties.Name="强制重新生成报告" />
-          <Button Classes="secondary" Content="刷新" Command="{Binding ActiveRefreshCommand}"
-                  IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+          <Button Grid.Column="2" Classes="secondary reportAction" Content="刷新"
+                  Command="{Binding ActiveRefreshCommand}" IsEnabled="{Binding !IsBusy}"
                   automation:AutomationProperties.Name="刷新报告版本" />
-          <Button Classes="secondary" Content="导出…" Command="{Binding ActiveExportCommand}"
-                  Margin="0,0,8,8"
+          <Button Grid.Column="3" Classes="secondary reportAction" Content="导出…"
+                  Command="{Binding ActiveExportCommand}"
                   automation:AutomationProperties.Name="导出报告" />
-        </WrapPanel>
+        </Grid>
 
         <!-- 3. 自动生成：日报按天、周报按周，共用同一个设置文件。 -->
         <Expander Grid.Row="3" IsExpanded="False" HorizontalAlignment="Stretch" Margin="0,0,0,12"

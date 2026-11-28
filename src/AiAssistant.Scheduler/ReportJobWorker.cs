@@ -131,6 +131,12 @@ public sealed class ReportJobWorker : IAsyncDisposable
                     continue;
                 }
 
+                if (job.Kind == ReportJobKind.Weekly)
+                {
+                    await RunWeeklyJobAsync(job, ct);
+                    continue;
+                }
+
                 Raise(job, "正在生成日报");
                 var outcome = await _runner.GenerateAsync(
                     new ReportJobRequest(job.TargetDate, job.TriggerSource, job.ForceOverwrite),
@@ -165,6 +171,48 @@ public sealed class ReportJobWorker : IAsyncDisposable
                 _logger.LogWarning("Report worker iteration failed with {ExceptionType}.", ex.GetType().Name);
                 await Task.Delay(_options.PollInterval, ct);
             }
+        }
+    }
+
+    private async Task RunWeeklyJobAsync(ReportJob job, CancellationToken ct)
+    {
+        if (_weeklyReports is null)
+        {
+            job.RecordFailure("weekly report use case is not configured", _clock.UtcNow);
+            await _queue.UpdateAsync(job, ct);
+            Raise(job, "周报生成失败");
+            return;
+        }
+
+        Raise(job, "正在生成周报");
+        try
+        {
+            var (report, created) = await _weeklyReports.GenerateWithOutcomeAsync(
+                job.TargetDate,
+                job.ForceOverwrite,
+                job.TriggerSource,
+                ct);
+            if (created)
+            {
+                job.MarkCompleted(_clock.UtcNow);
+            }
+            else
+            {
+                job.MarkSkippedAlreadyExists(_clock.UtcNow);
+            }
+
+            await _queue.UpdateAsync(job, ct);
+            Raise(job, created ? $"周报 v{report.Version} 已生成" : "已存在周报，跳过重复生成");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            job.RecordFailure($"{ex.GetType().Name}: {ex.Message}", _clock.UtcNow);
+            await _queue.UpdateAsync(job, ct);
+            Raise(job, "周报生成失败");
         }
     }
 
@@ -232,17 +280,26 @@ public sealed class ReportJobWorker : IAsyncDisposable
 
         try
         {
-            var report = await _weeklyReports.GenerateAsync(
-                now.LocalDate.AddDays(-1),
-                forceOverwrite: false,
-                ReportTriggerSource.ScheduledWeekly,
+            // 周报和日报走同一条队列：重试次数、退避与失败记录都由 report_jobs 负责。
+            var weekStart = RangeReportUseCase.WeekContaining(now.LocalDate.AddDays(-1)).From;
+            if (await HasActiveJobAsync(weekStart, forceOverwrite: false, ReportJobKind.Weekly, ct))
+            {
+                return;
+            }
+
+            var enqueued = await _queue.EnqueueAsync(
+                new ReportJobRequest(
+                    weekStart,
+                    ReportTriggerSource.ScheduledWeekly,
+                    ForceOverwrite: false,
+                    ReportJobKind.Weekly),
                 ct);
             _lastWeeklyDate = now.LocalDate;
             _logger.LogInformation(
-                "Generated scheduled weekly report {From}..{To} (v{Version}).",
-                report.WeekStart,
-                report.WeekEnd,
-                report.Version);
+                "Queued scheduled weekly report for week {WeekStart} (job={JobId}, deduplicated={Deduplicated}).",
+                weekStart,
+                enqueued.JobId,
+                enqueued.DeduplicatedExistingPendingJob);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -286,7 +343,7 @@ public sealed class ReportJobWorker : IAsyncDisposable
             forceOverwrite = true;
         }
 
-        if (await HasActiveJobAsync(targetDate, forceOverwrite, ct))
+        if (await HasActiveJobAsync(targetDate, forceOverwrite, ReportJobKind.Daily, ct))
         {
             return;
         }
@@ -315,10 +372,15 @@ public sealed class ReportJobWorker : IAsyncDisposable
         return false;
     }
 
-    private async Task<bool> HasActiveJobAsync(DateOnly targetDate, bool forceOverwrite, CancellationToken ct)
+    private async Task<bool> HasActiveJobAsync(
+        DateOnly targetDate,
+        bool forceOverwrite,
+        ReportJobKind kind,
+        CancellationToken ct)
     {
         var jobs = await _queue.ListRecentJobsAsync(200, ct);
         return jobs.Any(job =>
+            job.Kind == kind &&
             job.TargetDate == targetDate &&
             job.Status is ReportJobStatus.Pending or ReportJobStatus.Running &&
             (job.ForceOverwrite || !forceOverwrite));

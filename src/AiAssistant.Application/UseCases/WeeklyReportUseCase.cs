@@ -24,16 +24,27 @@ public sealed class WeeklyReportUseCase(
         DateOnly anyDateInWeek,
         bool forceOverwrite,
         ReportTriggerSource triggerSource,
+        CancellationToken ct = default) =>
+        (await GenerateWithOutcomeAsync(anyDateInWeek, forceOverwrite, triggerSource, ct)).Report;
+
+    /// <summary>
+    /// Same as <see cref="GenerateAsync"/> but also reports whether a new version was written, so the
+    /// job worker can mark the queued job as completed or skipped.
+    /// </summary>
+    public async Task<(WeeklyReport Report, bool Created)> GenerateWithOutcomeAsync(
+        DateOnly anyDateInWeek,
+        bool forceOverwrite,
+        ReportTriggerSource triggerSource,
         CancellationToken ct = default)
     {
         var (from, to) = RangeReportUseCase.WeekContaining(anyDateInWeek);
         if (!forceOverwrite && await repository.GetLatestAsync(from, ct) is { } existing)
         {
-            return existing;
+            return (existing, false);
         }
 
         var report = await range.GenerateWeekAsync(anyDateInWeek, ct);
-        return await repository.AppendAsync(
+        var stored = await repository.AppendAsync(
             from,
             to,
             report.Markdown,
@@ -42,6 +53,7 @@ public sealed class WeeklyReportUseCase(
             triggerSource,
             clock.UtcNow,
             ct);
+        return (stored, true);
     }
 
     public Task<IReadOnlyList<WeeklyReport>> ListVersionsAsync(

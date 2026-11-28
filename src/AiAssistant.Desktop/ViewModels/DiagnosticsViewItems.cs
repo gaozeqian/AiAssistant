@@ -61,7 +61,9 @@ public sealed class CapabilityItem(
 
 public sealed class ReportJobItem(ReportJob job)
 {
-    public string DateText => job.TargetDate.ToString("yyyy-MM-dd", CultureInfo.CurrentCulture);
+    public string DateText => job.Kind == ReportJobKind.Weekly
+        ? $"周报 · {job.TargetDate:yyyy-MM-dd}"
+        : job.TargetDate.ToString("yyyy-MM-dd", CultureInfo.CurrentCulture);
 
     public string StatusText => job.Status switch
     {

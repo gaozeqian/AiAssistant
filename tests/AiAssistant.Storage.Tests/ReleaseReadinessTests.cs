@@ -59,6 +59,9 @@ public sealed class ReleaseReadinessTests : IDisposable
                 ) VALUES ('v1-row', '2026-11-20T01:00:00.0000000+00:00', '你好时光', '暂停采集', 'PauseCapture', '{}', 0, NULL, NULL, NULL);
                 ALTER TABLE voice_commands DROP COLUMN audio_content_id;
                 ALTER TABLE voice_commands DROP COLUMN audio_cleared_at_utc;
+                -- v4/v5 也要回退，否则重放迁移会撞上已存在的列/表。
+                DROP TABLE IF EXISTS weekly_reports;
+                ALTER TABLE report_jobs DROP COLUMN kind;
                 DELETE FROM schema_migrations WHERE version >= 2;
                 """;
             await command.ExecuteNonQueryAsync(CancellationToken.None);

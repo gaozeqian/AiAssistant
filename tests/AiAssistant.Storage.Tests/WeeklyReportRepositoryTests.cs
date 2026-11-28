@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using AiAssistant.Application.Ports;
 using AiAssistant.Core.Domain;
 using AiAssistant.Storage.KeyStores;
 using AiAssistant.Storage.Media;
@@ -104,6 +105,33 @@ public sealed class WeeklyReportRepositoryTests : IDisposable
 
         await deletion.PurgeAllAsync(CancellationToken.None);
         Assert.Empty(await weekly.ListVersionsAsync(weekStart, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task JobQueue_KeepsDailyAndWeeklyJobsForTheSameDateSeparate()
+    {
+        var (_, factory, _) = await CreateStorageAsync("weekly-queue");
+        var queue = new SqliteReportJobQueue(factory, new SystemClock());
+        var weekStart = new DateOnly(2026, 11, 23);
+
+        var daily = await queue.EnqueueAsync(
+            new ReportJobRequest(weekStart, ReportTriggerSource.Manual), CancellationToken.None);
+        var weekly = await queue.EnqueueAsync(
+            new ReportJobRequest(weekStart, ReportTriggerSource.ScheduledWeekly, false, ReportJobKind.Weekly),
+            CancellationToken.None);
+        Assert.False(daily.DeduplicatedExistingPendingJob);
+        Assert.False(weekly.DeduplicatedExistingPendingJob);
+
+        // 同类型重复入队要去重，跨类型不能互相吞掉。
+        var duplicate = await queue.EnqueueAsync(
+            new ReportJobRequest(weekStart, ReportTriggerSource.Manual), CancellationToken.None);
+        Assert.True(duplicate.DeduplicatedExistingPendingJob);
+        Assert.Equal(daily.JobId, duplicate.JobId);
+
+        var jobs = await queue.ListRecentJobsAsync(10, CancellationToken.None);
+        Assert.Equal(2, jobs.Count);
+        Assert.Contains(jobs, job => job.Kind == ReportJobKind.Weekly);
+        Assert.Contains(jobs, job => job.Kind == ReportJobKind.Daily);
     }
 
     private async Task<(SqliteWeeklyReportRepository Weekly, EncryptedSqliteConnectionFactory Factory, DataDeletionService Deletion)>

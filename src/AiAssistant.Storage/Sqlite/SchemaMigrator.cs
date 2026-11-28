@@ -136,6 +136,12 @@ internal static class SchemaMigrator
 
             CREATE INDEX IF NOT EXISTS ix_weekly_reports_week ON weekly_reports(week_start, version);
             """)
+        ,
+        new(
+            new SchemaVersion(5, "S10_ReportJobKind"),
+            """
+            ALTER TABLE report_jobs ADD COLUMN kind INTEGER NOT NULL DEFAULT 0;
+            """)
     ];
 
     public static async Task<SchemaVersion> MigrateAsync(SqliteConnection connection, CancellationToken ct = default)

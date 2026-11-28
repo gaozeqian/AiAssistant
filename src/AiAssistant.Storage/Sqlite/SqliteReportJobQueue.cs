@@ -23,10 +23,11 @@ public sealed class SqliteReportJobQueue(EncryptedSqliteConnectionFactory connec
             existingCmd.Transaction = tx;
             existingCmd.CommandText = """
                 SELECT id FROM report_jobs
-                WHERE target_date = $date AND status IN (0, 1)
+                WHERE target_date = $date AND kind = $kind AND status IN (0, 1)
                 LIMIT 1;
                 """;
             existingCmd.Parameters.AddWithValue("$date", dateStr);
+            existingCmd.Parameters.AddWithValue("$kind", (int)request.Kind);
             if (await existingCmd.ExecuteScalarAsync(ct) is string existingId)
             {
                 await tx.CommitAsync(ct);
@@ -41,9 +42,9 @@ public sealed class SqliteReportJobQueue(EncryptedSqliteConnectionFactory connec
             insCmd.Transaction = tx;
             insCmd.CommandText = """
                 INSERT INTO report_jobs (
-                    id, target_date, trigger_source, force_overwrite, status, attempts, last_error, created_at_utc, next_attempt_at_utc, finished_at_utc
+                    id, target_date, trigger_source, force_overwrite, status, attempts, last_error, created_at_utc, next_attempt_at_utc, finished_at_utc, kind
                 ) VALUES (
-                    $id, $date, $source, $force, 0, 0, NULL, $now, $now, NULL
+                    $id, $date, $source, $force, 0, 0, NULL, $now, $now, NULL, $kind
                 );
                 """;
             insCmd.Parameters.AddWithValue("$id", jobId);
@@ -51,6 +52,7 @@ public sealed class SqliteReportJobQueue(EncryptedSqliteConnectionFactory connec
             insCmd.Parameters.AddWithValue("$source", (int)request.TriggerSource);
             insCmd.Parameters.AddWithValue("$force", request.ForceOverwrite ? 1 : 0);
             insCmd.Parameters.AddWithValue("$now", now.ToUniversalTime().ToString("O"));
+            insCmd.Parameters.AddWithValue("$kind", (int)request.Kind);
             await insCmd.ExecuteNonQueryAsync(ct);
         }
 
@@ -68,7 +70,7 @@ public sealed class SqliteReportJobQueue(EncryptedSqliteConnectionFactory connec
         {
             cmd.Transaction = tx;
             cmd.CommandText = """
-                SELECT id, target_date, trigger_source, force_overwrite, status, attempts, last_error, created_at_utc, next_attempt_at_utc, finished_at_utc
+                SELECT id, target_date, trigger_source, force_overwrite, status, attempts, last_error, created_at_utc, next_attempt_at_utc, finished_at_utc, kind
                 FROM report_jobs
                 WHERE status = 1;
                 """;
@@ -101,7 +103,7 @@ public sealed class SqliteReportJobQueue(EncryptedSqliteConnectionFactory connec
         {
             cmd.Transaction = tx;
             cmd.CommandText = """
-                SELECT id, target_date, trigger_source, force_overwrite, status, attempts, last_error, created_at_utc, next_attempt_at_utc, finished_at_utc
+                SELECT id, target_date, trigger_source, force_overwrite, status, attempts, last_error, created_at_utc, next_attempt_at_utc, finished_at_utc, kind
                 FROM report_jobs
                 WHERE status = 0 AND (next_attempt_at_utc IS NULL OR next_attempt_at_utc <= $now)
                 ORDER BY created_at_utc ASC
@@ -141,7 +143,7 @@ public sealed class SqliteReportJobQueue(EncryptedSqliteConnectionFactory connec
         await using var conn = await connectionFactory.OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            SELECT id, target_date, trigger_source, force_overwrite, status, attempts, last_error, created_at_utc, next_attempt_at_utc, finished_at_utc
+            SELECT id, target_date, trigger_source, force_overwrite, status, attempts, last_error, created_at_utc, next_attempt_at_utc, finished_at_utc, kind
             FROM report_jobs
             ORDER BY created_at_utc DESC
             LIMIT $limit;
@@ -194,5 +196,6 @@ public sealed class SqliteReportJobQueue(EncryptedSqliteConnectionFactory connec
             reader.GetInt32(5),
             reader.IsDBNull(6) ? null : reader.GetString(6),
             reader.IsDBNull(8) ? null : DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-            reader.IsDBNull(9) ? null : DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
+            reader.IsDBNull(9) ? null : DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            (ReportJobKind)reader.GetInt32(10));
 }

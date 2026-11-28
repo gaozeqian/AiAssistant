@@ -9,6 +9,13 @@ public enum ReportTriggerSource
     ScheduledWeekly = 4
 }
 
+/// <summary>Which report a queued job produces. Weekly jobs target the Monday that starts the week.</summary>
+public enum ReportJobKind
+{
+    Daily = 0,
+    Weekly = 1
+}
+
 public enum ReportJobStatus
 {
     Pending = 0,
@@ -26,6 +33,7 @@ public sealed class ReportJob
     public const int MaxAttempts = 3;
 
     public string Id { get; }
+    public ReportJobKind Kind { get; }
     public DateOnly TargetDate { get; }
     public ReportTriggerSource TriggerSource { get; }
     public bool ForceOverwrite { get; }
@@ -46,10 +54,12 @@ public sealed class ReportJob
         int attempts = 0,
         string? lastError = null,
         DateTimeOffset? nextAttemptAtUtc = null,
-        DateTimeOffset? finishedAtUtc = null)
+        DateTimeOffset? finishedAtUtc = null,
+        ReportJobKind kind = ReportJobKind.Daily)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         Id = id;
+        Kind = kind;
         TargetDate = targetDate;
         TriggerSource = triggerSource;
         ForceOverwrite = forceOverwrite;
