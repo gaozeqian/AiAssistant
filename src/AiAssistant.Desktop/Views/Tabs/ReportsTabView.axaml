@@ -12,7 +12,7 @@
       <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <!-- 0. 共用标题 + 日报/周报分段开关：左右两栏都跟随这个开关。 -->
         <StackPanel Spacing="{DynamicResource SpacingSm}">
-          <TextBlock Text="日报与周报" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
+          <TextBlock Text="报告设置" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
           <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
             <Button Content="日报" Classes="segment" Classes.selected="{Binding ShowDailyView}"
                     Command="{Binding ShowDailyCommand}"
@@ -201,14 +201,13 @@
             </StackPanel>
           </Border>
           <Grid Grid.Row="1">
-            <ScrollViewer>
-              <!-- 阅读区限宽：1709px 下 Markdown 会铺满整屏。字号沿用库的 FluentTheme 样式。 -->
-              <md:MarkdownScrollViewer Markdown="{Binding Markdown}"
-                                       MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left" />
-            </ScrollViewer>
+            <!-- 阅读区限宽：1709px 下 Markdown 会铺满整屏。MarkdownScrollViewer 自己滚，外面不再套一层。 -->
+            <md:MarkdownScrollViewer Markdown="{Binding Markdown}"
+                                     MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left" />
             <TextBlock Text="还没有可显示的日报正文。先在左侧选择日期并生成。"
-                       Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
+                       Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" TextAlignment="Center"
+                       MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left"
+                       VerticalAlignment="Center" Margin="24"
                        IsVisible="{Binding !HasMarkdown}" />
           </Grid>
         </Grid>
@@ -233,8 +232,9 @@
             <md:MarkdownScrollViewer Markdown="{Binding WeeklyMarkdown}"
                                      MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left" />
             <TextBlock Text="还没有周报。先在左侧选择日期并点击「生成」。"
-                       Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
+                       Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" TextAlignment="Center"
+                       MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left"
+                       VerticalAlignment="Center" Margin="24"
                        IsVisible="{Binding !HasWeeklyMarkdown}" />
           </Grid>
         </Grid>

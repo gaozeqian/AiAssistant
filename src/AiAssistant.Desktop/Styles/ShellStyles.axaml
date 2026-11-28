@@ -150,7 +150,7 @@
     <Setter Property="Background" Value="{DynamicResource HeaderBadgeBackgroundBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource HeaderBadgeForegroundBrush}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusLg}" />
-    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="Padding" Value="10,4" />
     <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
   </Style>
   <Style Selector="Button.headerChip.headerDanger">
