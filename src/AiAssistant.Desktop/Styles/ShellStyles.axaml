@@ -117,6 +117,7 @@
         <Setter Property="Foreground" Value="{DynamicResource DangerForegroundBrush}" />
       </Style>
     </ControlTheme>
+
   </Styles.Resources>
 
   <Style Selector="NumericUpDown /template/ ButtonSpinner#PART_Spinner">
@@ -128,6 +129,16 @@
   <Style Selector="Button.secondary">
     <Setter Property="Padding" Value="14,8" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
+  </Style>
+  <!--
+    Fluent 的 DatePicker 在 ControlTheme 里写死 MinWidth=296 + HorizontalAlignment=Left：
+    放进「标签 + 控件」的窄列会撑出容器，放进卡片又不会铺满。
+    模板本身改不了列宽——DatePicker.SetGrid() 会在运行时重建 ColumnDefinitions
+    （月 138*、年/日 78*，按当前文化的短日期顺序排），所以只在这里放开宽度与对齐。
+  -->
+  <Style Selector="DatePicker">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
   </Style>
   <!-- 报告操作行：4 个按钮在 316px 内等宽排布，14px 放不下「强制重生成」，用 12px + 紧凑内距。 -->
   <Style Selector="Button.reportAction">

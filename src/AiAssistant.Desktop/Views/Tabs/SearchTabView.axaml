@@ -14,19 +14,19 @@
           <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
                    PlaceholderText="输入关键词或问题，例如：迁移进展如何"
                    automation:AutomationProperties.Name="检索关键词或问题" />
-          <!-- 标签在上：40px 行内标签会让 DatePicker 的最小宽度撑出卡片 20px。 -->
-          <StackPanel Spacing="{DynamicResource SpacingXs}" Margin="0,4,0,0">
-            <TextBlock Text="从" Classes="muted" />
-            <DatePicker SelectedDate="{Binding FromDate}" Initialized="OnDatePickerInitialized"
+          <!-- DatePicker 已放开最小宽度，标签可以回到同一行。 -->
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource SpacingSm}" Margin="0,4,0,0">
+            <TextBlock Text="从" Classes="muted" VerticalAlignment="Center" />
+            <DatePicker Grid.Column="1" SelectedDate="{Binding FromDate}" Initialized="OnDatePickerInitialized"
                         HorizontalAlignment="Stretch"
                         automation:AutomationProperties.Name="检索起始日期" />
-          </StackPanel>
-          <StackPanel Spacing="{DynamicResource SpacingXs}" Margin="0,6,0,0">
-            <TextBlock Text="到" Classes="muted" />
-            <DatePicker SelectedDate="{Binding ToDate}" Initialized="OnDatePickerInitialized"
+          </Grid>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource SpacingSm}" Margin="0,6,0,0">
+            <TextBlock Text="到" Classes="muted" VerticalAlignment="Center" />
+            <DatePicker Grid.Column="1" SelectedDate="{Binding ToDate}" Initialized="OnDatePickerInitialized"
                         HorizontalAlignment="Stretch"
                         automation:AutomationProperties.Name="检索结束日期" />
-          </StackPanel>
+          </Grid>
         </StackPanel>
         <!-- 与 日报/周报 一致：三按钮等宽排布，宽度与上方输入框对齐。 -->
         <Grid Grid.Row="2" ColumnDefinitions="*,*,*" ColumnSpacing="6" Margin="0,12,0,0">
