@@ -73,7 +73,7 @@ git status --ignored --porcelain   # 确认源码树无逃逸产物
 ```bash
 # Windows（先 portable，再 MSI 复用同一 publish 载荷）
 pwsh build/package/package-windows.ps1 -SkipModelBundle -DevSelfSigned
-pwsh build/package/package-windows-msi.ps1 -Version 0.1.7 -DevSelfSigned -CertificatePath <cer>
+pwsh build/package/package-windows-msi.ps1 -Version 0.1.8 -DevSelfSigned -CertificatePath <cer>
 
 # macOS
 bash build/package/package-macos.sh --skip-sign --skip-models

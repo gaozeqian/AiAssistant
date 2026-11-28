@@ -144,23 +144,26 @@ public static class UiE2ERunner
 
         await StepAsync("周报生成（真实模型）", async () =>
         {
-            if (shell.Search is null)
+            if (shell.Reports is null)
             {
-                throw new SkipStepException("检索页未装配");
+                throw new SkipStepException("报告页未装配");
             }
 
-            await WaitAsync(shell.Search.WeeklyReportCommand.ExecuteAsync(null), TimeSpan.FromSeconds(240));
-            if (!shell.Search.HasWeeklyReport)
+            // 周报已并入「日报/周报」页：先切到该页并激活周报视图，再触发生成。
+            shell.SelectedSectionIndex = ShellSection.Reports;
+            shell.Reports.ShowWeeklyCommand.Execute(null);
+            await WaitAsync(shell.Reports.WeeklyReportCommand.ExecuteAsync(null), TimeSpan.FromSeconds(240));
+            if (!shell.Reports.HasWeeklyReport)
             {
-                throw new InvalidOperationException($"周报未生成：{shell.Search.WeeklyStatus}");
+                throw new InvalidOperationException($"周报未生成：{shell.Reports.WeeklyStatus}");
             }
 
-            if (string.IsNullOrWhiteSpace(shell.Search.WeeklyMarkdown))
+            if (string.IsNullOrWhiteSpace(shell.Reports.WeeklyMarkdown))
             {
                 throw new InvalidOperationException("周报正文为空");
             }
 
-            return $"status={shell.Search.WeeklyStatus}";
+            return $"status={shell.Reports.WeeklyStatus}";
         });
 
         await StepAsync("暂停采集并更新顶部横幅", async () =>
