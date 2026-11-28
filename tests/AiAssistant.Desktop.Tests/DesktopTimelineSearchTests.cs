@@ -209,7 +209,6 @@ public sealed partial class DesktopViewModelTests
             0.5);
         var search = new SearchViewModel(
             new EvidenceSearchUseCase(new FakeEvidenceSearch(evidence), new FakeAnswerer(), clock),
-            new RangeReportUseCase(new FakeRangeReportService(), clock),
             TempArtifactDirectory.CreatePath("search-ui"));
         search.Query = "迁移";
         await search.SearchCommand.ExecuteAsync(null);
@@ -265,7 +264,6 @@ public sealed partial class DesktopViewModelTests
             0.5);
         var search = new SearchViewModel(
             new EvidenceSearchUseCase(new FakeEvidenceSearch(evidence), new FakeAnswerer(), clock),
-            new RangeReportUseCase(new FakeRangeReportService(), clock),
             TempArtifactDirectory.CreatePath("search-ui"));
 
         var diagnostics = new DiagnosticsUseCase(

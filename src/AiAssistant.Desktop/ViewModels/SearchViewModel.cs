@@ -9,11 +9,10 @@ namespace AiAssistant.Desktop.ViewModels;
 
 public sealed record EvidenceNavigationRequest(DateOnly LocalDate, string EventId);
 
-/// <summary>Hybrid search, evidence-grounded Q&amp;A and weekly range reports in one panel.</summary>
+/// <summary>Hybrid search and evidence-grounded Q&amp;A. Weekly range reports live in the reports tab.</summary>
 public sealed class SearchViewModel : ObservableObject, IDisposable
 {
     private readonly EvidenceSearchUseCase _search;
-    private readonly RangeReportUseCase _range;
     private readonly IClock _clock;
     private readonly string _exportDirectory;
     private readonly CancellationTokenSource _disposeCts = new();
@@ -24,23 +23,18 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
     private string _answerMeta = "尚无问答记录";
     private string _statusMessage = "默认检索近 7 天，可调整日期范围。";
     private string _errorMessage = string.Empty;
-    private string _weeklyMarkdown = string.Empty;
-    private string _weeklyStatus = "尚未生成周报";
     private bool _isBusy;
     private double _progressPulseValue;
     private bool _disposed;
     private EvidenceQaAnswer? _lastAnswer;
-    private RangeReport? _weeklyReport;
     private readonly ProgressPulseController _progressPulse;
 
     public SearchViewModel(
         EvidenceSearchUseCase search,
-        RangeReportUseCase range,
         string exportDirectory,
         IClock? clock = null)
     {
         _search = search ?? throw new ArgumentNullException(nameof(search));
-        _range = range ?? throw new ArgumentNullException(nameof(range));
         _exportDirectory = exportDirectory ?? throw new ArgumentNullException(nameof(exportDirectory));
         _clock = clock ?? new SystemClock();
         _progressPulse = new ProgressPulseController(value => ProgressPulse = value);
@@ -50,8 +44,6 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
         SearchCommand = new AsyncRelayCommand(SearchAsync);
         AskCommand = new AsyncRelayCommand(AskAsync);
         ExportAnswerCommand = new AsyncRelayCommand(ExportAnswerAsync);
-        WeeklyReportCommand = new AsyncRelayCommand(GenerateWeeklyReportAsync);
-        ExportWeeklyCommand = new AsyncRelayCommand(ExportWeeklyReportAsync);
         // 空态跟着"有没有证据"走，而不是"有没有选中"。
         Evidence.CollectionChanged += (_, _) =>
         {
@@ -68,17 +60,11 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
     /// <summary>Empty state for the evidence list: only when nothing is running, to avoid a flash.</summary>
     public bool ShowEvidenceEmpty => !HasEvidence && !IsBusy;
 
-    public ObservableCollection<DailyBarItem> WeeklyBars { get; } = [];
-
     public IAsyncRelayCommand SearchCommand { get; }
 
     public IAsyncRelayCommand AskCommand { get; }
 
     public IAsyncRelayCommand ExportAnswerCommand { get; }
-
-    public IAsyncRelayCommand WeeklyReportCommand { get; }
-
-    public IAsyncRelayCommand ExportWeeklyCommand { get; }
 
     public event EventHandler<EvidenceNavigationRequest>? NavigationRequested;
 
@@ -130,18 +116,6 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
         }
     }
 
-    public string WeeklyMarkdown
-    {
-        get => _weeklyMarkdown;
-        private set => SetProperty(ref _weeklyMarkdown, value);
-    }
-
-    public string WeeklyStatus
-    {
-        get => _weeklyStatus;
-        private set => SetProperty(ref _weeklyStatus, value);
-    }
-
     public bool IsBusy
     {
         get => _isBusy;
@@ -165,8 +139,6 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
     public bool HasAnswer => _lastAnswer is not null;
-
-    public bool HasWeeklyReport => _weeklyReport is not null;
 
     /// <summary>Save-file dialog, wired by the shell after the window exists; null falls back to the export directory.</summary>
     public ISaveFilePicker? SaveFilePicker { get; set; }
@@ -286,74 +258,6 @@ public sealed class SearchViewModel : ObservableObject, IDisposable
         });
     }
 
-    private async Task GenerateWeeklyReportAsync()
-    {
-        await RunAsync(async ct =>
-        {
-            var anchor = ResolveTo();
-            var report = await _range.GenerateWeekAsync(anchor, ct);
-            _weeklyReport = report;
-            WeeklyMarkdown = report.Markdown;
-            WeeklyBars.Clear();
-            foreach (var day in report.DailyStats)
-            {
-                WeeklyBars.Add(new DailyBarItem(day, report.MaxDailyEvents));
-            }
-
-            WeeklyStatus = string.Create(
-                CultureInfo.InvariantCulture,
-                $"{report.FromDate:MM-dd} ~ {report.ToDate:MM-dd} · {report.TotalEvents} 条 · 活跃 {report.TotalActiveMinutes} 分钟 · {(report.Degraded ? $"统计模式（{report.DegradedReason}）" : "本地模型摘要")}");
-            OnPropertyChanged(nameof(HasWeeklyReport));
-            StatusMessage = "周报已生成，可导出 Markdown / SVG / PNG / PDF / JSON。";
-        });
-    }
-
-    private async Task ExportWeeklyReportAsync()
-    {
-        if (_weeklyReport is null)
-        {
-            return;
-        }
-
-        await RunAsync(async ct =>
-        {
-            var report = _weeklyReport;
-            if (SaveFilePicker is not null)
-            {
-                var types = new List<SaveFileType>
-                {
-                    new("Markdown", "md"),
-                    new("SVG 图表", "svg"),
-                    new("PNG 图片", "png"),
-                    new("PDF 文档", "pdf"),
-                    new("JSON", "json")
-                };
-
-                var picked = await SaveFilePicker.PickSaveFileAsync(
-                    $"AiAssistant-周报-{report.FromDate:yyyyMMdd}-{report.ToDate:yyyyMMdd}.md",
-                    types);
-                if (picked is null)
-                {
-                    return;
-                }
-
-                var path = await _range.ExportSingleAsync(
-                    report,
-                    ReportExportFormatExtensions.FromExtension(picked.Extension),
-                    picked.Path,
-                    ct);
-                StatusMessage = $"已导出周报：{path}";
-            }
-            else
-            {
-                var export = await _range.ExportAsync(report, _exportDirectory, ct);
-                StatusMessage = export.PngPath is null
-                    ? $"已导出周报（Markdown / SVG / JSON）：{export.MarkdownPath}"
-                    : $"已导出周报（Markdown / SVG / PNG / PDF / JSON）：{export.MarkdownPath}";
-            }
-        });
-    }
-
     private async Task RunAsync(Func<CancellationToken, Task> action)
     {
         if (_disposed)
@@ -433,13 +337,4 @@ public sealed class EvidenceCardItem
     public string MediaText => Reference.HasMedia
         ? "媒体仍在保留期内，可在时间线按需解密查看"
         : "原始媒体已清理，仅保留结构化证据";
-}
-
-public sealed class DailyBarItem(DailyActivityStat stat, int maxEvents)
-{
-    public string DateText { get; } = stat.Date.ToString("MM-dd", CultureInfo.InvariantCulture);
-
-    public string CountText { get; } = string.Create(CultureInfo.InvariantCulture, $"{stat.EventCount} 条");
-
-    public double BarWidthPixels { get; } = Math.Max(2, stat.BarWidthPercent(maxEvents) * 2.4);
 }

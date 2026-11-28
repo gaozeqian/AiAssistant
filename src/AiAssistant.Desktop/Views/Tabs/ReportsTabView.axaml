@@ -75,32 +75,83 @@
     </Border>
 
     <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}">
-      <Grid RowDefinitions="Auto,Auto,*">
-        <Grid ColumnDefinitions="*,Auto">
-          <StackPanel>
-            <TextBlock Text="日报正文" FontSize="{DynamicResource FontSizePage}" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding VersionText}" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
+      <Grid RowDefinitions="Auto,*">
+        <!-- 头部：标题 + 日报/周报分段开关 + 对应导出动作 -->
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingMd}" VerticalAlignment="Center">
+            <TextBlock Text="{Binding ContentTitle}" FontSize="{DynamicResource FontSizePage}" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}" VerticalAlignment="Center">
+              <Button Content="日报" Classes="segment" Classes.selected="{Binding ShowDailyView}"
+                      Command="{Binding ShowDailyCommand}"
+                      automation:AutomationProperties.Name="查看日报" />
+              <Button Content="周报" Classes="segment" Classes.selected="{Binding IsWeeklyView}"
+                      Command="{Binding ShowWeeklyCommand}"
+                      automation:AutomationProperties.Name="查看周报" />
+            </StackPanel>
           </StackPanel>
-          <Button Grid.Column="1" Classes="secondary" Content="导出…"
-                  Command="{Binding ExportCommand}" IsEnabled="{Binding HasReport}"
-                  automation:AutomationProperties.Name="导出日报" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}">
+            <Button Classes="secondary" Content="导出…" IsVisible="{Binding ShowDailyView}"
+                    Command="{Binding ExportCommand}" IsEnabled="{Binding HasReport}"
+                    automation:AutomationProperties.Name="导出日报" />
+            <Button Classes="primary" Content="生成周报" IsVisible="{Binding IsWeeklyView}"
+                    Command="{Binding WeeklyReportCommand}"
+                    automation:AutomationProperties.Name="生成周报" />
+            <Button Classes="secondary" Content="导出周报…" IsVisible="{Binding IsWeeklyView}"
+                    Command="{Binding ExportWeeklyCommand}"
+                    automation:AutomationProperties.Name="导出周报" />
+          </StackPanel>
+          <TextBlock Grid.Row="1" Text="{Binding VersionText}" Foreground="{DynamicResource MutedBrush}"
+                     Margin="0,4,0,0" IsVisible="{Binding ShowDailyView}" />
+          <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding WeeklyStatus}"
+                     Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0"
+                     IsVisible="{Binding IsWeeklyView}" />
         </Grid>
-        <Border Grid.Row="1" Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" Margin="0,14,0,12">
-          <StackPanel Spacing="{DynamicResource SpacingSm}">
-            <TextBlock Text="站会视图" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding StandupText}" TextWrapping="Wrap" />
-          </StackPanel>
-        </Border>
-        <Grid Grid.Row="2">
-          <ScrollViewer>
-            <!-- 阅读区限宽：1709px 下 Markdown 会铺满整屏。字号沿用库的 FluentTheme 样式。 -->
-            <md:MarkdownScrollViewer Markdown="{Binding Markdown}"
+
+        <!-- 日报正文 -->
+        <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="0,12,0,0" IsVisible="{Binding ShowDailyView}">
+          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}"
+                  Padding="{DynamicResource SpaceMd}" Margin="0,0,0,12">
+            <StackPanel Spacing="{DynamicResource SpacingSm}">
+              <TextBlock Text="站会视图" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding StandupText}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+          <Grid Grid.Row="1">
+            <ScrollViewer>
+              <!-- 阅读区限宽：1709px 下 Markdown 会铺满整屏。字号沿用库的 FluentTheme 样式。 -->
+              <md:MarkdownScrollViewer Markdown="{Binding Markdown}"
+                                       MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left" />
+            </ScrollViewer>
+            <TextBlock Text="还没有可显示的日报正文。先在左侧选择日期并生成。"
+                       Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
+                       IsVisible="{Binding !HasMarkdown}" />
+          </Grid>
+        </Grid>
+
+        <!-- 周报正文：柱状统计 + 区间报告（原检索页的「周报与统计」） -->
+        <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="0,12,0,0" IsVisible="{Binding IsWeeklyView}">
+          <ItemsControl ItemsSource="{Binding WeeklyBars}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:DailyBarItem">
+                <Grid ColumnDefinitions="56,*,90" Margin="0,2">
+                  <TextBlock Text="{Binding DateText}" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center" />
+                  <Border Grid.Column="1" Height="14" Background="{DynamicResource AccentBrush}"
+                          CornerRadius="{DynamicResource RadiusXs}" HorizontalAlignment="Left" Width="{Binding BarWidthPixels}" />
+                  <TextBlock Grid.Column="2" Text="{Binding CountText}" FontSize="{DynamicResource FontSizeBody}"
+                             Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Right" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Grid Grid.Row="1" Margin="0,12,0,0">
+            <md:MarkdownScrollViewer Markdown="{Binding WeeklyMarkdown}"
                                      MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left" />
-          </ScrollViewer>
-          <TextBlock Text="还没有可显示的日报正文。先在左侧选择日期并生成。"
-                     Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
-                     HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
-                     IsVisible="{Binding !HasMarkdown}" />
+            <TextBlock Text="还没有周报。点击右上角「生成周报」，按选中日期所在周统计。"
+                       Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
+                       IsVisible="{Binding !HasWeeklyMarkdown}" />
+          </Grid>
         </Grid>
       </Grid>
     </Border>

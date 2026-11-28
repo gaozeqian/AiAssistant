@@ -95,7 +95,6 @@ public sealed partial class DesktopViewModelTests
             0.5);
         var search = new SearchViewModel(
             new EvidenceSearchUseCase(new FakeEvidenceSearch(evidence), new FakeAnswerer(), clock),
-            new RangeReportUseCase(new FakeRangeReportService(), clock),
             TempArtifactDirectory.CreatePath("search-scroll"));
         using var shell = new ShellViewModel(
             timeline,
@@ -234,7 +233,6 @@ public sealed partial class DesktopViewModelTests
             "TestApp", "Synthetic test event", "结构化证据摘录", false, "keyword+vector", 0.5);
         var search = new SearchViewModel(
             new EvidenceSearchUseCase(new FakeEvidenceSearch(evidence), new FakeAnswerer(), clock),
-            new RangeReportUseCase(new FakeRangeReportService(), clock),
             TempArtifactDirectory.CreatePath("search-empty"));
         using var shell = new ShellViewModel(
             timeline,
@@ -262,6 +260,48 @@ public sealed partial class DesktopViewModelTests
         await WaitUntilAsync(() => !hint.IsVisible);
         Assert.False(hint.IsVisible);
         window.Close();
+    });
+
+    [Fact]
+    public Task Reports_WeeklySwitchTogglesContentAndTitle() => RunInHeadlessSession(async () =>
+    {
+        using var shell = CreateShell();
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = ShellSection.Reports;
+        await WaitUntilAsync(() => shell.Reports.ShowDailyView);
+
+        Assert.Equal("日报正文", shell.Reports.ContentTitle);
+        shell.Reports.ShowWeeklyCommand.Execute(null);
+        Assert.True(shell.Reports.IsWeeklyView);
+        Assert.False(shell.Reports.ShowDailyView);
+        Assert.Equal("周报正文", shell.Reports.ContentTitle);
+
+        shell.Reports.ShowDailyCommand.Execute(null);
+        Assert.False(shell.Reports.IsWeeklyView);
+        Assert.Equal("日报正文", shell.Reports.ContentTitle);
+        window.Close();
+        await Task.CompletedTask;
+    });
+
+    [Fact]
+    public Task Reports_WeeklyReportIsGeneratedInsideReportsTab() => RunInHeadlessSession(async () =>
+    {
+        var clock = new SystemClock();
+        using var reports = new ReportsViewModel(
+            new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
+            TempArtifactDirectory.CreatePath("reports-weekly"),
+            clock,
+            range: new RangeReportUseCase(new FakeRangeReportService(), clock));
+
+        Assert.True(reports.WeeklyReportCommand.CanExecute(null));
+        await reports.WeeklyReportCommand.ExecuteAsync(null);
+        Assert.Equal("# 区间报告", reports.WeeklyMarkdown);
+        Assert.True(reports.HasWeeklyReport);
+        Assert.True(reports.IsWeeklyView);
+        Assert.True(reports.ExportWeeklyCommand.CanExecute(null));
+        await Task.CompletedTask;
     });
 
     private static Button? DangerButton(Window window) =>

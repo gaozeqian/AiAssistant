@@ -417,7 +417,8 @@ public sealed class AppRuntime : IAsyncDisposable
                 _services.GetRequiredService<ReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports"),
                 Services.Clock,
-                _services.GetRequiredService<ReportScheduleSettingsUseCase>()),
+                _services.GetRequiredService<ReportScheduleSettingsUseCase>(),
+                _services.GetRequiredService<RangeReportUseCase>()),
             new VoiceControlViewModel(
                 _services.GetRequiredService<IVoiceSession>(),
                 _services.GetRequiredService<IVoiceCommandLog>(),
@@ -425,7 +426,6 @@ public sealed class AppRuntime : IAsyncDisposable
             _services.GetRequiredService<VoiceNavigationHub>(),
             new SearchViewModel(
                 _services.GetRequiredService<EvidenceSearchUseCase>(),
-                _services.GetRequiredService<RangeReportUseCase>(),
                 Path.Combine(_dataDirectory, "reports"),
                 Services.Clock),
             new DataManagementViewModel(

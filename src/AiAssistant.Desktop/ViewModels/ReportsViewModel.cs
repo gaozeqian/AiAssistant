@@ -13,6 +13,7 @@ namespace AiAssistant.Desktop.ViewModels;
 public sealed class ReportsViewModel : ObservableObject, IDisposable
 {
     private readonly ReportUseCase _reports;
+    private readonly RangeReportUseCase? _range;
     private readonly ReportScheduleSettingsUseCase? _scheduleSettings;
     private readonly string _exportDirectory;
     private readonly IClock _clock;
@@ -27,6 +28,10 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     private string _scheduleStatusMessage = string.Empty;
     private bool _isScheduleSaving;
     private bool _isBusy;
+    private bool _isWeeklyView;
+    private RangeReport? _weeklyReport;
+    private string _weeklyStatus = "尚未生成周报";
+    private string _weeklyMarkdown = string.Empty;
     private double _progressPulseValue;
     private readonly ProgressPulseController _progressPulse;
 
@@ -34,9 +39,11 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         ReportUseCase reports,
         string exportDirectory,
         IClock? clock = null,
-        ReportScheduleSettingsUseCase? scheduleSettings = null)
+        ReportScheduleSettingsUseCase? scheduleSettings = null,
+        RangeReportUseCase? range = null)
     {
         _reports = reports ?? throw new ArgumentNullException(nameof(reports));
+        _range = range;
         _exportDirectory = exportDirectory ?? throw new ArgumentNullException(nameof(exportDirectory));
         _clock = clock ?? new SystemClock();
         _scheduleSettings = scheduleSettings;
@@ -47,6 +54,10 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         RegenerateCommand = new AsyncRelayCommand(() => GenerateAsync(forceOverwrite: true));
         ExportCommand = new AsyncRelayCommand(ExportAsync);
         SaveScheduleCommand = new AsyncRelayCommand(SaveScheduleAsync);
+        WeeklyReportCommand = new AsyncRelayCommand(GenerateWeeklyAsync, () => _range is not null);
+        ExportWeeklyCommand = new AsyncRelayCommand(ExportWeeklyAsync, () => _weeklyReport is not null);
+        ShowDailyCommand = new RelayCommand(() => IsWeeklyView = false);
+        ShowWeeklyCommand = new RelayCommand(() => IsWeeklyView = true);
         Versions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasVersions));
     }
 
@@ -60,6 +71,57 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     public IAsyncRelayCommand RegenerateCommand { get; }
     public IAsyncRelayCommand ExportCommand { get; }
     public IAsyncRelayCommand SaveScheduleCommand { get; }
+
+    /// <summary>Generates the weekly range report for the week containing the selected date.</summary>
+    public IAsyncRelayCommand WeeklyReportCommand { get; }
+
+    public IAsyncRelayCommand ExportWeeklyCommand { get; }
+
+    public IRelayCommand ShowDailyCommand { get; }
+
+    public IRelayCommand ShowWeeklyCommand { get; }
+
+    public ObservableCollection<DailyBarItem> WeeklyBars { get; } = [];
+
+    /// <summary>日报/周报共用右侧阅读区，用分段按钮切换。</summary>
+    public bool IsWeeklyView
+    {
+        get => _isWeeklyView;
+        private set
+        {
+            if (SetProperty(ref _isWeeklyView, value))
+            {
+                OnPropertyChanged(nameof(ShowDailyView));
+                OnPropertyChanged(nameof(ContentTitle));
+            }
+        }
+    }
+
+    public bool ShowDailyView => !IsWeeklyView;
+
+    public string ContentTitle => IsWeeklyView ? "周报正文" : "日报正文";
+
+    public string WeeklyStatus
+    {
+        get => _weeklyStatus;
+        private set => SetProperty(ref _weeklyStatus, value);
+    }
+
+    public string WeeklyMarkdown
+    {
+        get => _weeklyMarkdown;
+        private set
+        {
+            if (SetProperty(ref _weeklyMarkdown, value))
+            {
+                OnPropertyChanged(nameof(HasWeeklyMarkdown));
+            }
+        }
+    }
+
+    public bool HasWeeklyMarkdown => !string.IsNullOrEmpty(WeeklyMarkdown);
+
+    public bool HasWeeklyReport => _weeklyReport is not null;
 
     public bool HasScheduleSettings => _scheduleSettings is not null;
 
@@ -377,6 +439,104 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             ErrorMessage = "导出失败，请检查目标目录权限。";
+        }
+    }
+
+    /// <summary>
+    /// 周报以"选中日期所在周"为锚点：和日报共用同一个日期选择器，避免再引入一个日期输入。
+    /// </summary>
+    private async Task GenerateWeeklyAsync()
+    {
+        if (_range is null || IsBusy || SelectedDate is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ErrorMessage = string.Empty;
+        WeeklyStatus = "正在生成周报…";
+        try
+        {
+            var anchor = DateOnly.FromDateTime(SelectedDate.Value.Date);
+            var report = await _range.GenerateWeekAsync(anchor, CancellationToken.None);
+            _weeklyReport = report;
+            WeeklyMarkdown = report.Markdown;
+            WeeklyBars.Clear();
+            foreach (var day in report.DailyStats)
+            {
+                WeeklyBars.Add(new DailyBarItem(day, report.MaxDailyEvents));
+            }
+
+            WeeklyStatus = string.Create(
+                CultureInfo.InvariantCulture,
+                $"{report.FromDate:MM-dd} ~ {report.ToDate:MM-dd} · {report.TotalEvents} 条 · 活跃 {report.TotalActiveMinutes} 分钟 · {(report.Degraded ? $"统计模式（{report.DegradedReason}）" : "本地模型摘要")}");
+            OnPropertyChanged(nameof(HasWeeklyReport));
+            ExportWeeklyCommand.NotifyCanExecuteChanged();
+            IsWeeklyView = true;
+        }
+        catch (Exception ex)
+        {
+            WeeklyStatus = "周报生成失败";
+            ErrorMessage = $"周报生成失败：{ex.Message}（原始活动数据未被修改）";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task ExportWeeklyAsync()
+    {
+        if (_range is null || _weeklyReport is null || IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            var report = _weeklyReport;
+            string path;
+            string successMessage;
+            if (SaveFilePicker is not null)
+            {
+                var types = new List<SaveFileType>
+                {
+                    new("Markdown", "md"),
+                    new("SVG 图表", "svg"),
+                    new("PNG 图片", "png"),
+                    new("PDF 文档", "pdf"),
+                    new("JSON", "json")
+                };
+                var picked = await SaveFilePicker.PickSaveFileAsync(
+                    $"AiAssistant-周报-{report.FromDate:yyyyMMdd}-{report.ToDate:yyyyMMdd}.md",
+                    types);
+                if (picked is null)
+                {
+                    return;
+                }
+
+                path = await _range.ExportSingleAsync(
+                    report,
+                    ReportExportFormatExtensions.FromExtension(picked.Extension),
+                    picked.Path,
+                    CancellationToken.None);
+                successMessage = $"已导出周报：{path}";
+            }
+            else
+            {
+                var export = await _range.ExportAsync(report, _exportDirectory, CancellationToken.None);
+                path = export.MarkdownPath;
+                successMessage = export.PngPath is null
+                    ? $"已导出周报（Markdown / SVG / JSON）：{path}"
+                    : $"已导出周报（Markdown / SVG / PNG / PDF / JSON）：{path}";
+            }
+
+            WeeklyStatus = successMessage;
+            ErrorMessage = string.Empty;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            ErrorMessage = "周报导出失败，请检查目标目录权限。";
         }
     }
 
