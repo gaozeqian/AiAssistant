@@ -139,12 +139,22 @@ public sealed class ReleaseReadinessTests : IDisposable
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         await AppendWithMediaAsync(storage.Repository, today, "offload-media");
 
-        var callerThread = Environment.CurrentManagedThreadId;
-        var result = await deletion.PurgeDateAsync(today, CancellationToken.None);
+        // 调用方必须是一条专用线程：xUnit 本身跑在线程池线程上，直接比较 ID 会因为
+        // Task.Run 复用同一池线程而偶发相等（CI 三平台都复现过）。
+        var callerThread = 0;
+        DataDeletionResult? result = null;
+        var caller = new Thread(() =>
+        {
+            callerThread = Environment.CurrentManagedThreadId;
+            result = deletion.PurgeDateAsync(today, CancellationToken.None).GetAwaiter().GetResult();
+        });
+        caller.Start();
+        caller.Join();
 
         // Microsoft.Data.Sqlite's async APIs are synchronous; running the purge inline on the
         // caller (the Avalonia UI thread) froze the window, so the core must be dispatched.
-        Assert.True(result.EventsDeleted >= 1);
+        Assert.NotNull(result);
+        Assert.True(result!.EventsDeleted >= 1);
         Assert.NotEqual(0, recording.PurgeThreadId);
         Assert.NotEqual(callerThread, recording.PurgeThreadId);
     }
