@@ -361,7 +361,10 @@ public sealed partial class DesktopViewModelTests
 
         Assert.Equal(new TimeOnly(2, 15), store.Settings.DailyLocalTime);
         Assert.False(store.Settings.Enabled);
-        Assert.Contains("已关闭", viewModel.ScheduleStatusMessage, StringComparison.Ordinal);
+        // "已关闭"语义移到了折叠头摘要，块内状态只保留保存结果。
+        Assert.Contains("已关闭", viewModel.ScheduleSummary, StringComparison.Ordinal);
+        Assert.Equal("已保存", viewModel.ScheduleStatusMessage);
+        Assert.False(viewModel.IsDailyScheduleExpanded);
     });
 
     [Fact]

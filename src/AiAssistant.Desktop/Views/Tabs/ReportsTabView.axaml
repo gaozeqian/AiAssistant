@@ -47,8 +47,10 @@
         </WrapPanel>
 
         <!-- 3. 自动生成：日报按天、周报按周，共用同一个设置文件。 -->
-        <Expander Grid.Row="3" IsExpanded="False" HorizontalAlignment="Stretch" Margin="0,0,0,12"
-                  IsVisible="{Binding ShowDailyView}">
+        <Expander x:Name="DailyScheduleExpander" Grid.Row="3" HorizontalAlignment="Stretch" Margin="0,0,0,12"
+                  IsVisible="{Binding ShowDailyView}"
+                  IsExpanded="{Binding IsDailyScheduleExpanded, Mode=TwoWay}"
+                  LostFocus="OnScheduleExpanderLostFocus">
           <Expander.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}">
               <TextBlock Text="自动日报" FontWeight="SemiBold" />
@@ -82,8 +84,10 @@
           </StackPanel>
         </Expander>
 
-        <Expander Grid.Row="3" IsExpanded="False" HorizontalAlignment="Stretch" Margin="0,0,0,12"
-                  IsVisible="{Binding IsWeeklyView}">
+        <Expander x:Name="WeeklyScheduleExpander" Grid.Row="3" HorizontalAlignment="Stretch" Margin="0,0,0,12"
+                  IsVisible="{Binding IsWeeklyView}"
+                  IsExpanded="{Binding IsWeeklyScheduleExpanded, Mode=TwoWay}"
+                  LostFocus="OnScheduleExpanderLostFocus">
           <Expander.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}">
               <TextBlock Text="自动周报" FontWeight="SemiBold" />
@@ -167,9 +171,9 @@
         <StackPanel Grid.Row="5" Spacing="{DynamicResource SpacingXs}" Margin="0,12,0,0">
           <!-- 空列表时不再重复"还没有日报/周报"：列表空态已经说过一次。 -->
           <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
-                     IsVisible="{Binding HasVersions}" />
+                     IsVisible="{Binding ShowDailyStatus}" />
           <TextBlock Text="{Binding WeeklyStatus}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
-                     IsVisible="{Binding HasWeeklyVersions}" />
+                     IsVisible="{Binding ShowWeeklyStatus}" />
           <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
                      IsVisible="{Binding HasError}" />
         </StackPanel>

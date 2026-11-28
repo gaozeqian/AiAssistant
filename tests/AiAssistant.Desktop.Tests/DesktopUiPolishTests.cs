@@ -353,6 +353,33 @@ public sealed partial class DesktopViewModelTests
         }
     }
 
+    [Fact]
+    public Task Reports_ScheduleEditorBindsAndCollapsesOnModeSwitch() => RunInHeadlessSession(async () =>
+    {
+        using var shell = CreateShell();
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        await shell.InitializeAsync();
+        shell.SelectedSectionIndex = ShellSection.Reports;
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Expander>()
+            .Any(item => item.Name == "DailyScheduleExpander"));
+
+        var expander = window.GetVisualDescendants().OfType<Expander>()
+            .First(item => item.Name == "DailyScheduleExpander");
+        Assert.False(expander.IsExpanded);
+
+        shell.Reports.IsDailyScheduleExpanded = true;
+        await WaitUntilAsync(() => expander.IsExpanded);
+        Assert.True(expander.IsExpanded);
+
+        // 切换 日报/周报 时两块都收起，避免下次进入还是展开态。
+        shell.Reports.ShowWeeklyCommand.Execute(null);
+        Assert.False(shell.Reports.IsDailyScheduleExpanded);
+        Assert.False(expander.IsExpanded);
+        window.Close();
+        await Task.CompletedTask;
+    });
+
     private static Button? DangerButton(Window window) =>
         window.GetVisualDescendants().OfType<Button>()
             .FirstOrDefault(button => button.Classes.Contains("danger") && button.IsEffectivelyVisible);
