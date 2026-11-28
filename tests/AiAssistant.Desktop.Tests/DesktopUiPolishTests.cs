@@ -1,5 +1,6 @@
 using AiAssistant.Application.Ports;
 using AiAssistant.Application.UseCases;
+using AiAssistant.Core.Domain;
 using AiAssistant.Core.ValueObjects;
 using AiAssistant.Desktop.ViewModels;
 using AiAssistant.Desktop.Views;
@@ -289,20 +290,68 @@ public sealed partial class DesktopViewModelTests
     public Task Reports_WeeklyReportIsGeneratedInsideReportsTab() => RunInHeadlessSession(async () =>
     {
         var clock = new SystemClock();
+        var range = new RangeReportUseCase(new FakeRangeReportService(), clock);
+        var repository = new FakeWeeklyRepository();
+        var weekly = new WeeklyReportUseCase(range, repository, clock);
         using var reports = new ReportsViewModel(
             new ReportUseCase(new FakeReportJobQueue(), new FakeReportRepository(), clock),
             TempArtifactDirectory.CreatePath("reports-weekly"),
             clock,
-            range: new RangeReportUseCase(new FakeRangeReportService(), clock));
+            range: range,
+            weekly: weekly);
 
         Assert.True(reports.WeeklyReportCommand.CanExecute(null));
         await reports.WeeklyReportCommand.ExecuteAsync(null);
         Assert.Equal("# 区间报告", reports.WeeklyMarkdown);
         Assert.True(reports.HasWeeklyReport);
         Assert.True(reports.IsWeeklyView);
+        Assert.Single(reports.WeeklyVersions);
         Assert.True(reports.ExportWeeklyCommand.CanExecute(null));
+
+        // 生成（非强制）复用已有版本；强制重生成才追加新版本——与日报语义一致。
+        await reports.WeeklyReportCommand.ExecuteAsync(null);
+        Assert.Single(reports.WeeklyVersions);
+        await reports.WeeklyRegenerateCommand.ExecuteAsync(null);
+        Assert.Equal(2, reports.WeeklyVersions.Count);
+        Assert.Equal(2, reports.SelectedWeeklyVersion!.Report.Version);
+        // 存库的是序列化后的 RangeReport：导出前必须能反序列化回来。
+        Assert.NotNull(WeeklyReportUseCase.ToRangeReport(reports.SelectedWeeklyVersion!.Report));
         await Task.CompletedTask;
     });
+
+    private sealed class FakeWeeklyRepository : IWeeklyReportRepository
+    {
+        private readonly List<WeeklyReport> _reports = [];
+
+        public Task<WeeklyReport?> GetLatestAsync(DateOnly weekStart, CancellationToken ct) =>
+            Task.FromResult(_reports
+                .Where(report => report.WeekStart == weekStart)
+                .OrderByDescending(report => report.Version)
+                .FirstOrDefault());
+
+        public Task<IReadOnlyList<WeeklyReport>> ListVersionsAsync(DateOnly weekStart, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<WeeklyReport>>(_reports
+                .Where(report => report.WeekStart == weekStart)
+                .OrderByDescending(report => report.Version)
+                .ToList());
+
+        public Task<WeeklyReport> AppendAsync(
+            DateOnly weekStart,
+            DateOnly weekEnd,
+            string markdown,
+            string payloadJson,
+            string modelId,
+            ReportTriggerSource triggerSource,
+            DateTimeOffset generatedAtUtc,
+            CancellationToken ct)
+        {
+            var version = _reports.Count(report => report.WeekStart == weekStart) + 1;
+            var report = new WeeklyReport(
+                $"weekly-{version}", weekStart, weekEnd, version, markdown, payloadJson, modelId, triggerSource, generatedAtUtc);
+            _reports.Add(report);
+            return Task.FromResult(report);
+        }
+    }
 
     private static Button? DangerButton(Window window) =>
         window.GetVisualDescendants().OfType<Button>()

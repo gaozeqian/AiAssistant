@@ -37,6 +37,13 @@ public sealed class DataDeletionService : IDataDeletionService
         await using var connection = await _connectionFactory.OpenConnectionAsync(ct);
         await using var tx = (SqliteTransaction)await connection.BeginTransactionAsync(ct);
         var reports = await ExecuteAsync(connection, tx, "DELETE FROM daily_reports WHERE local_date = $date;", date, ct);
+        // 周报跨越 7 天：只要区间覆盖该日期，就说明它包含这一天的数据，必须一并删除。
+        reports += await ExecuteAsync(
+            connection,
+            tx,
+            "DELETE FROM weekly_reports WHERE week_start <= $date AND week_end >= $date;",
+            date,
+            ct);
         var jobs = await ExecuteAsync(connection, tx, "DELETE FROM report_jobs WHERE target_date = $date;", date, ct);
         await tx.CommitAsync(ct);
         await CheckpointAsync(connection, ct);
@@ -59,6 +66,7 @@ public sealed class DataDeletionService : IDataDeletionService
             await using var tx = (SqliteTransaction)await connection.BeginTransactionAsync(ct);
             events = await CountAsync(connection, tx, "SELECT COUNT(*) FROM events;", ct);
             reports = await CountAsync(connection, tx, "SELECT COUNT(*) FROM daily_reports;", ct);
+            reports += await CountAsync(connection, tx, "SELECT COUNT(*) FROM weekly_reports;", ct);
             jobs = await CountAsync(connection, tx, "SELECT COUNT(*) FROM report_jobs;", ct);
             voiceCommands = await CountAsync(connection, tx, "SELECT COUNT(*) FROM voice_commands;", ct);
             mediaRefs = await CountAsync(connection, tx, "SELECT COUNT(*) FROM content_refs;", ct);
@@ -67,6 +75,7 @@ public sealed class DataDeletionService : IDataDeletionService
             await ExecuteAsync(connection, tx, "DELETE FROM events;", null, ct);
             await ExecuteAsync(connection, tx, "DELETE FROM content_refs;", null, ct);
             await ExecuteAsync(connection, tx, "DELETE FROM daily_reports;", null, ct);
+            await ExecuteAsync(connection, tx, "DELETE FROM weekly_reports;", null, ct);
             await ExecuteAsync(connection, tx, "DELETE FROM report_jobs;", null, ct);
             await ExecuteAsync(connection, tx, "DELETE FROM voice_commands;", null, ct);
             await ExecuteAsync(connection, tx, "DELETE FROM vector_index_meta;", null, ct);

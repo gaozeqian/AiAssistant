@@ -117,6 +117,25 @@ internal static class SchemaMigrator
             """
             ALTER TABLE voice_commands ADD COLUMN audio_cleared_at_utc TEXT NULL;
             """)
+        ,
+        new(
+            new SchemaVersion(4, "S9_WeeklyReports"),
+            """
+            CREATE TABLE IF NOT EXISTS weekly_reports (
+                id TEXT PRIMARY KEY,
+                week_start TEXT NOT NULL,
+                week_end TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                markdown TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                model_id TEXT NOT NULL,
+                trigger_source INTEGER NOT NULL,
+                generated_at_utc TEXT NOT NULL,
+                UNIQUE(week_start, version)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_weekly_reports_week ON weekly_reports(week_start, version);
+            """)
     ];
 
     public static async Task<SchemaVersion> MigrateAsync(SqliteConnection connection, CancellationToken ct = default)

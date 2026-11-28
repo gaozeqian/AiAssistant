@@ -418,7 +418,8 @@ public sealed class AppRuntime : IAsyncDisposable
                 Path.Combine(_dataDirectory, "reports"),
                 Services.Clock,
                 _services.GetRequiredService<ReportScheduleSettingsUseCase>(),
-                _services.GetRequiredService<RangeReportUseCase>()),
+                _services.GetRequiredService<RangeReportUseCase>(),
+                _services.GetRequiredService<WeeklyReportUseCase>()),
             new VoiceControlViewModel(
                 _services.GetRequiredService<IVoiceSession>(),
                 _services.GetRequiredService<IVoiceCommandLog>(),

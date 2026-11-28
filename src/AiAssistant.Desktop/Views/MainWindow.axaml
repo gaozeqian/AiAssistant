@@ -71,7 +71,7 @@
       <TabItem Header="检索与问答" automation:AutomationProperties.Name="检索与问答" automation:AutomationProperties.AcceleratorKey="Ctrl+2">
         <tabs:SearchTabView />
       </TabItem>
-      <TabItem Header="日报" automation:AutomationProperties.Name="日报" automation:AutomationProperties.AcceleratorKey="Ctrl+3">
+      <TabItem Header="日报/周报" automation:AutomationProperties.Name="日报/周报" automation:AutomationProperties.AcceleratorKey="Ctrl+3">
         <tabs:ReportsTabView />
       </TabItem>
       <TabItem Header="隐私与控制" automation:AutomationProperties.Name="隐私与控制" automation:AutomationProperties.AcceleratorKey="Ctrl+4">

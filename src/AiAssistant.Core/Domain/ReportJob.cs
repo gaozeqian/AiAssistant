@@ -5,7 +5,8 @@ public enum ReportTriggerSource
     Manual = 0,
     StartupCatchUp = 1,
     ScheduledDaily = 2,
-    VoiceCommand = 3
+    VoiceCommand = 3,
+    ScheduledWeekly = 4
 }
 
 public enum ReportJobStatus

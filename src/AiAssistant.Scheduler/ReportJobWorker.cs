@@ -1,4 +1,5 @@
 using AiAssistant.Application.Ports;
+using AiAssistant.Application.UseCases;
 using AiAssistant.Core.Domain;
 using Microsoft.Extensions.Logging;
 
@@ -30,11 +31,13 @@ public sealed class ReportJobWorker : IAsyncDisposable
     private readonly IEventRepository _events;
     private readonly IClock _clock;
     private readonly IReportScheduleSettingsStore _scheduleSettings;
+    private readonly WeeklyReportUseCase? _weeklyReports;
     private readonly ReportScheduleOptions _options;
     private readonly ILogger<ReportJobWorker> _logger;
     private readonly CancellationTokenSource _shutdown = new();
     private Task? _workerTask;
     private DateOnly? _lastScheduledDate;
+    private DateOnly? _lastWeeklyDate;
     private bool _started;
 
     public ReportJobWorker(
@@ -45,7 +48,8 @@ public sealed class ReportJobWorker : IAsyncDisposable
         IClock clock,
         IReportScheduleSettingsStore scheduleSettings,
         ReportScheduleOptions options,
-        ILogger<ReportJobWorker> logger)
+        ILogger<ReportJobWorker> logger,
+        WeeklyReportUseCase? weeklyReports = null)
     {
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(runner);
@@ -61,6 +65,7 @@ public sealed class ReportJobWorker : IAsyncDisposable
         _events = events;
         _clock = clock;
         _scheduleSettings = scheduleSettings;
+        _weeklyReports = weeklyReports;
         _options = options;
         _logger = logger;
     }
@@ -118,6 +123,7 @@ public sealed class ReportJobWorker : IAsyncDisposable
             try
             {
                 await EvaluateScheduledIfDueAsync(ct);
+                await EvaluateWeeklyIfDueAsync(ct);
                 var job = await _queue.ClaimNextPendingAsync(ct);
                 if (job is null)
                 {
@@ -192,6 +198,61 @@ public sealed class ReportJobWorker : IAsyncDisposable
         await EvaluateDateAsync(now.LocalDate.AddDays(-1), ReportTriggerSource.ScheduledDaily, ct);
         // Mark only after a successful check: a transient storage failure must retry on the next tick.
         _lastScheduledDate = now.LocalDate;
+    }
+
+    /// <summary>
+    /// Weekly reports skip the daily job queue: they are generated inline and stored versioned.
+    /// The trigger targets the previous completed week (anchor = yesterday) so a Sunday-evening run
+    /// summarises the week that just ended.
+    /// </summary>
+    private async Task EvaluateWeeklyIfDueAsync(CancellationToken ct)
+    {
+        if (_weeklyReports is null)
+        {
+            return;
+        }
+
+        var settings = _scheduleSettings.Load();
+        if (!settings.WeeklyEnabled)
+        {
+            return;
+        }
+
+        var now = _clock.Now();
+        if (now.LocalDate.DayOfWeek != settings.WeeklyDay)
+        {
+            return;
+        }
+
+        var localTime = TimeOnly.FromDateTime(now.ToCapturedLocalTime().DateTime);
+        if (localTime < settings.WeeklyLocalTime || _lastWeeklyDate == now.LocalDate)
+        {
+            return;
+        }
+
+        try
+        {
+            var report = await _weeklyReports.GenerateAsync(
+                now.LocalDate.AddDays(-1),
+                forceOverwrite: false,
+                ReportTriggerSource.ScheduledWeekly,
+                ct);
+            _lastWeeklyDate = now.LocalDate;
+            _logger.LogInformation(
+                "Generated scheduled weekly report {From}..{To} (v{Version}).",
+                report.WeekStart,
+                report.WeekEnd,
+                report.Version);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Keep the day unmarked so the next tick retries, mirroring the daily path.
+            _logger.LogWarning("Scheduled weekly report failed with {ExceptionType}.", ex.GetType().Name);
+        }
     }
 
     private async Task EvaluateDateAsync(

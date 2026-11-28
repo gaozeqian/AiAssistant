@@ -62,6 +62,9 @@ public static class ShellTheme
             Add("AccentDisabledBrush", "#C7E0F4");
             Add("OnAccentDisabledBrush", "#6E6E6E");
             // 输入框聚焦/悬停默认吃 Fluent 的 #000000（暗色）与纯白（亮色），与卡片底色不一致。
+            Add("ExpanderHeaderBackground", "#F7F7F7");
+            Add("ExpanderHeaderBackgroundPointerOver", "#EFEFEF");
+            Add("ExpanderHeaderBackgroundPressed", "#EFEFEF");
             Add("TextControlBackgroundFocused", "#FFFFFF");
             Add("TextControlBackgroundPointerOver", "#FFFFFF");
             Add("ComboBoxBackgroundFocused", "#FFFFFF");
@@ -103,6 +106,9 @@ public static class ShellTheme
             Add("AccentPressedBrush", "#095A9E");
             Add("AccentDisabledBrush", "#1E3A54");
             Add("OnAccentDisabledBrush", "#8C8C8C");
+            Add("ExpanderHeaderBackground", "#252526");
+            Add("ExpanderHeaderBackgroundPointerOver", "#2D2D2D");
+            Add("ExpanderHeaderBackgroundPressed", "#2D2D2D");
             Add("TextControlBackgroundFocused", "#252526");
             Add("TextControlBackgroundPointerOver", "#252526");
             Add("ComboBoxBackgroundFocused", "#252526");

@@ -6,7 +6,7 @@ namespace AiAssistant.Core.ValueObjects;
 public readonly record struct SchemaVersion(int Number, string Name) : IComparable<SchemaVersion>
 {
     public static readonly SchemaVersion Empty = new(0, "Uninitialized");
-    public static readonly SchemaVersion Current = new(3, "S8_VoiceCommandAudioClearedMarker");
+    public static readonly SchemaVersion Current = new(4, "S9_WeeklyReports");
 
     public int CompareTo(SchemaVersion other) => Number.CompareTo(other.Number);
 

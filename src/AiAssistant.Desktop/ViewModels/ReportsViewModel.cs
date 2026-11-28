@@ -14,6 +14,7 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
 {
     private readonly ReportUseCase _reports;
     private readonly RangeReportUseCase? _range;
+    private readonly WeeklyReportUseCase? _weekly;
     private readonly ReportScheduleSettingsUseCase? _scheduleSettings;
     private readonly string _exportDirectory;
     private readonly IClock _clock;
@@ -29,9 +30,14 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     private bool _isScheduleSaving;
     private bool _isBusy;
     private bool _isWeeklyView;
-    private RangeReport? _weeklyReport;
+    private WeeklyReport? _selectedWeekly;
+    private WeeklyVersionItem? _selectedWeeklyVersion;
     private string _weeklyStatus = "尚未生成周报";
     private string _weeklyMarkdown = string.Empty;
+    private bool _weeklyScheduleEnabled;
+    private WeekdayOption _weeklyScheduleDay = WeekdayOption.All[6];
+    private TimeSpan? _weeklyScheduleTime;
+    private string _weeklyScheduleStatus = string.Empty;
     private double _progressPulseValue;
     private readonly ProgressPulseController _progressPulse;
 
@@ -40,10 +46,12 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         string exportDirectory,
         IClock? clock = null,
         ReportScheduleSettingsUseCase? scheduleSettings = null,
-        RangeReportUseCase? range = null)
+        RangeReportUseCase? range = null,
+        WeeklyReportUseCase? weekly = null)
     {
         _reports = reports ?? throw new ArgumentNullException(nameof(reports));
         _range = range;
+        _weekly = weekly;
         _exportDirectory = exportDirectory ?? throw new ArgumentNullException(nameof(exportDirectory));
         _clock = clock ?? new SystemClock();
         _scheduleSettings = scheduleSettings;
@@ -54,11 +62,24 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         RegenerateCommand = new AsyncRelayCommand(() => GenerateAsync(forceOverwrite: true));
         ExportCommand = new AsyncRelayCommand(ExportAsync);
         SaveScheduleCommand = new AsyncRelayCommand(SaveScheduleAsync);
-        WeeklyReportCommand = new AsyncRelayCommand(GenerateWeeklyAsync, () => _range is not null);
-        ExportWeeklyCommand = new AsyncRelayCommand(ExportWeeklyAsync, () => _weeklyReport is not null);
+        WeeklyReportCommand = new AsyncRelayCommand(() => GenerateWeeklyAsync(force: false), () => _weekly is not null);
+        WeeklyRegenerateCommand = new AsyncRelayCommand(() => GenerateWeeklyAsync(force: true), () => _weekly is not null);
+        WeeklyRefreshCommand = new AsyncRelayCommand(RefreshWeeklyAsync, () => _weekly is not null);
+        ExportWeeklyCommand = new AsyncRelayCommand(ExportWeeklyAsync, () => _selectedWeekly is not null);
+        SaveWeeklyScheduleCommand = new AsyncRelayCommand(SaveWeeklyScheduleAsync);
+        // 左栏只放一行「生成 / 强制重生成 / 刷新 / 导出」，由当前视图决定落到日报还是周报。
+        ActiveGenerateCommand = new AsyncRelayCommand(
+            async () => await (IsWeeklyView ? WeeklyReportCommand : GenerateCommand).ExecuteAsync(null));
+        ActiveRegenerateCommand = new AsyncRelayCommand(
+            async () => await (IsWeeklyView ? WeeklyRegenerateCommand : RegenerateCommand).ExecuteAsync(null));
+        ActiveRefreshCommand = new AsyncRelayCommand(
+            async () => await (IsWeeklyView ? WeeklyRefreshCommand : RefreshCommand).ExecuteAsync(null));
+        ActiveExportCommand = new AsyncRelayCommand(
+            async () => await (IsWeeklyView ? ExportWeeklyCommand : ExportCommand).ExecuteAsync(null));
         ShowDailyCommand = new RelayCommand(() => IsWeeklyView = false);
         ShowWeeklyCommand = new RelayCommand(() => IsWeeklyView = true);
         Versions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasVersions));
+        WeeklyVersions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasWeeklyVersions));
     }
 
     public ObservableCollection<ReportVersionItem> Versions { get; } = [];
@@ -72,16 +93,65 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     public IAsyncRelayCommand ExportCommand { get; }
     public IAsyncRelayCommand SaveScheduleCommand { get; }
 
-    /// <summary>Generates the weekly range report for the week containing the selected date.</summary>
+    /// <summary>生成周报：本周已有版本时直接复用，不重复调用模型。</summary>
     public IAsyncRelayCommand WeeklyReportCommand { get; }
 
+    /// <summary>强制重新生成周报：总是新增一个版本。</summary>
+    public IAsyncRelayCommand WeeklyRegenerateCommand { get; }
+
+    /// <summary>刷新周报版本列表（重新读库）。</summary>
+    public IAsyncRelayCommand WeeklyRefreshCommand { get; }
+
     public IAsyncRelayCommand ExportWeeklyCommand { get; }
+
+    public IAsyncRelayCommand SaveWeeklyScheduleCommand { get; }
+
+    /// <summary>当前视图对应的四个操作：日报/周报共用同一组按钮。</summary>
+    public IAsyncRelayCommand ActiveGenerateCommand { get; }
+
+    public IAsyncRelayCommand ActiveRegenerateCommand { get; }
+
+    public IAsyncRelayCommand ActiveRefreshCommand { get; }
+
+    public IAsyncRelayCommand ActiveExportCommand { get; }
 
     public IRelayCommand ShowDailyCommand { get; }
 
     public IRelayCommand ShowWeeklyCommand { get; }
 
     public ObservableCollection<DailyBarItem> WeeklyBars { get; } = [];
+
+    public ObservableCollection<WeeklyVersionItem> WeeklyVersions { get; } = [];
+
+    public bool HasWeeklyVersions => WeeklyVersions.Count > 0;
+
+    /// <summary>周报版本选择：和日报版本列表行为一致，选中即切换正文。</summary>
+    public WeeklyVersionItem? SelectedWeeklyVersion
+    {
+        get => _selectedWeeklyVersion;
+        set
+        {
+            if (SetProperty(ref _selectedWeeklyVersion, value))
+            {
+                _selectedWeekly = value?.Report;
+                WeeklyMarkdown = value?.Report.Markdown ?? string.Empty;
+                WeeklyBars.Clear();
+                if (value is not null &&
+                    WeeklyReportUseCase.ToRangeReport(value.Report) is { } payload)
+                {
+                    // 旧版本或损坏的 payload 可能缺 DailyStats：柱状图退化为空，不影响正文。
+                    foreach (var day in payload.DailyStats ?? [])
+                    {
+                        WeeklyBars.Add(new DailyBarItem(day, payload.MaxDailyEvents));
+                    }
+                }
+
+                OnPropertyChanged(nameof(HasWeeklyReport));
+                OnPropertyChanged(nameof(WeeklyVersionText));
+                ExportWeeklyCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
 
     /// <summary>日报/周报共用右侧阅读区，用分段按钮切换。</summary>
     public bool IsWeeklyView
@@ -121,7 +191,66 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
 
     public bool HasWeeklyMarkdown => !string.IsNullOrEmpty(WeeklyMarkdown);
 
-    public bool HasWeeklyReport => _weeklyReport is not null;
+    public bool HasWeeklyReport => _selectedWeekly is not null;
+
+    public string WeeklyVersionText => _selectedWeekly is null
+        ? string.Empty
+        : $"v{_selectedWeekly.Version} · {_selectedWeekly.WeekStart:MM-dd}~{_selectedWeekly.WeekEnd:MM-dd} · {_selectedWeekly.ModelId} · {_selectedWeekly.GeneratedAtUtc.ToLocalTime():MM-dd HH:mm}";
+
+    /// <summary>自动周报：周几 + 时间，与自动日报共用同一个设置文件。</summary>
+    public bool WeeklyScheduleEnabled
+    {
+        get => _weeklyScheduleEnabled;
+        set
+        {
+            if (SetProperty(ref _weeklyScheduleEnabled, value))
+            {
+                OnPropertyChanged(nameof(WeeklyScheduleSummary));
+            }
+        }
+    }
+
+    public WeekdayOption WeeklyScheduleDay
+    {
+        get => _weeklyScheduleDay;
+        set
+        {
+            if (SetProperty(ref _weeklyScheduleDay, value))
+            {
+                OnPropertyChanged(nameof(WeeklyScheduleSummary));
+            }
+        }
+    }
+
+    public TimeSpan? WeeklyScheduleTime
+    {
+        get => _weeklyScheduleTime;
+        set
+        {
+            if (SetProperty(ref _weeklyScheduleTime, value))
+            {
+                OnPropertyChanged(nameof(WeeklyScheduleSummary));
+            }
+        }
+    }
+
+    public string WeeklyScheduleStatus
+    {
+        get => _weeklyScheduleStatus;
+        private set
+        {
+            if (SetProperty(ref _weeklyScheduleStatus, value))
+            {
+                OnPropertyChanged(nameof(WeeklyScheduleSummary));
+            }
+        }
+    }
+
+    public string WeeklyScheduleSummary => WeeklyScheduleEnabled
+        ? $"已启用 · 每周{WeeklyScheduleDay.Label} {WeeklyScheduleTime?.ToString(@"hh\:mm", CultureInfo.InvariantCulture) ?? "--:--"}"
+        : "已关闭";
+
+    public IReadOnlyList<WeekdayOption> WeekdayOptions { get; } = WeekdayOption.All;
 
     public bool HasScheduleSettings => _scheduleSettings is not null;
 
@@ -129,13 +258,25 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     public TimeSpan? ScheduleTime
     {
         get => _scheduleTime;
-        set => SetProperty(ref _scheduleTime, value);
+        set
+        {
+            if (SetProperty(ref _scheduleTime, value))
+            {
+                OnPropertyChanged(nameof(ScheduleSummary));
+            }
+        }
     }
 
     public bool ScheduleEnabled
     {
         get => _scheduleEnabled;
-        set => SetProperty(ref _scheduleEnabled, value);
+        set
+        {
+            if (SetProperty(ref _scheduleEnabled, value))
+            {
+                OnPropertyChanged(nameof(ScheduleSummary));
+            }
+        }
     }
 
     public bool IsScheduleSaving
@@ -147,8 +288,19 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     public string ScheduleStatusMessage
     {
         get => _scheduleStatusMessage;
-        private set => SetProperty(ref _scheduleStatusMessage, value);
+        private set
+        {
+            if (SetProperty(ref _scheduleStatusMessage, value))
+            {
+                OnPropertyChanged(nameof(ScheduleSummary));
+            }
+        }
     }
+
+    /// <summary>折叠状态下的摘要：一眼看出自动日报是否开启、几点执行。</summary>
+    public string ScheduleSummary => ScheduleEnabled
+        ? $"已启用 · 每天 {ScheduleTime?.ToString(@"hh\:mm", CultureInfo.InvariantCulture) ?? "--:--"}"
+        : "已关闭";
 
     public DateTimeOffset? SelectedDate
     {
@@ -158,6 +310,7 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _selectedDate, value))
             {
                 _ = RefreshAsync();
+                _ = RefreshWeeklyAsync();
             }
         }
     }
@@ -249,7 +402,9 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     public async Task InitializeAsync()
     {
         LoadScheduleSettings();
+        LoadWeeklyScheduleSettings();
         await RefreshAsync();
+        await RefreshWeeklyAsync();
     }
 
     private void LoadScheduleSettings()
@@ -444,34 +599,29 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// 周报以"选中日期所在周"为锚点：和日报共用同一个日期选择器，避免再引入一个日期输入。
+    /// force=false 时若本周已有版本则直接复用，与日报"生成 / 强制重生成"的语义一致。
     /// </summary>
-    private async Task GenerateWeeklyAsync()
+    private async Task GenerateWeeklyAsync(bool force)
     {
-        if (_range is null || IsBusy || SelectedDate is null)
+        if (_weekly is null || IsBusy || SelectedDate is null)
         {
             return;
         }
 
         IsBusy = true;
         ErrorMessage = string.Empty;
-        WeeklyStatus = "正在生成周报…";
+        WeeklyStatus = force ? "正在强制重新生成周报…" : "正在生成周报…";
         try
         {
             var anchor = DateOnly.FromDateTime(SelectedDate.Value.Date);
-            var report = await _range.GenerateWeekAsync(anchor, CancellationToken.None);
-            _weeklyReport = report;
-            WeeklyMarkdown = report.Markdown;
-            WeeklyBars.Clear();
-            foreach (var day in report.DailyStats)
-            {
-                WeeklyBars.Add(new DailyBarItem(day, report.MaxDailyEvents));
-            }
-
-            WeeklyStatus = string.Create(
-                CultureInfo.InvariantCulture,
-                $"{report.FromDate:MM-dd} ~ {report.ToDate:MM-dd} · {report.TotalEvents} 条 · 活跃 {report.TotalActiveMinutes} 分钟 · {(report.Degraded ? $"统计模式（{report.DegradedReason}）" : "本地模型摘要")}");
-            OnPropertyChanged(nameof(HasWeeklyReport));
-            ExportWeeklyCommand.NotifyCanExecuteChanged();
+            var before = WeeklyVersions.Count;
+            var report = await _weekly.GenerateAsync(anchor, force, ReportTriggerSource.Manual, CancellationToken.None);
+            await RefreshWeeklyAsync();
+            SelectedWeeklyVersion = WeeklyVersions.FirstOrDefault(item => item.Report.Id == report.Id)
+                ?? WeeklyVersions.FirstOrDefault();
+            WeeklyStatus = WeeklyVersions.Count == before && !force
+                ? $"本周已有周报 v{report.Version}，未重新生成"
+                : $"周报 v{report.Version} 已生成";
             IsWeeklyView = true;
         }
         catch (Exception ex)
@@ -485,16 +635,53 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async Task ExportWeeklyAsync()
+    private async Task RefreshWeeklyAsync()
     {
-        if (_range is null || _weeklyReport is null || IsBusy)
+        if (_weekly is null || SelectedDate is null)
         {
             return;
         }
 
         try
         {
-            var report = _weeklyReport;
+            var versions = await _weekly.ListVersionsAsync(
+                DateOnly.FromDateTime(SelectedDate.Value.Date),
+                CancellationToken.None);
+            var previous = SelectedWeeklyVersion?.Report.Id;
+            WeeklyVersions.Clear();
+            foreach (var report in versions)
+            {
+                WeeklyVersions.Add(new WeeklyVersionItem(report));
+            }
+
+            SelectedWeeklyVersion = WeeklyVersions.FirstOrDefault(item => item.Report.Id == previous)
+                ?? WeeklyVersions.FirstOrDefault();
+            WeeklyStatus = WeeklyVersions.Count == 0
+                ? "本周还没有周报"
+                : $"本周 {WeeklyVersions.Count} 个周报版本";
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or Core.Exceptions.AiAssistantDomainException)
+        {
+            ErrorMessage = "读取周报失败，请检查加密数据库状态。";
+        }
+    }
+
+    private async Task ExportWeeklyAsync()
+    {
+        if (_range is null || _selectedWeekly is null || IsBusy)
+        {
+            return;
+        }
+
+        var report = WeeklyReportUseCase.ToRangeReport(_selectedWeekly);
+        if (report is null)
+        {
+            ErrorMessage = "周报内容无法解析，无法导出。";
+            return;
+        }
+
+        try
+        {
             string path;
             string successMessage;
             if (SaveFilePicker is not null)
@@ -539,6 +726,68 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
             ErrorMessage = "周报导出失败，请检查目标目录权限。";
         }
     }
+
+    private void LoadWeeklyScheduleSettings()
+    {
+        if (_scheduleSettings is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = _scheduleSettings.Get();
+            WeeklyScheduleEnabled = settings.WeeklyEnabled;
+            WeeklyScheduleDay = WeekdayOption.From(settings.WeeklyDay);
+            WeeklyScheduleTime = settings.WeeklyLocalTime.ToTimeSpan();
+            WeeklyScheduleStatus = DescribeWeeklySchedule(settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            WeeklyScheduleStatus = "读取自动周报设置失败。";
+        }
+    }
+
+    private async Task SaveWeeklyScheduleAsync()
+    {
+        if (_scheduleSettings is null || IsScheduleSaving)
+        {
+            return;
+        }
+
+        if (WeeklyScheduleTime is null)
+        {
+            WeeklyScheduleStatus = "请选择自动周报时间。";
+            return;
+        }
+
+        IsScheduleSaving = true;
+        try
+        {
+            var time = TimeOnly.FromTimeSpan(WeeklyScheduleTime.Value);
+            await _scheduleSettings.SaveWeeklyAsync(WeeklyScheduleEnabled, WeeklyScheduleDay.Day, time);
+            WeeklyScheduleStatus = DescribeWeeklySchedule(
+                new ReportScheduleSettings(
+                    TimeOnly.FromTimeSpan((ScheduleTime ?? TimeSpan.Zero)),
+                    ScheduleEnabled,
+                    WeeklyScheduleEnabled,
+                    WeeklyScheduleDay.Day,
+                    time));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException)
+        {
+            WeeklyScheduleStatus = "保存自动周报设置失败，请检查数据目录权限。";
+        }
+        finally
+        {
+            IsScheduleSaving = false;
+        }
+    }
+
+    private static string DescribeWeeklySchedule(ReportScheduleSettings settings) =>
+        settings.WeeklyEnabled
+            ? $"每周{WeekdayOption.From(settings.WeeklyDay).Label} {settings.WeeklyLocalTime.ToString("HH:mm", CultureInfo.InvariantCulture)} 生成上一周周报"
+            : "自动周报已关闭；仍可手动生成";
 
     /// <summary>
     /// Reads the standup block out of the persisted stats JSON. The model-facing schema uses
@@ -629,4 +878,41 @@ public sealed class ReportVersionItem
         ReportTriggerSource.VoiceCommand => "语音",
         _ => "其他"
     }}";
+}
+
+/// <summary>周报版本列表项：与日报版本项同构，便于两个视图保持一致的交互。</summary>
+public sealed class WeeklyVersionItem(WeeklyReport report)
+{
+    public WeeklyReport Report { get; } = report;
+
+    public string DisplayText { get; } = string.Create(
+        CultureInfo.InvariantCulture,
+        $"v{report.Version} · {report.WeekStart:MM-dd}~{report.WeekEnd:MM-dd} · {DescribeTrigger(report.TriggerSource)} · {report.GeneratedAtUtc.ToLocalTime():MM-dd HH:mm}");
+
+    private static string DescribeTrigger(ReportTriggerSource source) => source switch
+    {
+        ReportTriggerSource.Manual => "手动",
+        ReportTriggerSource.StartupCatchUp => "启动补偿",
+        ReportTriggerSource.ScheduledDaily => "定时",
+        ReportTriggerSource.ScheduledWeekly => "自动周报",
+        ReportTriggerSource.VoiceCommand => "语音",
+        _ => "其他"
+    };
+}
+
+/// <summary>星期选项：自动周报的"周几"下拉框。</summary>
+public sealed record WeekdayOption(DayOfWeek Day, string Label)
+{
+    public static readonly IReadOnlyList<WeekdayOption> All =
+    [
+        new(DayOfWeek.Monday, "一"),
+        new(DayOfWeek.Tuesday, "二"),
+        new(DayOfWeek.Wednesday, "三"),
+        new(DayOfWeek.Thursday, "四"),
+        new(DayOfWeek.Friday, "五"),
+        new(DayOfWeek.Saturday, "六"),
+        new(DayOfWeek.Sunday, "日")
+    ];
+
+    public static WeekdayOption From(DayOfWeek day) => All.First(option => option.Day == day);
 }

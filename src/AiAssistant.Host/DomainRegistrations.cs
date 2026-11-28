@@ -259,6 +259,8 @@ internal static class DomainRegistrations
             clock: clock));
 
         services.AddSingleton<IReportRepository, SqliteReportRepository>();
+        services.AddSingleton<IWeeklyReportRepository, SqliteWeeklyReportRepository>();
+        services.AddSingleton<WeeklyReportUseCase>();
         services.AddSingleton(new ReportGenerationOptions { DefaultTier = configuration.Policy.DefaultTier });
         services.AddSingleton<IReportGenerationRunner, ReportGenerationRunner>();
         var documentStyle = EmbeddingProfile.ResolveDocumentStyle(

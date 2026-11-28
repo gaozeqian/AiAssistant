@@ -4,10 +4,16 @@ namespace AiAssistant.Application.Ports;
 /// Automatic daily-report policy. The time is local wall-clock time; the worker always evaluates
 /// the previous local date so a midnight run has a complete day to summarize.
 /// </summary>
-public sealed record ReportScheduleSettings(TimeOnly DailyLocalTime, bool Enabled)
+public sealed record ReportScheduleSettings(
+    TimeOnly DailyLocalTime,
+    bool Enabled,
+    bool WeeklyEnabled = false,
+    DayOfWeek WeeklyDay = DayOfWeek.Sunday,
+    TimeOnly WeeklyLocalTime = default)
 {
-    /// <summary>Default: check the previous day at 00:30 local time.</summary>
-    public static readonly ReportScheduleSettings Default = new(new TimeOnly(0, 30), Enabled: true);
+    /// <summary>Default: daily check at 00:30; weekly check Sunday 18:00, disabled.</summary>
+    public static readonly ReportScheduleSettings Default =
+        new(new TimeOnly(0, 30), Enabled: true, WeeklyEnabled: false, DayOfWeek.Sunday, new TimeOnly(18, 0));
 }
 
 /// <summary>

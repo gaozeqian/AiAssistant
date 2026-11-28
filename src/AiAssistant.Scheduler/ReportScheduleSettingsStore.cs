@@ -44,7 +44,10 @@ public sealed class ReportScheduleSettingsStore : IReportScheduleSettingsStore
         ArgumentNullException.ThrowIfNull(settings);
         var document = new ReportScheduleDocument(
             settings.DailyLocalTime.ToString("HH:mm", CultureInfo.InvariantCulture),
-            settings.Enabled);
+            settings.Enabled,
+            settings.WeeklyEnabled,
+            settings.WeeklyDay.ToString(),
+            settings.WeeklyLocalTime.ToString("HH:mm", CultureInfo.InvariantCulture));
         var tempPath = $"{_filePath}.{Guid.NewGuid():N}.tmp";
         try
         {
@@ -102,7 +105,25 @@ public sealed class ReportScheduleSettingsStore : IReportScheduleSettingsStore
                 return false;
             }
 
-            settings = new ReportScheduleSettings(time, document.Enabled);
+            // 旧版本文件没有周报字段：缺失时按"关闭 + 周日 18:00"补齐，不覆盖已有值。
+            var weeklyTime = TimeOnly.TryParseExact(
+                document.WeeklyTime ?? DefaultWeeklyTime,
+                TimeFormats,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsedWeekly)
+                ? parsedWeekly
+                : TimeOnly.ParseExact(DefaultWeeklyTime, "HH:mm", CultureInfo.InvariantCulture);
+            var weeklyDay = Enum.TryParse<DayOfWeek>(document.WeeklyDay, ignoreCase: true, out var parsedDay)
+                ? parsedDay
+                : DayOfWeek.Sunday;
+
+            settings = new ReportScheduleSettings(
+                time,
+                document.Enabled,
+                document.WeeklyEnabled,
+                weeklyDay,
+                weeklyTime);
             return true;
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
@@ -125,8 +146,20 @@ public sealed class ReportScheduleSettingsStore : IReportScheduleSettingsStore
             Environment.GetEnvironmentVariable(EnvironmentNames.ReportDisableSchedule),
             "true",
             StringComparison.OrdinalIgnoreCase);
-        return new ReportScheduleSettings(time, !disabled);
+        return new ReportScheduleSettings(
+            time,
+            !disabled,
+            ReportScheduleSettings.Default.WeeklyEnabled,
+            ReportScheduleSettings.Default.WeeklyDay,
+            ReportScheduleSettings.Default.WeeklyLocalTime);
     }
 
-    private sealed record ReportScheduleDocument(string Time, bool Enabled);
+    private const string DefaultWeeklyTime = "18:00";
+
+    private sealed record ReportScheduleDocument(
+        string Time,
+        bool Enabled,
+        bool WeeklyEnabled = false,
+        string? WeeklyDay = null,
+        string? WeeklyTime = null);
 }

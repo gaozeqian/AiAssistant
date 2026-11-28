@@ -10,6 +10,15 @@ public sealed class ReportScheduleSettingsUseCase(IReportScheduleSettingsStore s
 {
     public ReportScheduleSettings Get() => store.Load();
 
+    /// <summary>Saves the daily schedule without dropping the weekly settings that share the file.</summary>
     public Task SaveAsync(TimeOnly dailyLocalTime, bool enabled, CancellationToken ct = default) =>
-        store.SaveAsync(new ReportScheduleSettings(dailyLocalTime, enabled), ct);
+        store.SaveAsync(
+            store.Load() with { DailyLocalTime = dailyLocalTime, Enabled = enabled },
+            ct);
+
+    /// <summary>Saves the weekly schedule without dropping the daily settings that share the file.</summary>
+    public Task SaveWeeklyAsync(bool enabled, DayOfWeek day, TimeOnly localTime, CancellationToken ct = default) =>
+        store.SaveAsync(
+            store.Load() with { WeeklyEnabled = enabled, WeeklyDay = day, WeeklyLocalTime = localTime },
+            ct);
 }

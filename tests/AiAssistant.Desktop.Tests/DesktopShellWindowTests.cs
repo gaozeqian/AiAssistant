@@ -42,7 +42,7 @@ public sealed partial class DesktopViewModelTests
         var tabs = window.GetVisualDescendants().OfType<TabItem>().ToArray();
         Assert.Equal(7, tabs.Length);
         Assert.Equal(
-            new[] { "时间线", "检索与问答", "日报", "隐私与控制", "语音", "数据与导出", "本地诊断" },
+            new[] { "时间线", "检索与问答", "日报/周报", "隐私与控制", "语音", "数据与导出", "本地诊断" },
             tabs.Select(tab => AutomationProperties.GetName(tab)).ToArray());
         Assert.All(tabs, tab =>
         {

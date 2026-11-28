@@ -7,33 +7,62 @@
              x:DataType="vm:ShellViewModel">
   <Grid DataContext="{Binding Reports}" x:DataType="vm:ReportsViewModel"
         ColumnDefinitions="360,*" Margin="0,12,0,0">
-    <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceLg}" Margin="0,0,12,0">
+    <Border Grid.Column="0" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}"
+            Padding="{DynamicResource SpaceLg}" Margin="0,0,12,0">
       <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
-        <TextBlock Text="日报与站会" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
-        <DatePicker Grid.Row="1" SelectedDate="{Binding SelectedDate}" Margin="0,14,0,10" Initialized="OnDatePickerInitialized"
-                    automation:AutomationProperties.Name="日报日期" />
-        <WrapPanel Grid.Row="2" Margin="0,0,0,12">
-          <Button Classes="primary" Content="生成日报" Command="{Binding GenerateCommand}" Margin="0,0,8,8"
-                  automation:AutomationProperties.Name="生成日报" />
-          <Button Classes="secondary" Content="强制重生成" Command="{Binding RegenerateCommand}" Margin="0,0,8,8"
-                  automation:AutomationProperties.Name="强制重新生成日报" />
-          <Button Classes="secondary" Content="刷新" Command="{Binding RefreshCommand}" Margin="0,0,8,8"
-                  automation:AutomationProperties.Name="刷新日报版本" />
+        <!-- 0. 共用标题 + 日报/周报分段开关：左右两栏都跟随这个开关。 -->
+        <StackPanel Spacing="{DynamicResource SpacingSm}">
+          <TextBlock Text="日报与周报" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" />
+          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
+            <Button Content="日报" Classes="segment" Classes.selected="{Binding ShowDailyView}"
+                    Command="{Binding ShowDailyCommand}"
+                    automation:AutomationProperties.Name="切换到日报" />
+            <Button Content="周报" Classes="segment" Classes.selected="{Binding IsWeeklyView}"
+                    Command="{Binding ShowWeeklyCommand}"
+                    automation:AutomationProperties.Name="切换到周报" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- 1. 日期：日报按当天，周报取所在周，共用同一个选择器。 -->
+        <StackPanel Grid.Row="1" Spacing="{DynamicResource SpacingXs}" Margin="0,12,0,0">
+          <TextBlock Text="报告日期（周报取所在周）" Classes="muted" />
+          <DatePicker SelectedDate="{Binding SelectedDate}" Initialized="OnDatePickerInitialized"
+                      automation:AutomationProperties.Name="报告日期" />
+        </StackPanel>
+
+        <!-- 2. 四种操作两边完全一致。 -->
+        <WrapPanel Grid.Row="2" Margin="0,12,0,0">
+          <Button Classes="primary" Content="生成" Command="{Binding ActiveGenerateCommand}"
+                  IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+                  automation:AutomationProperties.Name="生成报告" />
+          <Button Classes="secondary" Content="强制重生成" Command="{Binding ActiveRegenerateCommand}"
+                  IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+                  automation:AutomationProperties.Name="强制重新生成报告" />
+          <Button Classes="secondary" Content="刷新" Command="{Binding ActiveRefreshCommand}"
+                  IsEnabled="{Binding !IsBusy}" Margin="0,0,8,8"
+                  automation:AutomationProperties.Name="刷新报告版本" />
+          <Button Classes="secondary" Content="导出…" Command="{Binding ActiveExportCommand}"
+                  Margin="0,0,8,8"
+                  automation:AutomationProperties.Name="导出报告" />
         </WrapPanel>
-        <Border Grid.Row="3" Background="{DynamicResource SubtleCardBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}"
-                Margin="0,0,0,12" IsVisible="{Binding HasScheduleSettings}">
-          <StackPanel Spacing="{DynamicResource SpacingSm}">
+
+        <!-- 3. 自动生成：日报按天、周报按周，共用同一个设置文件。 -->
+        <Expander Grid.Row="3" IsExpanded="False" HorizontalAlignment="Stretch" Margin="0,0,0,12"
+                  IsVisible="{Binding ShowDailyView}">
+          <Expander.Header>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}">
+              <TextBlock Text="自动日报" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding ScheduleSummary}" FontSize="{DynamicResource FontSizeCaption}"
+                         Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Expander.Header>
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="0,8,0,0">
             <Grid ColumnDefinitions="*,Auto">
-              <StackPanel Spacing="2">
-                <TextBlock Text="自动日报" FontWeight="SemiBold" />
-                <TextBlock Text="检查前一天，有活动才生成" FontSize="{DynamicResource FontSizeCaption}"
-                           Foreground="{DynamicResource MutedBrush}" />
-              </StackPanel>
+              <TextBlock Text="启用自动日报" VerticalAlignment="Center" />
               <ToggleSwitch Grid.Column="1" IsChecked="{Binding ScheduleEnabled, Mode=TwoWay}"
                             OnContent="开" OffContent="关" VerticalAlignment="Center"
                             automation:AutomationProperties.Name="启用自动日报" />
             </Grid>
-            <!-- 标签在上：360px 卡片里横排会把 TimePicker 挤成「0 : 30」。 -->
             <StackPanel Spacing="{DynamicResource SpacingXs}">
               <TextBlock Text="每天" Classes="muted" />
               <TimePicker SelectedTime="{Binding ScheduleTime, Mode=TwoWay}"
@@ -51,61 +80,111 @@
                       automation:AutomationProperties.Name="保存自动日报设置" />
             </Grid>
           </StackPanel>
-        </Border>
+        </Expander>
+
+        <Expander Grid.Row="3" IsExpanded="False" HorizontalAlignment="Stretch" Margin="0,0,0,12"
+                  IsVisible="{Binding IsWeeklyView}">
+          <Expander.Header>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}">
+              <TextBlock Text="自动周报" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding WeeklyScheduleSummary}" FontSize="{DynamicResource FontSizeCaption}"
+                         Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Expander.Header>
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="0,8,0,0">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="启用自动周报" VerticalAlignment="Center" />
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding WeeklyScheduleEnabled, Mode=TwoWay}"
+                            OnContent="开" OffContent="关" VerticalAlignment="Center"
+                            automation:AutomationProperties.Name="启用自动周报" />
+            </Grid>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource SpacingSm}">
+              <TextBlock Text="每周" Classes="muted" VerticalAlignment="Center" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding WeekdayOptions}"
+                        SelectedItem="{Binding WeeklyScheduleDay, Mode=TwoWay}"
+                        HorizontalAlignment="Stretch"
+                        automation:AutomationProperties.Name="自动周报星期">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:WeekdayOption">
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </Grid>
+            <StackPanel Spacing="{DynamicResource SpacingXs}">
+              <TextBlock Text="时间" Classes="muted" />
+              <TimePicker SelectedTime="{Binding WeeklyScheduleTime, Mode=TwoWay}"
+                          ClockIdentifier="24HourClock" MinuteIncrement="1" HorizontalAlignment="Stretch"
+                          automation:AutomationProperties.Name="自动周报时间" />
+            </StackPanel>
+            <TextBlock Text="到点后自动生成「上一周」的周报并保存为版本；无活动记录时不生成。"
+                       FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{Binding WeeklyScheduleStatus}" FontSize="{DynamicResource FontSizeCaption}"
+                         Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                         VerticalAlignment="Center" Margin="0,0,8,0" />
+              <Button Grid.Column="1" Classes="secondary" Content="保存"
+                      Command="{Binding SaveWeeklyScheduleCommand}" IsEnabled="{Binding !IsScheduleSaving}"
+                      automation:AutomationProperties.Name="保存自动周报设置" />
+            </Grid>
+          </StackPanel>
+        </Expander>
+
+        <!-- 4. 版本列表：日报版本 / 周报版本，同一个位置、同一种交互。 -->
         <Grid Grid.Row="4">
-          <ListBox ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}"
-                   Background="Transparent" BorderThickness="0">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:ReportVersionItem">
-                <TextBlock Text="{Binding DisplayText}" Padding="6,8" />
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
+          <Grid IsVisible="{Binding ShowDailyView}">
+            <ListBox ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}"
+                     Background="Transparent" BorderThickness="0">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ReportVersionItem">
+                  <TextBlock Text="{Binding DisplayText}" Padding="6,8" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Text="这一天还没有日报。点击「生成」创建第一版。"
+                       Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16"
+                       IsVisible="{Binding !HasVersions}" />
+          </Grid>
+          <Grid IsVisible="{Binding IsWeeklyView}">
+            <ListBox ItemsSource="{Binding WeeklyVersions}" SelectedItem="{Binding SelectedWeeklyVersion}"
+                     Background="Transparent" BorderThickness="0">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:WeeklyVersionItem">
+                  <TextBlock Text="{Binding DisplayText}" Padding="6,8" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Text="这一周还没有周报。点击「生成」创建第一版。"
+                       Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16"
+                       IsVisible="{Binding !HasWeeklyVersions}" />
+          </Grid>
           <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" VerticalAlignment="Top" IsVisible="{Binding IsBusy}" />
-          <TextBlock Text="这一天还没有日报。点击「生成日报」创建第一版。"
-                     Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
-                     HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16"
-                     IsVisible="{Binding !HasVersions}" />
         </Grid>
+
+        <!-- 5. 状态 -->
         <StackPanel Grid.Row="5" Spacing="{DynamicResource SpacingXs}" Margin="0,12,0,0">
-          <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+          <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                     IsVisible="{Binding ShowDailyView}" />
+          <TextBlock Text="{Binding WeeklyStatus}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                     IsVisible="{Binding IsWeeklyView}" />
+          <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
+                     IsVisible="{Binding HasError}" />
         </StackPanel>
       </Grid>
     </Border>
 
-    <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}" Padding="{DynamicResource SpaceXl}">
+    <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource RadiusMd}"
+            Padding="{DynamicResource SpaceXl}">
       <Grid RowDefinitions="Auto,*">
-        <!-- 头部：标题 + 日报/周报分段开关 + 对应导出动作 -->
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingMd}" VerticalAlignment="Center">
-            <TextBlock Text="{Binding ContentTitle}" FontSize="{DynamicResource FontSizePage}" FontWeight="SemiBold" />
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}" VerticalAlignment="Center">
-              <Button Content="日报" Classes="segment" Classes.selected="{Binding ShowDailyView}"
-                      Command="{Binding ShowDailyCommand}"
-                      automation:AutomationProperties.Name="查看日报" />
-              <Button Content="周报" Classes="segment" Classes.selected="{Binding IsWeeklyView}"
-                      Command="{Binding ShowWeeklyCommand}"
-                      automation:AutomationProperties.Name="查看周报" />
-            </StackPanel>
-          </StackPanel>
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}">
-            <Button Classes="secondary" Content="导出…" IsVisible="{Binding ShowDailyView}"
-                    Command="{Binding ExportCommand}" IsEnabled="{Binding HasReport}"
-                    automation:AutomationProperties.Name="导出日报" />
-            <Button Classes="primary" Content="生成周报" IsVisible="{Binding IsWeeklyView}"
-                    Command="{Binding WeeklyReportCommand}"
-                    automation:AutomationProperties.Name="生成周报" />
-            <Button Classes="secondary" Content="导出周报…" IsVisible="{Binding IsWeeklyView}"
-                    Command="{Binding ExportWeeklyCommand}"
-                    automation:AutomationProperties.Name="导出周报" />
-          </StackPanel>
-          <TextBlock Grid.Row="1" Text="{Binding VersionText}" Foreground="{DynamicResource MutedBrush}"
-                     Margin="0,4,0,0" IsVisible="{Binding ShowDailyView}" />
-          <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding WeeklyStatus}"
-                     Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0"
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding ContentTitle}" FontSize="{DynamicResource FontSizePage}" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding VersionText}" Foreground="{DynamicResource MutedBrush}"
+                     IsVisible="{Binding ShowDailyView}" />
+          <TextBlock Text="{Binding WeeklyVersionText}" Foreground="{DynamicResource MutedBrush}"
                      IsVisible="{Binding IsWeeklyView}" />
-        </Grid>
+        </StackPanel>
 
         <!-- 日报正文 -->
         <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="0,12,0,0" IsVisible="{Binding ShowDailyView}">
@@ -129,7 +208,7 @@
           </Grid>
         </Grid>
 
-        <!-- 周报正文：柱状统计 + 区间报告（原检索页的「周报与统计」） -->
+        <!-- 周报正文：柱状统计 + 区间报告 -->
         <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="0,12,0,0" IsVisible="{Binding IsWeeklyView}">
           <ItemsControl ItemsSource="{Binding WeeklyBars}">
             <ItemsControl.ItemTemplate>
@@ -137,7 +216,8 @@
                 <Grid ColumnDefinitions="56,*,90" Margin="0,2">
                   <TextBlock Text="{Binding DateText}" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center" />
                   <Border Grid.Column="1" Height="14" Background="{DynamicResource AccentBrush}"
-                          CornerRadius="{DynamicResource RadiusXs}" HorizontalAlignment="Left" Width="{Binding BarWidthPixels}" />
+                          CornerRadius="{DynamicResource RadiusXs}" HorizontalAlignment="Left"
+                          VerticalAlignment="Center" Width="{Binding BarWidthPixels}" />
                   <TextBlock Grid.Column="2" Text="{Binding CountText}" FontSize="{DynamicResource FontSizeBody}"
                              Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Right" />
                 </Grid>
@@ -147,7 +227,7 @@
           <Grid Grid.Row="1" Margin="0,12,0,0">
             <md:MarkdownScrollViewer Markdown="{Binding WeeklyMarkdown}"
                                      MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left" />
-            <TextBlock Text="还没有周报。点击右上角「生成周报」，按选中日期所在周统计。"
+            <TextBlock Text="还没有周报。先在左侧选择日期并点击「生成」。"
                        Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
                        IsVisible="{Binding !HasWeeklyMarkdown}" />

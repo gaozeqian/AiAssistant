@@ -378,8 +378,13 @@ public sealed partial class DesktopViewModelTests
         await shell.InitializeAsync();
         shell.SelectedSectionIndex = ShellSection.Reports;
 
+        // 自动日报现在是可折叠块：先展开，模板才会实例化内部控件。
+        await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Expander>().Any(item => item.IsVisible));
+        window.GetVisualDescendants().OfType<Expander>().First(item => item.IsVisible).IsExpanded = true;
         await WaitUntilAsync(() => window.GetVisualDescendants().OfType<TimePicker>().Any());
-        var picker = window.GetVisualDescendants().OfType<TimePicker>().Single();
+        // 自动日报与自动周报各有一个 TimePicker：按无障碍名称取日报那个。
+        var picker = window.GetVisualDescendants().OfType<TimePicker>()
+            .Single(item => AutomationProperties.GetName(item) == "自动日报检查时间");
         Assert.Equal(TimeSpan.FromMinutes(30), picker.SelectedTime);
 
         var toggle = window.GetVisualDescendants().OfType<ToggleSwitch>()
