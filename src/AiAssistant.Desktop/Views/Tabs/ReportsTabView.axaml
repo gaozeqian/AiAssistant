@@ -63,12 +63,12 @@
                             OnContent="开" OffContent="关" VerticalAlignment="Center"
                             automation:AutomationProperties.Name="启用自动日报" />
             </Grid>
-            <StackPanel Spacing="{DynamicResource SpacingXs}">
-              <TextBlock Text="每天" Classes="muted" />
-              <TimePicker SelectedTime="{Binding ScheduleTime, Mode=TwoWay}"
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource SpacingSm}">
+              <TextBlock Text="每天" Classes="muted" VerticalAlignment="Center" />
+              <TimePicker Grid.Column="1" SelectedTime="{Binding ScheduleTime, Mode=TwoWay}"
                           ClockIdentifier="24HourClock" MinuteIncrement="1" HorizontalAlignment="Stretch"
                           automation:AutomationProperties.Name="自动日报检查时间" />
-            </StackPanel>
+            </Grid>
             <TextBlock Text="启动时也会检查前一天。无日报且有活动记录时生成；已有日报但之后有新活动时自动追加新版本。"
                        FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
             <Grid ColumnDefinitions="*,Auto">
@@ -111,12 +111,12 @@
                 </ComboBox.ItemTemplate>
               </ComboBox>
             </Grid>
-            <StackPanel Spacing="{DynamicResource SpacingXs}">
-              <TextBlock Text="时间" Classes="muted" />
-              <TimePicker SelectedTime="{Binding WeeklyScheduleTime, Mode=TwoWay}"
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource SpacingSm}">
+              <TextBlock Text="时间" Classes="muted" VerticalAlignment="Center" />
+              <TimePicker Grid.Column="1" SelectedTime="{Binding WeeklyScheduleTime, Mode=TwoWay}"
                           ClockIdentifier="24HourClock" MinuteIncrement="1" HorizontalAlignment="Stretch"
                           automation:AutomationProperties.Name="自动周报时间" />
-            </StackPanel>
+            </Grid>
             <TextBlock Text="到点后自动生成「上一周」的周报并保存为版本；无活动记录时不生成。"
                        FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
             <Grid ColumnDefinitions="*,Auto">
