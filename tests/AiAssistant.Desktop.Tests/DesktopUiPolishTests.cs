@@ -29,7 +29,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 2; // 隐私与控制：有 primary 按钮
+        shell.SelectedSectionIndex = ShellSection.Capture; // 隐私与控制：有 primary 按钮
         await WaitUntilAsync(() => PrimaryButton(window) is not null);
 
         var button = PrimaryButton(window);
@@ -115,7 +115,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 1;
+        shell.SelectedSectionIndex = ShellSection.Search;
         await WaitUntilAsync(() => AnswerBlock(window, search.Answer) is not null);
 
         var answer = AnswerBlock(window, search.Answer);
@@ -206,7 +206,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 4;
+        shell.SelectedSectionIndex = ShellSection.Data;
         await WaitUntilAsync(() => DangerButton(window) is not null);
 
         var button = DangerButton(window);
@@ -250,7 +250,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 1;
+        shell.SelectedSectionIndex = ShellSection.Search;
         await WaitUntilAsync(() => EmptyEvidenceHint(window) is not null);
 
         var hint = EmptyEvidenceHint(window);

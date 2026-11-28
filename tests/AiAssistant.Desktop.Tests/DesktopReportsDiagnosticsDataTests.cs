@@ -191,7 +191,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 5;
+        shell.SelectedSectionIndex = ShellSection.Diagnostics;
         // 前往语音 is available on every OS; 去授权 is hidden on Linux where no deep link exists.
         await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
             .Any(button => button.IsVisible && button.Content?.ToString() == "前往语音"));
@@ -231,7 +231,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 5;
+        shell.SelectedSectionIndex = ShellSection.Diagnostics;
         await WaitUntilAsync(() => HasButton(window, "重新检查"));
 
         var refresh = ButtonByText(window, "重新检查");
@@ -376,7 +376,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 6;
+        shell.SelectedSectionIndex = ShellSection.Reports;
 
         await WaitUntilAsync(() => window.GetVisualDescendants().OfType<TimePicker>().Any());
         var picker = window.GetVisualDescendants().OfType<TimePicker>().Single();
@@ -403,7 +403,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 4;
+        shell.SelectedSectionIndex = ShellSection.Data;
 
         await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
             .Any(button => AutomationProperties.GetName(button) == "导出加密备份"));
@@ -438,7 +438,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 4;
+        shell.SelectedSectionIndex = ShellSection.Data;
 
         await WaitUntilAsync(() => window.GetVisualDescendants().OfType<NumericUpDown>().Count() == 3);
         foreach (var number in window.GetVisualDescendants().OfType<NumericUpDown>())
@@ -483,7 +483,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 4;
+        shell.SelectedSectionIndex = ShellSection.Data;
 
         await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
             .Any(button => AutomationProperties.GetName(button) == "导出加密备份"));
@@ -533,7 +533,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 4;
+        shell.SelectedSectionIndex = ShellSection.Data;
 
         await WaitUntilAsync(() => HasButton(window, "导出加密备份…"));
         await data.BackupCommand.ExecuteAsync(null);
@@ -577,15 +577,16 @@ public sealed partial class DesktopViewModelTests
 
         // Indeterminate bars freeze once their tab content is detached and re-attached, and they
         // look different from the determinate pulse used by 日报/检索; every panel must match.
+        // 顺序必须与 MainWindow 的 TabItem 顺序一致（见 ShellSection）。
         Type[] tabViews =
         [
             typeof(Views.Tabs.TimelineTabView),
             typeof(Views.Tabs.SearchTabView),
+            typeof(Views.Tabs.ReportsTabView),
             typeof(Views.Tabs.PrivacyCaptureTabView),
             typeof(Views.Tabs.VoiceTabView),
             typeof(Views.Tabs.DataExportTabView),
-            typeof(Views.Tabs.DiagnosticsTabView),
-            typeof(Views.Tabs.ReportsTabView)
+            typeof(Views.Tabs.DiagnosticsTabView)
         ];
 
         var names = new List<string>();
@@ -626,7 +627,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 4;
+        shell.SelectedSectionIndex = ShellSection.Data;
 
         await WaitUntilAsync(() => HasButton(window, "导出加密备份…"));
         Click(window, "导出加密备份…");
@@ -665,7 +666,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 4;
+        shell.SelectedSectionIndex = ShellSection.Data;
 
         await WaitUntilAsync(() => HasButton(window, "从备份恢复…"));
         Click(window, "从备份恢复…");
@@ -839,7 +840,7 @@ public sealed partial class DesktopViewModelTests
         window.Show();
         await shell.InitializeAsync();
 
-        shell.SelectedSectionIndex = 4; // 数据与导出
+        shell.SelectedSectionIndex = ShellSection.Data; // 数据与导出
         await WaitUntilAsync(() => HasButton(window, "删除该日数据"));
         Click(window, "删除该日数据");
         await WaitUntilAsync(() => data.HasPending);

@@ -203,27 +203,27 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     public void ShowTimeline()
     {
-        SelectedSectionIndex = 0;
+        SelectedSectionIndex = ShellSection.Timeline;
     }
 
     public void ShowSearch()
     {
-        SelectedSectionIndex = 1;
+        SelectedSectionIndex = ShellSection.Search;
     }
 
     public void ShowVoice()
     {
-        SelectedSectionIndex = 3;
+        SelectedSectionIndex = ShellSection.Voice;
     }
 
     public void ShowDiagnostics()
     {
-        SelectedSectionIndex = 5;
+        SelectedSectionIndex = ShellSection.Diagnostics;
     }
 
     public void ShowReports()
     {
-        SelectedSectionIndex = 6;
+        SelectedSectionIndex = ShellSection.Reports;
     }
 
     private void SelectSection(string? value)
@@ -239,10 +239,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     {
         switch (SelectedSectionIndex)
         {
-            case 5:
+            case ShellSection.Diagnostics:
                 await Diagnostics.RefreshCommand.ExecuteAsync(null);
                 break;
-            case 6:
+            case ShellSection.Reports:
                 await Reports.RefreshCommand.ExecuteAsync(null);
                 break;
             default:
@@ -297,7 +297,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     private void OnEvidenceNavigationRequested(object? sender, EvidenceNavigationRequest request)
     {
-        SelectedSectionIndex = 0;
+        SelectedSectionIndex = ShellSection.Timeline;
         _ = NavigateTimelineAsync(request);
     }
 

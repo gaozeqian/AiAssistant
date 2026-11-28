@@ -235,7 +235,7 @@ public sealed partial class DesktopViewModelTests
 
         Assert.Equal("正在本机采集", shell.CaptureStatus);
 
-        shell.SelectedSectionIndex = 2; // 隐私与控制
+        shell.SelectedSectionIndex = ShellSection.Capture; // 隐私与控制
         await WaitUntilAsync(() => HasButton(window, "暂停采集"));
         Click(window, "暂停采集");
         await WaitUntilAsync(() => shell.Capture.IsPaused);
@@ -269,7 +269,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 3;
+        shell.SelectedSectionIndex = ShellSection.Voice;
 
         await WaitUntilAsync(() => window.GetVisualDescendants().OfType<Button>()
             .Any(button => AutomationProperties.GetName(button) == "重听命令音频"));
@@ -310,7 +310,7 @@ public sealed partial class DesktopViewModelTests
         var window = new MainWindow { DataContext = shell };
         window.Show();
         await shell.InitializeAsync();
-        shell.SelectedSectionIndex = 3;
+        shell.SelectedSectionIndex = ShellSection.Voice;
 
         await WaitUntilAsync(() => window.GetVisualDescendants().OfType<VoiceTabView>().Any());
         var tab = window.GetVisualDescendants().OfType<VoiceTabView>().Single();
@@ -343,7 +343,7 @@ public sealed partial class DesktopViewModelTests
         window.Show();
         await shell.InitializeAsync();
 
-        shell.SelectedSectionIndex = 3; // 语音
+        shell.SelectedSectionIndex = ShellSection.Voice; // 语音
         await WaitUntilAsync(() => window.GetVisualDescendants().OfType<ToggleSwitch>()
             .Any(ts => AutomationProperties.GetName(ts) == "启用语音"));
 

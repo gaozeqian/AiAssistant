@@ -231,7 +231,7 @@ public sealed partial class DesktopViewModelTests
             voiceNavigation: null,
             search: search);
 
-        shell.SelectedSectionIndex = 1;
+        shell.SelectedSectionIndex = ShellSection.Search;
         search.Evidence[0].NavigateCommand.Execute(null);
 
         await WaitUntilAsync(() => timeline.SelectedEvent?.Event.Id == "cited");

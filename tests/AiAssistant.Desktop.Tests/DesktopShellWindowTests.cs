@@ -42,7 +42,7 @@ public sealed partial class DesktopViewModelTests
         var tabs = window.GetVisualDescendants().OfType<TabItem>().ToArray();
         Assert.Equal(7, tabs.Length);
         Assert.Equal(
-            new[] { "时间线", "检索与问答", "隐私与控制", "语音", "数据与导出", "本地诊断", "日报" },
+            new[] { "时间线", "检索与问答", "日报", "隐私与控制", "语音", "数据与导出", "本地诊断" },
             tabs.Select(tab => AutomationProperties.GetName(tab)).ToArray());
         Assert.All(tabs, tab =>
         {
@@ -67,17 +67,17 @@ public sealed partial class DesktopViewModelTests
         Assert.Contains("搜索应用、标题或正文", Names(window));
         Assert.Contains("刷新时间线", Names(window));
 
-        shell.SelectedSectionIndex = 1;
+        shell.SelectedSectionIndex = ShellSection.Search;
         await WaitUntilAsync(() => Names(window).Contains("基于证据提问"));
         Assert.Contains("检索关键词或问题", Names(window));
         Assert.Contains("检索证据", Names(window));
         Assert.Contains("基于证据提问", Names(window));
 
-        shell.SelectedSectionIndex = 3;
+        shell.SelectedSectionIndex = ShellSection.Voice;
         await WaitUntilAsync(() => Names(window).Contains("记录命令音频"));
         Assert.Contains("记录命令音频", Names(window));
 
-        shell.SelectedSectionIndex = 5;
+        shell.SelectedSectionIndex = ShellSection.Diagnostics;
         await WaitUntilAsync(() => Names(window).Contains("重新检查平台能力"));
         Assert.Contains("重新检查平台能力", Names(window));
         window.Close();

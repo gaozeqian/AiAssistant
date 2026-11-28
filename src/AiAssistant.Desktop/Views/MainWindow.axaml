@@ -64,26 +64,27 @@
 
     <TabControl Grid.Row="1" Margin="20" SelectedIndex="{Binding SelectedSectionIndex}" Background="Transparent"
                 automation:AutomationProperties.Name="主导航">
+      <!-- 按使用频率排序：日常（时间线/检索/日报）→ 设置（采集/语音/数据）→ 一次性（诊断）。 -->
       <TabItem Header="时间线" automation:AutomationProperties.Name="时间线" automation:AutomationProperties.AcceleratorKey="Ctrl+1">
         <tabs:TimelineTabView />
       </TabItem>
       <TabItem Header="检索与问答" automation:AutomationProperties.Name="检索与问答" automation:AutomationProperties.AcceleratorKey="Ctrl+2">
         <tabs:SearchTabView />
       </TabItem>
-      <TabItem Header="隐私与控制" automation:AutomationProperties.Name="隐私与控制" automation:AutomationProperties.AcceleratorKey="Ctrl+3">
+      <TabItem Header="日报" automation:AutomationProperties.Name="日报" automation:AutomationProperties.AcceleratorKey="Ctrl+3">
+        <tabs:ReportsTabView />
+      </TabItem>
+      <TabItem Header="隐私与控制" automation:AutomationProperties.Name="隐私与控制" automation:AutomationProperties.AcceleratorKey="Ctrl+4">
         <tabs:PrivacyCaptureTabView />
       </TabItem>
-      <TabItem Header="语音" automation:AutomationProperties.Name="语音" automation:AutomationProperties.AcceleratorKey="Ctrl+4">
+      <TabItem Header="语音" automation:AutomationProperties.Name="语音" automation:AutomationProperties.AcceleratorKey="Ctrl+5">
         <tabs:VoiceTabView />
       </TabItem>
-      <TabItem Header="数据与导出" automation:AutomationProperties.Name="数据与导出" automation:AutomationProperties.AcceleratorKey="Ctrl+5">
+      <TabItem Header="数据与导出" automation:AutomationProperties.Name="数据与导出" automation:AutomationProperties.AcceleratorKey="Ctrl+6">
         <tabs:DataExportTabView />
       </TabItem>
-      <TabItem Header="本地诊断" automation:AutomationProperties.Name="本地诊断" automation:AutomationProperties.AcceleratorKey="Ctrl+6">
+      <TabItem Header="本地诊断" automation:AutomationProperties.Name="本地诊断" automation:AutomationProperties.AcceleratorKey="Ctrl+7">
         <tabs:DiagnosticsTabView />
-      </TabItem>
-      <TabItem Header="日报" automation:AutomationProperties.Name="日报" automation:AutomationProperties.AcceleratorKey="Ctrl+7">
-        <tabs:ReportsTabView />
       </TabItem>
     </TabControl>
   </Grid>
