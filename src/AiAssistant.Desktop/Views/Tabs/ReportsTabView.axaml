@@ -204,7 +204,8 @@
           </Border>
           <Grid Grid.Row="1">
             <!-- 阅读区限宽：1709px 下 Markdown 会铺满整屏。MarkdownScrollViewer 自己滚，外面不再套一层。 -->
-            <md:MarkdownScrollViewer Markdown="{Binding Markdown}"
+            <!-- 切换版本时不沿用上一次的滚动位置，正文始终从顶部开始。 -->
+            <md:MarkdownScrollViewer Markdown="{Binding Markdown}" SaveScrollValueWhenContentUpdated="False"
                                      MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left" />
             <TextBlock Text="还没有可显示的日报正文。先在左侧选择日期并生成。"
                        Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" TextAlignment="Center"
@@ -232,7 +233,7 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
           <Grid Grid.Row="1" Margin="0,12,0,0">
-            <md:MarkdownScrollViewer Markdown="{Binding WeeklyMarkdown}"
+            <md:MarkdownScrollViewer Markdown="{Binding WeeklyMarkdown}" SaveScrollValueWhenContentUpdated="False"
                                      MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left" />
             <TextBlock Text="还没有周报。先在左侧选择日期并点击「生成」。"
                        Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" TextAlignment="Center"
