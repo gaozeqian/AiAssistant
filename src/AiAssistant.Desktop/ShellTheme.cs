@@ -21,7 +21,8 @@ public static class ShellTheme
         application.Resources.ThemeDictionaries[ThemeVariant.Light] = BuildThemeDictionary(isDark: false);
         application.Resources.ThemeDictionaries[ThemeVariant.Dark] = BuildThemeDictionary(isDark: true);
         // 令牌与主题无关，放在应用级资源里，XAML 通过 {DynamicResource FontSizeBody} 等引用。
-        DesignTokens.AddTo(application.Resources);
+        // 系统开启"减少动效"时时长令牌归零，Transition/Animation 立即完成。
+        DesignTokens.AddTo(application.Resources, ReducedMotion.IsEnabled());
     }
 
     /// <summary>

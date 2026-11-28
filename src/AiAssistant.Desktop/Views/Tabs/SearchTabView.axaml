@@ -40,7 +40,7 @@
         <StackPanel Grid.Row="4" Spacing="{DynamicResource SpacingXs}" Margin="0,8,0,0">
           <TextBlock Text="{Binding StatusMessage}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding ErrorMessage}" FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap"
-                     IsVisible="{Binding HasError}" />
+                     IsVisible="{Binding HasError}" Classes.appear="{Binding HasError}" />
         </StackPanel>
         <!-- 回答可能很长：必须自己滚动，否则最小窗口下会被卡片硬切。 -->
         <ScrollViewer Grid.Row="5" Margin="0,14,0,0" VerticalScrollBarVisibility="Auto"

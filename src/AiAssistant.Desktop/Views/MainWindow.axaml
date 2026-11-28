@@ -16,6 +16,10 @@
     <StyleInclude Source="avares://AiAssistant.Desktop/Styles/ShellStyles.axaml" />
   </Window.Styles>
 
+  <!--
+    Ctrl+D1..D7 与无障碍播报的 Ctrl+1..7 是同一个物理按键（Avalonia 的 KeyGesture 只接受 D1..D9
+    写法）；播报用用户习惯的写法，绑定用框架能解析的写法。
+  -->
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+D1" Command="{Binding SelectSectionCommand}" CommandParameter="0" />
     <KeyBinding Gesture="Ctrl+D2" Command="{Binding SelectSectionCommand}" CommandParameter="1" />

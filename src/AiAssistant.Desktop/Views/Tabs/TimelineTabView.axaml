@@ -27,7 +27,8 @@
         <DockPanel Grid.Row="3" Margin="0,14,0,0" LastChildFill="True">
           <!-- 错误贴近操作区：放在卡片最底部时，实测会被状态行挤出可视区。 -->
           <Border DockPanel.Dock="Top" Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}"
-                  Padding="10,8" Margin="0,0,0,8" IsVisible="{Binding HasError}">
+                  Padding="10,8" Margin="0,0,0,8" IsVisible="{Binding HasError}"
+                  Classes.appear="{Binding HasError}">
             <TextBlock Text="{Binding ErrorMessage}" FontSize="{DynamicResource FontSizeBody}"
                        Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
           </Border>
@@ -37,10 +38,11 @@
                   automation:AutomationProperties.Name="加载更早的活动记录" />
           <Grid>
             <ListBox ItemsSource="{Binding Events}" SelectedItem="{Binding SelectedEvent}"
-                     Background="Transparent" BorderThickness="0">
+                     Background="Transparent" BorderThickness="0"
+                     Classes.appear="{Binding !IsLoading}">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:TimelineEventItem">
-                  <Border Padding="10,9" CornerRadius="{DynamicResource RadiusSm}" Margin="0,2">
+                  <Border Padding="10,8" CornerRadius="{DynamicResource RadiusSm}" Margin="0,2">
                     <Grid ColumnDefinitions="62,*" RowDefinitions="Auto,Auto,Auto">
                       <TextBlock Grid.RowSpan="3" Text="{Binding TimeText}" FontFamily="Cascadia Mono,Consolas,monospace" FontSize="{DynamicResource FontSizeBody}"
                                  Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Top" Margin="0,2,8,0" />
@@ -54,9 +56,12 @@
                 </DataTemplate>
               </ListBox.ItemTemplate>
             </ListBox>
-            <TextBlock Text="暂无可显示的活动" Foreground="{DynamicResource MutedBrush}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       IsVisible="{Binding !HasEvents}" />
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="{DynamicResource SpacingXs}"
+                        IsVisible="{Binding !HasEvents}">
+              <TextBlock Text="这一天还没有活动" Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Center" />
+              <TextBlock Text="确认「正在本机采集」已开启，或换一个日期" FontSize="{DynamicResource FontSizeCaption}"
+                         Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Center" />
+            </StackPanel>
             <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" VerticalAlignment="Top" IsVisible="{Binding IsLoading}" />
             <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" VerticalAlignment="Bottom" IsVisible="{Binding IsLoadingMore}" />
           </Grid>
@@ -110,9 +115,14 @@
               <TextBlock Text="此事件没有关联媒体。" Foreground="{DynamicResource MutedBrush}" IsVisible="{Binding HasNoMedia}" />
             </StackPanel>
 
-            <StackPanel IsVisible="{Binding !HasSelectedEvent}" HorizontalAlignment="Center" Margin="0,100,0,0" Spacing="{DynamicResource SpacingSm}">
+            <StackPanel IsVisible="{Binding ShowSelectionHint}" HorizontalAlignment="Center" Margin="0,100,0,0" Spacing="{DynamicResource SpacingSm}">
               <TextBlock Text="选择左侧事件开始回看" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" HorizontalAlignment="Center" />
               <TextBlock Text="媒体只在选中时解密，明文不会写入临时文件" Foreground="{DynamicResource MutedBrush}" />
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding !HasEvents}" HorizontalAlignment="Center" Margin="0,100,0,0" Spacing="{DynamicResource SpacingSm}">
+              <TextBlock Text="这一天还没有活动" FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" HorizontalAlignment="Center" />
+              <TextBlock Text="换个日期，或在「隐私与控制」确认采集已开启" Foreground="{DynamicResource MutedBrush}" />
             </StackPanel>
           </StackPanel>
         </ScrollViewer>

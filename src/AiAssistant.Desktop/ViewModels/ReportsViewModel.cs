@@ -118,8 +118,17 @@ public sealed class ReportsViewModel : ObservableObject, IDisposable
     public string Markdown
     {
         get => _markdown;
-        private set => SetProperty(ref _markdown, value);
+        private set
+        {
+            if (SetProperty(ref _markdown, value))
+            {
+                OnPropertyChanged(nameof(HasMarkdown));
+            }
+        }
     }
+
+    /// <summary>True when the body has text; the empty-state overlay keys off the body, not the selection.</summary>
+    public bool HasMarkdown => !string.IsNullOrEmpty(Markdown);
 
     public string StandupText
     {

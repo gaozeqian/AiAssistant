@@ -43,7 +43,11 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
         LoadMoreCommand = new AsyncRelayCommand(LoadEarlierAsync);
         // 空态只跟"有没有数据"走：没有这条通知，界面会在有 120 条记录、只是没选中时
         // 依然显示「暂无可显示的活动」并压在列表上。
-        Events.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasEvents));
+        Events.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasEvents));
+            OnPropertyChanged(nameof(ShowSelectionHint));
+        };
     }
 
     public ObservableCollection<TimelineDateItem> ActiveDates { get; } = [];
@@ -93,6 +97,7 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _selectedEvent, value))
             {
                 OnPropertyChanged(nameof(HasSelectedEvent));
+                OnPropertyChanged(nameof(ShowSelectionHint));
                 OnPropertyChanged(nameof(HasNoMedia));
                 _ = LoadPreviewSafelyAsync(value);
             }
@@ -190,6 +195,12 @@ public sealed class TimelineViewModel : ObservableObject, IDisposable
 
     /// <summary>True when the current date actually has rows; drives the list's empty state.</summary>
     public bool HasEvents => Events.Count > 0;
+
+    /// <summary>
+    /// True only when there is something to select but nothing selected. When the day is empty the
+    /// detail pane must not tell the user to "select an event on the left".
+    /// </summary>
+    public bool ShowSelectionHint => HasEvents && SelectedEvent is null;
 
     public bool HasNoMedia => SelectedEvent is { HasMedia: false };
 

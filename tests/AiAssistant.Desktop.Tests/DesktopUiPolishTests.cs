@@ -40,12 +40,13 @@ public sealed partial class DesktopViewModelTests
         ((IPseudoClasses)button.Classes).Set(":pointerover", true);
         Dispatcher.UIThread.RunJobs();
         // 关键回归：悬停必须仍是 accent 色，而不是 Fluent 的 10% 黑白叠加。
-        Assert.Equal(Color.Parse("#0A6CBF"), SolidColor(presenter.Background));
+        // 背景有 120ms BrushTransition，等它收敛到目标色。
+        await WaitUntilAsync(() => SolidColor(presenter.Background) == Color.Parse("#0A6CBF"));
 
         ((IPseudoClasses)button.Classes).Set(":pointerover", false);
         ((IPseudoClasses)button.Classes).Set(":pressed", true);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(Color.Parse("#095A9E"), SolidColor(presenter.Background));
+        await WaitUntilAsync(() => SolidColor(presenter.Background) == Color.Parse("#095A9E"));
 
         ((IPseudoClasses)button.Classes).Set(":pressed", false);
         Dispatcher.UIThread.RunJobs();
@@ -60,14 +61,17 @@ public sealed partial class DesktopViewModelTests
         window.Show();
         await shell.InitializeAsync();
 
-        var empty = window.GetVisualDescendants().OfType<TextBlock>()
-            .Single(block => block.Text == "暂无可显示的活动");
-        Assert.True(empty.IsVisible);
+        // 左侧列表与右侧详情各有一份同名空态，取列表里那一份（祖辈是 DockPanel）。
+        var emptyText = window.GetVisualDescendants().OfType<TextBlock>()
+            .First(block => block.Text == "这一天还没有活动"
+                && block.GetVisualAncestors().OfType<DockPanel>().Any());
+        var emptyPanel = emptyText.GetVisualAncestors().OfType<StackPanel>().First();
+        Assert.True(emptyPanel.IsVisible);
 
         var timestamp = ((IClock)new SystemClock()).Now();
         shell.Timeline.Events.Add(new TimelineEventItem(CreateEvent("only-row", timestamp)));
-        await WaitUntilAsync(() => !empty.IsVisible);
-        Assert.False(empty.IsVisible);
+        await WaitUntilAsync(() => !emptyPanel.IsVisible);
+        Assert.False(emptyPanel.IsVisible);
         window.Close();
     });
 
@@ -172,6 +176,16 @@ public sealed partial class DesktopViewModelTests
     });
 
     [Fact]
+    public void DesignTokens_ReducedMotionZeroesDurations()
+    {
+        var resources = new ResourceDictionary();
+        DesignTokens.AddTo(resources, reducedMotion: true);
+        Assert.Equal(TimeSpan.Zero, resources["DurationFast"]);
+        Assert.Equal(TimeSpan.Zero, resources["DurationBase"]);
+        Assert.Equal(TimeSpan.Zero, resources["DurationSlow"]);
+    }
+
+    [Fact]
     public Task AccentTextBrush_MeetsAaOnCardBackground() => RunInHeadlessSession(() =>
     {
         foreach (var variant in new[] { ThemeVariant.Dark, ThemeVariant.Light })
@@ -202,7 +216,7 @@ public sealed partial class DesktopViewModelTests
         Dispatcher.UIThread.RunJobs();
 
         var expected = Resolve<ISolidColorBrush>("DangerBackgroundBrush", ThemeVariant.Light).Color;
-        Assert.Equal(expected, SolidColor(presenter.Background));
+        await WaitUntilAsync(() => SolidColor(presenter.Background) == expected);
         ((IPseudoClasses)button.Classes).Set(":pointerover", false);
         Dispatcher.UIThread.RunJobs();
         window.Close();
@@ -292,5 +306,5 @@ public sealed partial class DesktopViewModelTests
             .FirstOrDefault(block => block.Text == answer && block.IsEffectivelyVisible);
 
     private static Color SolidColor(IBrush? brush) =>
-        Assert.IsType<SolidColorBrush>(brush).Color;
+        Assert.IsAssignableFrom<ISolidColorBrush>(brush).Color;
 }

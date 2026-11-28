@@ -66,7 +66,7 @@ public abstract class TabViewBase : UserControl
             button.Content = new TextBlock
             {
                 Text = text,
-                FontSize = 13,
+                FontSize = DesignTokens.FontSize.Label,
                 Foreground = button.Foreground,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
                 VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center

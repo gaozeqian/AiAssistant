@@ -16,7 +16,8 @@
                 automation:AutomationProperties.Name="重新检查平台能力" />
       </Grid>
       <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPulse}" IsVisible="{Binding IsLoading}" />
-      <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}" IsVisible="{Binding HasError}">
+      <Border Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="{DynamicResource RadiusSm}" Padding="{DynamicResource SpaceMd}"
+              IsVisible="{Binding HasError}" Classes.appear="{Binding HasError}">
         <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerForegroundBrush}" TextWrapping="Wrap" />
       </Border>
       <Grid ColumnDefinitions="*,*,*">

@@ -93,12 +93,14 @@
         </Border>
         <Grid Grid.Row="2">
           <ScrollViewer>
-            <md:MarkdownScrollViewer Markdown="{Binding Markdown}" />
+            <!-- 阅读区限宽：1709px 下 Markdown 会铺满整屏。字号沿用库的 FluentTheme 样式。 -->
+            <md:MarkdownScrollViewer Markdown="{Binding Markdown}"
+                                     MaxWidth="{DynamicResource ReadingMaxWidth}" HorizontalAlignment="Left" />
           </ScrollViewer>
           <TextBlock Text="还没有可显示的日报正文。先在左侧选择日期并生成。"
                      Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
                      HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
-                     IsVisible="{Binding !HasReport}" />
+                     IsVisible="{Binding !HasMarkdown}" />
         </Grid>
       </Grid>
     </Border>

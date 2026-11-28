@@ -51,6 +51,9 @@ public static class DesignTokens
         public const double Lg = 14;
     }
 
+    /// <summary>Maximum width of long-form reading panes (event detail, report body).</summary>
+    public const double ReadingMaxWidth = 920;
+
     /// <summary>Motion durations; zeroed when the OS asks for reduced motion.</summary>
     public static class Motion
     {
@@ -60,7 +63,9 @@ public static class DesignTokens
     }
 
     /// <summary>Registers every token as an application resource. Called once from <see cref="ShellTheme.Apply"/>.</summary>
-    public static void AddTo(IResourceDictionary resources)
+    /// <param name="resources">Target dictionary (the application's resource dictionary).</param>
+    /// <param name="reducedMotion">When true every motion duration becomes zero.</param>
+    public static void AddTo(IResourceDictionary resources, bool reducedMotion = false)
     {
         ArgumentNullException.ThrowIfNull(resources);
 
@@ -91,8 +96,10 @@ public static class DesignTokens
         resources["RadiusMd"] = new CornerRadius(Radius.Md);
         resources["RadiusLg"] = new CornerRadius(Radius.Lg);
 
-        resources["DurationFast"] = TimeSpan.FromMilliseconds(Motion.FastMs);
-        resources["DurationBase"] = TimeSpan.FromMilliseconds(Motion.BaseMs);
-        resources["DurationSlow"] = TimeSpan.FromMilliseconds(Motion.SlowMs);
+        resources["ReadingMaxWidth"] = ReadingMaxWidth;
+
+        resources["DurationFast"] = TimeSpan.FromMilliseconds(reducedMotion ? 0 : Motion.FastMs);
+        resources["DurationBase"] = TimeSpan.FromMilliseconds(reducedMotion ? 0 : Motion.BaseMs);
+        resources["DurationSlow"] = TimeSpan.FromMilliseconds(reducedMotion ? 0 : Motion.SlowMs);
     }
 }

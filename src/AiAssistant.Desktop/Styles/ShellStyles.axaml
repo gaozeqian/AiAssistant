@@ -164,6 +164,38 @@
   <Style Selector="ListBoxItem">
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
+  <!--
+    动效只加在两处不会与 Avalonia 的 TabControl detach / IsVisible 语义打架的地方：
+    1) hover 背景色过渡：给模板里的 ContentPresenter 挂 BrushTransition，状态切换由样式改同一个属性；
+    2) 一次性入场：用 .appear 类触发 Style.Animations，类由绑定在状态变化时加上。
+    时长走 DurationFast/Base 令牌，系统"减少动效"时归零。
+  -->
+  <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="{DynamicResource DurationFast}" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="ListBoxItem /template/ ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="{DynamicResource DurationFast}" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Control.appear">
+    <Style.Animations>
+      <Animation Duration="{DynamicResource DurationBase}" FillMode="Forward">
+        <KeyFrame Cue="0%">
+          <Setter Property="Opacity" Value="0" />
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="Opacity" Value="1" />
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
   <!-- 弱化说明文字：颜色 + 换行，不强制字号（正文/说明各自用 FontSize 令牌）。 -->
   <Style Selector="TextBlock.muted">
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
